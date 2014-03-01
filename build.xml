@@ -43,6 +43,7 @@
 
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
+<envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -731,6 +732,12 @@ CLEANING
     <arg line="-c 'rm -rf src/frontend/org/voltdb/catalog/*.java'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/DBBPool.java'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/.flagfile'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf *.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
@@ -922,7 +929,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, project_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -2202,6 +2209,37 @@ DEPLOYMENT FILE SCHEMA CODE GENERATION
         <arg line="-c 'rm -rfv ${deployment.parsergen.dir}'" />
     </exec>
 </target>
+
+<!--
+***************************************
+DBBPool.java preprocessing
+***************************************
+-->
+
+<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate">
+    <delete file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+    <exec dir='${src.gpl.dir}/org/voltcore/utils'
+          executable='gcc'
+          failonerror='true'>
+          <arg value='-E'/>
+          <arg value='-xc' />
+          <arg value='-Wp,-P' />
+          <arg value='-traditional-cpp' />
+          <arg value='-D${jmemcheck}' />
+          <arg value='-o' />
+          <arg value='DBBPool.java' />
+          <arg value='DBBPool.java.template' />
+    </exec>
+    <touch file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+</target>
+
+<target name="dbbpool_gen_check" depends="">
+    <uptodate property="dbbpool_gen_uptodate"
+              targetfile="${src.gpl.dir}/org/voltcore/utils/.flagfile">
+        <srcfiles file="${src.gpl.dir}/org/voltcore/utils/DBBPool.java.template" />
+    </uptodate>
+</target>
+
 
 <!--
 ***********************

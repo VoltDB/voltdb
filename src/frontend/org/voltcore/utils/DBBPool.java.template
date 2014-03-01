@@ -41,14 +41,13 @@ import sun.nio.ch.DirectBuffer;
 public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
-
-    private static final boolean ASSERTIONS_ON;
-
+    private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
+#ifndef NO_MEMCHECK
+    
     static {
-        boolean assertionsOn = false;
-        assert(assertionsOn = true);
-        ASSERTIONS_ON = assertionsOn;
+        HOST.info("Strict java memory checking is enabled");
     }
+#endif
 
     /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
@@ -64,15 +63,15 @@ public final class DBBPool {
          * The buffer
          */
         final private ByteBuffer b;
+#ifndef NO_MEMCHECK
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
+#endif
 
         public BBContainer(ByteBuffer b) {
-            if (ASSERTIONS_ON) {
-                m_allocationThrowable = new Throwable(Thread.currentThread().getName());
-            } else {
-                m_allocationThrowable = null;
-            }
+#ifndef NO_MEMCHECK
+            m_allocationThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+#endif
             this.b = b;
         }
 
@@ -101,35 +100,44 @@ public final class DBBPool {
         }
 
         protected void checkUseAfterFree() {
-            if (ASSERTIONS_ON) {
-                if (m_freeThrowable != null) {
-                    System.err.println("Use after free in DBBPool");
-                    System.err.println("Free was by:");
-                    m_freeThrowable.printStackTrace();
-                    System.err.println("Use was by:");
-                    new Throwable(Thread.currentThread().getName()).printStackTrace();
-                    System.exit(-1);
-                }
+#ifndef NO_MEMCHECK
+            if (m_freeThrowable != null) {
+                System.err.println("Use after free in DBBPool");
+                System.err.println("Free was by:");
+                m_freeThrowable.printStackTrace();
+                System.err.println("Use was by:");
+                Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+                t.printStackTrace();
+                HOST.fatal("Use after free in DBBPool");
+                HOST.fatal("Free was by:", m_freeThrowable);
+                HOST.fatal("Use was by:", t);
+                System.exit(-1);
             }
+#endif
         }
 
         protected ByteBuffer checkDoubleFree() {
-            if (ASSERTIONS_ON) {
-                synchronized (this) {
-                    if (m_freeThrowable != null) {
-                        System.err.println("Double free in DBBPool");
-                        System.err.println("Original free was by:");
-                        m_freeThrowable.printStackTrace();
-                        System.err.println("Current free was by:");
-                        new Throwable(Thread.currentThread().getName()).printStackTrace();
-                        System.exit(-1);
-                    }
-                    m_freeThrowable = new Throwable(Thread.currentThread().getName());
+#ifndef NO_MEMCHECK
+            synchronized (this) {
+                if (m_freeThrowable != null) {
+                    System.err.println("Double free in DBBPool");
+                    System.err.println("Original free was by:");
+                    m_freeThrowable.printStackTrace();
+                    System.err.println("Current free was by:");
+                    Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+                    t.printStackTrace();
+                    HOST.fatal("Double free in DBBPool");
+                    HOST.fatal("Original free was by:", m_freeThrowable);
+                    HOST.fatal("Current free was by:", t);
+                    System.exit(-1);
                 }
+                m_freeThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
             }
+#endif
             return b;
         }
 
+#ifndef NO_MEMCHECK
         @Override
         public void finalize() {
             if (m_freeThrowable == null) {
@@ -138,6 +146,7 @@ public final class DBBPool {
                 System.exit(-1);
             }
         }
+#endif
     }
 
     /**
@@ -397,10 +406,10 @@ public final class DBBPool {
             }
         }
     }
-
-
+#ifdef MEMCHECK_FULL
 
     private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+#endif
 
     /*
      * Delete a char array that was allocated on the native heap
@@ -410,12 +419,17 @@ public final class DBBPool {
      * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
     private static void deleteCharArrayMemory(long pointer) {
-        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
+#ifdef MEMCHECK_FULL
+        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis())) != null) {
             m_deletedStuff.get(pointer).printStackTrace();
-            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis()).printStackTrace();
+            HOST.fatal("Original:", m_deletedStuff.get(point);
+            HOST.fatal("Second:", t);
             System.exit(-1);
         }
-//        nativeDeleteCharArrayMemory(pointer);
+#else
+        nativeDeleteCharArrayMemory(pointer);
+#endif
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);

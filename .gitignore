@@ -49,3 +49,5 @@ doc/tutorials/auction/csvloader_*.csv
 /*.sublime-workspace
 /testobjects/
 /.tags
+src/frontend/org/voltcore/utils/DBBPool.java
+src/frontend/org/voltcore/utils/.flagfile
