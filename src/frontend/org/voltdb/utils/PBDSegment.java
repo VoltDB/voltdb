@@ -156,6 +156,7 @@ class PBDSegment {
     }
 
     void sync() throws IOException {
+        if (m_closed) throw new IOException("closed");
         if (!m_syncedSinceLastEdit) {
             m_buf.b().force();
         }
@@ -163,10 +164,12 @@ class PBDSegment {
     }
 
     boolean hasMoreEntries() throws IOException {
+        if (m_closed) throw new IOException("closed");
         return m_objectReadIndex < m_buf.b().getInt(COUNT_OFFSET);
     }
 
     boolean offer(BBContainer cont, boolean compress) throws IOException {
+        if (m_closed) throw new IOException("closed");
         final ByteBuffer buf = cont.b();
         final int remaining = buf.remaining();
         if (remaining < 32 || !buf.isDirect()) compress = false;
@@ -205,6 +208,7 @@ class PBDSegment {
     }
 
     BBContainer poll(OutputContainerFactory factory) throws IOException {
+        if (m_closed) throw new IOException("closed");
         final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
             final ByteBuffer mbuf = m_buf.b();
@@ -279,6 +283,7 @@ class PBDSegment {
      * although incredibly unlikely
      */
     int sizeInBytes() {
+        if (m_closed) throw new RuntimeException("closed");
         return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
     }
 }
