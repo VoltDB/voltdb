@@ -40,6 +40,7 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -282,7 +283,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             final long fadviseStart = fadvisedBytes;
                             //-1 because we don't want to drop the last page because
                             //we might modify it while appending
-                            fadvisedBytes = ((positionAtSync / 4096) - 1) * 4096;
+                            fadvisedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
                             final long retval = PosixAdvise.fadvise(
                                     m_fos.getFD(),
                                     fadviseStart,

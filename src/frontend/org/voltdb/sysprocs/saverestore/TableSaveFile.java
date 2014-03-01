@@ -40,6 +40,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
@@ -568,12 +569,12 @@ public class TableSaveFile
                         if (retval != 0) {
                             log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
                         }
-                        long length = position - 4096 - positionAtLastFAdvise;
+                        long length = position - Bits.pageSize() - positionAtLastFAdvise;
                         if (length > 0) {
                             retval = PosixAdvise.fadvise(
                                     m_fd,
                                     positionAtLastFAdvise,
-                                    position - 4096 - positionAtLastFAdvise,
+                                    position - Bits.pageSize() - positionAtLastFAdvise,
                                     PosixAdvise.POSIX_FADV_DONTNEED);
                         }
                         if (retval != 0) {
