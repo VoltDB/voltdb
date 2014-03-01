@@ -409,6 +409,7 @@ public final class DBBPool {
 #ifdef MEMCHECK_FULL
 
     private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+    private static NonBlockingHashMap<Long, Throwable> m_allocatedStuff = new NonBlockingHashMap<Long, Throwable>();
 #endif
 
     /*
@@ -420,10 +421,28 @@ public final class DBBPool {
      */
     private static void deleteCharArrayMemory(long pointer) {
 #ifdef MEMCHECK_FULL
+        if (!m_allocatedStuff.containsKey(pointer)) {
+            Long closest = Long.MAX_VALUE;
+            for (Long l : m_allocatedStuff.keySet()) {
+                long delta = pointer - l;
+                if (delta < 0) continue;
+                if (delta < pointer - closest) closest = l;
+            }
+            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted a pointer that was never allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis());
+            t.printStackTrace();
+            if (!closest.equals(Long.MAX_VALUE)) {
+                System.err.println("Closest known allocation is:");
+                m_allocatedStuff.get(closest).printStackTrace();
+            }
+            HOST.fatal("Deleted address that was never allocated", t);
+            if (!closest.equals(Long.MAX_VALUE)) HOST.fatal("Closest known allocation was:", m_allocatedStuff.get(closest));
+            System.exit(-1);
+        }
+        m_allocatedStuff.remove(pointer);
         if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis())) != null) {
             m_deletedStuff.get(pointer).printStackTrace();
-            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis()).printStackTrace();
-            HOST.fatal("Original:", m_deletedStuff.get(point);
+            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis());
+            HOST.fatal("Original:", m_deletedStuff.get(pointer));
             HOST.fatal("Second:", t);
             System.exit(-1);
         }
@@ -435,7 +454,12 @@ public final class DBBPool {
     private static native void nativeDeleteCharArrayMemory(long pointer);
 
     public static BBContainer allocateUnsafeByteBuffer(long size) {
-        return DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
+        final BBContainer retcont = DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
+#ifdef MEMCHECK_FULL
+        final long pointer = retcont.address();
+        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+#endif
+        return retcont;
     }
 
     /*
