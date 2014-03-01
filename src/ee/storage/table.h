@@ -394,10 +394,10 @@ protected:
         if (m_tuplesPinnedByUndo != 0) {
             return false;
         }
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < m_compactionThreshold;
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t m_compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {
@@ -449,6 +449,7 @@ protected:
   private:
     int32_t m_refcount;
     ThreadLocalPool m_tlPool;
+    double m_compactionThreshold;
 };
 
 }
