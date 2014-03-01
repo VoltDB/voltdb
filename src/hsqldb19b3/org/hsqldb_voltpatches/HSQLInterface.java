@@ -245,7 +245,7 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
-        if ((tableCount + rowCount) > 0) {
+        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0)) {
             assert rowCount == 1;
             assert tableCount + valueCount == 1;
             return true;

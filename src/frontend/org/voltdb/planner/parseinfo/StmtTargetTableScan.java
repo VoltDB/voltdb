@@ -19,20 +19,27 @@ package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * StmtTableScan caches data related to a given instance of a table within the statement scope
  */
 public class StmtTargetTableScan extends StmtTableScan {
     // Catalog table
-    private Table m_table = null;
+    private final Table m_table;
     private Collection<Index> m_indexes;
+    private List<Column> m_columns;
+    // Store a unique list of the columns actually used by this table instance.
+    protected Map<String, SchemaColumn> m_scanColumns = new HashMap<String, SchemaColumn>();
 
     public StmtTargetTableScan(Table table, String tableAlias) {
         super(tableAlias);
@@ -80,16 +87,10 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve) {
-        tve.resolveForDB(db);
-        return tve;
-    }
-
-    @Override
     public Collection<Index> getIndexes() {
         if (m_indexes == null) {
             m_indexes = new ArrayList<Index>();
-            for(Index index : m_table.getIndexes()) {
+            for (Index index : m_table.getIndexes()) {
                 m_indexes.add(index);
             }
         }
@@ -97,8 +98,25 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public String getColumnName(int m_columnIndex) {
-        // TODO Auto-generated method stub
-        return null;
+    public String getColumnName(int columnIndex) {
+        if (m_columns == null) {
+            m_columns = CatalogUtil.getSortedCatalogItems(m_table.getColumns(), "index");
+        }
+        return m_columns.get(columnIndex).getTypeName();
+    }
+
+    @Override
+    public void resolveTVE(TupleValueExpression expr, String columnName) {
+        expr.resolveForTable(m_table);
+        if (m_scanColumns.get(columnName) == null) {
+            SchemaColumn scol = new SchemaColumn(m_table.getTypeName(), m_tableAlias,
+                    columnName, columnName, (TupleValueExpression) expr.clone());
+            m_scanColumns.put(columnName, scol);
+        }
+    }
+
+    @Override
+    public Collection<SchemaColumn> getScanColumns() {
+        return m_scanColumns.values();
     }
 }

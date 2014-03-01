@@ -193,11 +193,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 <<<<<<< HEAD
+<<<<<<< HEAD
         if ( ! node->isSubQuery()) {
             // Input table is the target table in this case
             m_engine->setLastAccessedTable(input_table);
         }
         ProgressMonitorProxy pmp(m_engine, target_table);
+=======
+        ProgressMonitorProxy pmp(m_engine, node->isSubQuery() ? target_table : (Table*)NULL);
+>>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
 =======
         ProgressMonitorProxy pmp(m_engine, this, target_table);
@@ -207,7 +211,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());
-            m_engine->noteTuplesProcessedForProgressMonitoring(1);
             pmp.countdownProgress();
             //
             // For each tuple we need to evaluate it against our predicate

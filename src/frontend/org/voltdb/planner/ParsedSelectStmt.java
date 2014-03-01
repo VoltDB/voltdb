@@ -286,10 +286,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Handle joined query case case.
         // MV partitioned table without partition column can only join with replicated tables.
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
-        for (StmtTableScan mvTableScan: stmtCache) {
+        for (StmtTableScan mvTableScan: tableAliasMap.values()) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
 
-            Set<SchemaColumn> columns = mvTableScan.getScanColumns();
+            Collection<SchemaColumn> columns = mvTableScan.getScanColumns();
             // For a COUNT(*)-only scan, a table may have no scan columns.
             // For a joined query without processed columns from table TB, TB has no scan columns
             if (columns != null) {

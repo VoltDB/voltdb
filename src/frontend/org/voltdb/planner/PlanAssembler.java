@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,11 +39,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -69,6 +72,7 @@ import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
@@ -211,7 +215,7 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
-        m_partitioning.analyzeTablePartitioning(parsedStmt.stmtCache);
+        m_partitioning.analyzeTablePartitioning(parsedStmt.tableAliasMap.values());
 
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
@@ -223,6 +227,16 @@ public class PlanAssembler {
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
+            // Simplify the outer join if possible
+            if (m_parsedSelect.joinTree instanceof BranchNode) {
+                // The execution engine expects to see the outer table on the left side only
+                // which means that RIGHT joins need to be converted to the LEFT ones
+                ((BranchNode)m_parsedSelect.joinTree).toLeftJoin();
+
+                // End of the recursion. Nothing to simplify
+                simplifyOuterJoin((BranchNode)m_parsedSelect.joinTree);
+            }
+
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
@@ -279,7 +293,7 @@ public class PlanAssembler {
             // per-join-order basis, and so, so must this analysis.
             HashMap<AbstractExpression, Set<AbstractExpression>>
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
-            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableAliasMap.values(), valueEquivalence);
         }
         subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
@@ -688,9 +702,7 @@ public class PlanAssembler {
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
-                HashSet<String> tablesRead = new HashSet<String>();
-                root.getTablesReadByFragment(tablesRead);
-                if (! subAssembler.hasReplicatedResult(root)) {
+                if ( ! root.hasReplicatedResult()) {
                     throw new PlanningErrorException(
                             "This special case join between an outer replicated table and " +
                             "an inner partitioned table is too complex and is not supported.");
@@ -1081,7 +1093,13 @@ public class PlanAssembler {
         }
 
         insertNode.setMultiPartition(true);
+<<<<<<< HEAD
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
+=======
+        // The following is the moral equivalent of addSendReceivePair
+        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
+
+>>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
         // add a count or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
@@ -1277,8 +1295,7 @@ public class PlanAssembler {
                 }
                 // if this is a fancy expression-based index...
                 else {
-                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
-                    StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
+                    StmtTableScan tableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
                     try {
                         indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
@@ -1765,6 +1782,14 @@ public class PlanAssembler {
         Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
         if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
+<<<<<<< HEAD
+=======
+            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+
+            String fromTableAlias = groupBys.get(0).expression.baseTableAlias();
+            assert(fromTableAlias != null);
+            StmtTableScan fromTableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
+>>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
 
             for (Index index : allIndexes) {
                 if ( ! IndexType.isScannable(index.getType())) {
@@ -1809,9 +1834,12 @@ public class PlanAssembler {
                 } else {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
+<<<<<<< HEAD
                     int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
                     StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
 
+=======
+>>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
                     try {
                         indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
@@ -2152,4 +2180,95 @@ public class PlanAssembler {
         }
     }
 
+    /**
+     * Outer join simplification using null rejection.
+     * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.43.2531
+     * Outerjoin Simplification and Reordering for Query Optimization
+     * by Cesar A. Galindo-Legaria , Arnon Rosenthal
+     * Algorithm:
+     * Traverse the join tree top-down:
+     *  For each join node n1 do:
+     *    For each expression expr (join and where) at the node n1
+     *      For each join node n2 descended from n1 do:
+     *          If expr rejects nulls introduced by n2 inner table,
+     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
+     *          for n2 inner and outer tables
+     */
+    private static void simplifyOuterJoin(BranchNode joinTree) {
+        assert(joinTree != null);
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        JoinNode leftNode = joinTree.getLeftNode();
+        JoinNode rightNode = joinTree.getRightNode();
+        // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
+        if (leftNode.getWhereExpression() != null) {
+            exprs.add(leftNode.getWhereExpression());
+        }
+        if (rightNode.getWhereExpression() != null) {
+            exprs.add(rightNode.getWhereExpression());
+        }
+        simplifyOuterJoinRecursively(joinTree, exprs);
+    }
+
+    private static void simplifyOuterJoinRecursively(BranchNode joinNode, List<AbstractExpression> exprs) {
+        assert (joinNode != null);
+        JoinNode leftNode = joinNode.getLeftNode();
+        JoinNode rightNode = joinNode.getRightNode();
+        if (joinNode.getJoinType() == JoinType.LEFT) {
+            for (AbstractExpression expr : exprs) {
+                // Get all the tables underneath this node and
+                // see if the expression is NULL-rejecting for any of them
+                Collection<String> tableAliases = rightNode.generateTableJoinOrder();
+                boolean rejectNull = false;
+                for (String tableAlias : tableAliases) {
+                    if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                        // We are done at this level
+                        joinNode.setJoinType(JoinType.INNER);
+                        rejectNull = true;
+                        break;
+                    }
+                }
+                if (rejectNull) {
+                    break;
+                }
+            }
+        } else {
+            assert(joinNode.getJoinType() == JoinType.INNER);
+        }
+
+        // Now add this node expression to the list and descend
+        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
+        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
+        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
+        if (leftNode.getJoinExpression() != null) {
+            newExprs.add(leftNode.getJoinExpression());
+        }
+        if (rightNode.getJoinExpression() != null) {
+            newExprs.add(rightNode.getJoinExpression());
+        }
+
+        if (leftNode.getWhereExpression() != null) {
+            exprs.add(leftNode.getWhereExpression());
+        }
+        if (rightNode.getWhereExpression() != null) {
+            exprs.add(rightNode.getWhereExpression());
+        }
+
+        if (joinNode.getJoinType() == JoinType.INNER) {
+            exprs.addAll(newExprs);
+            if (leftNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
+            }
+            if (rightNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
+            }
+        } else {
+            if (rightNode instanceof BranchNode) {
+                newExprs.addAll(exprs);
+                simplifyOuterJoinRecursively((BranchNode)rightNode, newExprs);
+            }
+            if (leftNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
+            }
+        }
+    }
 }

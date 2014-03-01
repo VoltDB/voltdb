@@ -216,13 +216,10 @@ public class TestSubQueries   extends PlannerTestCase {
     }
 
 
-    public void testWhereSubquery() {
-        {
-          AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
-          pn = pn.getChild(0);
-        }
-
-    }
+//    public void testWhereSubquery() {
+//        AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
+//        pn = pn.getChild(0);
+//    }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();

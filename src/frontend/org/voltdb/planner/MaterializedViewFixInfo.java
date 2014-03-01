@@ -36,6 +36,7 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -359,20 +360,16 @@ public class MaterializedViewFixInfo {
 
     private void collectReAggNodePostExpressions(JoinNode joinTree,
             List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
-        if (joinTree.getNodeType() == JoinNode.NodeType.JOIN) {
-            collectReAggNodePostExpressions(joinTree.getLeftNode(), needReAggTVEs, aggPostExprs);
-            collectReAggNodePostExpressions(joinTree.getRightNode(), needReAggTVEs, aggPostExprs);
-        } else if (joinTree.getNodeType() == JoinNode.NodeType.LEAF ||
-                joinTree.getNodeType() == JoinNode.NodeType.SUBQUERY){
-            joinTree.setJoinExpression(
-                    processFilters(joinTree.getJoinExpression(), needReAggTVEs, aggPostExprs));
-
-            // For outer join filters. Inner join or single table query will have whereExpr be null.
-            joinTree.setWhereExpression(
-                    processFilters(joinTree.getWhereExpression(), needReAggTVEs, aggPostExprs));
-        } else {
-            assert(false);
+        if (joinTree instanceof BranchNode) {
+            collectReAggNodePostExpressions(((BranchNode)joinTree).getLeftNode(), needReAggTVEs, aggPostExprs);
+            collectReAggNodePostExpressions(((BranchNode)joinTree).getRightNode(), needReAggTVEs, aggPostExprs);
+            return;
         }
+        joinTree.setJoinExpression(processFilters(joinTree.getJoinExpression(),
+                                                  needReAggTVEs, aggPostExprs));
+        // For outer join filters. Inner join or single table query will have whereExpr be null.
+        joinTree.setWhereExpression(processFilters(joinTree.getWhereExpression(),
+                                    needReAggTVEs, aggPostExprs));
     }
 
 

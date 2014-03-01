@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.VoltType;
@@ -313,7 +312,7 @@ public class PartitioningForStatement implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(List<StmtTableScan> tableScanList,
+    public int analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
@@ -321,7 +320,7 @@ public class PartitioningForStatement implements Cloneable{
         int unfilteredPartitionKeyCount = 0;
 
         // Iterate over the tables to collect partition columns.
-        for (StmtTableScan tableScan : tableScanList) {
+        for (StmtTableScan tableScan : collection) {
             // Replicated tables don't need filter coverage.
             if (tableScan.getIsReplicated()) {
                 continue;
@@ -385,13 +384,13 @@ public class PartitioningForStatement implements Cloneable{
      * @param tableCacheList
      * @throws PlanningErrorException
      */
-    void analyzeTablePartitioning(List<StmtTableScan> tableScanList)
+    void analyzeTablePartitioning(Collection<StmtTableScan> collection)
             throws PlanningErrorException
     {
         m_countOfPartitionedTables = 0;
         // Do we have a need for a distributed scan at all?
         // Iterate over the tables to collect partition columns.
-        for (StmtTableScan tableScan : tableScanList) {
+        for (StmtTableScan tableScan : collection) {
             if ( ! tableScan.getIsReplicated()) {
                 ++m_countOfPartitionedTables;
             }

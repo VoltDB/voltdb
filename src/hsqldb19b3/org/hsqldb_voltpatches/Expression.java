@@ -1796,8 +1796,13 @@ public class Expression {
         case OpTypes.TABLE_SUBQUERY:
         case OpTypes.ROW:
         case OpTypes.TABLE:
+<<<<<<< HEAD
             throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                     "VoltDB does not support subqueries, consider using views or multiple statements instead");
+=======
+        case OpTypes.EXISTS:
+            throw new HSQLParseException("Unsupported subquery syntax within an expression. Consider using a join or multiple statements instead");
+>>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 
@@ -1809,8 +1814,6 @@ public class Expression {
 
         case OpTypes.IN:
             opAsString = "the IN operator. Consider using an OR expression"; break; // not yet supported
-        case OpTypes.EXISTS:
-            opAsString = "subqueries"; break; // not yet supported ExpressionLogical for subqueries
 
         case OpTypes.OVERLAPS:
         case OpTypes.UNIQUE:

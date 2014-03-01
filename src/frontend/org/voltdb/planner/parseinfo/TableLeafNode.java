@@ -17,11 +17,16 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.types.JoinType;
+import org.voltdb.expressions.ExpressionUtil;
 
 public class TableLeafNode extends JoinNode {
-
+    private StmtTargetTableScan m_tableScan;
     /**
      * Construct a table leaf node
      * @param id - node unique id
@@ -30,12 +35,12 @@ public class TableLeafNode extends JoinNode {
      * @param whereExpr - filter expression
      * @param id - node id
      */
-    public TableLeafNode(int id, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-        super(id, JoinType.INNER, NodeType.LEAF);
-        m_tableAliasIndex = tableAliasIdx;
+    public TableLeafNode(int id, AbstractExpression joinExpr, AbstractExpression whereExpr,
+            StmtTargetTableScan tableScan) {
+        super(id);
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
-        assert(m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
+        m_tableScan = tableScan;
     }
 
     /**
@@ -47,20 +52,43 @@ public class TableLeafNode extends JoinNode {
                 (AbstractExpression) m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new TableLeafNode(m_id, m_tableAliasIndex, joinExpr, whereExpr);
+        JoinNode newNode = new TableLeafNode(m_id, joinExpr, whereExpr, m_tableScan);
         return newNode;
     }
 
     @Override
     public JoinNode cloneWithoutFilters() {
-        JoinNode newNode = new TableLeafNode(m_id, m_tableAliasIndex, null, null);
+        JoinNode newNode = new TableLeafNode(m_id, null, null, m_tableScan);
         return newNode;
     }
 
     @Override
-    public int getTableAliasIndex() {
-        assert (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-        return m_tableAliasIndex;
+    public StmtTableScan getTableScan() { return m_tableScan; }
+
+    @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
+
+    @Override
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
+        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
     }
 
+    @Override
+    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
+            Set<AbstractExpression>> equivalenceSet,
+            ArrayDeque<JoinNode> joinNodes)
+    {
+        if ( ! m_whereInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
+                                                      equivalenceSet);
+        }
+        // HSQL sometimes tags single-table filters in inner joins as join clauses
+        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+        // conditions that determine partitioning, so process them as where clauses.
+        if ( ! m_joinInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
+                                                      equivalenceSet);
+        }
+    }
 }

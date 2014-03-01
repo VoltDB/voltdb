@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
@@ -35,6 +36,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -74,11 +76,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        assert(m_targetTableAlias != null);
-        tablesRead.add(m_targetTableAlias);
+        if (m_tableScan != null && m_tableScan instanceof StmtTargetTableScan) {
+            tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+        }
     }
 
     @Override
@@ -124,7 +127,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @param name
      */
     public void setTargetTableName(String name) {
-        assert(name != null);
+        assert(m_isSubQuery || name != null);
         m_targetTableName = name;
     }
 
@@ -149,8 +152,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         setSubQuery(tableScan instanceof StmtSubqueryScan);
         setTargetTableAlias(tableScan.getTableAlias());
         setTargetTableName(tableScan.getTableName());
-        Set<SchemaColumn> scanColumns = tableScan.getScanColumns();
-        if (scanColumns != null && scanColumns.isEmpty() == false) {
+        Collection<SchemaColumn> scanColumns = tableScan.getScanColumns();
+        if (scanColumns != null && ! scanColumns.isEmpty()) {
             setScanColumns(scanColumns);
         }
     }

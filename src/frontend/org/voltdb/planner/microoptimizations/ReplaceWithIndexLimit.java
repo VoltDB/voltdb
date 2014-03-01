@@ -325,8 +325,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            int idx = m_parsedStmt.tableAliasIndexMap.get(fromTableAlias);
-            StmtTableScan tableScan = m_parsedStmt.stmtCache.get(idx);
+            StmtTableScan tableScan = m_parsedStmt.tableAliasMap.get(fromTableAlias);
 
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
@@ -343,7 +342,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
     // lookup aggCol up to min((filterSize + 1), indexedColIdx.size())
     // aggCol can be one of equality comparison key (then a constant value),
     // or all filters compose the complete set of prefix key components
-    private boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
+    private static boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
 
         boolean found = false;
 
@@ -374,7 +373,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         return false;
     }
 
-    private boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
+    private static boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
             AbstractExpression aggExpr,
             List<AbstractExpression> filterExprs,
             List<AbstractExpression> bindingExprs) {
