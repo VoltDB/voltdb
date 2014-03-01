@@ -227,8 +227,11 @@ public abstract class SubPlanAssembler {
      */
     protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
     {
+<<<<<<< HEAD
         Table table = tableScan.getTable();
 
+=======
+>>>>>>> master
         // Track the running list of filter expressions that remain as each is either cherry-picked
         // for optimized coverage via the index keys.
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
@@ -310,7 +313,7 @@ public abstract class SubPlanAssembler {
         // the index scan.
         IndexableExpression inListExpr = null;
 
-        for ( ; coveredCount < keyComponentCount; ++coveredCount) {
+        for ( ; (coveredCount < keyComponentCount) && ! filtersToCover.isEmpty(); ++coveredCount) {
             if (indexedExprs == null) {
                 coveringColId = indexedColIds[coveredCount];
             } else {
@@ -320,7 +323,7 @@ public abstract class SubPlanAssembler {
             boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
             if (eqExpr == null) {
@@ -337,7 +340,7 @@ public abstract class SubPlanAssembler {
                     // tables' columns.
                     inListExpr = getIndexableExpressionFromFilters(
                         ExpressionType.COMPARE_IN, ExpressionType.COMPARE_IN,
-                        coveringExpr, coveringColId, table, filtersToCover,
+                        coveringExpr, coveringColId, tableScan, filtersToCover,
                         false, EXCLUDE_FROM_POST_FILTERS);
                     if (inListExpr != null) {
                         // Make sure all prior key component equality filters
@@ -429,7 +432,7 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> otherBindingsForOrder =
                 recoverOrderSpoilers(orderSpoilers, nSpoilers, nRecoveredSpoilers,
                                      indexedExprs, indexedColIds,
-                                     table, filtersToCover);
+                                     tableScan, filtersToCover);
             if (otherBindingsForOrder == null) {
                 // Some order spoiler didn't have an equality filter.
                 // Invalidate the provisional indexed ordering.
@@ -457,7 +460,7 @@ public abstract class SubPlanAssembler {
             // into separate upper and lower bound inequalities.
             IndexableExpression doubleBoundExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 false, EXCLUDE_FROM_POST_FILTERS);
 
             // For simplicity of implementation:
@@ -476,13 +479,13 @@ public abstract class SubPlanAssembler {
                 // Look for a lower bound.
                 startingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover,
+                    coveringExpr, coveringColId, tableScan, filtersToCover,
                     allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
                 // Look for an upper bound.
                 endingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover,
+                    coveringExpr, coveringColId, tableScan, filtersToCover,
                     allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
             }
         }
@@ -876,13 +879,13 @@ public abstract class SubPlanAssembler {
      *                       orderSpoilers before this position are covered.
      * @param indexedExprs   the index key component expressions in the general case
      * @param colIds         the index key component columns in the simple case
-     * @param table          the index base table, used to validate column base tables
+     * @param tableScan      the index base table scan, used to validate column base tables
      * @param filtersToCover query conditions that may contain the desired equality filters
      */
     private static List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
         int nRecoveredSpoilers,
         List<AbstractExpression> indexedExprs, int[] colIds,
-        Table table, List<AbstractExpression> filtersToCover)
+        StmtTableScan tableScan, List<AbstractExpression> filtersToCover)
     {
         // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
         // always risk adding a dependency on a particular parameterization, so be prepared to
@@ -913,7 +916,7 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> moreBindings = null;
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 alwaysAllowConstrainingJoinFilters, KEEP_IN_POST_FILTERS);
             if (eqExpr == null) {
                 return null;
@@ -948,7 +951,7 @@ public abstract class SubPlanAssembler {
      *                     that might match a query filter, possibly null.
      * @param coveringColId When coveringExpr is null,
      *                      the id of the indexed column might match a query filter.
-     * @param table The table on which the indexed expression is based
+     * @param tableScan The table scan on which the indexed expression is based
      * @param filtersToCover the query conditions that may contain the desired filter
      * @param allowIndexedJoinFilters Whether filters referencing other tables' columns are acceptable
      * @param filterAction the desired disposition of the matched filter,
@@ -961,7 +964,7 @@ public abstract class SubPlanAssembler {
      */
     private static IndexableExpression getIndexableExpressionFromFilters(
         ExpressionType targetComparator, ExpressionType altTargetComparator,
-        AbstractExpression coveringExpr, int coveringColId, Table table,
+        AbstractExpression coveringExpr, int coveringColId, StmtTableScan tableScan,
         List<AbstractExpression> filtersToCover,
         boolean allowIndexedJoinFilters, boolean filterAction)
     {
@@ -977,7 +980,7 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = (ComparisonExpression) filter;
                 indexableExpr = filter.getLeft();
                 otherExpr = filter.getRight();
-                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                binding = bindingIfValidIndexedFilterOperand(tableScan, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
@@ -1076,7 +1079,7 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = normalizedExpr.reverseOperator();
                 indexableExpr = filter.getRight();
                 otherExpr = filter.getLeft();
-                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                binding = bindingIfValidIndexedFilterOperand(tableScan, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
@@ -1104,6 +1107,7 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
+<<<<<<< HEAD
     protected boolean hasReplicatedResult(AbstractPlanNode plan)
     {
         HashSet<String> tablesRead = new HashSet<String>();
@@ -1121,18 +1125,18 @@ public abstract class SubPlanAssembler {
     }
 
     private static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+=======
+    private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
+>>>>>>> master
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (table.getTypeName().equals(tve.getTableName()))
-            {
+            if (tableScan.m_tableAlias.equals(tve.getTableAlias())) {
                 return true;
             }
         }
         return false;
     }
 
-    private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
+    private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(StmtTableScan tableScan,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
         AbstractExpression coveringExpr, int coveringColId)
     {
@@ -1155,7 +1159,7 @@ public abstract class SubPlanAssembler {
         }
         // Left and right operands must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
-        if (isOperandDependentOnTable(otherExpr, table)) {
+        if (isOperandDependentOnTable(otherExpr, tableScan)) {
             return null;
         }
 
@@ -1167,9 +1171,7 @@ public abstract class SubPlanAssembler {
             TupleValueExpression tve = (TupleValueExpression) indexableExpr;
             // Handle a simple indexed column identified by its column id.
             if ((coveringColId == tve.getColumnIndex()) &&
-                //FIXME: This clumsy testing of table names regardless of table aliases is
-                // EXACTLY why we can't have nice things like self-joins.
-                (table.getTypeName().equals(tve.getTableName()))) {
+                (tableScan.m_tableAlias.equals(tve.getTableAlias()))) {
                 // A column match never requires parameter binding. Return an empty list.
                 return s_reusableImmutableEmptyBinding;
             }
@@ -1186,7 +1188,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-    protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
+    static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
 
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);

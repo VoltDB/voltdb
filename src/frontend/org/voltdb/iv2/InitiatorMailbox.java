@@ -403,4 +403,9 @@ public class InitiatorMailbox implements Mailbox
                     ": " + message);
         }
     }
+
+    public void notifyOfSnapshotNonce(String nonce) {
+        if (m_joinProducer == null) return;
+        m_joinProducer.notifyOfSnapshotNonce(nonce);
+    }
 }

@@ -58,7 +58,7 @@ import org.hsqldb_voltpatches.store.ObjectCacheHashMap;
  * Acts as a buffer manager for a single TEXT table with respect its Row data.<p>
  *
  * Handles read/write operations on the table's text format data file using a
- * compatible pair of org.hsqldb.rowio input/output class instances.
+ * compatible pair of org.hsqldb_voltpatches.rowio input/output class instances.
  *
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)

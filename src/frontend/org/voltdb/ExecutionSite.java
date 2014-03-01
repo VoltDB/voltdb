@@ -1504,4 +1504,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public void setProcedureName(String procedureName) {}
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {}
 }

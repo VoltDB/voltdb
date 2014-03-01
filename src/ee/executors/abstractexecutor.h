@@ -128,22 +128,13 @@ class AbstractExecutor {
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
-
-    // useful for debugging/logging/progress reporting
-    std::string m_planNodeName;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",
-               m_abstractNode->getPlanNodeId());
-
-    // useful for debugging/logging/progress reporting
-    m_engine->setLastAccessedPlanNodeName(&m_planNodeName);
-
-    if (m_tmpOutputTable)
-    {
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
+    if (m_tmpOutputTable) {
         VOLT_TRACE("Clearing output table...");
         m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
     }

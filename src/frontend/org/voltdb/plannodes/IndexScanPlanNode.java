@@ -57,7 +57,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
-        DETERMINISM_ONLY,
+        PURPOSE,
         SORT_DIRECTION;
     }
 
@@ -102,7 +102,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
 
-    private boolean m_forDeterminismOnly = false;
+    private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
+    private static final int FOR_GROUPING = 2;
+    private static final int FOR_DETERMINISM = 3;
+
+    private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     public IndexScanPlanNode() {
         super();
@@ -561,13 +565,22 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
-        if (m_forDeterminismOnly) {
-            stringer.key(Members.DETERMINISM_ONLY.name()).value(true);
+        if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
+            stringer.key(Members.PURPOSE.name()).value(m_purpose);
         }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
-
+        if (m_searchkeyExpressions.size() > 0) {
+            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
+            for (AbstractExpression ae : m_searchkeyExpressions) {
+                assert (ae instanceof JSONString);
+                stringer.value(ae);
+            }
+            stringer.endArray();
+        }
+        if (m_endExpression != null) {
+            stringer.key(Members.END_EXPRESSION.name());
+            stringer.value(m_endExpression);
+        }
         if (m_initialExpression != null) {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
@@ -575,13 +588,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
-
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
     }
 
     //all members loaded
@@ -591,7 +597,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
+        m_purpose = jobj.has(Members.PURPOSE.name()) ?
+                jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
@@ -621,9 +628,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // The plan is easy to explain if it isn't using indexed expressions.
             // Just explain why an index scan was chosen
             // -- either for determinism or for an explicit ORDER BY requirement.
-            if (m_forDeterminismOnly) {
+            if (m_purpose == FOR_DETERMINISM) {
                 usageInfo = " (for deterministic order only)";
-            } else {
+            }
+            else if (m_purpose == FOR_GROUPING) {
+                usageInfo = " (for optimized grouping only)";
+            }
+            else {
                 usageInfo = " (for sort order only)";
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.
@@ -767,7 +778,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setForDeterminismOnly() {
-        m_forDeterminismOnly = true;
+        m_purpose = FOR_DETERMINISM;
+    }
+
+    public void setForGroupingOnly() {
+        m_purpose = FOR_GROUPING;
+    }
+
+    public boolean isForGroupingOnly() {
+        return m_purpose == FOR_GROUPING;
     }
 
     // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter

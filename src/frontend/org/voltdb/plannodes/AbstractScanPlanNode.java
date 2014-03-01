@@ -113,22 +113,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Does the plan guarantee an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true unless the scan has an inline limit and no particular order.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        AbstractPlanNode limit = this.getInlinePlanNode(PlanNodeType.LIMIT);
-        if ((limit == null) || isOrderDeterministic()) {
-            return true;
-        } else {
-            m_nondeterminismDetail = "a limit on an unordered scan may return different rows";
-            return false;
-        }
-    }
-
-    /**
      * @return the target_table_name
      */
     public String getTargetTableName() {
@@ -367,8 +351,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
-        stringer.key(Members.PREDICATE.name());
-        stringer.value(m_predicate);
+        if (m_predicate != null) {
+            stringer.key(Members.PREDICATE.name());
+            stringer.value(m_predicate);
+        }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
         if (m_isSubQuery) {

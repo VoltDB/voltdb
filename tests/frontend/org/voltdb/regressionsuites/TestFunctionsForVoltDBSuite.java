@@ -348,10 +348,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
         try {
             cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", 1000, 1);
-            fail("Should have thrown unfortunate type error.");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         } catch (ProcCallException pce) {
-            String msg = pce.getMessage();
-            assertTrue(msg.contains("TYPE ERROR FOR PARAMETER 0"));
+            fail("Should have thrown unfortunate type error.");
         }
     }
 
@@ -644,18 +643,18 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         try {
             cr = client.callProcedure("IdFieldProc", "id", 1);
-            fail("parameter check failed");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
         catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
+            fail("parameter check failed");
         }
 
         try {
             cr = client.callProcedure("IdFieldProc", 1, "1");
-            fail("parameter check failed");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
         catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+            fail("parameter check failed");
         }
 
         cr = client.callProcedure("IdFieldProc", "tag", "three");
@@ -755,10 +754,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         try {
             cr = client.callProcedure("IdArrayProc", 1, 1, "1");
-            fail("parameter check failed");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
         catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+            fail("parameter check failed");
         }
 
         cr = client.callProcedure("NullArrayProc", "funky", 2);
@@ -858,10 +857,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         try {
             cr = client.callProcedure("IdArrayLengthProc", 1, 3);
-            fail("parameter check failed");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
         catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+            fail("parameter check failed");
         }
 
         cr = client.callProcedure("NullFieldProc", "funky");

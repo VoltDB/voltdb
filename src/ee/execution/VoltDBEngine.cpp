@@ -118,7 +118,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tuplesProcessedSinceReport(0),
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedTable(NULL),
-      m_lastAccessedPlanNodeName(NULL),
       m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
@@ -167,7 +166,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit)
+                         int64_t tempTableMemoryLimit,
+                         int32_t compactionThreshold)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -176,6 +176,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -331,6 +332,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
+    m_tuplesProcessedSinceReport = 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -360,6 +362,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         // at the end of each frag, rollup and reset counters
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
+        m_tuplesProcessedSinceReport = 0;
     }
 
     m_stringPool.purge();
@@ -707,7 +710,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
                                                                  catalogTable->path(),
-                                                                 catalogTable->signature());
+                                                                 catalogTable->signature(),
+                                                                 m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {
@@ -781,6 +785,13 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 // call above should rebuild them all anyway
                 continue;
             }
+
+            //
+            // Same schema, but TUPLE_LIMIT may change.
+            // Because there is no table rebuilt work next, no special need to take care of
+            // the new tuple limit.
+            //
+            persistenttable->setTupleLimit(catalogTable->tuplelimit());
 
             //////////////////////////////////////////
             // find all of the indexes to add
@@ -1711,6 +1722,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
+
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
@@ -1725,7 +1738,9 @@ void VoltDBEngine::reportProgessToTopend() {
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
-                                        *m_lastAccessedPlanNodeName,
+                                        (m_lastAccessedExec == NULL) ?
+                                        dummy_last_accessed_plan_node_name :
+                                        planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);

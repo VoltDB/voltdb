@@ -31,29 +31,31 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
-import java.io.InputStream;
 import java.io.Reader;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Date;
-import java.sql.NClob;
 import java.sql.Ref;
-import java.sql.RowId;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Map;
 
-import org.hsqldb_voltpatches.Error;
+//#ifdef JAVA6
+import java.sql.NClob;
+import java.sql.RowId;
+import java.sql.SQLXML;
+
+//#endif JAVA6
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.HsqlException;
+import org.hsqldb_voltpatches.Error;
+import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
@@ -729,7 +731,6 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
 
 //#ifdef DEPRECATEDJDBC
-    @Deprecated
     public synchronized BigDecimal getBigDecimal(int parameterIndex,
             int scale) throws SQLException {
 
@@ -4685,7 +4686,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param columnIndex of the column value for which to perform the
      *                 conversion
-     * @param targetType the org.hsqldb.types.Type object for targetType
+     * @param targetType the org.hsqldb_voltpatches.types.Type object for targetType
      * @return an Object of the requested targetType, representing the value of the
      *       specified column
      * @throws SQLException when there is no rowData, the column index is
@@ -4729,6 +4730,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         return (wasNullValue = (o == null));
     }
 
+    /************************* Volt DB Extensions *************************/
+
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -4746,4 +4749,5 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

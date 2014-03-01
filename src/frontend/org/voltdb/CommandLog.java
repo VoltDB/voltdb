@@ -66,6 +66,7 @@ public interface CommandLog {
     public abstract ListenableFuture<Object> log(
             Iv2InitiateTaskMessage message,
             long spHandle,
+            int[] involvedPartitions,
             DurabilityListener listener,
             Object durabilityHandle);
 

@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -54,6 +55,8 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
+import com.google_voltpatches.common.base.Throwables;
+
 /**
  *   De/multiplexes transactions across a cluster
  *
@@ -62,7 +65,9 @@ import org.voltdb.common.Constants;
  */
 class Distributer {
 
+    static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
+    public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
@@ -128,6 +133,17 @@ class Distributer {
 
     private String m_buildString;
 
+    /*
+     * The connection we have issued our subscriptions to. If the connection is lost
+     * we will need to request subscription from a different node
+     */
+    private NodeConnection m_subscribedConnection = null;
+    //Track if a request is pending so we don't accidentally handle a failed node twice
+    private boolean m_subscriptionRequestPending = false;
+
+    //Until catalog subscription is implemented, only fetch it once
+    private boolean m_fetchedCatalog = false;
+
     /**
      * Handles topology updates for client affinity
      */
@@ -135,6 +151,7 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -150,12 +167,64 @@ class Distributer {
     }
 
     /**
+     * Handles @Subscribe response
+     */
+    class SubscribeCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            //Pre 4.1 clusers don't know about subscribe, don't stress over it.
+            if (response.getStatusString() != null &&
+                response.getStatusString().contains("@Subscribe was not found")) {
+                synchronized (Distributer.this) {
+                    m_subscriptionRequestPending = false;
+                }
+                return;
+            }
+            //Fast path subscribing retry if the connection was lost before getting a response
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
+                subscribeToNewNode();
+                return;
+            } else if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+                return;
+            }
+
+            //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
+            if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
+                System.err.println("Error response received subscribing to topology updates.\n " +
+                                   "Performance may be reduced on topology updates. Error was \"" +
+                                    response.getStatusString() + "\"");
+                //Retry on the off chance that it will work the Nth time, or work at a different node
+                m_ex.schedule(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            subscribeToNewNode();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            Throwables.propagate(t);
+                        }
+                    }
+                }, 2, TimeUnit.MINUTES);
+                return;
+            }
+            //If success, the code in NodeConnection.stopping needs to know it has to handle selecting
+            //a new node to for subscriptions, so set the pending request to false to let that code
+            //know that the failure won't be handled in the callback
+            synchronized (Distributer.this) {
+                m_subscriptionRequestPending = false;
+            }
+        }
+    }
+
+    /**
      * Handles procedure updates for client affinity
      */
     class ProcUpdateCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -163,7 +232,9 @@ class Distributer {
                         VoltTable vt = results[0];
                         updateProcedurePartitioning(vt);
                     }
+                    m_fetchedCatalog = true;
                 }
+
             }
             catch (Exception e) {
                 e.printStackTrace();
@@ -377,6 +448,19 @@ class Distributer {
                 if (response.getClientHandle() == PING_HANDLE) {
                     m_outstandingPing = false;
                     return;
+                } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
+                    /*
+                     * Really didn't want to add this block because it is not DRY
+                     * for the exception handling, but trying to set + reset the async topo callback
+                     * turned out to be pretty challenging
+                     */
+                    cb = new TopoUpdateCallback();
+                    try {
+                        cb.clientCallback(response);
+                    } catch (Exception e) {
+                        uncaughtException(cb, response, e);
+                    }
+                    return;
                 }
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
@@ -494,6 +578,25 @@ class Distributer {
                                 m_connection.getRemotePort(),
                                 m_connections.size(),
                                 m_closeCause);
+                    }
+
+                    /*
+                     * Deal with the fact that this may have been the connection that subscriptions were issued
+                     * to. If a subscription request was pending, don't handle selecting a new node here
+                     * let the callback see the failure and retry
+                     */
+                    if (m_useClientAffinity &&
+                        m_subscribedConnection == this &&
+                        m_subscriptionRequestPending == false &&
+                        !m_ex.isShutdown()) {
+                        //Don't subscribe to a new node immediately
+                        //to somewhat prevent a thundering herd
+                        m_ex.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                subscribeToNewNode();
+                            }
+                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
                     }
                 }
                 m_isConnected = false;
@@ -657,13 +760,68 @@ class Distributer {
                 m_hostIdToConnection.put(hostId, cxn);
             }
 
-            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-            //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
+            if (m_subscribedConnection == null) {
+                subscribeToNewNode();
+            }
+        }
+    }
 
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-            //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
+    /*
+     * Subscribe to receive async updates on a new node connection. This will set m_subscribed
+     * connection to the provided connection.
+     *
+     * If we are subscribing to a new connection on node failure this will also fetch the topology post node
+     * failure. If the cluster hasn't finished resolving the failure it is fine, we will get the new topo through\
+     */
+    private void subscribeToNewNode() {
+        //Technically necessary to synchronize for safe publication of this store
+        NodeConnection cxn = null;
+        synchronized (Distributer.this) {
+            m_subscribedConnection = null;
+            if (!m_connections.isEmpty()) {
+                cxn = m_connections.get(new Random().nextInt(m_connections.size()));
+                m_subscriptionRequestPending = true;
+                m_subscribedConnection = cxn;
+            } else {
+                return;
+            }
+        }
+        try {
+
+            //Subscribe to topology updates before retrieving the current topo
+            //so there isn't potential for lost updates
+            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
+            final ByteBuffer buf = serializeSPI(spi);
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new SubscribeCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+            //The handle is specific to topology updates and has special cased handling
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new TopoUpdateCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            //Don't need to retrieve procedure updates every time we do a new subscription
+            //since catalog changes aren't correlated with node failure the same way topo is
+            if (!m_fetchedCatalog) {
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+                //The handle is specific to procedure updates and has special cased handling
+                cxn.createWork(spi.getHandle(),
+                        spi.getProcName(),
+                        serializeSPI(spi),
+                        new ProcUpdateCallback(),
+                        true,
+                        USE_DEFAULT_TIMEOUT);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -801,13 +959,11 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
-            buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = null;
             try {
-                invocation.flattenToBuffer(buf);
-                buf.flip();
+                buf = serializeSPI(invocation);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                Throwables.propagate(e);
             }
             cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
@@ -1048,5 +1204,14 @@ class Distributer {
             return HashinatorLiteType.LEGACY;
         }
         return m_hashinator.getConfigurationType();
+    }
+
+    private ByteBuffer serializeSPI(ProcedureInvocation pi) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        pi.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
+
     }
 }

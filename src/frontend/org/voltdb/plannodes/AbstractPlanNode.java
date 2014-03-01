@@ -283,22 +283,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return
-     */
-    public boolean isContentDeterministic() {
-        // Leaf nodes need to re-implement this test.
-        assert(m_children != null);
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isContentDeterministic()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
      * Accessor for description of plan non-determinism.
      * @return the field
      */
@@ -781,11 +765,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             stringer.value(node.getPlanNodeId().intValue());
         }
-        stringer.endArray().key(Members.PARENT_IDS.name()).array();
-
-        for (AbstractPlanNode node : m_parents) {
-            stringer.value(node.getPlanNodeId().intValue());
-        }
         stringer.endArray(); //end inlineNodes
 
         outputSchemaToJSON(stringer);
@@ -814,7 +793,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             JSONStringer stringer = new JSONStringer();
             try
             {
+                stringer.object();
                 outputSchemaToJSON(stringer);
+                stringer.endObject();
                 sb.append(stringer.toString());
             }
             catch (Exception e)

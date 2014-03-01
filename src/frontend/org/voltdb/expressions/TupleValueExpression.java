@@ -294,11 +294,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         return index;
     }
 
-    @Override
-    public String baseTableAlias() {
-        return m_tableAlias;
-    }
-
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.

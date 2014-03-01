@@ -35,6 +35,7 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -232,7 +233,14 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        try {
+            return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testExtraClasses() {

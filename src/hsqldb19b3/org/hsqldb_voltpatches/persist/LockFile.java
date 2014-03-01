@@ -1297,7 +1297,6 @@ public class LockFile {
      *         argument; <tt>false</tt> otherwise.
      * @see #hashCode
      */
-    @Override
     public final boolean equals(final Object obj) {
 
         if (this == obj) {
@@ -1336,7 +1335,6 @@ public class LockFile {
      * @return a hash code value for this object.
      * @see #equals(java.lang.Object)
      */
-    @Override
     public final int hashCode() {
         return file == null ? 0
                             : file.hashCode();
@@ -1441,7 +1439,6 @@ public class LockFile {
      *         java.lang.SecurityManager#checkRead}</tt> method denies
      *         read access to the lock file;
      */
-    @Override
     public String toString() {
 
         return new StringBuffer(super.toString()).append("[file =").append(
@@ -1887,7 +1884,6 @@ public class LockFile {
      * @throws Throwable if this object encounters an unhandled exception
      *        while trying to release the cooperative lock condition
      */
-    @Override
     protected final void finalize() throws Throwable {
         this.tryRelease();
     }
@@ -1948,7 +1944,6 @@ public class LockFile {
          * @return representation of <tt>lockFile</tt> and
          *      <tt>inMethod</tt>, as <tt>String</tt> object
          */
-        @Override
         public String getMessage() {    // override
             return "lockFile: " + lockFile + " method: " + inMethod;
         }
@@ -2017,7 +2012,6 @@ public class LockFile {
          * @return representation of <tt>lockFile</tt>, <tt>inMethod</tt> and
          *      <tt>reason</tt>, as a <tt>String</tt> object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " reason: " + reason;
         }
@@ -2075,7 +2069,6 @@ public class LockFile {
          * @return representation of lockFile, inMethod and reason, as
          *      a String object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " reason: " + reason;
         }
@@ -2145,7 +2138,6 @@ public class LockFile {
          *      <tt>read</tt> and <tt>heartbeat</tt>, as a <tt>String</tt>
          *      object
          */
-        @Override
         public String getMessage() {    // override
 
             return super.getMessage() + " read: "
@@ -2196,7 +2188,6 @@ public class LockFile {
          * @return representation of <tt>lockFile<tt>, <tt>inMethod</tt> and
          *      <tt>reason</tt>, as a <tt>String</tt> object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " reason: " + reason;
         }
@@ -2242,7 +2233,6 @@ public class LockFile {
          * @return representation of <tt>lockFile</tt>, <tt>inMethod</tt> and
          *      <tt>reason</tt>, as a <tt>String</tt> object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " reason: " + reason;
         }
@@ -2289,7 +2279,6 @@ public class LockFile {
          * @return representation of lockFile, inMethod and reason, as
          *      a String object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " reason: " + reason;
         }
@@ -2334,7 +2323,6 @@ public class LockFile {
          * @return representation of lockFile, inMethod and length, as
          *      a String object
          */
-        @Override
         public String getMessage() {    // override
             return super.getMessage() + " length: " + length;
         }
@@ -2370,7 +2358,6 @@ public class LockFile {
          * @return representation of inMethod, file and magic,
          *      as a String object
          */
-        @Override
         public String getMessage() {    // override
 
             String message = super.getMessage() + " magic: ";

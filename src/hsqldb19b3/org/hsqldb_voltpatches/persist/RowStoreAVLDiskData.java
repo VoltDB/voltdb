@@ -33,8 +33,6 @@ package org.hsqldb_voltpatches.persist;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.RowAVLDiskData;
@@ -43,6 +41,8 @@ import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
+import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.Error;
 
 /*
  * Implementation of PersistentStore for TEXT tables.

@@ -37,20 +37,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+import org.hsqldb_voltpatches.Statement;
 import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Session;
-import org.hsqldb_voltpatches.Statement;
 import org.hsqldb_voltpatches.StatementTypes;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.SimpleLog;
 import org.hsqldb_voltpatches.lib.StringConverter;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rowio.RowInputTextLog;
-import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
  * Handles operations involving reading back a script or log file written
@@ -103,7 +103,7 @@ public class ScriptReaderText extends ScriptReaderBase {
                         ValuePool.emptyObjectArray);
 
                 if (cs.getType() == StatementTypes.CREATE_SCHEMA) {
-                    HsqlName name = cs.getSchemaName();
+                    HsqlName name = cs.getSchemalName();
 
                     session.setSchema(name.name);
                 }

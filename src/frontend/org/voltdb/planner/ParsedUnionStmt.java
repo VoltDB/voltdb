@@ -104,5 +104,21 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         this.joinOrder = joinOrder;
     }
 
+    public boolean isOrderDeterministic() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministic()) {
+                return false;
+            }
+        }
+        return true;
+    }
 
+    public boolean hasLimitOrOffset() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( childStmt.hasLimitOrOffset()) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
