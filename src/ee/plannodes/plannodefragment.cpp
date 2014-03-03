@@ -59,10 +59,10 @@ using namespace voltdb;
 PlanNodeFragment::PlanNodeFragment() :
         m_serializedType("org.voltdb.plannodes.PlanNodeList"),
         m_idToNodeMap(),
-        m_stmtExecutionListArray(1),
-        m_stmtPlanNodesArray(1),
+        m_stmtExecutionListArray(),
+        m_stmtPlanNodesArray(),
         m_parameters(),
-        m_subqueryParameters(0) 
+        m_subqueryParameters() 
 {
     // Create an entry for the parent statement. It always exists
     m_stmtPlanNodesArray.push_back(new std::vector<AbstractPlanNode*>());
@@ -72,10 +72,10 @@ PlanNodeFragment::PlanNodeFragment() :
 PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node) :
         m_serializedType("org.voltdb.plannodes.PlanNodeList"),
         m_idToNodeMap(),
-        m_stmtExecutionListArray(1),
-        m_stmtPlanNodesArray(1),
+        m_stmtExecutionListArray(),
+        m_stmtPlanNodesArray(),
         m_parameters(),
-        m_subqueryParameters(0)
+        m_subqueryParameters()
 {
     // Create an entry for the parent statement. It always exists
     m_stmtPlanNodesArray.push_back(new std::vector<AbstractPlanNode*>());
@@ -130,7 +130,7 @@ PlanNodeFragment::createFromCatalog(const string value)
     PlannerDomRoot domRoot(value.c_str());
     PlannerDomValue rootObj = domRoot.rootObject();
 
-    std::unique_ptr<PlanNodeFragment> pnf(new PlanNodeFragment());
+    std::auto_ptr<PlanNodeFragment> pnf(new PlanNodeFragment());
 
     // load nodes from the parent statement
     PlanNodeFragment::fromJSONObject(rootObj.valueForKey("PLAN_NODES"), *pnf->m_stmtPlanNodesArray[0], pnf->m_idToNodeMap);
@@ -144,7 +144,7 @@ PlanNodeFragment::createFromCatalog(const string value)
 
     // load subqueries
     if (rootObj.hasKey("SUBQUERIES_PLAN_NODES")) {
-        pnf = PlanNodeFragment::loadSubqueriesFromJSONObject(rootObj, std::move(pnf));
+        PlanNodeFragment::loadSubqueriesFromJSONObject(rootObj, pnf.get());
     }
 
     PlanNodeFragment *retval = pnf.release();
@@ -152,8 +152,8 @@ PlanNodeFragment::createFromCatalog(const string value)
     return retval;
 }
 
-std::unique_ptr<PlanNodeFragment>
-PlanNodeFragment::loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::unique_ptr<PlanNodeFragment> pnf) {
+void
+PlanNodeFragment::loadSubqueriesFromJSONObject(PlannerDomValue rootObj, PlanNodeFragment* pnf) {
     PlannerDomValue planNodesArray = rootObj.valueForKey("SUBQUERIES_PLAN_NODES");
     PlannerDomValue executionListArray = rootObj.valueForKey("SUBQUERIES_EXECUTE_LISTS");
     if (planNodesArray.arrayLen() != executionListArray.arrayLen()) {
@@ -168,10 +168,10 @@ PlanNodeFragment::loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::uni
         if (id != i + 1) {
             throwFatalException("Failed to load subqueries: subquery ids are out of order.");
         }
-        std::unique_ptr<std::vector<AbstractPlanNode*> > executionList(new std::vector<AbstractPlanNode*>());
+        std::auto_ptr<std::vector<AbstractPlanNode*> > executionList(new std::vector<AbstractPlanNode*>());
         PlannerDomValue subExecuteListArray = executionListObj.valueForKey("EXECUTE_LIST");
-        for (int i = 0; i < subExecuteListArray.arrayLen(); i++) {
-            executionList->push_back(pnf->m_idToNodeMap[subExecuteListArray.valueAtIndex(i).asInt()]);
+        for (int j = 0; i < subExecuteListArray.arrayLen(); j++) {
+            executionList->push_back(pnf->m_idToNodeMap[subExecuteListArray.valueAtIndex(j).asInt()]);
         }
         pnf->m_stmtExecutionListArray.push_back(executionList.release());
 
@@ -180,7 +180,7 @@ PlanNodeFragment::loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::uni
         if (id != i + 1) {
             throwFatalException("Failed to load subqueries: subquery ids are out of order.");
         }
-        std::unique_ptr<std::vector<AbstractPlanNode*> > planNodes(new std::vector<AbstractPlanNode*>());
+        std::auto_ptr<std::vector<AbstractPlanNode*> > planNodes(new std::vector<AbstractPlanNode*>());
         PlanNodeFragment::fromJSONObject(planNodesObj.valueForKey("PLAN_NODES"), *planNodes.get(), pnf->m_idToNodeMap);
         pnf->m_stmtPlanNodesArray.push_back(planNodes.release());
     }
@@ -197,7 +197,7 @@ PlanNodeFragment::loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::uni
 
 // @TODO ENG-451-exists - final pass through to distribute params and executors vectors
 
-    return std::move(pnf);
+    return;
 }
 
 void
@@ -255,7 +255,7 @@ PlanNodeFragment::loadSubqueryParametersFromJSONObject(PlannerDomValue subqueryP
     }
     PlannerDomValue parametersArray = subqueryParamsObj.valueForKey("PARAMETERS");
     int size = parametersArray.arrayLen();
-    std::unique_ptr<std::vector<std::pair< int, voltdb::AbstractExpression*> > > parameters(
+    std::auto_ptr<std::vector<std::pair< int, voltdb::AbstractExpression*> > > parameters(
         new std::vector<std::pair< int, voltdb::AbstractExpression*> >(size));
     for (int i = 0; i < size; i++) {
         PlannerDomValue parameterObj = parametersArray.valueAtIndex(i);

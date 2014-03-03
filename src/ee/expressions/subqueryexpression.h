@@ -19,6 +19,7 @@
 #define HSTORESUBQUERYEXPRESSION_H
 
 #include <vector>
+#include <sstream>
 
 #include "expressions/abstractexpression.h"
 #include "common/NValue.hpp"
@@ -38,7 +39,9 @@ class SubqueryExpression : public AbstractExpression {
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return spacer + "SubqueryExpression: " + std::to_string(m_subqueryId);
+        std::ostringstream buffer;
+        buffer << spacer << "SubqueryExpression: " << m_subqueryId;
+        return (buffer.str());
     }
 
   protected:

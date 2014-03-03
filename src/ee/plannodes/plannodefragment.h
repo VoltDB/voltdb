@@ -117,8 +117,8 @@ class PlanNodeFragment {
     static void loadParametersFromJSONObject(PlannerDomValue parametersArray,
         std::vector<std::pair< int, voltdb::ValueType> >& parameters);
     // reads subqueries from json objects
-    static std::unique_ptr<PlanNodeFragment>
-    loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::unique_ptr<PlanNodeFragment> pnf);
+    static void
+    loadSubqueriesFromJSONObject(PlannerDomValue rootObj, PlanNodeFragment* pnf);
     // reads subquery parameters
     static void loadSubqueryParametersFromJSONObject(PlannerDomValue subqueryParamsObj,
         std::vector<std::vector<std::pair< int, voltdb::AbstractExpression*> >*>& subqueryParameters);
