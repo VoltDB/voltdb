@@ -1164,7 +1164,7 @@ SnapshotCompletionInterest, Promotable
                                       restoreProc.getEverysite(),
                                       0,//Can provide anything for multi-part
                                       0,
-                                      EstTime.currentTimeMillis());
+                                      System.nanoTime());
     }
 
     /**

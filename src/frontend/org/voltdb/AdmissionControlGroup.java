@@ -20,11 +20,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+import org.HdrHistogram_voltpatches.Histogram;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.dtxn.LatencyStats.LatencyInfo;
+import org.voltdb.dtxn.LatencyStats;
 
 /**
  * Manage admission control for incoming requests by tracking the size of outstanding requests
@@ -100,7 +102,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
     // Same single-writer, unsynchronized reader pattern as initiator stats.
-    private final LatencyInfo m_latencyInfo = new LatencyInfo();
+    private final Histogram m_latencyInfo = LatencyStats.constructHistogram();
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -276,7 +278,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             long connectionId,
             String connectionHostname,
             String procedureName,
-            int delta,
+            long deltaNanos,
             byte status) {
         boolean needToInsert = false;
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
@@ -289,8 +291,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             info = new InvocationInfo(connectionHostname);
             procInfoMap.put(procedureName, info);
         }
-        info.processInvocation(delta, status);
-        m_latencyInfo.addSample(delta);
+        info.processInvocation((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos), status);
+        m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
         if (needToInsert) {
             m_connectionStates.put(connectionId, procInfoMap);
         }
@@ -300,7 +302,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         return m_connectionStates.entrySet().iterator();
     }
 
-    public LatencyInfo getLatencyInfo() {
+    public Histogram getLatencyInfo() {
         return m_latencyInfo;
     }
 }
