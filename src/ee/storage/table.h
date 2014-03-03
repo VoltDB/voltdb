@@ -54,6 +54,8 @@
 #include <list>
 #include <cassert>
 
+#include <boost/unordered_map.hpp>
+
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -228,7 +230,7 @@ class Table {
     // returned via shallow vector copy -- seems good enough.
     const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
 
-    virtual TableIndex *index(std::string name);
+    inline TableIndex *index(std::string name);
 
     virtual TableIndex *primaryKeyIndex() {
         return m_pkeyIndex;
@@ -443,6 +445,7 @@ protected:
 
     // indexes
     std::vector<TableIndex*> m_indexes;
+    boost::unordered_map<std::string, TableIndex*> m_indexNameMap;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
 

@@ -504,11 +504,10 @@ bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) 
 }
 
 TableIndex *Table::index(std::string name) {
-    BOOST_FOREACH(TableIndex *index, m_indexes) {
-        if (index->getName().compare(name) == 0) {
-            return index;
-        }
+    if (m_indexNameMap.find(name) != m_indexNameMap.end()) {
+        return m_indexNameMap.at(name);
     }
+
     std::stringstream errorString;
     errorString << "Could not find Index with name " << name << " among {";
     const char* sep = "";
@@ -540,6 +539,7 @@ void Table::addIndex(TableIndex *index) {
         m_uniqueIndexes.push_back(index);
     }
     m_indexes.push_back(index);
+    m_indexNameMap[index->getName()] = index;
 }
 
 void Table::removeIndex(TableIndex *index) {
@@ -554,6 +554,7 @@ void Table::removeIndex(TableIndex *index) {
     for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
         if ((*iter) == index) {
             m_indexes.erase(iter);
+            m_indexNameMap.erase(index->getName());
             break;
         }
     }
