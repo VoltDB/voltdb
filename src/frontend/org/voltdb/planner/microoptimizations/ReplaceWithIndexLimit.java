@@ -325,7 +325,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            StmtTableScan tableScan = m_parsedStmt.tableAliasMap.get(fromTableAlias);
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(fromTableAlias);
 
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);

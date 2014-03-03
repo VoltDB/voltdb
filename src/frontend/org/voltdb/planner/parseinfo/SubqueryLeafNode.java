@@ -100,4 +100,9 @@ public class SubqueryLeafNode extends JoinNode{
                                                       equivalenceSet);
         }
     }
+
+    @Override
+    public boolean containSubSelects() {
+        return true;
+    }
 }

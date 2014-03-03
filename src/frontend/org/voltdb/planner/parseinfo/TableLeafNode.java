@@ -91,4 +91,9 @@ public class TableLeafNode extends JoinNode {
                                                       equivalenceSet);
         }
     }
+
+    @Override
+    public boolean containSubSelects() {
+        return false;
+    }
 }

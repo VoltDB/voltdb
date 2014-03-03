@@ -26,14 +26,7 @@ import org.voltdb.planner.CompiledPlan;
 public abstract class MicroOptimization {
     protected AbstractParsedStmt m_parsedStmt;
 
-<<<<<<< HEAD
     boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement) { return true; }
-=======
-    @SuppressWarnings("static-method")
-    boolean shouldRun(DeterminismMode detMode) {
-        return true;
-    }
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
 
     public abstract List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) ;
 }

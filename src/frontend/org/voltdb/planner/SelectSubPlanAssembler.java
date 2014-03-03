@@ -75,7 +75,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // returns a collection of JoinNode trees, as in:
         // m_joinOrders.addAll(parsedStmt.generateJoinOrders())
         //If a join order was provided
-        if (parsedStmt.joinOrder != null) {
+        if (parsedStmt.m_joinOrder != null) {
             //Extract the table names/aliases from the , separated list
             ArrayList<String> tableAliases = new ArrayList<String>();
             //Don't allow dups for now since self joins aren't supported
@@ -86,12 +86,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // these as different cases (strange) or to complain about both -- which could be
             // accomplished by appending an additional space to the join order here
             // instead of calling trim.
-            for (String element : parsedStmt.joinOrder.trim().split(",")) {
+            for (String element : parsedStmt.m_joinOrder.trim().split(",")) {
                 String alias = element.trim().toUpperCase();
                 tableAliases.add(alias);
                 if (!dupCheck.add(alias)) {
                     StringBuilder sb = new StringBuilder();
-                    sb.append("The specified join order \"").append(parsedStmt.joinOrder);
+                    sb.append("The specified join order \"").append(parsedStmt.m_joinOrder);
                     sb.append("\" contains a duplicate element \"").append(alias).append("\".");
                     throw new RuntimeException(sb.toString());
                 }
@@ -100,22 +100,22 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             //TODO: now that the table aliases list is built, the remaining validations
             // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
             // that generates a JoinNode tree or throws an exception.
-            if (parsedStmt.tableAliasMap.size() != tableAliases.size()) {
+            if (parsedStmt.m_tableAliasMap.size() != tableAliases.size()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
-                sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of elements\n");
-                sb.append("Expected ").append(parsedStmt.tableList.size());
+                sb.append(parsedStmt.m_joinOrder).append("\" does not contain the correct number of elements\n");
+                sb.append("Expected ").append(parsedStmt.m_tableList.size());
                 sb.append(" but found ").append(tableAliases.size()).append(" elements.");
                 throw new RuntimeException(sb.toString());
             }
 
-            Set<String> aliasSet = parsedStmt.tableAliasMap.keySet();
+            Set<String> aliasSet = parsedStmt.m_tableAliasMap.keySet();
             Set<String> specifiedNames = new HashSet<String>(tableAliases);
             specifiedNames.removeAll(aliasSet);
             if (specifiedNames.isEmpty() == false) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
-                sb.append(parsedStmt.joinOrder).append("\" contains ");
+                sb.append(parsedStmt.m_joinOrder).append("\" contains ");
                 int i = 0;
                 for (String name : specifiedNames) {
                     sb.append(name);
@@ -136,7 +136,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 throw new RuntimeException("The specified join order is invalid for the given query");
             }
             //m_parsedStmt.joinTree.m_joinOrder = tables;
-            m_joinOrders.add(m_parsedStmt.joinTree);
+            m_joinOrders.add(m_parsedStmt.m_joinTree);
         } else {
             queueAllJoinOrders();
         }
@@ -151,10 +151,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private boolean isValidJoinOrder(List<String> tableAliases)
     {
-        assert(m_parsedStmt.joinTree != null);
+        assert(m_parsedStmt.m_joinTree != null);
 
         // Split the original tree into the sub-trees having the same join type for all nodes
-        List<JoinNode> subTrees = m_parsedStmt.joinTree.extractSubTrees();
+        List<JoinNode> subTrees = m_parsedStmt.m_joinTree.extractSubTrees();
 
         // For a sub-tree with inner joins only any join order is valid. The only requirement is that
         // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
@@ -222,7 +222,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             finalSubTrees.add(0, joinOrderSubTree);
         }
         // if we got there the join order is OK. Rebuild the whole tree
-        m_parsedStmt.joinTree = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
+        m_parsedStmt.m_joinTree = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
         return true;
     }
 
@@ -232,11 +232,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private void queueAllJoinOrders() {
         // these just shouldn't happen right?
-        assert(m_parsedStmt.noTableSelectionList.size() == 0);
-        assert(m_parsedStmt.joinTree != null);
+        assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
+        assert(m_parsedStmt.m_joinTree != null);
 
         // Clone the original
-        JoinNode clonedTree = (JoinNode) m_parsedStmt.joinTree.clone();
+        JoinNode clonedTree = (JoinNode) m_parsedStmt.m_joinTree.clone();
         // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
         List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
@@ -326,9 +326,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             // Analyze join and filter conditions
-            joinTree.analyzeJoinExpressions(m_parsedStmt.noTableSelectionList);
+            joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // a query that is a little too quirky or complicated.
-            assert(m_parsedStmt.noTableSelectionList.size() == 0);
+            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 
             if ( ! m_partitioning.wasSpecifiedAsSingle()) {
                 // Now that analyzeJoinExpressions has done its job of properly categorizing
@@ -349,7 +349,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
                 int countOfIndependentlyPartitionedTables =
-                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.tableAliasMap.values(),
+                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
                                                                       valueEquivalence);
                 if (countOfIndependentlyPartitionedTables > 1) {
                     // The case of more than one independent partitioned table
@@ -376,7 +376,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * it doesn't mean no more plans can be generated. It's possible that the
      * particular join order it got had no reasonable plans.
      *
-     * @param joinOrder An array of tables in the join order.
+/// Patched a bad javadoc comment, should have removed or repaired it.
+     * @param m_joinOrder An array of tables in the join order.
      */
     private void generateMorePlansForJoinTree(JoinNode joinTree) {
         assert(joinTree != null);

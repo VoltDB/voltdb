@@ -70,6 +70,7 @@ public class StatementQuery extends StatementDMQL {
         checkAccessRights(session);
     }
 
+    @Override
     Result getResult(Session session) {
 
         Result result = queryExpression.getResult(session,
@@ -80,6 +81,7 @@ public class StatementQuery extends StatementDMQL {
         return result;
     }
 
+    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -97,6 +99,7 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
+    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         queryExpression.getBaseTableNames(set);
@@ -108,6 +111,7 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
+    @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 
     /************************* Volt DB Extensions *************************/
@@ -174,13 +178,9 @@ public class StatementQuery extends StatementDMQL {
         return voltGetXMLExpression(queryExpression, parameters, session);
     }
 
-<<<<<<< HEAD
+
     static VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, ExpressionColumn parameters[], Session session)
-    throws HSQLParseException
-=======
-    VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
->>>>>>> master
     {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
         // The only other instances of QueryExpression are direct QueryExpression instances instantiated in XreadSetOperation
@@ -229,14 +229,9 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
-<<<<<<< HEAD
     static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
-    throws HSQLParseException {
-=======
-    VoltXMLElement voltGetXMLSpecification(QuerySpecification select, Session session)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
->>>>>>> master
-
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    {
         // select
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
@@ -494,11 +489,8 @@ public class StatementQuery extends StatementDMQL {
      * @param element
      * @param cols - output collection containing the column references
      */
-<<<<<<< HEAD
-    static protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
-=======
-    protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
->>>>>>> master
+
+    static protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
         if ("columnref".equalsIgnoreCase(element.name)) {
             cols.add(element);
         } else {
@@ -515,12 +507,9 @@ public class StatementQuery extends StatementDMQL {
      * @param columns list of columns to resolve
      * @return rvs list of range variables
      */
-<<<<<<< HEAD
-    static protected void resolveUsingColumns(List<VoltXMLElement> columns, RangeVariable[] rvs) throws HSQLParseException {
-=======
-    protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
+    static protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
->>>>>>> master
+
         // Only one OUTER join for a whole select is supported so far
         for (VoltXMLElement columnElmt : columns) {
             String table = null;

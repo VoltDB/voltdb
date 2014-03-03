@@ -92,9 +92,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     else
     {
         // Create output table based on output schema from the plan
-        const std::string& temp_name = (!node->isSubQuery()) ?
-            node->getTargetTable()->name() :
-            node->getChildren()[0]->getOutputTable()->name();
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
         setTempOutputTable(limits, temp_name);
     }
     return true;
@@ -115,11 +115,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     assert(output_table);
 
-    Table* input_table = (!node->isSubQuery()) ?
-        node->getTargetTable() :
-        node->getChildren()[0]->getOutputTable();
+    Table* input_table = (node->isSubQuery()) ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
 
     assert(input_table);
+/// What does it mean that a subquery seqscan has a target table? This seems useless/meaningless.
     Table* target_table = node->getTargetTable();
     assert(target_table);
 
@@ -192,22 +193,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_ctr = 0;
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-<<<<<<< HEAD
-<<<<<<< HEAD
-        if ( ! node->isSubQuery()) {
-            // Input table is the target table in this case
-            m_engine->setLastAccessedTable(input_table);
-        }
-        ProgressMonitorProxy pmp(m_engine, target_table);
-=======
-        ProgressMonitorProxy pmp(m_engine, node->isSubQuery() ? target_table : (Table*)NULL);
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
-=======
-        ProgressMonitorProxy pmp(m_engine, this, target_table);
+
+/// This looks reversed, and target_table is obsolete -- should be more like: isSubquery ? NULL : input_table
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? target_table : (Table*)NULL);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
->>>>>>> master
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());

@@ -73,8 +73,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+/// We DO NOT reorganize imports in hsql code.
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.TimestampData;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -447,6 +449,7 @@ public class Expression {
         }
     }
 
+/// We DO NOT add @Override to hsql code
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -460,6 +463,7 @@ public class Expression {
         return false;
     }
 
+/// We DO NOT add @Override to hsql code
     public int hashCode() {
 
         int val = opType + exprSubType;
@@ -1716,10 +1720,11 @@ public class Expression {
             }
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
-            
+
         case OpTypes.TABLE_SUBQUERY:
             if (subQuery == null || subQuery.queryExpression == null) {
-                throw new HSQLParseException("VoltDB could not determine the SubQuery");
+/// Bad merge lost cleaner exception class reference
+                throw new HSQLParseException("VoltDB could not determine the subquery");
             }
             // @TODO: SubQuery doesn't have an information about the query parameters
             // Or maybe there is a way?
@@ -1796,13 +1801,9 @@ public class Expression {
         case OpTypes.TABLE_SUBQUERY:
         case OpTypes.ROW:
         case OpTypes.TABLE:
-<<<<<<< HEAD
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support subqueries, consider using views or multiple statements instead");
-=======
         case OpTypes.EXISTS:
+/// Bad merge lost improved error message
             throw new HSQLParseException("Unsupported subquery syntax within an expression. Consider using a join or multiple statements instead");
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 

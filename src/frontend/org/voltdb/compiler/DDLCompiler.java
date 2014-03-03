@@ -1789,7 +1789,7 @@ public class DDLCompiler {
             }
 
             // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.tableList.get(0);
+            Table srcTable = stmt.m_tableList.get(0);
             if (viewTableNames.contains(srcTable.getTypeName())) {
                 String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
                         viewName, srcTable.getTypeName());
@@ -2030,8 +2030,8 @@ public class DDLCompiler {
         int displayColCount = stmt.displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
-        if (stmt.tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.tableList.size()) + " sources. " +
+        if (stmt.m_tableList.size() != 1) {
+            msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
             "Only one source view or source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }

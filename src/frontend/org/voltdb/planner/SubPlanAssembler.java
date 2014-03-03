@@ -19,7 +19,6 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -27,7 +26,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -224,20 +222,10 @@ public abstract class SubPlanAssembler {
      */
     protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
     {
-<<<<<<< HEAD
-<<<<<<< HEAD
-        Table table = tableScan.getTable();
-=======
-        Table table;
-        if (tableScan instanceof StmtTargetTableScan) {
-            table = ((StmtTargetTableScan)tableScan).getTargetTable();
-        } else {
+        if (tableScan instanceof StmtTargetTableScan == false) {
             return null;
         }
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
 
-=======
->>>>>>> master
         // Track the running list of filter expressions that remain as each is either cherry-picked
         // for optimized coverage via the index keys.
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
@@ -1113,32 +1101,9 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    protected boolean hasReplicatedResult(AbstractPlanNode plan)
-    {
-        HashSet<String> tablesRead = new HashSet<String>();
-        plan.getTablesReadByFragment(tablesRead);
-        for (String tableAliasName : tablesRead) {
-            Integer tableIdx = m_parsedStmt.tableAliasIndexMap.get(tableAliasName);
-            assert(tableIdx != null);
-            StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableIdx);
-            if ( ! tableCache.getIsReplicated()) {
-                return false;
-            }
-
-        }
-        return true;
-    }
-
-=======
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
-    private static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
-=======
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
->>>>>>> master
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            if (tableScan.m_tableAlias.equals(tve.getTableAlias())) {
+            if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
                 return true;
             }
         }
@@ -1180,7 +1145,7 @@ public abstract class SubPlanAssembler {
             TupleValueExpression tve = (TupleValueExpression) indexableExpr;
             // Handle a simple indexed column identified by its column id.
             if ((coveringColId == tve.getColumnIndex()) &&
-                (tableScan.m_tableAlias.equals(tve.getTableAlias()))) {
+                (tableScan.getTableAlias().equals(tve.getTableAlias()))) {
                 // A column match never requires parameter binding. Return an empty list.
                 return s_reusableImmutableEmptyBinding;
             }
@@ -1197,12 +1162,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-<<<<<<< HEAD
-    static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
-=======
     protected static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
-
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);
 

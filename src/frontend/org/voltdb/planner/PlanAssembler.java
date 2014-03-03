@@ -89,11 +89,9 @@ public class PlanAssembler {
 
     // The convinience struct to accumulate results after pasring multiple statements
     private class ParsedResultAccumulator {
-        public boolean m_contentIsDeterministic = true;
         public boolean m_orderIsDeterministic = true;
         public CompiledPlan m_compiledPlan;
         public int m_planId = 0;
-        public PartitioningForStatement m_commonPartitioning = null;
         public PartitioningForStatement m_currentPartitioning = null;
     }
 
@@ -118,6 +116,10 @@ public class PlanAssembler {
 
     /** Describes the specified and inferred partition context. */
     private PartitioningForStatement m_partitioning;
+
+    public PartitioningForStatement getPartition() {
+        return m_partitioning;
+    }
 
     /** Error message */
     String m_recentErrorMsg;
@@ -151,16 +153,16 @@ public class PlanAssembler {
 
     String getSQLText() {
         if (m_parsedDelete != null) {
-            return m_parsedDelete.sql;
+            return m_parsedDelete.m_sql;
         }
         else if (m_parsedInsert != null) {
-            return m_parsedInsert.sql;
+            return m_parsedInsert.m_sql;
         }
         else if (m_parsedUpdate != null) {
-            return m_parsedUpdate.sql;
+            return m_parsedUpdate.m_sql;
         }
         else if (m_parsedSelect != null) {
-            return m_parsedSelect.sql;
+            return m_parsedSelect.m_sql;
         }
         assert(false);
         return null;
@@ -215,36 +217,36 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
-        m_partitioning.analyzeTablePartitioning(parsedStmt.tableAliasMap.values());
+        m_partitioning.analyzeTablePartitioning(parsedStmt.m_tableAliasMap.values());
 
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
             return;
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
-            if (m_parsedSelect.joinTree instanceof BranchNode) {
+            if (m_parsedSelect.m_joinTree instanceof BranchNode) {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
-                ((BranchNode)m_parsedSelect.joinTree).toLeftJoin();
+                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
 
                 // End of the recursion. Nothing to simplify
-                simplifyOuterJoin((BranchNode)m_parsedSelect.joinTree);
+                simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
 
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
 
-// @TODO
-// Need to use StmtTableScan instead
+        // @TODO
+        // Need to use StmtTableScan instead
         // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.tableList)) {
+        if (tableListIncludesView(parsedStmt.m_tableList)) {
             throw new RuntimeException("Illegal to modify a materialized view.");
         }
 
@@ -252,8 +254,8 @@ public class PlanAssembler {
 
         // Check that only multi-partition writes are made to replicated tables.
         // figure out which table we're updating/deleting
-        assert (parsedStmt.tableList.size() == 1);
-        Table targetTable = parsedStmt.tableList.get(0);
+        assert (parsedStmt.m_tableList.size() == 1);
+        Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
             if (m_partitioning.wasSpecifiedAsSingle()) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
@@ -271,12 +273,12 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException("Illegal to update an export table.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException("Illegal to delete from an export table.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
@@ -293,7 +295,7 @@ public class PlanAssembler {
             // per-join-order basis, and so, so must this analysis.
             HashMap<AbstractExpression, Set<AbstractExpression>>
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
-            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableAliasMap.values(), valueEquivalence);
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.m_tableAliasMap.values(), valueEquivalence);
         }
         subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
@@ -331,13 +333,24 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-
         if (subQueryResult != null && retval != null) {
-            boolean contentIsDeterministic =
-                    subQueryResult.m_contentIsDeterministic && retval.isContentDeterministic();
             boolean orderIsDeterministic =
                     subQueryResult.m_orderIsDeterministic && retval.isOrderDeterministic();
-            retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+
+/// TODO! This is not right and probably never was.
+/// I don't think that Mike's ParsedResultAccumulator is serving very well here.
+/// It could probably serve to propagate the condition "hasLimitOrOffset == true" from any subquery to its parent even if the parent query had no offset or limit.
+/// But for order determinism I think that we will want to look at each subquery in context -- which seqscan is it feeding?
+/// If the subquery is order deterministic OR it can be made order deterministic by the micro-optimization rewrite,
+/// then, it's parent seqscan can be considered order determistic (though it technically has a seqscan and not an index scan).
+/// Analysis of each subquery in the context of each particular seqscan would theoretically allow the user to add specific order by columns in the parent query to guard against possible order non-determinism in a specific subquery.
+/// Detection of non-determinism HERE on the subquery taken out of context seems to make that harder.
+/// Subquery (seqscan) order detection could also be helpful in implementing optimized
+/// non-hashed group bys of subquery output that is or can be madeordered. We don't strictly have to optimize this case, but it would be nice.
+/// We need tests to know what cases of subqueries, if any, are giving false positives or false negatives for order and content determinism.
+/// It might be acceptable to mislabel a deterministic parent query, but it could be a serious error to miss a non-deterministic parent query.
+            // TODO(xin): Conficts
+            retval.statementGuaranteesDeterminism(orderIsDeterministic, false);
 
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
@@ -363,10 +376,10 @@ public class PlanAssembler {
      */
     private ParsedResultAccumulator getBestCostPlanForSubQueries(AbstractParsedStmt parsedStmt) {
         List<StmtSubqueryScan> subqueryNodes = new ArrayList<StmtSubqueryScan>();
-        if (parsedStmt.joinTree == null) {
+        if (parsedStmt.m_joinTree == null) {
             return null;
         }
-        parsedStmt.joinTree.extractSubQueries(subqueryNodes);
+        parsedStmt.m_joinTree.extractSubQueries(subqueryNodes);
         if (subqueryNodes.isEmpty()) {
             return null;
         }
@@ -432,8 +445,8 @@ public class PlanAssembler {
                 throw new RuntimeException(
                         "setupForNewPlans not called or not successfull.");
             }
-            assert (nextStmt.tableList.size() == 1);
-            if (nextStmt.tableList.get(0).getIsreplicated()) {
+            assert (nextStmt.m_tableList.size() == 1);
+            if (nextStmt.m_tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
             }
             retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
@@ -467,18 +480,26 @@ public class PlanAssembler {
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
+        PartitioningForStatement commonPartitioning = null;
 
         // Build best plans for the children first
-        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
+        int planId = 0;
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
-            parsedResult = planForParsedStmt(parsedChildStmt, parsedResult);
-            parsedResult = setCommonPartitioning(parsedResult);
-            if (parsedResult.m_compiledPlan == null) {
+            PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+            PlanSelector processor = (PlanSelector) m_planSelector.clone();
+            processor.m_planId = planId;
+            PlanAssembler assembler = new PlanAssembler(
+                    m_catalogCluster, m_catalogDb, partitioning, processor);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+            partitioning = assembler.getPartition();
+
+            // make sure we got a winner
+            if (bestChildPlan == null) {
+                if (m_recentErrorMsg == null) {
+                    m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
+                }
                 return null;
             }
-<<<<<<< HEAD
-            childrenPlans.add(parsedResult.m_compiledPlan);
-=======
             childrenPlans.add(bestChildPlan);
 
             // Make sure that next child's plans won't override current ones.
@@ -505,8 +526,7 @@ public class PlanAssembler {
                 // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
-            AbstractExpression
-            commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
+            AbstractExpression commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
             if (commonPartitionExpression == null) {
                 // the prior statement(s) were apparently replicated reads
                 // and have no effect on partitioning
@@ -526,17 +546,16 @@ public class PlanAssembler {
             }
             if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
                 throw new PlanningErrorException(
-                        "Statements use conflicting partitioned table filters in set operation.");
+                        "Statements use conflicting partitioned table filters in set operation or sub-query.");
             }
->>>>>>> master
         }
 
-        if (parsedResult.m_commonPartitioning != null) {
-            m_partitioning = (PartitioningForStatement)parsedResult.m_commonPartitioning.clone();
+        if (commonPartitioning != null) {
+            m_partitioning = commonPartitioning;
         }
 
         // need to reset plan id for the entire UNION
-        m_planSelector.m_planId = parsedResult.m_planId;
+        m_planSelector.m_planId = planId;
 
         // Add and link children plans
         for (CompiledPlan selectPlan : childrenPlans) {
@@ -559,9 +578,7 @@ public class PlanAssembler {
         return retval;
     }
 
-<<<<<<< HEAD
     private ParsedResultAccumulator planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
-
         parsedResult.m_currentPartitioning = (PartitioningForStatement)m_partitioning.clone();
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = parsedResult.m_planId;
@@ -573,76 +590,14 @@ public class PlanAssembler {
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }
-            return parsedResult;
+            return null;
         }
-
         parsedResult.m_orderIsDeterministic = parsedResult.m_orderIsDeterministic &&
                 parsedResult.m_compiledPlan.isOrderDeterministic();
-        parsedResult.m_contentIsDeterministic = parsedResult.m_contentIsDeterministic &&
-                parsedResult.m_compiledPlan.isContentDeterministic();
 
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
 
-//        parsedResult = setCommonPartitioning(partitioning, parsedResult);
-        return parsedResult;
-    }
-
-    /**
-     * Pick a new common partitioning given the existing common partitioning and the new one.
-     * An exception is thrown if they are not compatible
-     *
-     * @param parsedResult with the current partitioning
-     * @return updated parsedResult
-     */
-    private static ParsedResultAccumulator setCommonPartitioning(ParsedResultAccumulator parsedResult) {
-        assert (parsedResult!= null);
-        assert (parsedResult.m_currentPartitioning != null);
-
-         // Decide whether child statements' partitioning is compatible.
-        if (parsedResult.m_commonPartitioning == null) {
-            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
-            return parsedResult;
-        }
-
-        AbstractExpression statementPartitionExpression = parsedResult.m_currentPartitioning.singlePartitioningExpression();
-        if (parsedResult.m_commonPartitioning.requiresTwoFragments()) {
-            if (parsedResult.m_currentPartitioning.requiresTwoFragments() || statementPartitionExpression != null) {
-                // If two child statements need to use a second fragment,
-                // it can't currently be a two-fragment plan.
-                // The coordinator expects a single-table result from each partition.
-                // Also, currently the coordinator of a two-fragment plan is not allowed to
-                // target a particular partition, so neither can the union of the coordinator
-                // and a statement that wants to run single-partition.
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
-            }
-            // the new statement is apparently a replicated read and has no effect on partitioning
-            return parsedResult;
-        }
-        AbstractExpression
-        commonPartitionExpression = parsedResult.m_commonPartitioning.singlePartitioningExpression();
-        if (commonPartitionExpression == null) {
-            // the prior statement(s) were apparently replicated reads
-            // and have no effect on partitioning
-            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
-            return parsedResult;
-        }
-        if (parsedResult.m_currentPartitioning.requiresTwoFragments()) {
-            // Again, currently the coordinator of a two-fragment plan is not allowed to
-            // target a particular partition, so neither can the union of the coordinator
-            // and a statement that wants to run single-partition.
-            throw new PlanningErrorException(
-                    "Statements are too complex in set operation using multiple partitioned tables.");
-        }
-        if (statementPartitionExpression == null) {
-            // the new statement is apparently a replicated read and has no effect on partitioning
-            return parsedResult;
-        }
-        if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
-            throw new PlanningErrorException(
-                    "Statements use conflicting partitioned table filters in set operation or sub-query.");
-        }
         return parsedResult;
     }
 
@@ -670,10 +625,8 @@ public class PlanAssembler {
         return parentPlan;
     }
 
-    private AbstractPlanNode getNextSelectPlan() {
-=======
     private CompiledPlan getNextSelectPlan() {
->>>>>>> master
+
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -695,6 +648,11 @@ public class PlanAssembler {
          * inner side of a NestLoop join.
          */
         if (m_partitioning.requiresTwoFragments()) {
+
+            if (m_parsedSelect.m_joinTree.containSubSelects()) {
+                throw new PlanningErrorException("Subselect queries only are supported in single partition stored procedure.");
+            }
+
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
@@ -739,7 +697,7 @@ public class PlanAssembler {
                 if (m_parsedSelect.mayNeedAvgPushdown()) {
                     m_parsedSelect.switchOptimalSuiteForAvgPushdown();
                 }
-                if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
+                if (m_parsedSelect.m_tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
                         && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
                     // MV partitioned joined query needs reAggregation work on coordinator.
                     // Index scan on MV table can not be supported.
@@ -833,8 +791,8 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         // figure out which table we're deleting from
-        assert (m_parsedDelete.tableList.size() == 1);
-        Table targetTable = m_parsedDelete.tableList.get(0);
+        assert (m_parsedDelete.m_tableList.size() == 1);
+        Table targetTable = m_parsedDelete.m_tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null) {
@@ -912,7 +870,7 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
-        Table targetTable = m_parsedUpdate.tableList.get(0);
+        Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
@@ -989,8 +947,8 @@ public class PlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
 
         // figure out which table we're inserting into
-        assert (m_parsedInsert.tableList.size() == 1);
-        Table targetTable = m_parsedInsert.tableList.get(0);
+        assert (m_parsedInsert.m_tableList.size() == 1);
+        Table targetTable = m_parsedInsert.m_tableList.get(0);
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
@@ -1093,13 +1051,10 @@ public class PlanAssembler {
         }
 
         insertNode.setMultiPartition(true);
-<<<<<<< HEAD
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
-=======
+/// This comment should have been dropped.
         // The following is the moral equivalent of addSendReceivePair
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
         // add a count or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
@@ -1112,11 +1067,8 @@ public class PlanAssembler {
      * @param isReplicated Whether or not the target table is a replicated table.
      * @return
      */
-<<<<<<< HEAD
+
     private static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
-=======
-    static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
->>>>>>> master
     {
         AbstractPlanNode sumOrLimitNode;
         if (isReplicated) {
@@ -1243,88 +1195,6 @@ public class PlanAssembler {
                                               : SortDirectionType.DESC);
         }
         orderByNode.addAndLinkChild(root);
-<<<<<<< HEAD
-
-        // get all of the columns in the sort
-        List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-        String fromTableAlias = orderExpressions.get(0).baseTableAlias();
-
-        // In theory, for every table in the query, there needs to exist a uniqueness constraint
-        // (primary key or other unique index) on some of the ORDER BY values regardless of whether
-        // the associated index is used in the selected plan.
-        // If the index scan was used at the top of the plan, and its sort order was valid
-        // -- meaning covering the entire ORDER BY clause --
-        // this function would have already returned without adding an orderByNode.
-        // The interesting cases, including issue ENG-3335, are
-        // -- when the index scan is in the distributed part of the plan
-        // Then, the orderByNode is required to re-order the results at the coordinator.
-        // -- when the index was not the one selected for the plan.
-        // -- when the index is defined on a left-most child of a join the distributed part of the plan
-        // Then, the orderByNode is required to re-order the results at the coordinator.
-
-        // Start by eliminating joins since, in general, a join (one-to-many) may produce multiple joined rows for each unique input row.
-        // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
-        // to determine whether the particular join preserves the uniqueness of its index-scanned input.
-        boolean allScansAreDeterministic = true;
-        for (Table table : m_parsedSelect.tableList) {
-
-            allScansAreDeterministic = false;
-            // search indexes for one that makes the order by deterministic
-            for (Index index : table.getIndexes()) {
-                // skip non-unique indexes
-                if (!index.getUnique()) {
-                    continue;
-                }
-
-                // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
-
-                String jsonExpr = index.getExpressionsjson();
-                // if this is a pure-column index...
-                if (jsonExpr.isEmpty()) {
-                    for (ColumnRef cref : index.getColumns()) {
-                        Column col = cref.getColumn();
-                        // Can not set table Alias here, only table name
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
-                        tve.setValueSize(col.getSize());
-                        tve.setValueType(VoltType.get((byte) col.getType()));
-                        indexExpressions.add(tve);
-                    }
-                }
-                // if this is a fancy expression-based index...
-                else {
-                    StmtTableScan tableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
-                    try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
-                    } catch (JSONException e) {
-                        e.printStackTrace(); // danger will robinson
-                        assert(false);
-                        return null;
-                    }
-                }
-
-                // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
-                //    WHERE A.unique_id = 1 AND A.b_id = 2 and B.unique_id = A.b_id ORDER BY B.unique_id
-                if (orderExpressions.containsAll(indexExpressions)) {
-                    allScansAreDeterministic = true;
-                    break;
-                }
-            }
-
-            if ( ! allScansAreDeterministic) {
-                break;
-            }
-        }
-
-        if (allScansAreDeterministic) {
-            orderByNode.setOrderingByUniqueColumns();
-        }
-
-=======
->>>>>>> master
         return orderByNode;
     }
 
@@ -1472,14 +1342,14 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
         assert(find);
 
         // If it is normal joined query, replace the node under receive node with materialized view scan node.
-        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
@@ -1759,7 +1629,6 @@ public class PlanAssembler {
 
     private AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
         ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
-
         // Can't use index access to optimize a multi-table-based GROUP BY
         String fromTableAlias = null;
         for (ParsedColInfo col : groupBys) {
@@ -1782,15 +1651,10 @@ public class PlanAssembler {
         Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
         if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
-<<<<<<< HEAD
-=======
-            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
 
-            String fromTableAlias = groupBys.get(0).expression.baseTableAlias();
+/// This assert is redundant with one above.
             assert(fromTableAlias != null);
-            StmtTableScan fromTableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
-
+            StmtTableScan fromTableScan = m_parsedSelect.m_tableAliasMap.get(fromTableAlias);
             for (Index index : allIndexes) {
                 if ( ! IndexType.isScannable(index.getType())) {
                     continue;
@@ -1834,12 +1698,6 @@ public class PlanAssembler {
                 } else {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
-<<<<<<< HEAD
-                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
-                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
-
-=======
->>>>>>> da5896cc756ad4082136525c0628adf4c74500e2
                     try {
                         indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
@@ -2099,11 +1957,7 @@ public class PlanAssembler {
      * @param expr The distinct expression
      * @return The new root node.
      */
-<<<<<<< HEAD
     private static AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
-=======
-    static AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
->>>>>>> master
     {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
         distinctNode.setDistinctExpression(expr);
@@ -2135,6 +1989,8 @@ public class PlanAssembler {
     public String getErrorMessage() {
         return m_recentErrorMsg;
     }
+
+
 
     /**
      * Remove the coordinator send/receive pair if any from the graph.

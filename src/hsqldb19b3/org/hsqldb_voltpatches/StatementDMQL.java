@@ -829,8 +829,8 @@ public abstract class StatementDMQL extends Statement {
         return null;
     }
 
-    static protected void voltAppendParameters(Session session, VoltXMLElement xml, ExpressionColumn[] parameters)
-//    protected void voltAppendParameters(Session session, VoltXMLElement xml)
+    static protected void voltAppendParameters(Session session, VoltXMLElement xml,
+                                               ExpressionColumn[] parameters)
     {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         xml.children.add(parameterXML);
@@ -855,7 +855,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    protected static Expression voltCombineWithAnd(Expression... conditions)
+    static protected Expression voltCombineWithAnd(Expression... conditions)
     {
         Expression result = null;
         for(Expression child : conditions) {

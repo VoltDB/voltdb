@@ -73,6 +73,8 @@ public abstract class JoinNode implements Cloneable {
     @Override
     abstract public Object clone();
 
+    abstract public boolean containSubSelects();
+
     public int getId() {
         return m_id;
     }
