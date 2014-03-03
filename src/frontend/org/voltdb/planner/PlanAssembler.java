@@ -337,6 +337,18 @@ public class PlanAssembler {
             boolean orderIsDeterministic =
                     subQueryResult.m_orderIsDeterministic && retval.isOrderDeterministic();
 
+/// TODO! This is not right and probably never was.
+/// I don't think that Mike's ParsedResultAccumulator is serving very well here.
+/// It could probably serve to propagate the condition "hasLimitOrOffset == true" from any subquery to its parent even if the parent query had no offset or limit.
+/// But for order determinism I think that we will want to look at each subquery in context -- which seqscan is it feeding?
+/// If the subquery is order deterministic OR it can be made order deterministic by the micro-optimization rewrite,
+/// then, it's parent seqscan can be considered order determistic (though it technically has a seqscan and not an index scan).
+/// Analysis of each subquery in the context of each particular seqscan would theoretically allow the user to add specific order by columns in the parent query to guard against possible order non-determinism in a specific subquery.
+/// Detection of non-determinism HERE on the subquery taken out of context seems to make that harder.
+/// Subquery (seqscan) order detection could also be helpful in implementing optimized
+/// non-hashed group bys of subquery output that is or can be madeordered. We don't strictly have to optimize this case, but it would be nice.
+/// We need tests to know what cases of subqueries, if any, are giving false positives or false negatives for order and content determinism.
+/// It might be acceptable to mislabel a deterministic parent query, but it could be a serious error to miss a non-deterministic parent query.
             // TODO(xin): Conficts
             retval.statementGuaranteesDeterminism(orderIsDeterministic, false);
 
@@ -1039,6 +1051,7 @@ public class PlanAssembler {
         }
 
         insertNode.setMultiPartition(true);
+/// This comment should have been dropped.
         // The following is the moral equivalent of addSendReceivePair
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
@@ -1639,6 +1652,7 @@ public class PlanAssembler {
         if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
+/// This assert is redundant with one above.
             assert(fromTableAlias != null);
             StmtTableScan fromTableScan = m_parsedSelect.m_tableAliasMap.get(fromTableAlias);
             for (Index index : allIndexes) {

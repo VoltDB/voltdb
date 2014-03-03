@@ -101,6 +101,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             selectStmt.postParse(sql, joinOrder);
         }
 
+/// Same comment about "this."
         this.m_sql = sql;
         this.m_joinOrder = joinOrder;
     }
