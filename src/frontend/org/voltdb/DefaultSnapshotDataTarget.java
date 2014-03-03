@@ -289,6 +289,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
+            try {
+                m_syncTask.get();
+            } catch (ExecutionException e) {
+                SNAP_LOG.error("Error cancelling snapshot sync task", e);
+            }
+
             m_channel.force(false);
         } finally {
             m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
