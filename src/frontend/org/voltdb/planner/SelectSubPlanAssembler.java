@@ -376,6 +376,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * it doesn't mean no more plans can be generated. It's possible that the
      * particular join order it got had no reasonable plans.
      *
+/// You patched a bad javadoc comment, should have removed or repaired it.
      * @param m_joinOrder An array of tables in the join order.
      */
     private void generateMorePlansForJoinTree(JoinNode joinTree) {

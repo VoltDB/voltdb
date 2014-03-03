@@ -53,6 +53,10 @@ public class StmtSubqueryScan extends StmtTableScan {
     public StmtSubqueryScan(AbstractParsedStmt subquery, String tableAlias) {
         super(tableAlias);
         m_subquery = subquery;
+/// I think it's confusing to reuse the subquery variable here to hold the subquery child statement that
+/// defines the "real" subquery's schema, instead of a separate local variable (as it was) initially set = subquery
+/// This code is technically correct since m_subquery is already safely set, but it's just a little confusing.
+/// This needs a comment like -- A union or other set operator uses the output columns of its left-most leaf child statement.
         while (subquery instanceof ParsedUnionStmt) {
             assert( ! ((ParsedUnionStmt)subquery).m_children.isEmpty());
             subquery = ((ParsedUnionStmt)subquery).m_children.get(0);
@@ -75,6 +79,13 @@ public class StmtSubqueryScan extends StmtTableScan {
         return TABLE_SCAN_TYPE.TEMP_TABLE_SCAN;
     }
 
+/// There is probably no actual catalog table by this name and if there WAS by accident a table by this name, this might cause confusion.
+/// A possible alternative is to return null -- SOME of the callers would be satisfied by this value (and more correct).
+/// Other callers could ask for the alias instead if that's what they want, or they could ask for the alias only if they got a null table name.
+/// Another idea is to remove this function from StmtTableScan and fix each caller to do the right thing.
+/// That might mean adding a cast after "if (tableScan instanceof StmtTargetTableScan)... " or "assert(tableScan instanceof StmtTargetTableScan)".
+/// Caller by caller, decide "What does it mean for the tableScan here to be a subquery?"
+/// "What alternative value (null? the alias?) or alternative other action would make the most sense here?"
     @Override
     public String getTableName() {
         // derived table name is generated as "SYSTEM_SUBQUERY" + "hashCode".
@@ -146,6 +157,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setValueSize(schemaCol.getSize());
 
 
+/// This code is repeated in StmtTargetTableScan's resolveTVE and it operates on StmtTableScan members -- refactor out to a protected StmtTableScan method and make the members private.
         if (!m_scanColumnNameSet.contains(columnName)) {
             SchemaColumn scol = new SchemaColumn("", m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());

@@ -224,6 +224,7 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
+/// The beauty of the "m_" convention is that you can get rid of the "this.".
         this.m_sql = sql;
         this.m_joinOrder = joinOrder;
     }

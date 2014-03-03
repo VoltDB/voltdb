@@ -39,6 +39,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
 
+/// I have not yet reviewed these test changes. --paul
     private final String[] procs = {"R1.insert", "R2.insert", /* "P1.insert", "P2.insert", "P3.insert"*/};
     private final String [] tbs =  {"R1","R2"/*,"P1","P2","P3"*/};
 
@@ -68,6 +69,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
+/// If this test is being disabled intentionally for now, explain why in a comment.
     public void notestSubSelects_Simple() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
@@ -104,6 +106,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
+/// If this test is being disabled intentionally for now, explain why in a comment.
     public void notestSubSelects_Aggregations() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();

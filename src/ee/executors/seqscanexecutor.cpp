@@ -120,6 +120,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             node->getTargetTable();
 
     assert(input_table);
+/// What does it mean that a subquery seqscan has a target table? This seems useless/meaningless.
     Table* target_table = node->getTargetTable();
     assert(target_table);
 
@@ -193,6 +194,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
+/// This looks reversed, and target_table is obsolete -- should be more like: isSubquery ? NULL : input_table
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? target_table : (Table*)NULL);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {

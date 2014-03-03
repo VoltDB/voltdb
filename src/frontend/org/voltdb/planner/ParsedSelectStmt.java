@@ -1055,6 +1055,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 return false;
             }
 
+/// Prefer standard java instanceof tests to custom tag tests like this -- maybe we can completely get rid of TABLE_SCAN_TYPE this way?
             if (tableScan.getScanType() != TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
                 return false; // don't yet handle FROM clause subquery, here.
             }

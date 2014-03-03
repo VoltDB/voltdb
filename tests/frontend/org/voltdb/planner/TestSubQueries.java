@@ -45,6 +45,7 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestSubQueries extends PlannerTestCase {
 
+/// I have not yet reviewed these test changes yet. --paul
     public void testUnsupportedSyntax() {
         failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
     }
