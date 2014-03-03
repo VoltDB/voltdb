@@ -81,7 +81,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_tableAllocationTargetSize(tableAllocationTargetSize),
     m_pkeyIndex(NULL),
     m_refcount(0),
-    m_compactionThreshold(0.95)
+    m_compactionThreshold(95)
 {
 }
 
