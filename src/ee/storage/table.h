@@ -230,7 +230,7 @@ class Table {
     // returned via shallow vector copy -- seems good enough.
     const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
 
-    inline TableIndex *index(std::string name);
+    virtual TableIndex *index(std::string name);
 
     virtual TableIndex *primaryKeyIndex() {
         return m_pkeyIndex;
