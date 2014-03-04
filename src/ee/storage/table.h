@@ -54,8 +54,6 @@
 #include <list>
 #include <cassert>
 
-#include <boost/unordered_map.hpp>
-
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -445,7 +443,6 @@ protected:
 
     // indexes
     std::vector<TableIndex*> m_indexes;
-    boost::unordered_map<std::string, TableIndex*> m_indexNameMap;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
 
