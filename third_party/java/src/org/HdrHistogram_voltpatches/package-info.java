@@ -271,6 +271,6 @@
  * {@link org.HdrHistogram.AbstractHistogram#getEstimatedFootprintInBytes() getEstimatedFootprintInBytes()} method.
  */
 
-package org.HdrHistogram;
+package org.HdrHistogram_voltpatches;
 
 

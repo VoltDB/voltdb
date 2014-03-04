@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
@@ -65,11 +67,17 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    public static Histogram constructHistogram() {
-        return new Histogram(60L * 60L * 1000000L, 3);
+    public static AbstractHistogram constructHistogram(boolean threadSafe) {
+        final long highestTrackableValue = 60L * 60L * 1000000L;
+        final int numberOfSignificantValueDigits = 2;
+        if (threadSafe) {
+            return new AtomicHistogram( highestTrackableValue, numberOfSignificantValueDigits);
+        } else {
+            return new Histogram( highestTrackableValue, numberOfSignificantValueDigits);
+        }
     }
 
-    private Histogram m_totals = constructHistogram();
+    private AbstractHistogram m_totals = constructHistogram(false);
 
     public LatencyStats(long siteId) {
         super(siteId, false);
@@ -82,8 +90,8 @@ public class LatencyStats extends SiteStatsSource {
         m_totals.reset();
         ClientInterface ci = VoltDB.instance().getClientInterface();
         if (ci != null) {
-            List<Histogram> thisci = ci.getLatencyStats();
-            for (Histogram info : thisci) {
+            List<AbstractHistogram> thisci = ci.getLatencyStats();
+            for (AbstractHistogram info : thisci) {
                 m_totals.add(info);
                 info.reset();
             }

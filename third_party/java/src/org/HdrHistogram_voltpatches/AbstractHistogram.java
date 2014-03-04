@@ -9,7 +9,11 @@
 package org.HdrHistogram_voltpatches;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.xerial.snappy.Snappy;
 
 /**
  * This non-public AbstractHistogramBase super-class separation is meant to bunch "cold" fields
@@ -613,5 +617,40 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
     static final long valueFromIndex(int bucketIndex, int subBucketIndex, int unitMagnitude)
     {
         return ((long) subBucketIndex) << ( bucketIndex + unitMagnitude);
+    }
+
+    public byte[] toCompressedBytes() {
+        ByteBuffer buf = ByteBuffer.allocate(8 * countsArrayLength + (3 * 8) + 4);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+        buf.putLong(lowestTrackableValue);
+        buf.putLong(highestTrackableValue);
+        buf.putInt(numberOfSignificantValueDigits);
+        buf.putLong(getTotalCount());
+        for (int ii = 0; ii < countsArrayLength; ii++) {
+            buf.putLong(getCountAtIndex(ii));
+        }
+        try {
+            return Snappy.compress(buf.array());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Histogram fromCompressedBytes(byte bytes[]) {
+        try {
+            ByteBuffer buf = ByteBuffer.wrap(Snappy.uncompress(bytes));
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            final long lTrackableValue = buf.getLong();
+            final long hTrackableValue = buf.getLong();
+            final int nSVD = buf.getInt();
+            Histogram h = new Histogram(lTrackableValue, hTrackableValue, nSVD);
+            h.addToTotalCount(buf.getLong());
+            for (int ii = 0; ii < h.countsArrayLength; ii++) {
+                h.addToCountAtIndex(ii, buf.getLong());
+            }
+            return h;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

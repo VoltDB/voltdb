@@ -51,6 +51,7 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -2674,8 +2675,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return statsIterators;
     }
 
-    public List<Histogram> getLatencyStats() {
-        List<Histogram> latencyStats = new ArrayList<Histogram>();
+    public List<AbstractHistogram> getLatencyStats() {
+        List<AbstractHistogram> latencyStats = new ArrayList<AbstractHistogram>();
         for (AdmissionControlGroup acg : m_allACGs) {
             latencyStats.add(acg.getLatencyInfo());
         }

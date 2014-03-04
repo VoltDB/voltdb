@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
@@ -99,10 +100,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     private final ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
                  new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>(1024, .75f, 1);
 
-    // Use the same-ish trick for the latency stats.  LatencyInfo keeps
-    // volatile ImmutableLists for the buckets and a separate volatile max.
-    // Same single-writer, unsynchronized reader pattern as initiator stats.
-    private final Histogram m_latencyInfo = LatencyStats.constructHistogram();
+    private final AbstractHistogram m_latencyInfo = LatencyStats.constructHistogram(true);
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -302,7 +300,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         return m_connectionStates.entrySet().iterator();
     }
 
-    public Histogram getLatencyInfo() {
+    public AbstractHistogram getLatencyInfo() {
         return m_latencyInfo;
     }
 }

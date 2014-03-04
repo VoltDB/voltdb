@@ -8,13 +8,8 @@
 
 package org.HdrHistogram_voltpatches;
 
-import org.xerial.snappy.Snappy;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * <h3>A High Dynamic Range (HDR) Histogram</h3>
@@ -153,40 +148,5 @@ public class Histogram extends AbstractHistogram {
     private void readObject(final ObjectInputStream o)
             throws IOException, ClassNotFoundException {
         o.defaultReadObject();
-    }
-
-    public byte[] toCompressedBytes() {
-        ByteBuffer buf = ByteBuffer.allocate(8 * counts.length + (3 * 8) + 4);
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-        buf.putLong(lowestTrackableValue);
-        buf.putLong(highestTrackableValue);
-        buf.putInt(numberOfSignificantValueDigits);
-        buf.putLong(totalCount);
-        for (long count : counts) {
-            buf.putLong(count);
-        }
-        try {
-            return Snappy.compress(buf.array());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static Histogram fromCompressedBytes(byte bytes[]) {
-        try {
-            ByteBuffer buf = ByteBuffer.wrap(Snappy.uncompress(bytes));
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-            final long lTrackableValue = buf.getLong();
-            final long hTrackableValue = buf.getLong();
-            final int nSVD = buf.getInt();
-            Histogram h = new Histogram(lTrackableValue, hTrackableValue, nSVD);
-            h.addToTotalCount(buf.getLong());
-            for (int ii = 0; ii < h.counts.length; ii++) {
-                h.addToCountAtIndex(ii, buf.getLong());
-            }
-            return h;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 }
