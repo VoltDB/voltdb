@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 
 import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
+import org.voltcore.TransactionIdManager;
 import org.voltcore.agreement.AgreementSite.AgreementTransactionState;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -64,6 +65,11 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         long m_lastSeenTxnId;
         long m_lastSafeTxnId;
+
+        @Override
+        public String toString() {
+            return "{" + TransactionIdManager.getTimestampFromTransactionId(m_lastSeenTxnId) + "," + TransactionIdManager.getTimestampFromTransactionId(m_lastSeenTxnId) + "}";
+        }
     }
 
     final LinkedHashMap<Long, LastInitiatorData> m_initiatorData = new LinkedHashMap<Long, LastInitiatorData>();
@@ -372,6 +378,18 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // Sufficient ordering established?
         if (ts.txnId > m_newestCandidateTransaction) {
+            LastInitiatorData min = null;
+            long max = 0;
+            for (LastInitiatorData lid2 : m_initiatorData.values()) {
+                if (min == null) {
+                    min = lid2;
+                    max = lid2.m_lastSeenTxnId;
+                } else if (min.m_lastSeenTxnId > lid2.m_lastSeenTxnId) {
+                    min = lid2;
+                }
+                max = Math.max(max, lid2.m_lastSeenTxnId);
+            }
+            long delta = TransactionIdManager.getTimestampFromTransactionId(max) - TransactionIdManager.getTimestampFromTransactionId(min.m_lastSeenTxnId);
             newState = QueueState.BLOCKED_ORDERING;
             executeStateChange(newState, ts, lid);
             return m_state;

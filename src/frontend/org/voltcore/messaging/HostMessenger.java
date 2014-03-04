@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,6 +45,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.COWNavigableSet;
@@ -67,6 +70,8 @@ import com.google_voltpatches.common.primitives.Longs;
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
 
     private static final VoltLogger logger = new VoltLogger("NETWORK");
+
+    public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -319,7 +324,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
-                    m_config.zkInterface, 60 * 1000, ImmutableSet.<Long>copyOf(m_network.getThreadIds()));
+                    m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
             if (m_zk == null) {
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
@@ -408,8 +413,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
-            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-            fhost.register(this);
+            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
             putForeignHost(hostId, fhost);
             fhost.enableRead();
         } catch (java.io.IOException e) {
@@ -486,8 +490,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 /*
                  * Now add the host to the mailbox system
                  */
-                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-                fhost.register(this);
+                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
                 putForeignHost(hostId, fhost);
                 fhost.enableRead();
             } catch (Exception e) {
@@ -599,8 +602,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
             try {
-                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii]);
-                fhost.register(this);
+                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii], new PicoNetwork(sockets[ii]));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
@@ -638,12 +640,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Do the usual thing of waiting for the agreement site
          * to join the cluster and creating the client
          */
-        ImmutableSet.Builder<Long> verbotenThreadBuilder = ImmutableSet.<Long>builder();
-        verbotenThreadBuilder.addAll(m_network.getThreadIds());
-        verbotenThreadBuilder.addAll(m_agreementSite.getThreadIds());
+        VERBOTEN_THREADS.addAll(m_network.getThreadIds());
+        VERBOTEN_THREADS.addAll(m_agreementSite.getThreadIds());
         m_agreementSite.waitForRecovery();
         m_zk = org.voltcore.zk.ZKUtil.getClient(
-                m_config.zkInterface, 60 * 1000, verbotenThreadBuilder.build());
+                m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
@@ -919,6 +920,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         m_joiner.shutdown();
         m_network.shutdown();
+        VERBOTEN_THREADS.clear();
     }
 
     /*

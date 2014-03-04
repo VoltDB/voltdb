@@ -386,11 +386,9 @@ public class ZooKeeper {
         watchManager.defaultWatcher = watcher;
         cnxn = new ClientCnxn(connectString, sessionTimeout, this, watchManager);
         cnxn.start();
-        ImmutableSet.Builder<Long> builder = ImmutableSet.<Long>builder();
-        builder.addAll(verbotenThreads);
-        builder.add(cnxn.eventThread.getId());
-        builder.add(cnxn.sendThread.getId());
-        this.verbotenThreads = builder.build();
+        verbotenThreads.add(cnxn.eventThread.getId());
+        verbotenThreads.add(cnxn.sendThread.getId());
+        this.verbotenThreads = verbotenThreads;
     }
 
     private void verbotenThreadCheck() {

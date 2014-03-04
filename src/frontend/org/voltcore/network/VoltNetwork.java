@@ -488,4 +488,8 @@ class VoltNetwork implements Runnable
         m_tasks.offer(r);
         m_selector.wakeup();
     }
+
+    int numPorts() {
+        return m_ports.size();
+    }
 }

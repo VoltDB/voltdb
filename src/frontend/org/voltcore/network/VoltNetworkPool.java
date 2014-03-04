@@ -38,7 +38,6 @@ public class VoltNetworkPool {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final VoltNetwork m_networks[];
-    private final AtomicLong m_nextWorkerSelection = new AtomicLong();
 
     public VoltNetworkPool() {
         this(1, null);
@@ -85,7 +84,12 @@ public class VoltNetworkPool {
             final InputHandler handler,
             final int interestOps,
             final ReverseDNSPolicy dns) throws IOException {
-        VoltNetwork vn = m_networks[(int)(m_nextWorkerSelection.incrementAndGet() % m_networks.length)];
+        VoltNetwork vn = m_networks[0];
+        for (int ii = 1; ii < m_networks.length; ii++) {
+            if (vn.numPorts() > m_networks[ii].numPorts()) {
+                vn = m_networks[ii];
+            }
+        }
         return vn.registerChannel(channel, handler, interestOps, dns);
     }
 

@@ -36,6 +36,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -71,6 +72,7 @@ public class ZKTestBase {
         m_clients.clear();
         for (HostMessenger hm : m_messengers) {
             if (hm != null) {
+                System.err.println("Expect full tear down");
                 hm.shutdown();
             }
         }
@@ -88,7 +90,7 @@ public class ZKTestBase {
                 }
                 System.out.println(event);
             }},
-            ImmutableSet.<Long>of());
+            Sets.<Long>newHashSet());
         m_clients.add(keeper);
         permit.acquire();
         return keeper;
