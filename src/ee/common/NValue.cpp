@@ -293,18 +293,6 @@ void NValue::createDecimalFromString(const std::string &txt) {
  * E-12, which can overflow unnecessarily at the middle step.
  */
 NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal multiply");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
     if ((lhs.getValueType() == VALUE_TYPE_DECIMAL) &&
         (rhs.getValueType() == VALUE_TYPE_DECIMAL))
     {
@@ -372,18 +360,6 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
  */
 
 NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "No decimal NValue in decimal subtract");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
     TTLInt calc;
     calc.FromInt(lhs.getDecimal());
     calc *= NValue::kMaxScaleFactor;

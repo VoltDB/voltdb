@@ -272,10 +272,11 @@ public:
         assert(m_data);
         assert(idx < m_schema->columnCount());
 
-        //assert(isActive());
-        const voltdb::ValueType columnType = m_schema->columnType(idx);
-        const char* dataPtr = getDataPtr(idx);
-        const bool isInlined = m_schema->columnIsInlined(idx);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = static_cast<ValueType>(columnInfo->type);
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
@@ -369,6 +370,12 @@ private:
         assert(m_schema);
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
+    }
+
+    inline const char* getDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
+        assert(m_schema);
+        assert(m_data);
+        return &m_data[colInfo->offset + TUPLE_HEADER_SIZE];
     }
 };
 
