@@ -1060,44 +1060,6 @@ class NValue {
         }
     }
 
-    double castAsDoubleAndGetValueWithoutNull() const {
-            const ValueType type = getValueType();
-
-            switch (type) {
-              case VALUE_TYPE_TINYINT:
-                return static_cast<double>(getTinyInt());
-              case VALUE_TYPE_SMALLINT:
-                return static_cast<double>(getSmallInt());
-              case VALUE_TYPE_INTEGER:
-                return static_cast<double>(getInteger());
-              case VALUE_TYPE_ADDRESS:
-                return static_cast<double>(getBigInt());
-              case VALUE_TYPE_BIGINT:
-                return static_cast<double>(getBigInt());
-              case VALUE_TYPE_TIMESTAMP:
-                return static_cast<double>(getTimestamp());
-              case VALUE_TYPE_DOUBLE:
-                return getDouble();
-              case VALUE_TYPE_DECIMAL:
-              {
-                double retval;
-                TTInt scaledValue = getDecimal();
-                TTInt whole(scaledValue);
-                TTInt fractional(scaledValue);
-                whole /= kMaxScaleFactor;
-                fractional %= kMaxScaleFactor;
-                retval = static_cast<double>(whole.ToInt()) +
-                        (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
-                return retval;
-              }
-              case VALUE_TYPE_VARCHAR:
-              case VALUE_TYPE_VARBINARY:
-              default:
-                throwCastSQLException(type, VALUE_TYPE_DOUBLE);
-                return 0; // NOT REACHED
-            }
-        }
-
     TTInt castAsDecimalAndGetValue() const {
         const ValueType type = getValueType();
         if (isNull()) {
@@ -1554,57 +1516,6 @@ class NValue {
         return retval;
     }
 
-    NValue castAsDecimalWithoutNull() const {
-            NValue retval(VALUE_TYPE_DECIMAL);
-            const ValueType type = getValueType();
-            switch (type) {
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
-            {
-                int64_t rhsint = castAsRawInt64AndGetValue();
-                retval.createDecimalFromInt(rhsint);
-                break;
-            }
-            case VALUE_TYPE_DECIMAL:
-                ::memcpy(retval.m_data, m_data, sizeof(TTInt));
-                break;
-            case VALUE_TYPE_DOUBLE:
-            {
-                const double& value = getDouble();
-                if (value >= s_gtMaxDecimalAsDouble || value <= s_ltMinDecimalAsDouble) {
-                    char message[4096];
-                    snprintf(message, 4096, "Attempted to cast value %f causing overflow/underflow", value);
-                    throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
-                }
-                // Resort to string as the intermediary since even int64_t does not cover the full range.
-                char decimalAsString[41]; // Large enough to account for digits, sign, decimal, and terminating null.
-                snprintf(decimalAsString, sizeof(decimalAsString), "%.12f", value);
-                // Shift the entire integer part 1 digit to the right, overwriting the decimal point.
-                // This effectively creates a potentially very large integer value
-                //  equal to the original double scaled up by 10^12.
-                for (char* intDigit = strchr(decimalAsString, '.'); intDigit > decimalAsString; --intDigit) {
-                    *intDigit = *(intDigit-1);
-                }
-                TTInt result(decimalAsString+1);
-                retval.getDecimal() = result;
-                break;
-            }
-            case VALUE_TYPE_VARCHAR:
-            {
-                const int32_t length = getObjectLength();
-                const char* bytes = reinterpret_cast<const char*>(getObjectValue());
-                const std::string value(bytes, length);
-                retval.createDecimalFromString(value);
-                break;
-            }
-            default:
-                throwCastSQLException(type, VALUE_TYPE_DECIMAL);
-            }
-            return retval;
-        }
-
     /**
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided storage area
@@ -1938,8 +1849,8 @@ class NValue {
     }
 
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
-//        if (lhs == INT64_NULL || rhs == INT64_NULL)
-//            return getBigIntValue(INT64_NULL);
+        if (lhs == INT64_NULL || rhs == INT64_NULL)
+            return getBigIntValue(INT64_NULL);
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if ( ((lhs^rhs)
                 | (((lhs^(~(lhs^rhs)
@@ -1952,8 +1863,8 @@ class NValue {
     }
 
     NValue opSubtractBigInts(const int64_t lhs, const int64_t rhs) const {
-//        if (lhs == INT64_NULL || rhs == INT64_NULL)
-//            return getBigIntValue(INT64_NULL);
+        if (lhs == INT64_NULL || rhs == INT64_NULL)
+            return getBigIntValue(INT64_NULL);
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if ( ((lhs^rhs)
                 & (((lhs ^ ((lhs^rhs)
@@ -2011,8 +1922,8 @@ class NValue {
     }
 
     NValue opDivideBigInts(const int64_t lhs, const int64_t rhs) const {
-//        if (lhs == INT64_NULL || rhs == INT64_NULL)
-//            return getBigIntValue(INT64_NULL);
+        if (lhs == INT64_NULL || rhs == INT64_NULL)
+            return getBigIntValue(INT64_NULL);
 
         if (rhs == 0) {
             char message[4096];
@@ -2029,8 +1940,8 @@ class NValue {
     }
 
     NValue opAddDoubles(const double lhs, const double rhs) const {
-//        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
-//            return getDoubleValue(DOUBLE_MIN);
+        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
+            return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs + rhs;
         throwDataExceptionIfInfiniteOrNaN(result, "'+' operator");
@@ -2038,8 +1949,8 @@ class NValue {
     }
 
     NValue opSubtractDoubles(const double lhs, const double rhs) const {
-//        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
-//            return getDoubleValue(DOUBLE_MIN);
+        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
+            return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs - rhs;
         throwDataExceptionIfInfiniteOrNaN(result, "'-' operator");
@@ -2047,8 +1958,8 @@ class NValue {
     }
 
     NValue opMultiplyDoubles(const double lhs, const double rhs) const {
-//        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
-//            return getDoubleValue(DOUBLE_MIN);
+        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
+            return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs * rhs;
         throwDataExceptionIfInfiniteOrNaN(result, "'*' operator");
@@ -2056,8 +1967,8 @@ class NValue {
     }
 
     NValue opDivideDoubles(const double lhs, const double rhs) const {
-//        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
-//            return getDoubleValue(DOUBLE_MIN);
+        if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
+            return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs / rhs;
         throwDataExceptionIfInfiniteOrNaN(result, "'/' operator");
@@ -2065,6 +1976,18 @@ class NValue {
     }
 
     NValue opAddDecimals(const NValue lhs, const NValue rhs) const {
+        if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
+            (rhs.getValueType() != VALUE_TYPE_DECIMAL))
+        {
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal adder.");
+        }
+
+        if (lhs.isNull() || rhs.isNull()) {
+            TTInt retval;
+            retval.SetMin();
+            return getDecimalValue(retval);
+        }
+
         TTInt retval(lhs.getDecimal());
         if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
@@ -2078,11 +2001,17 @@ class NValue {
     }
 
     NValue opSubtractDecimals(const NValue lhs, const NValue rhs) const {
-//        if (lhs.isNull() || rhs.isNull()) {
-//            TTInt retval;
-//            retval.SetMin();
-//            return getDecimalValue(retval);
-//        }
+        if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
+            (rhs.getValueType() != VALUE_TYPE_DECIMAL))
+        {
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal subtract.");
+        }
+
+        if (lhs.isNull() || rhs.isNull()) {
+            TTInt retval;
+            retval.SetMin();
+            return getDecimalValue(retval);
+        }
 
         TTInt retval(lhs.getDecimal());
         if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -2424,7 +2353,7 @@ inline int NValue::compare(const NValue rhs) const {
  * comparison in favor of op_*.
  */
 inline int NValue::compareWithoutNull(const NValue rhs) const {
-    assert(isNull() == false && rhs.isNull() == false);
+    assert(isNull() == false && rhs.isNull() = false);
 
     switch (m_valueType) {
     case VALUE_TYPE_VARCHAR:
@@ -3349,10 +3278,6 @@ inline bool NValue::isZero() const {
 }
 
 inline NValue NValue::op_subtract(const NValue rhs) const {
-    if (isNull() || rhs.isNull()) {
-        // Data type is not important, just return NULL.
-        return getNullValue();
-    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
     case VALUE_TYPE_BIGINT:
@@ -3360,15 +3285,16 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_TIMESTAMP:
-        return opSubtractBigInts(castAsBigIntAndGetValueWithoutNull(),
-                rhs.castAsBigIntAndGetValueWithoutNull());
+        return opSubtractBigInts(castAsBigIntAndGetValue(),
+                rhs.castAsBigIntAndGetValue());
 
     case VALUE_TYPE_DOUBLE:
-        return opSubtractDoubles(getDouble(),
-                rhs.castAsDoubleAndGetValueWithoutNull());
+        return opSubtractDoubles(castAsDoubleAndGetValue(),
+                rhs.castAsDoubleAndGetValue());
 
     case VALUE_TYPE_DECIMAL:
-        return opSubtractDecimals(*this, rhs.castAsDecimalWithoutNull());
+        return opSubtractDecimals(castAsDecimal(),
+                rhs.castAsDecimal());
 
     default:
         break;
@@ -3379,10 +3305,6 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
-    if (isNull() || rhs.isNull()) {
-        // Data type is not important, just return NULL.
-        return getNullValue();
-    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
     case VALUE_TYPE_BIGINT:
@@ -3390,15 +3312,16 @@ inline NValue NValue::op_add(const NValue rhs) const {
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_TIMESTAMP:
-        return opAddBigInts(castAsBigIntAndGetValueWithoutNull(),
-                rhs.castAsBigIntAndGetValueWithoutNull());
+        return opAddBigInts(castAsBigIntAndGetValue(),
+                rhs.castAsBigIntAndGetValue());
 
     case VALUE_TYPE_DOUBLE:
-        return opAddDoubles(getDouble(),
-                rhs.castAsDoubleAndGetValueWithoutNull());
+        return opAddDoubles(castAsDoubleAndGetValue(),
+                rhs.castAsDoubleAndGetValue());
 
     case VALUE_TYPE_DECIMAL:
-        return opAddDecimals(*this, rhs.castAsDecimalWithoutNull());
+        return opAddDecimals(castAsDecimal(),
+                rhs.castAsDecimal());
 
     default:
         break;
@@ -3409,10 +3332,6 @@ inline NValue NValue::op_add(const NValue rhs) const {
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
-    if (isNull() || rhs.isNull()) {
-        // Data type is not important, just return NULL.
-        return getNullValue();
-    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
       case VALUE_TYPE_TINYINT:
@@ -3420,12 +3339,12 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
       case VALUE_TYPE_INTEGER:
       case VALUE_TYPE_BIGINT:
       case VALUE_TYPE_TIMESTAMP:
-        return opMultiplyBigInts(castAsBigIntAndGetValueWithoutNull(),
-                                 rhs.castAsBigIntAndGetValueWithoutNull());
+        return opMultiplyBigInts(castAsBigIntAndGetValue(),
+                                 rhs.castAsBigIntAndGetValue());
 
       case VALUE_TYPE_DOUBLE:
-        return opMultiplyDoubles(getDouble(),
-                                 rhs.castAsDoubleAndGetValueWithoutNull());
+        return opMultiplyDoubles(castAsDoubleAndGetValue(),
+                                 rhs.castAsDoubleAndGetValue());
 
       case VALUE_TYPE_DECIMAL:
         return opMultiplyDecimals(*this, rhs);
@@ -3439,10 +3358,6 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
-    if (isNull() || rhs.isNull()) {
-        // Data type is not important, just return NULL.
-        return getNullValue();
-    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
       case VALUE_TYPE_TINYINT:
@@ -3450,15 +3365,16 @@ inline NValue NValue::op_divide(const NValue rhs) const {
       case VALUE_TYPE_INTEGER:
       case VALUE_TYPE_BIGINT:
       case VALUE_TYPE_TIMESTAMP:
-        return opDivideBigInts(castAsBigIntAndGetValueWithoutNull(),
-                               rhs.castAsBigIntAndGetValueWithoutNull());
+        return opDivideBigInts(castAsBigIntAndGetValue(),
+                               rhs.castAsBigIntAndGetValue());
 
       case VALUE_TYPE_DOUBLE:
-        return opDivideDoubles(getDouble(),
-                               rhs.castAsDoubleAndGetValueWithoutNull());
+        return opDivideDoubles(castAsDoubleAndGetValue(),
+                               rhs.castAsDoubleAndGetValue());
 
       case VALUE_TYPE_DECIMAL:
-        return opDivideDecimals(*this, rhs.castAsDecimalWithoutNull());
+        return opDivideDecimals(castAsDecimal(),
+                                rhs.castAsDecimal());
 
       default:
         break;
