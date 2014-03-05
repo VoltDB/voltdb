@@ -42,7 +42,7 @@ def get_stats(hostname, port, days):
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'BestOfPeriod_ab',
+    proc = VoltProcedure(conn, 'CenterAverageOfPeriod',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
@@ -249,15 +249,15 @@ def main():
         throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
         filenames.append((app, latency95_filename, latency99_filename, throughput_filename, iorder))
 
-        plot(app + " latency95", "Time", "Latency (ms)",
+        plot(app + " avg latency95", "Time", "Latency (ms)",
              path + "-latency95-" + app_filename + ".png", width, height, app,
              data, 'lat95')
 
-        plot(app + " latency99", "Time", "Latency (ms)",
+        plot(app + " avg latency99(avg)", "Time", "Latency (ms)",
              path + "-latency99-" + app_filename + ".png", width, height, app,
              data, 'lat99')
 
-        plot(app+" throughput(best) per node", "Time", "Thpt tx/sec",
+        plot(app+" avg throughput per node", "Time", "Thpt tx/sec",
                     path + "-throughput-" + app_filename + ".png", width, height, app, data, 'tps')
 
     # generate index file
