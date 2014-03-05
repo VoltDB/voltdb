@@ -136,7 +136,7 @@ public abstract class NIOWriteStreamBase {
                 outbuf.limit(oldLimit);
             } else {
                 //Slow path serialize to heap, and then put in buffers
-                ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
+                ByteBuffer buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
                 checkSloppySerialization(buf, ds);
                 buf.position(0);
