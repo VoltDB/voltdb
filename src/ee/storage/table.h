@@ -403,12 +403,6 @@ protected:
     virtual void onSetColumns() {
     };
 
-    double loadFactor() {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
-
     // ------------------------------------------------------------------
     // DATA
     // ------------------------------------------------------------------
