@@ -294,13 +294,13 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         if (current.isNull()) {
             continue;
         }
-        if (current.compareWithoutNull(existingValue) == 0) {
+        if (current.compare(existingValue) == 0) {
             newVal = current;
             VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
             break;
         }
         VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-        if (newVal.isNull() || (negate_for_min * current.compareWithoutNull(newVal)) > 0) {
+        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
             newVal = current;
             VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
         }
@@ -350,7 +350,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
         if (current.isNull()) {
             continue;
         }
-        if (current.compareWithoutNull(existingValue) == 0) {
+        if (current.compare(existingValue) == 0) {
             if (!skippedOne) {
                 VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
                 skippedOne = true;
@@ -361,7 +361,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
             break;
         }
         VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
-        if (newVal.isNull() || (negate_for_min * current.compareWithoutNull(newVal)) > 0) {
+        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
             newVal = current;
             VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
         }
@@ -421,13 +421,13 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                     // ignore any new value that is not strictly an improvement
-                    if (!existingValue.isNull() && newValue.compareWithoutNull(existingValue) >= 0) {
+                    if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
                         newValue = existingValue;
                     }
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
                     // ignore any new value that is not strictly an improvement
-                    if (!existingValue.isNull() && newValue.compareWithoutNull(existingValue) <= 0) {
+                    if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
                         newValue = existingValue;
                     }
                     break;
@@ -522,7 +522,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 reversedForMin = -1; // fall through...
                 /* no break */
             case EXPRESSION_TYPE_AGGREGATE_MAX:
-                if (oldValue.compareWithoutNull(existingValue) == 0) {
+                if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 

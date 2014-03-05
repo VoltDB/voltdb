@@ -494,13 +494,13 @@ class NValue {
         bool operator()(const NValue v1, const NValue v2) const {
             int hasNullCompare = v1.compareNull(v2);
             if (hasNullCompare == VALUE_COMPARE_LESSTHAN) {
-            	return true;
+                return true;
             } else if (hasNullCompare == VALUE_COMPARE_INVALID &&
-            		v1.compareWithoutNull(v2) == VALUE_COMPARE_LESSTHAN) {
-            	return true;
+                    v1.compareWithoutNull(v2) == VALUE_COMPARE_LESSTHAN) {
+                return true;
             }
 
-        	return false;
+            return false;
         }
     };
 
@@ -510,13 +510,13 @@ class NValue {
         bool operator()(NValue const& x,
             NValue const& y) const
         {
-        	int hasNullCompare = x.compareNull(y);
-        	if (hasNullCompare == VALUE_COMPARE_EQUAL) {
-        		return true;
-        	} else if (hasNullCompare == VALUE_COMPARE_INVALID &&
-        			x.compareWithoutNull(y) == VALUE_COMPARE_EQUAL) {
-        		return true;
-        	}
+            int hasNullCompare = x.compareNull(y);
+            if (hasNullCompare == VALUE_COMPARE_EQUAL) {
+                return true;
+            } else if (hasNullCompare == VALUE_COMPARE_INVALID &&
+                    x.compareWithoutNull(y) == VALUE_COMPARE_EQUAL) {
+                return true;
+            }
             return false;
         }
     };
@@ -2382,39 +2382,39 @@ inline int NValue::compareNull(const NValue rhs) const {
  * comparison in favor of op_*.
  */
 inline int NValue::compare(const NValue rhs) const {
-	   switch (getValueType()) {
-	    case VALUE_TYPE_TINYINT:
-	    case VALUE_TYPE_SMALLINT:
-	    case VALUE_TYPE_INTEGER:
-	    case VALUE_TYPE_BIGINT:
-	        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-	            return castAsDouble().compareDoubleValue(rhs);
-	        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-	            return -1 * rhs.compareDecimalValue(*this);
-	        } else {
-	            return compareAnyIntegerValue(rhs);
-	        }
-	    case VALUE_TYPE_TIMESTAMP:
-	        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-	            return castAsDouble().compareDoubleValue(rhs);
-	        } else {
-	            return compareAnyIntegerValue(rhs);
-	        }
-	    case VALUE_TYPE_DOUBLE:
-	        return compareDoubleValue(rhs);
-	    case VALUE_TYPE_VARCHAR:
-	        return compareStringValue(rhs);
-	    case VALUE_TYPE_VARBINARY:
-	        return compareBinaryValue(rhs);
-	    case VALUE_TYPE_DECIMAL:
-	        return compareDecimalValue(rhs);
-	    default: {
-	        throwDynamicSQLException(
-	                "non comparable types lhs '%s' rhs '%s'",
-	                getValueTypeString().c_str(),
-	                rhs.getValueTypeString().c_str());
-	    }
-	    }
+       switch (getValueType()) {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+            if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+                return castAsDouble().compareDoubleValue(rhs);
+            } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+                return -1 * rhs.compareDecimalValue(*this);
+            } else {
+                return compareAnyIntegerValue(rhs);
+            }
+        case VALUE_TYPE_TIMESTAMP:
+            if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+                return castAsDouble().compareDoubleValue(rhs);
+            } else {
+                return compareAnyIntegerValue(rhs);
+            }
+        case VALUE_TYPE_DOUBLE:
+            return compareDoubleValue(rhs);
+        case VALUE_TYPE_VARCHAR:
+            return compareStringValue(rhs);
+        case VALUE_TYPE_VARBINARY:
+            return compareBinaryValue(rhs);
+        case VALUE_TYPE_DECIMAL:
+            return compareDecimalValue(rhs);
+        default: {
+            throwDynamicSQLException(
+                    "non comparable types lhs '%s' rhs '%s'",
+                    getValueTypeString().c_str(),
+                    rhs.getValueTypeString().c_str());
+        }
+        }
 }
 
 /**
@@ -3117,23 +3117,23 @@ inline NValue NValue::op_greaterThanOrEqual(const NValue rhs) const {
 inline NValue NValue::op_max(const NValue rhs) const {
     int hasNullCompare = compareNull(rhs);
     if (hasNullCompare == VALUE_COMPARE_GREATERTHAN) {
-    	return *this;
+        return *this;
     } else if (hasNullCompare == VALUE_COMPARE_INVALID &&
-    		compareWithoutNull(rhs) == VALUE_COMPARE_GREATERTHAN) {
-    	return *this;
+            compareWithoutNull(rhs) == VALUE_COMPARE_GREATERTHAN) {
+        return *this;
     }
     return rhs;
 }
 
 inline NValue NValue::op_min(const NValue rhs) const {
-	int hasNullCompare = compareNull(rhs);
-	if (hasNullCompare == VALUE_COMPARE_LESSTHAN) {
-		return *this;
-	} else if (hasNullCompare == VALUE_COMPARE_INVALID &&
-			compareWithoutNull(rhs) == VALUE_COMPARE_LESSTHAN) {
-		return *this;
-	}
-	return rhs;
+    int hasNullCompare = compareNull(rhs);
+    if (hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+        return *this;
+    } else if (hasNullCompare == VALUE_COMPARE_INVALID &&
+            compareWithoutNull(rhs) == VALUE_COMPARE_LESSTHAN) {
+        return *this;
+    }
+    return rhs;
 }
 
 inline NValue NValue::getNullValue(ValueType type) {
@@ -3349,10 +3349,10 @@ inline bool NValue::isZero() const {
 }
 
 inline NValue NValue::op_subtract(const NValue rhs) const {
-	if (isNull() || rhs.isNull()) {
-		// Data type is not important, just return NULL.
-		return getNullValue();
-	}
+    if (isNull() || rhs.isNull()) {
+        // Data type is not important, just return NULL.
+        return getNullValue();
+    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
     case VALUE_TYPE_BIGINT:
@@ -3379,10 +3379,10 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
-	if (isNull() || rhs.isNull()) {
-		// Data type is not important, just return NULL.
-		return getNullValue();
-	}
+    if (isNull() || rhs.isNull()) {
+        // Data type is not important, just return NULL.
+        return getNullValue();
+    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
     case VALUE_TYPE_BIGINT:
@@ -3409,10 +3409,10 @@ inline NValue NValue::op_add(const NValue rhs) const {
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
-	if (isNull() || rhs.isNull()) {
-		// Data type is not important, just return NULL.
-		return getNullValue();
-	}
+    if (isNull() || rhs.isNull()) {
+        // Data type is not important, just return NULL.
+        return getNullValue();
+    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
       case VALUE_TYPE_TINYINT:
@@ -3439,10 +3439,10 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
-	if (isNull() || rhs.isNull()) {
-		// Data type is not important, just return NULL.
-		return getNullValue();
-	}
+    if (isNull() || rhs.isNull()) {
+        // Data type is not important, just return NULL.
+        return getNullValue();
+    }
     ValueType vt = promoteForOp(getValueType(), rhs.getValueType());
     switch (vt) {
       case VALUE_TYPE_TINYINT:
