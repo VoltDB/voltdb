@@ -25,6 +25,7 @@
 #include "storage/ElasticIndexReadContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "logging/LogManager.h"
 
 namespace voltdb
 {
@@ -143,6 +144,13 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
     int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
+
+    if (m_streams.empty()) {
+        char errMsg[1024];
+        snprintf(errMsg, 1024, "Table streamer has no streams to serialize more for table %s.",
+                 m_table.name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+    }
 
     // Rebuild the stream list as dictated by context semantics.
     StreamList savedStreams(m_streams);
