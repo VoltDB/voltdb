@@ -161,6 +161,8 @@ public class ClientCnxn {
 
     final Selector selector = Selector.open();
 
+    final Set<Long> verbotenThreads;
+
     /**
      * Set to true when close is called. Latches the connection such that we
      * don't attempt to re-connect to the server if in the middle of closing the
@@ -327,8 +329,8 @@ public class ClientCnxn {
      * @throws IOException
      */
     public ClientCnxn(String hosts, int sessionTimeout, ZooKeeper zooKeeper,
-            ClientWatchManager watcher) throws IOException {
-        this(hosts, sessionTimeout, zooKeeper, watcher, 0, new byte[16]);
+            ClientWatchManager watcher, Set<Long> verbotenThreads) throws IOException {
+        this(hosts, sessionTimeout, zooKeeper, watcher, verbotenThreads, 0, new byte[16]);
     }
 
     /**
@@ -351,12 +353,13 @@ public class ClientCnxn {
      * @throws IOException
      */
     public ClientCnxn(String hosts, int sessionTimeout, ZooKeeper zooKeeper,
-            ClientWatchManager watcher, long sessionId, byte[] sessionPasswd)
+            ClientWatchManager watcher, Set<Long> verbotenThreads, long sessionId, byte[] sessionPasswd)
             throws IOException {
         this.zooKeeper = zooKeeper;
         this.watcher = watcher;
         this.sessionId = sessionId;
         this.sessionPasswd = sessionPasswd;
+        this.verbotenThreads = verbotenThreads;
 
         // parse out chroot, if any
         int off = hosts.indexOf('/');
@@ -505,6 +508,7 @@ public class ClientCnxn {
 
         @Override
         public void run() {
+            verbotenThreads.add(Thread.currentThread().getId());
             try {
                 isRunning = true;
                 while (true) {
@@ -524,6 +528,8 @@ public class ClientCnxn {
                 }
             } catch (InterruptedException e) {
                 LOG.error("Event thread exiting due to interruption", e);
+            } finally {
+                verbotenThreads.remove(Thread.currentThread().getId());
             }
 
             LOG.debug("EventThread shut down");
@@ -1074,6 +1080,7 @@ public class ClientCnxn {
 
         @Override
         public void run() {
+            verbotenThreads.add(Thread.currentThread().getId());
             long now = System.currentTimeMillis();
             long lastHeard = now;
             long lastSend = now;
@@ -1207,6 +1214,7 @@ public class ClientCnxn {
                     }
                 }
             }
+            verbotenThreads.remove(Thread.currentThread().getId());
             cleanup();
             try {
                 selector.close();

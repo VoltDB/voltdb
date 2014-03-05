@@ -384,7 +384,7 @@ public class ZooKeeper {
         LOG.info("Initiating client connection, connectString=" + connectString
                 + " sessionTimeout=" + sessionTimeout + " watcher=" + watcher);
         watchManager.defaultWatcher = watcher;
-        cnxn = new ClientCnxn(connectString, sessionTimeout, this, watchManager);
+        cnxn = new ClientCnxn(connectString, sessionTimeout, this, watchManager, verbotenThreads);
         cnxn.start();
         verbotenThreads.add(cnxn.eventThread.getId());
         verbotenThreads.add(cnxn.sendThread.getId());
@@ -450,16 +450,16 @@ public class ZooKeeper {
      * @throws IllegalArgumentException
      *             if an invalid chroot path is specified
      */
-    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher,
+    public ZooKeeper(String connectString, int sessionTimeout, Watcher watcher, Set<Long> verbotenThreads,
             long sessionId, byte[] sessionPasswd) throws IOException {
         LOG.info("Initiating client connection, connectString=" + connectString
                 + " sessionTimeout=" + sessionTimeout + " watcher=" + watcher
                 + " sessionId=" + sessionId + " sessionPasswd="
                 + (sessionPasswd == null ? "<null>" : "<hidden>"));
-        verbotenThreads = ImmutableSet.<Long>of();
+        this.verbotenThreads = verbotenThreads;
         watchManager.defaultWatcher = watcher;
         cnxn = new ClientCnxn(connectString, sessionTimeout, this,
-                watchManager, sessionId, sessionPasswd);
+                watchManager, verbotenThreads, sessionId, sessionPasswd);
         cnxn.start();
     }
 

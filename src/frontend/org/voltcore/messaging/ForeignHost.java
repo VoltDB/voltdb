@@ -23,10 +23,12 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google_voltpatches.common.base.Throwables;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -130,8 +132,8 @@ public class ForeignHost {
         m_network = network;
     }
 
-    public void enableRead() {
-        m_network.start(m_handler);
+    public void enableRead(Set<Long> verbotenThreads) {
+        m_network.start(m_handler, verbotenThreads);
     }
 
     synchronized void close()

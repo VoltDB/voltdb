@@ -58,7 +58,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -415,7 +414,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
             putForeignHost(hostId, fhost);
-            fhost.enableRead();
+            fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
@@ -492,7 +491,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                  */
                 fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
                 putForeignHost(hostId, fhost);
-                fhost.enableRead();
+                fhost.enableRead(VERBOTEN_THREADS);
             } catch (Exception e) {
                 logger.error("Error joining new node", e);
                 m_knownFailedHosts.add(hostId);
@@ -632,7 +631,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * to enable read
          */
         for (ForeignHost fh : m_foreignHosts.values()) {
-            fh.enableRead();
+            fh.enableRead(VERBOTEN_THREADS);
         }
         m_agreementSite.start();
 

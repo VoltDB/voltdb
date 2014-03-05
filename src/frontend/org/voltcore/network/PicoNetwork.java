@@ -111,12 +111,14 @@ public class PicoNetwork implements Runnable, Connection
     final String m_remoteSocketAddressString;
     private volatile String m_remoteHostAndAddressAndPort;
     private String m_toString;
+    private Set<Long> m_verbotenThreads;
 
     /**
      * Start this VoltNetwork's thread;
      */
-    public void start(InputHandler ih) {
+    public void start(InputHandler ih, Set<Long> verbotenThreads) {
         m_ih = ih;
+        m_verbotenThreads = verbotenThreads;
         m_thread.start();
     }
 
@@ -163,6 +165,7 @@ public class PicoNetwork implements Runnable, Connection
 
     @Override
     public void run() {
+        m_verbotenThreads.add(Thread.currentThread().getId());
         try {
             while (m_shouldStop == false) {
                 try {
@@ -195,6 +198,7 @@ public class PicoNetwork implements Runnable, Connection
         } catch (Throwable t) {
             t.printStackTrace();
         } finally {
+            m_verbotenThreads.add(Thread.currentThread().getId());
             try {
                 p_shutdown();
             } catch (Throwable t) {
@@ -380,10 +384,6 @@ public class PicoNetwork implements Runnable, Connection
         m_selector.wakeup();
 
         return ft;
-    }
-
-    Long getThreadId() {
-        return m_thread.getId();
     }
 
     @Override
