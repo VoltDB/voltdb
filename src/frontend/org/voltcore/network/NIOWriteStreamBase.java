@@ -114,27 +114,35 @@ public abstract class NIOWriteStreamBase {
         DeferredSerialization ds = null;
         int bytesQueued = 0;
         while ((ds = oldlist.poll()) != null) {
-            ByteBuffer data[] = ds.serialize();
-            for (ByteBuffer buf : data) {
-                if (buf.limit() != buf.capacity()) {
-                    boolean assertOn = false;
-                    assert (assertOn = true);
-                    if (assertOn) {
-                        networkLog.fatal("Sloppy serialization size for message class " + ds);
-                        System.exit(-1);
-                    }
-                    RateLimitedLogger.tryLogForMessage(
-                            "Sloppy serialization size for message class " + ds,
-                            System.currentTimeMillis(),
-                            1, TimeUnit.HOURS,
-                            networkLog,
-                            Level.WARN);
-                }
+            final int serializedSize = ds.getSerializedSize();
+            if (serializedSize == -1) continue;
+            BBContainer outCont = m_queuedBuffers.peekLast();
+            if (outCont == null || !outCont.b.hasRemaining()) {
+                outCont = pool.acquire();
+                outCont.b.clear();
+                m_queuedBuffers.offer(outCont);
+            }
+            //Fastpath, serialize to direct buffer creating no garbage
+            if (outCont.b.remaining() >= serializedSize) {
+                final ByteBuffer outbuf = outCont.b;
+                final int oldLimit = outbuf.limit();
+                outbuf.limit(outbuf.position() + serializedSize);
+                final ByteBuffer slice = outbuf.slice();
+                ds.serialize(slice);
+                checkSloppySerialization(slice, ds);
+                slice.position(0);
+                bytesQueued += slice.remaining();
+                outbuf.position(outbuf.limit());
+                outbuf.limit(oldLimit);
+            } else {
+                //Slow path serialize to heap, and then put in buffers
+                ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
+                ds.serialize(buf);
+                checkSloppySerialization(buf, ds);
                 buf.position(0);
                 bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
-                    BBContainer outCont = m_queuedBuffers.peekLast();
-                    if (outCont == null || !outCont.b.hasRemaining()) {
+                    if (!outCont.b.hasRemaining()) {
                         outCont = pool.acquire();
                         outCont.b.clear();
                         m_queuedBuffers.offer(outCont);
@@ -151,6 +159,23 @@ public abstract class NIOWriteStreamBase {
             }
         }
         updateQueued(bytesQueued, true);
+    }
+
+    private void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
+        if (buf.limit() != buf.capacity()) {
+            boolean assertOn = false;
+            assert (assertOn = true);
+            if (assertOn) {
+                networkLog.fatal("Sloppy serialization size for message class " + ds);
+                System.exit(-1);
+            }
+            RateLimitedLogger.tryLogForMessage(
+                    "Sloppy serialization size for message class " + ds,
+                    System.currentTimeMillis(),
+                    1, TimeUnit.HOURS,
+                    networkLog,
+                    Level.WARN);
+        }
     }
 
     /**

@@ -841,8 +841,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public ByteBuffer[] serialize() throws IOException
+        public void serialize(ByteBuffer buf) throws IOException
         {
+            buf.putInt(buf.capacity() - 4);
+            clientResponse.flattenToBuffer(buf);
+        }
+
+        @Override
+        public void cancel() {
+        }
+
+        @Override
+        public int getSerializedSize() throws IOException {
             // HACK-O-RIFFIC
             // For now, figure out if this is a transaction that was ignored
             // by the ReplaySequencer and just remove the handle from the CIHM
@@ -857,7 +867,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 clientData = cihm.findHandle(response.getClientInterfaceHandle());
             }
             if (clientData == null) {
-                return new ByteBuffer[] {};
+                return -1;
             }
             final long now = System.currentTimeMillis();
             final int delta = (int)(now - clientData.m_creationTime);
@@ -866,7 +876,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (restartTransaction(clientData.m_messageSize, clientData.m_creationTime)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
-                return new ByteBuffer[] {};
+                return -1;
             }
 
             /*
@@ -883,14 +893,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             clientResponse.setClusterRoundtrip(delta);
             clientResponse.setHash(null); // not part of wire protocol
 
-            ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
-            results.putInt(results.capacity() - 4);
-            clientResponse.flattenToBuffer(results);
-            return new ByteBuffer[] { results };
-        }
-
-        @Override
-        public void cancel() {
+            return clientResponse.getSerializedSize() + 4;
         }
 
         @Override
@@ -2271,18 +2274,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     buf.flip();
 
                     //Check for no change
-                    final ByteBuffer oldValue =
-                            m_currentTopologyValues.get() != null ?
-                                    m_currentTopologyValues.get().serialize()[0] : null;
+                    ByteBuffer oldValue = null;
+                    DeferredSerialization ds = m_currentTopologyValues.get();
+                    if (ds != null) {
+                        oldValue = ByteBuffer.allocate(ds.getSerializedSize());
+                        ds.serialize(oldValue);
+                    }
+
                     if (buf.equals(oldValue)) return;
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
-                        public ByteBuffer[] serialize() throws IOException {
-                            return new ByteBuffer[] { buf.duplicate() };
+                        public void serialize(ByteBuffer outbuf) throws IOException {
+                            outbuf.put(buf.duplicate());
                         }
                         @Override
                         public void cancel() {}
+
+                        @Override
+                        public int getSerializedSize() {
+                            return buf.remaining();
+                        }
                     });
                     if (oldValue != null) {
                         m_notifier.queueNotification(
@@ -2555,7 +2567,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 @Override
                 public ClientResponseImpl call() throws Exception {
                     ClientResponseImpl resp = new ClientResponseImpl();
-                    ByteBuffer b = ds.serialize()[0];
+                    ByteBuffer b = ByteBuffer.allocate(ds.getSerializedSize());
+                    ds.serialize(b);
                     b.position(4);
                     resp.initFromBuffer(b);
                     return resp;

@@ -168,37 +168,35 @@ public class PicoNetwork implements Runnable, Connection
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
             while (m_shouldStop == false) {
-                try {
-                    try {
-                        Runnable task = null;
-                        while ((task = m_tasks.poll()) != null) {
-                            task.run();
-                        }
-                        dispatchReadStream();
-                        drainWriteStream();
-                    } catch (IOException e) {
-                        m_shouldStop = true;
-                        final String trimmed = e.getMessage().trim();
-                        if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
-                                e instanceof AsynchronousCloseException ||
-                                e instanceof ClosedChannelException ||
-                                e instanceof ClosedByInterruptException) {
-                            m_logger.debug( "VoltPort died, probably of natural causes", e);
-                        } else {
-                            e.printStackTrace();
-                            networkLog.error( "VoltPort died due to an unexpected exception", e);
-                        }
-                    }
-                    m_selector.select();
-                } catch (Throwable ex) {
-                    ex.printStackTrace();
-                    m_logger.error(null, ex);
+                Runnable task = null;
+                while ((task = m_tasks.poll()) != null) {
+                    task.run();
                 }
+                dispatchReadStream();
+                drainWriteStream();
+                m_selector.select();
             }
-        } catch (Throwable t) {
-            t.printStackTrace();
+        } catch (CancelledKeyException e) {
+            networkLog.warn(
+                    "Had a cancelled key exception for "
+                            + m_toString, e);
+        } catch (IOException e) {
+            final String trimmed = e.getMessage().trim();
+            if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
+                    e instanceof AsynchronousCloseException ||
+                    e instanceof ClosedChannelException ||
+                    e instanceof ClosedByInterruptException) {
+                m_logger.debug( "VoltPort died, probably of natural causes", e);
+            } else {
+                e.printStackTrace();
+                networkLog.error( "VoltPort died due to an unexpected exception", e);
+            }
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            m_logger.error(null, ex);
+            m_shouldStop = true;
         } finally {
-            m_verbotenThreads.add(Thread.currentThread().getId());
+            m_verbotenThreads.remove(Thread.currentThread().getId());
             try {
                 p_shutdown();
             } catch (Throwable t) {
@@ -236,7 +234,6 @@ public class PicoNetwork implements Runnable, Connection
         final int read = m_readStream.read(m_sc, Integer.MAX_VALUE, m_pool);
 
         if (read == -1) {
-            System.out.println("EOS for " + m_toString);
             m_interestOps &= ~SelectionKey.OP_READ;
             m_key.interestOps(m_interestOps);
 
@@ -269,7 +266,6 @@ public class PicoNetwork implements Runnable, Connection
             disableWriteSelection();
 
             if (m_shouldStop) {
-                System.out.println("Finally drained " + m_toString);
                 m_sc.close();
                 unregistered();
             }

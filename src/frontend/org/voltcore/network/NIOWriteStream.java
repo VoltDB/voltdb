@@ -229,12 +229,24 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             m_queuedWrites.offer(new DeferredSerialization() {
                 @Override
-                public ByteBuffer[] serialize() {
-                    return b;
+                public void serialize(ByteBuffer outbuf) {
+                    for (ByteBuffer buf : b) {
+                        outbuf.put(buf);
+                    }
                 }
 
                 @Override
                 public void cancel() {}
+
+                @Override
+                public int getSerializedSize() {
+                    int sum = 0;
+                    for (ByteBuffer buf : b) {
+                        buf.position(0);
+                        sum += buf.remaining();
+                    }
+                    return sum;
+                }
             });
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
