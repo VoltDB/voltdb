@@ -181,7 +181,7 @@ public class PicoNetwork implements Runnable, Connection
                     "Had a cancelled key exception for "
                             + m_toString, e);
         } catch (IOException e) {
-            final String trimmed = e.getMessage().trim();
+            final String trimmed = e.getMessage() == null ? "" : e.getMessage().trim();
             if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
