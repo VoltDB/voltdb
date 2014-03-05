@@ -234,7 +234,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         //
         VoltTable results[] = null;
         // This should get us an invocation at each host
-        for (int i = 0; i < SITES * HOSTS; i++) {
+        for (int i = 0; i < 1000; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
@@ -257,7 +257,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 counts += results[0].getLong("INVOCATIONS");
             }
         }
-        assertEquals(HOSTS * SITES, counts);
+        assertEquals(1000, counts);
         // verify that each node saw a NEW_ORDER.insert initiation
         validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
     }
