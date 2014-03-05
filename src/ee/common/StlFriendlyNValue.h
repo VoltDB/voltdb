@@ -38,7 +38,14 @@ struct StlFriendlyNValue : public NValue {
 
     bool operator==(const StlFriendlyNValue& other) const
     {
-        return compare(other) == 0;
+        int hasNullCompare = compareNull(other);
+        if (hasNullCompare == VALUE_COMPARE_EQUAL) {
+            return true;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID && compareWithoutNull(other) == 0) {
+            return true;
+        }
+
+        return false;
     }
 
     const StlFriendlyNValue& operator=(const NValue& other)
@@ -50,7 +57,14 @@ struct StlFriendlyNValue : public NValue {
 
     bool operator<(const StlFriendlyNValue& other) const
     {
-        return compare(other) < 0;
+        int hasNullCompare = compareNull(other);
+        if (hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+            return true;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID && compareWithoutNull(other) < 0) {
+            return true;
+        }
+
+        return false;
     }
 
 };

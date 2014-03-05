@@ -691,7 +691,12 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
         // if the GROUP BY keys are listed in major-to-minor sort order,
         // the last one will be the most likely to have changed.
         for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
-            if (nextGroupByKeyTuple.getNValue(ii).compare(inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
+            NValue gbValue = nextGroupByKeyTuple.getNValue(ii);
+            NValue ipValue = inProgressGroupByKeyTuple.getNValue(ii);
+            int hasNullCompare = gbValue.compareNull(ipValue);
+            if ((hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN)
+                    || (hasNullCompare == VALUE_COMPARE_INVALID && gbValue.compareWithoutNull(ipValue) != VALUE_COMPARE_EQUAL))
+            {
                 VOLT_TRACE("new group!");
                 // Output old row.
                 if (insertOutputTuple(aggregateRow)) {

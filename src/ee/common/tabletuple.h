@@ -780,12 +780,17 @@ inline int TableTuple::compare(const TableTuple &other) const {
     for (int ii = 0; ii < columnCount; ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
-        diff = lhs.compare(rhs);
-        if (diff) {
-            return diff;
+        int hasNullCompare = lhs.compareNull(rhs);
+        if (hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+            return hasNullCompare;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID) {
+            diff = lhs.compareWithoutNull(rhs);
+            if (diff) {
+                return diff;
+            }
         }
     }
-    return 0;
+    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {

@@ -750,12 +750,18 @@ struct TupleKeyComparator
             lhValue = lhs.indexedValue(lhTuple, ii);
             rhValue = rhs.indexedValue(rhTuple, ii);
 
-            int comparison = lhValue.compare(rhValue);
 
-            if (comparison == VALUE_COMPARE_LESSTHAN) return -1;
-            else if (comparison == VALUE_COMPARE_GREATERTHAN) return 1;
+            int hasNullCompare = lhValue.compareNull(rhValue);
+            if (hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+                return hasNullCompare;
+            } else if (hasNullCompare == VALUE_COMPARE_INVALID) {
+                int diff = lhValue.compareWithoutNull(rhValue);
+                if (diff) {
+                    return diff;
+                }
+            }
         }
-        return 0;
+        return VALUE_COMPARE_EQUAL;
     }
 private:
     const TupleSchema *m_keySchema;
