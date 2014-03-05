@@ -32,7 +32,8 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
-    public HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
+    private final HashMap<Column, AbstractExpression> m_columns = new HashMap<Column, AbstractExpression>();
+    private ParsedSelectStmt m_subselect;
 
     /**
     * Class constructor
@@ -48,9 +49,6 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         // A simple INSERT ... VALUES statement (all that's supported initially) has no underlying
         // table scans, so the table list should actually be empty until the statement's target
         // table is inserted, below.
-        // TODO: When INSERT ... SELECT is supported, it's unclear how the source and target tables will
-        // be distinguished (positionally? in separate members?) and/or how soon thereafter the SELECT
-        // clause will need to allow joins.
         assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
@@ -60,7 +58,15 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(node, table, columns);
+                parseTargetColumns(node, table, m_columns);
+            }
+            else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+                // TODO: When INSERT ... SELECT is supported, it's unclear whether the source tables need to be
+                // reflected in the m_tableList -- that would likely be propagated here --
+                // and how the target table would then be distinguished
+                // (positionally? in a separate member?) and/or how soon thereafter the SELECT
+                // clause will need to allow joins.
+                m_subselect = parseSubquery(node);
             }
         }
     }
@@ -70,12 +76,27 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "COLUMNS:\n";
-        for (Entry<Column, AbstractExpression> col : columns.entrySet()) {
+        for (Entry<Column, AbstractExpression> col : m_columns.entrySet()) {
             retval += "\tColumn: " + col.getKey().getTypeName() + ": ";
             retval += col.getValue().toString() + "\n";
         }
-        retval = retval.trim();
 
+        if (m_subselect != null) {
+            retval += "SUBSELECT:\n";
+            retval += m_subselect.toString();
+        }
         return retval;
     }
+
+    public AbstractExpression getValuesExpression(Column column) {
+        return m_columns.get(column);
+    }
+
+    /**
+     * @return the m_subselect
+     */
+    public ParsedSelectStmt getSubselect() {
+        return m_subselect;
+    }
+
 }

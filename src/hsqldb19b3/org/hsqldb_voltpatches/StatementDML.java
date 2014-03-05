@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
@@ -168,6 +169,7 @@ public class StatementDML extends StatementDMQL {
               null);
     }
 
+    @Override
     Result getResult(Session session) {
 
         Result result = null;
@@ -200,6 +202,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     // this fk references -> other  :  other read lock
+    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         if (!baseTable.isTemp()) {
@@ -233,6 +236,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     // other fk references this :  if constraint trigger action  : other write lock
+    @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
         if (baseTable.isTemp()) {
@@ -537,7 +541,7 @@ public class StatementDML extends StatementDMQL {
         newData.beforeFirst();
 
         while (newData.hasNext()) {
-            Object[] data = (Object[]) newData.getNext();
+            Object[] data = newData.getNext();
 
             baseTable.insertRow(session, store, data);
 
@@ -1286,7 +1290,7 @@ public class StatementDML extends StatementDMQL {
     {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
-        VoltXMLElement child = targetRangeVariables[0].voltGetRangeVariableXML(session);
+        VoltXMLElement child = rangeVariables[0].voltGetRangeVariableXML(session);
         assert(child != null);
         xml.children.add(child);
     }
@@ -1308,7 +1312,12 @@ public class StatementDML extends StatementDMQL {
 
         case StatementTypes.INSERT :
             xml = new VoltXMLElement("insert");
-            voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
+            if (queryExpression == null) {
+                voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
+            } else {
+                VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
+                xml.children.add(child);
+            }
             // INSERT has no child node or condition,
             // UNTIL we support "INSERT INTO <table> SELECT ... FROM ... WHERE..."
             break;

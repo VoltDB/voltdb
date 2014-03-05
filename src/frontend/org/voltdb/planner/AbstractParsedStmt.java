@@ -133,27 +133,25 @@ public abstract class AbstractParsedStmt {
        return retval;
    }
 
-   /**
-   * @param parsedStmt
-   * @param sql
-   * @param xmlSQL
-   * @param db
-   * @param joinOrder
-   */
-  private static AbstractParsedStmt parse(AbstractParsedStmt parsedStmt, String sql,
-          VoltXMLElement stmtTypeElement,  String[] paramValues, Database db, String joinOrder) {
-      // parse tables and parameters
-      parsedStmt.parseTablesAndParams(stmtTypeElement);
+    /**
+     * @param parsedStmt
+     * @param sql
+     * @param xmlSQL
+     * @param db
+     * @param joinOrder
+     */
+    private static void parse(AbstractParsedStmt parsedStmt, String sql,
+            VoltXMLElement stmtTypeElement,  String[] paramValues, Database db, String joinOrder) {
+        // parse tables and parameters
+        parsedStmt.parseTablesAndParams(stmtTypeElement);
 
-      // parse specifics
-      parsedStmt.parse(stmtTypeElement);
+        // parse specifics
+        parsedStmt.parse(stmtTypeElement);
 
-      // post parse action
-      parsedStmt.postParse(sql, joinOrder);
+        // post parse action
+        parsedStmt.postParse(sql, joinOrder);
+    }
 
-      return parsedStmt;
-
-  }
     /**
      *
      * @param sql
@@ -166,7 +164,8 @@ public abstract class AbstractParsedStmt {
             Database db, String joinOrder) {
 
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
-        return parse(retval, sql, stmtTypeElement, paramValues, db, joinOrder);
+        parse(retval, sql, stmtTypeElement, paramValues, db, joinOrder);
+        return retval;
     }
 
     /**
@@ -586,8 +585,19 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
+
+        AbstractParsedStmt subquery = null;
         // Possible sub-query
-        AbstractParsedStmt subquery = parseSubQuery(tableNode);
+        for (VoltXMLElement childNode : tableNode.children) {
+            if ( ! childNode.name.equals("tablesubquery")) {
+                continue;
+            }
+            if (childNode.children.isEmpty()) {
+                break;
+            }
+            subquery = parseSubquery(childNode.children.get(0));
+            break;
+        }
 
         // add table to the query cache before processing the JOIN/WHERE expressions
         // The order is important because processing sub-query expressions assumes that
@@ -741,21 +751,13 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    private AbstractParsedStmt parseSubQuery(VoltXMLElement tableScan) {
-        for (VoltXMLElement childNode : tableScan.children) {
-            if (childNode.name.equals("tablesubquery")) {
-                if (!childNode.children.isEmpty()) {
-                    AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(childNode.children.get(0), m_paramValues, m_db);
-                    // Propagate parameters from the parent to the child
-                    subQuery.m_paramsById.putAll(m_paramsById);
-                    subQuery.m_paramList = m_paramList;
-                    subQuery = AbstractParsedStmt.parse(subQuery, m_sql, childNode.children.get(0), m_paramValues, m_db, m_joinOrder);
-
-                    return subQuery;
-                }
-            }
-        }
-        return null;
+    protected ParsedSelectStmt parseSubquery(VoltXMLElement queryNode) {
+        ParsedSelectStmt subQuery = new ParsedSelectStmt(m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        subQuery.m_paramsById.putAll(m_paramsById);
+        ((AbstractParsedStmt)subQuery).m_paramList = m_paramList;
+        AbstractParsedStmt.parse(subQuery, m_sql, queryNode, m_paramValues, m_db, m_joinOrder);
+        return subQuery;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.

@@ -942,21 +942,73 @@ public class PlanAssembler {
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
 
+        // get the ordered list of columns for the targettable using a helper
+        // function they're not guaranteed to be in order in the catalog
+        List<Column> columns = CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
+
+
+        ParsedSelectStmt subselect = m_parsedInsert.getSubselect();
+        if (subselect != null) {
+            // TODO: Maybe most or all of this processing should be taken care of much earlier,
+            // as soon as the subselect is parsed?
+            CompiledPlan selectPlan = getBestCostPlan(subselect);
+            // TODO: A) test for either a subquery on replicated data
+            // OR a subquery on partitioned data that exports its partitioning column(s).
+            // -- an exported partitioning column has the following attributes:
+            // -- it is based on a TupleValueExpression.
+            // -- the index of the TupleValueExpression is that of the partitioning column of its table.
+            // -- (some day it can also be an exported partitioning column from a nested subquery).
+            // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
+            //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
+            //    rollups.
+            // B) test that in the latter (partitioned) case, the target table is partitioned
+            // and that its partitioning column is being set to an exported subquery partitioning column.
+            // In theory, the EE's insert filters should allow querying replicated data into a
+            // partitioned target table.
+            // All other cases (like inserting partitioned results into replicated data)
+            // are not supported (even within a single partition stored procedure, for safety's sake?).
+
+            // for each column in the table in order...
+            int ii = 0;
+            for (Column column : columns) {
+                //TODO: construct a column-by-column projection of subquery results and defined defaults
+                // to the defined target columns -- this is probably better done prior to the subquery
+                // planning to allow it to optimize (possibly inline) the projection.
+                // Default values, cases requiring type casts, or any
+                // other kind of projection capabilities. Long-term, these will be implemented at the
+                // insert node -- likely with the help of an inline projection node OR a jsonified
+                // representation of the target table's default value expressions that can be cached
+                // in the DDL per target table instead of reserialized (in whole or in part) per insert
+                // statement plan.
+                // For POC purposes, don't support defaults or casting or out-of-order listing of column names!
+                assert(VoltType.get((byte)column.getType()) == subselect.displayColumns().get(ii++).expression.getValueType());
+            }
+            // connect the insert to the subselect tree.
+            insertNode.addAndLinkChild(selectPlan.rootPlanGraph);
+
+            if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+                insertNode.setMultiPartition(false);
+                return insertNode;
+            }
+
+            insertNode.setMultiPartition(true); //TODO: rethink???
+            // The following is the moral equivalent of addSendReceivePair
+            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
+
+            // add a count or a limit and send on top of the union
+            return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        }
+
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
         MaterializePlanNode materializeNode = new MaterializePlanNode();
         NodeSchema mat_schema = new NodeSchema();
 
-        // get the ordered list of columns for the targettable using a helper
-        // function they're not guaranteed to be in order in the catalog
-        List<Column> columns =
-            CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
-
         // for each column in the table in order...
         for (Column column : columns) {
 
             // get the expression for the column
-            AbstractExpression expr = m_parsedInsert.columns.get(column);
+            AbstractExpression expr = m_parsedInsert.getValuesExpression(column);
 
             // if there's no expression, make sure the column has
             // some supported default value

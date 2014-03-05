@@ -62,7 +62,7 @@ public class TestHSQLDB extends TestCase {
         public int read() throws IOException { return sr.read(); }
     }
 
-    /*public void testCatalogRead() {
+    /*public void notestCatalogRead() {
         String ddl = "create table test (cash integer default 23);";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -107,7 +107,7 @@ public class TestHSQLDB extends TestCase {
         return hsql;
     }
 
-    /*public void testWithTPCCDDL() throws HSQLParseException {
+    /*public void notestWithTPCCDDL() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
         assertTrue(hsql != null);
 
@@ -129,7 +129,7 @@ public class TestHSQLDB extends TestCase {
         assertTrue(doc != null);
     }
 
-    public void testDMLFromTPCCNewOrder() {
+    public void notestDMLFromTPCCNewOrder() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 
@@ -190,7 +190,7 @@ public class TestHSQLDB extends TestCase {
         }
     }
 
-    public void testSqlInToXML() throws HSQLParseException {
+    public void notestSqlInToXML() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
         assertTrue(hsql != null);
         VoltXMLElement stmt;
@@ -236,7 +236,7 @@ public class TestHSQLDB extends TestCase {
                 "VoltDB does not support subqueries");
     }
 
-    public void testVarbinary() {
+    public void notestVarbinary() {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         URL url = getClass().getResource("hsqltest-varbinaryddl.sql");
 
@@ -268,7 +268,22 @@ public class TestHSQLDB extends TestCase {
         System.out.println(xml);
     }
 
-    /*public void testSimpleSQL() {
+    public void testInsertIntoSelectFrom() {
+        HSQLInterface hsql = setupTPCCDDL();
+        assertTrue(hsql != null);
+
+        String sql = "INSERT INTO new_order (NO_O_ID, NO_D_ID, NO_W_ID) SELECT O_ID, O_D_ID+1, CAST(? AS INTEGER) FROM ORDERS;";
+        VoltXMLElement xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+        }
+        assertFalse(xml == null);
+        System.out.println(xml);
+    }
+
+    /*public void notestSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 
@@ -304,7 +319,7 @@ public class TestHSQLDB extends TestCase {
 
     }*/
 
-    /*public void testDeleteIssue() {
+    /*public void notestDeleteIssue() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 
