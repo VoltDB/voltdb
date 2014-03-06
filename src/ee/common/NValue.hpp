@@ -2353,7 +2353,7 @@ inline int NValue::compare(const NValue rhs) const {
  * comparison in favor of op_*.
  */
 inline int NValue::compareWithoutNull(const NValue rhs) const {
-    assert(isNull() == false && rhs.isNull() = false);
+    assert(isNull() == false && rhs.isNull() == false);
 
     switch (m_valueType) {
     case VALUE_TYPE_VARCHAR:

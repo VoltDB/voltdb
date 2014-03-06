@@ -764,7 +764,11 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
-        if (lhs.op_notEquals(rhs).isTrue()) {
+
+        int hasNullCompare = lhs.compareNull(rhs);
+        if (hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+            return false;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID && lhs.compareWithoutNull(rhs) != VALUE_COMPARE_EQUAL) {
             return false;
         }
     }
