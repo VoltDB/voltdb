@@ -118,9 +118,13 @@ public class CatalogContext {
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
 
-        for (Procedure proc : procedures) {
-            ProcedurePartitionInfo ppi = new ProcedurePartitionInfo(VoltType.get((byte)proc.getPartitioncolumn().getType()), proc.getPartitionparameter());
-            proc.setAttachment(ppi);
+        if (procedures != null) {
+            for (Procedure proc : procedures) {
+                if (proc.getSinglepartition()) {
+                    ProcedurePartitionInfo ppi = new ProcedurePartitionInfo(VoltType.get((byte)proc.getPartitioncolumn().getType()), proc.getPartitionparameter());
+                    proc.setAttachment(ppi);
+                }
+            }
         }
     }
 

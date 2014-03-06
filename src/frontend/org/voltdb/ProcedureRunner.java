@@ -114,6 +114,10 @@ public class ProcedureRunner {
     protected ProcedureStatsCollector m_statsCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
+    protected final boolean m_isSinglePartition;
+    protected final boolean m_hasJava;
+    protected final boolean m_isReadOnly;
+    protected final boolean m_isEverySite;
     protected final int m_partitionColumn;
     protected final VoltType m_partitionColumnType;
     protected final Language m_language;
@@ -172,9 +176,22 @@ public class ProcedureRunner {
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
-        ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
-        m_partitionColumn = ppi.index;
-        m_partitionColumnType = ppi.type;
+        m_hasJava = catProc.getHasjava();
+        m_isReadOnly = catProc.getReadonly();
+        m_isSinglePartition = m_catProc.getSinglepartition();
+        boolean isEverySite = false;
+        if (isSystemProcedure()) {
+            isEverySite = m_catProc.getEverysite();
+        }
+        m_isEverySite = isEverySite();
+        if (m_isSinglePartition) {
+            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
+            m_partitionColumn = ppi.index;
+            m_partitionColumnType = ppi.type;
+        } else {
+            m_partitionColumn = 0;
+            m_partitionColumnType = null;
+        }
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
@@ -198,11 +215,7 @@ public class ProcedureRunner {
     }
 
     public boolean isEverySite() {
-        boolean retval = false;
-        if (isSystemProcedure()) {
-            retval = m_catProc.getEverysite();
-        }
-        return retval;
+        return m_isEverySite;
     }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
@@ -288,7 +301,7 @@ public class ProcedureRunner {
             boolean error = false;
             boolean abort = false;
             // run a regular java class
-            if (m_catProc.getHasjava()) {
+            if (m_hasJava) {
                 try {
                     if (m_language == Language.JAVA) {
                         if (HOST_TRACE_ENABLED) {
@@ -411,7 +424,7 @@ public class ProcedureRunner {
      * @return true if the txn hashes to the current partition, false otherwise
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
-        if (m_catProc.getSinglepartition()) {
+        if (m_isSinglePartition) {
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
@@ -561,12 +574,12 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args, m_catProc.getSinglepartition()).get();
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
             if (batch.errorMsg != null) {
                 throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
             }
 
-            if (m_catProc.getReadonly() && !batch.isReadOnly()) {
+            if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
             }
 
@@ -712,7 +725,7 @@ public class ProcedureRunner {
                         qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
             }
         }
-        else if (m_catProc.getSinglepartition()) {
+        else if (m_isSinglePartition) {
             results = fastPath(batch);
         }
         else {
@@ -1378,6 +1391,6 @@ public class ProcedureRunner {
            params,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
-           m_catProc.getReadonly());
+           m_isReadOnly);
     }
 }
