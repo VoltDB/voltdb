@@ -68,8 +68,8 @@ package org.hsqldb_voltpatches;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.index.NodeAVL;
 import org.hsqldb_voltpatches.index.NodeAVLDisk;
+import org.hsqldb_voltpatches.index.NodeAVL;
 import org.hsqldb_voltpatches.lib.IntLookup;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;

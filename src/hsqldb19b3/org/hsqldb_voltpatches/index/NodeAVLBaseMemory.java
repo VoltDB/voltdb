@@ -68,8 +68,8 @@ package org.hsqldb_voltpatches.index;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.persist.*;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
+import org.hsqldb_voltpatches.persist.*;
 
 /**
  *  Common MEMORY and TEXT table node implementation. Nodes are always in

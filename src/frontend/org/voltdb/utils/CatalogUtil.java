@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -55,6 +54,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -79,7 +79,9 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -113,7 +115,6 @@ import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.SystemProcedureCatalog;
 
 /**
  *
@@ -168,6 +169,92 @@ public abstract class CatalogUtil {
         }
 
         return serializedCatalog;
+    }
+
+    /**
+     * Load a catalog from the jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The serialized string of the catalog content.
+     * @throws IOException
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static String loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
+    {
+        // Throws IOException on load failure.
+        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        // I.e. jarfile may be modified.
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.upgradeCatalogAsNeeded(jarfile);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+    }
+
+    /**
+     * Get the catalog build info from the jar bytes.
+     * Performs sanity checks on the build info and version strings.
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return build info lines
+     * @throws IOException If the catalog or the version string cannot be loaded.
+     */
+    public static String[] getBuildInfoFromJar(InMemoryJarfile jarfile)
+            throws IOException
+    {
+        // Read the raw build info bytes.
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+        }
+
+        // Convert the bytes to a string and split by lines.
+        String buildInfo;
+        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
+        String[] buildInfoLines = buildInfo.split("\n");
+
+        // Sanity check the number of lines and the version string.
+        if (buildInfoLines.length < 1) {
+            throw new IOException("Catalog build info has no version string.");
+        }
+        String versionFromCatalog = buildInfoLines[0].trim();
+        if (!CatalogUtil.isCatalogVersionValid(versionFromCatalog)) {
+            throw new IOException(String.format(
+                    "Catalog build info version (%s) is bad.", versionFromCatalog));
+        }
+
+        // Trim leading/trailing whitespace.
+        for (int i = 0; i < buildInfoLines.length; ++i) {
+            buildInfoLines[i] = buildInfoLines[i].trim();
+        }
+
+        return buildInfoLines;
+    }
+
+    /**
+     * Load an in-memory catalog jar file from jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The in-memory jar containing the loaded catalog.
+     * @throws IOException If the catalog cannot be loaded.
+     */
+    public static InMemoryJarfile loadInMemoryJarFile(byte[] catalogBytes)
+            throws IOException
+    {
+        assert(catalogBytes != null);
+
+        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
+        }
+
+        return jarfile;
     }
 
     /**
@@ -525,6 +612,31 @@ public abstract class CatalogUtil {
         return true;
     }
 
+    /**
+     * Check if a catalog version string is valid.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's valid, false otherwise.
+     */
+
+    public static boolean isCatalogVersionValid(String catalogVersionStr)
+    {
+        // Do we have a version string?
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        // Is it properly formed?
+        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        if (catalogVersion == null) {
+            return false;
+        }
+
+        // It's valid.
+        return true;
+    }
+
     public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL,
             boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
@@ -764,14 +876,7 @@ public abstract class CatalogUtil {
         }
 
         byte[] data = null;
-        try {
-            data = sb.toString().getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            hostLog.error("CRCing deployment file to determine" +
-                    " compatibility and determined deployment file is"+
-                    " not valid UTF-8. File must be UTF-8 encoded.");
-            data = new byte[]{0x0}; // should generate a CRC mismatch.
-        }
+        data = sb.toString().getBytes(Constants.UTF8ENCODING);
 
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(data);
@@ -820,12 +925,7 @@ public abstract class CatalogUtil {
      */
     public static DeploymentType parseDeploymentFromString(String deploymentString) {
         ByteArrayInputStream byteIS;
-        try {
-            byteIS = new ByteArrayInputStream(deploymentString.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            hostLog.warn("Unable to read deployment string: " + e.getMessage());
-            return null;
-        }
+        byteIS = new ByteArrayInputStream(deploymentString.getBytes(Constants.UTF8ENCODING));
         // get deployment info from xml file
         return getDeployment(byteIS);
     }

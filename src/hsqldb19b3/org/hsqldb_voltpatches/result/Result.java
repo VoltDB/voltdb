@@ -110,7 +110,7 @@ public class Result {
         Result.newDataResult(emptyMeta);
 
     // type of result
-    public byte mode;
+    byte mode;
 
     // database ID
     int databaseID;
@@ -1612,4 +1612,8 @@ public class Result {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Result");
         }
     }
+
+    /************************* Volt DB Extensions *************************/
+    public boolean hasError() { return mode == ResultConstants.ERROR; }
+    /**********************************************************************/
 }

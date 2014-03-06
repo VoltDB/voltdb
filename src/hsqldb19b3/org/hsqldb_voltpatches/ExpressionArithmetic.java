@@ -85,7 +85,6 @@ public class ExpressionArithmetic extends Expression {
         }
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -150,7 +149,6 @@ public class ExpressionArithmetic extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -228,7 +226,6 @@ public class ExpressionArithmetic extends Expression {
         return sb.toString();
     }
 
-    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -248,7 +245,6 @@ public class ExpressionArithmetic extends Expression {
         return unresolvedSet;
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -292,7 +288,7 @@ public class ExpressionArithmetic extends Expression {
                     break;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case OpTypes.SUBTRACT :
             case OpTypes.MULTIPLY :
             case OpTypes.DIVIDE :
@@ -399,7 +395,6 @@ public class ExpressionArithmetic extends Expression {
         }
     }
 
-    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -409,8 +404,8 @@ public class ExpressionArithmetic extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangePosition].getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -443,5 +438,4 @@ public class ExpressionArithmetic extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
     }
-
 }

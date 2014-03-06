@@ -407,9 +407,7 @@ public class SetFunction implements Serializable {
                         return Type.SQL_BIGINT;
 
                     case Types.SQL_BIGINT :
-                        // hack by voltdb team to avoid using giant types in sums
-                        //return Type.SQL_DECIMAL_BIGINT_SQR;
-                        return Type.SQL_BIGINT;
+                        return Type.SQL_DECIMAL_BIGINT_SQR;
 
                     case Types.SQL_REAL :
                     case Types.SQL_FLOAT :

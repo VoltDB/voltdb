@@ -47,6 +47,7 @@ import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -432,8 +433,17 @@ public class ExportManager
             if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
-                exportLog.error("Invalid export generation in overflow directory " + generationDirectory +
-                        " this will have to be cleaned up manually.");
+                String list[] = generationDirectory.list();
+                if (list != null && list.length == 0) {
+                    try {
+                        VoltFile.recursivelyDelete(generationDirectory);
+                    } catch (IOException ioe) {
+                    }
+                } else {
+                    exportLog.error("Invalid export generation in overflow directory " + generationDirectory
+                            + " this will need to be manually cleaned up. number of files left: "
+                            + (list != null ? list.length : 0));
+                }
             }
         }
     }

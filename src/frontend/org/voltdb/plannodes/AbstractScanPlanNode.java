@@ -328,8 +328,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
-        stringer.key(Members.PREDICATE.name());
-        stringer.value(m_predicate);
+        if (m_predicate != null) {
+            stringer.key(Members.PREDICATE.name());
+            stringer.value(m_predicate);
+        }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
     }

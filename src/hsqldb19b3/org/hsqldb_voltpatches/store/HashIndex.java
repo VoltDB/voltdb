@@ -65,10 +65,11 @@ class HashIndex {
 
     HashIndex(int hashTableSize, int capacity, boolean fixedSize) {
 
+        // CHERRY PICK to prevent a flaky crash case
         if (capacity < hashTableSize) {
             capacity = hashTableSize;
         }
-
+        // End of CHERRY PICK
         reset(hashTableSize, capacity);
 
         this.fixedSize = fixedSize;

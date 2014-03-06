@@ -64,19 +64,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         super(name);
     }
 
-    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
-    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
-    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
-    // SAME METADATA.
-    public void validateSchema(VoltTable result, VoltTable expected)
-    {
-        assertEquals(expected.getColumnCount(), result.getColumnCount());
-        for (int i = 0; i < result.getColumnCount(); i++) {
-            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
-            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
-        }
-    }
-
     // For the provided table, verify that there is a row for each host in the cluster where
     // the column designated by 'columnName' has the value 'rowId'.  For example, for
     // Initiator stats, if columnName is 'PROCEDURE_NAME' and rowId is 'foo', this
@@ -303,7 +290,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema = new ColumnInfo[12];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -315,6 +302,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

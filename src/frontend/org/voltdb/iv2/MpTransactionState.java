@@ -161,6 +161,8 @@ public class MpTransactionState extends TransactionState
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
                 task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+                // Set the involved partitions for command logging
+                task.setInvolvedPartitions(m_masterHSIds.keySet());
             }
 
             if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
