@@ -123,7 +123,6 @@ public class MockVoltDB implements VoltDBInterface
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL);
 
-            m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
             m_statsAgent = new StatsAgent();
             m_statsAgent.registerMailbox(m_hostMessenger,
                     m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));

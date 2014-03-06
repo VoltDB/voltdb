@@ -378,18 +378,6 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // Sufficient ordering established?
         if (ts.txnId > m_newestCandidateTransaction) {
-            LastInitiatorData min = null;
-            long max = 0;
-            for (LastInitiatorData lid2 : m_initiatorData.values()) {
-                if (min == null) {
-                    min = lid2;
-                    max = lid2.m_lastSeenTxnId;
-                } else if (min.m_lastSeenTxnId > lid2.m_lastSeenTxnId) {
-                    min = lid2;
-                }
-                max = Math.max(max, lid2.m_lastSeenTxnId);
-            }
-            long delta = TransactionIdManager.getTimestampFromTransactionId(max) - TransactionIdManager.getTimestampFromTransactionId(min.m_lastSeenTxnId);
             newState = QueueState.BLOCKED_ORDERING;
             executeStateChange(newState, ts, lid);
             return m_state;
