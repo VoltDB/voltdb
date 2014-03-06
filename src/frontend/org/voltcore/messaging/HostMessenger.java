@@ -233,7 +233,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public void disconnect(Set<Integer> failedHostIds) {
             synchronized(HostMessenger.this) {
                 for (int hostId: failedHostIds) {
-                    m_knownFailedHosts.add(hostId);
+                    addFailedHost(hostId);
                     removeForeignHost(hostId);
                     if (!m_shuttingDown) {
                         logger.warn(String.format("Host %d failed", hostId));
