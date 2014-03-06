@@ -1701,8 +1701,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-
         if (catProc == null) {
             if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
@@ -1744,6 +1742,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], errorMessage, task.clientHandle);
         }
+
+        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
         // Check procedure policies
         error = checkPolicies(null, user, task, catProc);
