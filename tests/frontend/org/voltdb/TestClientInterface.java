@@ -639,10 +639,10 @@ public class TestClientInterface {
         DeferredSerialization resp = responsesDS.take();
 
         if (shouldRestart) {
-            assertEquals(0, resp.getSerializedSize());
+            assertEquals(-1, resp.getSerializedSize());
             checkInitMsgSent("hello", 1, true, true);
         } else {
-            assertEquals(1, resp.getSerializedSize());
+            assertTrue(-1 != resp.getSerializedSize());
             verify(m_messenger, never()).send(anyLong(), any(VoltMessage.class));
         }
 
