@@ -826,7 +826,12 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
     assert (m_columnCount == tuple.sizeInValues());
     for (int i = m_columnCount - 1; i >= 0; --i) {
         if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
-            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
+            VOLT_TRACE("%d th attribute was NULL. It is non-nillable attribute.", i);
+            /*/ enable for debug ...
+            std::cout << "DEBUG NOT NULL VIOLATION: column " <<
+                    i << " of " << m_columnCount << " in " <<
+                    tuple.debug(name()) << std::endl;
+            // ... enable for debug */
             return false;
         }
     }

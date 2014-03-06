@@ -26,14 +26,19 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundInsertIntoSelect;
+import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundInsertIntoSelect;
+import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundSelectThenInsert;
 
 public class TestInsertIntoSelectSuite extends RegressionSuite {
 
-    static final Class<?>[] PROCEDURES = {};
+    private static final Class<?>[] PROCEDURES = {
+        MultiRoundInsertIntoSelect.class,
+        MultiRoundSelectThenInsert.class,
+    };
 
     public TestInsertIntoSelectSuite(String name) {
         super(name);
@@ -49,17 +54,23 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         ClientResponse resp;
-        resp = client.callProcedure("@AdHoc", "insert into P1 (b1, a2) select 100+b1, a2 from P1 where b1 >= 6");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        String insertIntoSelect = "insert into P1 (b1, a2) select b1, 'z' || a2 from P1 where b1 >= 6";
+
+        /*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
         VoltTable vt = resp.getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(4, vt.getLong(0));
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
 
         resp = client.callProcedure("CountP1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(14, resp.getResults()[0].asScalarLong());
 
-        resp = client.callProcedure("@AdHoc", "select count(*) from P1 where b1 > 100");
+        resp = client.callProcedure("@AdHoc", "select count(*) from P1 where a2 >= 'z'");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
     }
@@ -74,21 +85,23 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         ClientResponse resp;
-        resp = client.callProcedure("@AdHoc", "insert into P2 (a1, a2) select 100+b1, a2 from P1 where b1 >= 6");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        String insertIntoSelect = "insert into P2 (a1, a2) select b1, a2 from P1 where b1 >= 6";
+
+        /*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
         VoltTable vt = resp.getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(4, vt.getLong(0));
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
 
         resp = client.callProcedure("CountP1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(10, resp.getResults()[0].asScalarLong());
 
         resp = client.callProcedure("CountP2");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(4, resp.getResults()[0].asScalarLong());
-
-        resp = client.callProcedure("@AdHoc", "select count(*) from P2 where a1 > 100");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
     }
@@ -103,17 +116,23 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         ClientResponse resp;
-        resp = client.callProcedure("@AdHoc", "insert into R1 (b1, a2) select 100+b1, a2 from R1 where b1 >= 6");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        String insertIntoSelect = "insert into R1 (b1, a2) select 100+b1, a2 from R1 where b1 >= 6";
+
+        /*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
         VoltTable vt = resp.getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(4, vt.getLong(0));
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
 
         resp = client.callProcedure("CountR1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(14, resp.getResults()[0].asScalarLong());
 
-        resp = client.callProcedure("@AdHoc", "select count(*) from R1 where b1 > 100");
+        resp = client.callProcedure("@AdHoc", "select count(*) from R1 where b1 >= 100");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
     }
@@ -128,11 +147,17 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         ClientResponse resp;
-        resp = client.callProcedure("@AdHoc", "insert into R2 (a1, a2) select 100+b1, a2 from R1 where b1 >= 6");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        String insertIntoSelect = "insert into R2 (a1, a2) select 100+b1, a2 from R1 where b1 >= 6";
+
+        /*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
         VoltTable vt = resp.getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(4, vt.getLong(0));
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
 
         resp = client.callProcedure("CountR1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -142,11 +167,102 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
 
-        resp = client.callProcedure("@AdHoc", "select count(*) from R2 where a1 > 100");
+        resp = client.callProcedure("@AdHoc", "select count(*) from R2 where a1 >= 100");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
     }
 
+    public void testReplicatedFilteringIntoPartitionedTable() throws Exception
+    {
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        ClientResponse resp;
+        String insertIntoSelect = "insert into P2 (a1, a2) select 100+b1, a2 from R1 where b1 >= 6";
+
+        /*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
+        VoltTable vt = resp.getResults()[0];
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("CountR1");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(10, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("CountP2");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("@AdHoc", "select count(*) from P2 where a1 >= 100");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testPartitionedTableSmallSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSelfCopyStoredProc(7);
+    }
+    
+    public void testPartitionedTableSmallSlowSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSlowSelfCopyStoredProc(7);
+    }
+    
+    public void testPartitionedTableMediumSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSelfCopyStoredProc(10);
+    }
+    
+    public void testPartitionedTableMediumSlowSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSlowSelfCopyStoredProc(10);
+    }
+    
+    public void testPartitionedTableLargeSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSelfCopyStoredProc(13);
+    }
+    
+    public void testPartitionedTableLargeSlowSelfCopyStoredProc() throws Exception
+    {
+        testPartitionedTableSlowSelfCopyStoredProc(13);
+    }
+    
+    public void testPartitionedTableSelfCopyStoredProc(long iterations) throws Exception
+    {
+        ClientResponse resp;
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            resp = client.callProcedure("P1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        resp = client.callProcedure(MultiRoundInsertIntoSelect.class.getSimpleName(), iterations);
+    }
+    
+    public void testPartitionedTableSlowSelfCopyStoredProc(long iterations) throws Exception
+    {
+        ClientResponse resp;
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            resp = client.callProcedure("P1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        resp = client.callProcedure(MultiRoundSelectThenInsert.class.getSimpleName(), iterations);
+    }
+    
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInsertIntoSelectSuite.class);
@@ -157,24 +273,23 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             // a table that should generate procedures
             // use column names such that lexical order != column order.
             project.addLiteralSchema(
-                    "CREATE TABLE p1(b1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+                    "CREATE TABLE p1(b1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL);" +
                     "PARTITION TABLE p1 ON COLUMN b1;" +
 
-                    "CREATE TABLE p2(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
+                    "CREATE TABLE p2(a1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL); " +
                     "PARTITION TABLE p2 ON COLUMN a1;" +
                     "CREATE UNIQUE INDEX p2_tree_idx ON p2(a1);" +
 
-                    "CREATE TABLE r1(b1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+                    "CREATE TABLE r1(b1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL, PRIMARY KEY (b1));" +
 
-                    "CREATE TABLE r2(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1));" +
+                    "CREATE TABLE r2(a1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL, PRIMARY KEY (a1));" +
 
                     "CREATE PROCEDURE CountP1 AS select count(*) from p1;" +
                     "CREATE PROCEDURE CountP2 AS select count(*) from p2;" +
                     "CREATE PROCEDURE CountR1 AS select count(*) from r1;" +
                     "CREATE PROCEDURE CountR2 AS select count(*) from r2;" +
                     "");
-
-
+            project.addProcedures(PROCEDURES);
         } catch (IOException error) {
             fail(error.getMessage());
         }

@@ -62,7 +62,7 @@ public class AdHocPlannedStatement {
 
     AdHocPlannedStatement(CompiledPlan plan, CorePlan coreIn) {
         this(plan.sql.getBytes(Constants.UTF8ENCODING), coreIn,
-             plan.extractedParamValues, plan.boundParamIndexes());
+             plan.extractedParamValues(), plan.boundParamIndexes());
     }
 
     AdHocPlannedStatement(AdHocPlannedStatement original, CorePlan coreIn) {

@@ -120,12 +120,10 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // running in a distributed cluster
     //
     if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                   m_inputTable->name().c_str());
+        VOLT_TRACE("No tuples were found in our input table '%s'", m_inputTable->name().c_str());
         return false;
     }
 #endif
-    assert ( ! m_inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;
@@ -140,6 +138,12 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
     while (iterator.next(tbTuple)) {
+        /*/ enable for debug ...
+        std::cout << "DEBUG INSERTING TUPLE: " <<
+                tbTuple.debug(targetTable->name()).c_str() << " from schema " <<
+                m_inputTable->schema()->debug() << " into " <<
+                targetTable->schema()->debug() << std::endl;
+        // ... enable for debug */
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                    targetTable->schema()->debug().c_str());

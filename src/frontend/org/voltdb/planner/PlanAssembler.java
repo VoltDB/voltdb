@@ -234,8 +234,6 @@ public class PlanAssembler {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-
-                // End of the recursion. Nothing to simplify
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
 
@@ -262,8 +260,6 @@ public class PlanAssembler {
                         + "' in a single-partition procedure.";
                 throw new PlanningErrorException(msg);
             }
-        } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
-            m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
         }
 
         if (parsedStmt instanceof ParsedInsertStmt) {
@@ -304,13 +300,14 @@ public class PlanAssembler {
      * Generate the best cost plan for the current SQL statement context.
      *
      * @param parsedStmt Current SQL statement to generate plan for
+     * @param coordinateResult include (as required) or exclude (unconditionally) the plan nodes that
+     * propagate the results of a select statement to a coordinator site, making a multi-fragment plan.
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
-
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean coordinateResult) {
         // Get the best plans for the sub-queries first
         ParsedResultAccumulator subQueryResult = getBestCostPlanForSubQueries(parsedStmt);
-        if (subQueryResult != null && subQueryResult.m_compiledPlan == null){
+        if (subQueryResult != null && subQueryResult.m_compiledPlan == null) {
             // There was at least one sub-query and we should have a compiled plan for it
             return null;
         }
@@ -345,6 +342,15 @@ public class PlanAssembler {
             // the final best parent plan
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
+        // Remove the coordinator send/receive pair from the plan for a subselect.
+        // It may be added later by the caller for the whole plan.
+        //TODO: refactor getNextPlan to prevent generating them in the first place.
+        // But be careful -- this could create (or close?) loopholes in how some
+        // micro-optimizations apply (to the partial plan vs. the coordinated plan),
+        // especially the determinism rewrites.
+        if ( ! coordinateResult) {
+            retval.rootPlanGraph = removeCoordinatorSendReceivePair(retval.rootPlanGraph);
+        }
         return retval;
     }
 
@@ -377,12 +383,7 @@ public class PlanAssembler {
             AbstractParsedStmt subQuery = subqueryScan.getSubquery();
             assert(subQuery != null);
 
-            parsedResult = planForParsedStmt(subQuery, parsedResult);
-            // Remove the coordinator send/receive pair. It will be added later
-            // for the whole plan
-            parsedResult.m_compiledPlan.rootPlanGraph =
-                    removeCoordinatorSendReceivePair(parsedResult.m_compiledPlan.rootPlanGraph);
-
+            planForParsedStmt(subQuery, parsedResult);
             subqueryScan.setPartitioning(parsedResult.m_currentPartitioning);
             if (parsedResult.m_compiledPlan == null) {
                 return parsedResult;
@@ -413,13 +414,14 @@ public class PlanAssembler {
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
             retval = getNextSelectPlan();
+        } else if (m_parsedInsert != null) {
+            nextStmt = m_parsedInsert;
+            retval = getNextInsertPlan();
         } else {
+            //TODO: push CompiledPlan construction into getNextUpdatePlan/getNextDeletePlan
+            //
             retval = new CompiledPlan();
-            retval.readOnly = false;
-            if (m_parsedInsert != null) {
-                nextStmt = m_parsedInsert;
-                retval.rootPlanGraph = getNextInsertPlan();
-            } else if (m_parsedUpdate != null) {
+            if (m_parsedUpdate != null) {
                 nextStmt = m_parsedUpdate;
                 retval.rootPlanGraph = getNextUpdatePlan();
                 // note that for replicated tables, multi-fragment plans
@@ -434,6 +436,7 @@ public class PlanAssembler {
                         "setupForNewPlans not called or not successfull.");
             }
             assert (nextStmt.m_tableList.size() == 1);
+            retval.readOnly = false;
             if (nextStmt.m_tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
             }
@@ -478,7 +481,7 @@ public class PlanAssembler {
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, true);
             partitioning = assembler.getPartition();
 
             // make sure we got a winner
@@ -566,27 +569,25 @@ public class PlanAssembler {
         return retval;
     }
 
-    private ParsedResultAccumulator planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
+    private void planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
         parsedResult.m_currentPartitioning = (PartitioningForStatement)m_partitioning.clone();
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = parsedResult.m_planId;
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, parsedResult.m_currentPartitioning, selector);
-        parsedResult.m_compiledPlan = assembler.getBestCostPlan(parsedStmt);
+        parsedResult.m_compiledPlan = assembler.getBestCostPlan(parsedStmt, false);
         // make sure we got a winner
         if (parsedResult.m_compiledPlan == null) {
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }
-            return null;
+            return;
         }
         parsedResult.m_orderIsDeterministic = parsedResult.m_orderIsDeterministic &&
                 parsedResult.m_compiledPlan.isOrderDeterministic();
 
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
-
-        return parsedResult;
     }
 
     /**
@@ -927,7 +928,7 @@ public class PlanAssembler {
      *
      * @return The next plan for a given insert statement.
      */
-    private AbstractPlanNode getNextInsertPlan() {
+    private CompiledPlan getNextInsertPlan() {
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
         if (m_bestAndOnlyPlanWasGenerated)
@@ -937,6 +938,7 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
+        boolean targetIsReplicated = targetTable.getIsreplicated();
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
@@ -945,59 +947,129 @@ public class PlanAssembler {
         // get the ordered list of columns for the targettable using a helper
         // function they're not guaranteed to be in order in the catalog
         List<Column> columns = CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
+        Column partitioningColumn = null;
+        if ( ! m_partitioning.wasSpecifiedAsSingle()) {
+            partitioningColumn = targetTable.getPartitioncolumn();
+        }
+        CompiledPlan retval;
 
-
-        ParsedSelectStmt subselect = m_parsedInsert.getSubselect();
-        if (subselect != null) {
+        ParsedSelectStmt subselectStmt = m_parsedInsert.getSubselect();
+        if (subselectStmt != null) {
             // TODO: Maybe most or all of this processing should be taken care of much earlier,
             // as soon as the subselect is parsed?
-            CompiledPlan selectPlan = getBestCostPlan(subselect);
-            // TODO: A) test for either a subquery on replicated data
-            // OR a subquery on partitioned data that exports its partitioning column(s).
-            // -- an exported partitioning column has the following attributes:
-            // -- it is based on a TupleValueExpression.
-            // -- the index of the TupleValueExpression is that of the partitioning column of its table.
-            // -- (some day it can also be an exported partitioning column from a nested subquery).
-            // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
-            //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
-            //    rollups.
-            // B) test that in the latter (partitioned) case, the target table is partitioned
-            // and that its partitioning column is being set to an exported subquery partitioning column.
-            // In theory, the EE's insert filters should allow querying replicated data into a
-            // partitioned target table.
-            // All other cases (like inserting partitioned results into replicated data)
-            // are not supported (even within a single partition stored procedure, for safety's sake?).
+            CompiledPlan subselectPlan = getBestCostPlan(subselectStmt, false);
+            // TODO: Add a guard or a speed bump (trivial projection or filter) to the special case of
+            // "insert into XXX values (...) select * from XXX<table>" which will infinitely replicate
+            // its table if it is not given some reason to break the process up into two phases,
+            // reading the target table (completely) to fill a temp table BEFORE starting to insert
+            // new rows into the target table.
+            int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
+            // Approximate # of exported partitioned columns == # of partitioned tables.
+            Set<Integer> exportedPartitioningColumns = new HashSet<>(partitionedTableCount);
+            // The EE's insert filters allow querying replicated data even when inserting into a
+            // partitioned target table.  Test that either the subquery is solely on replicated data ...
+            if (partitionedTableCount > 0) {
+                //TODO: OR is on partitioned data but exports one or more partitioning column(s).
+                // Test that in the partitioned case, the target table is partitioned.
+                if (targetIsReplicated) {
+                    throw new PlanningErrorException("The replicated table, '" + targetTable.getTypeName() +
+                            "', must not be the recipient of partitioned data in a single statement. " +
+                            " Use separate INSERT and SELECT statements, " +
+                            " optionally within a stored procedure." );
+                }
+                // An exported partitioning column has the following attributes:
+                // -- it is based on a TupleValueExpression.
+                // -- the index of the TupleValueExpression is that of its table's partitioning column.
+                // -- (some day it can also be an exported partitioning column from a nested subquery).
+                // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
+                //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
+                //    rollups.
+                //FIXME. For POC purposes, use any column you like for the partitioning key,
+                // as long as it's the first in the table DDL and first in the VALUES list and SELECT list!
+                exportedPartitioningColumns.add(0); // HACK FOR POC
+                // int columnPosition = 0;
+                // foreach (displayCol : substatement-display-columns) {
+                //     if (displayCol has a TVE expression and the TVE expression is among the equivalent partitioning expressions analyzed for the subselect) {
+                //         exportedPartitioningColumns.add(columnPosition);
+                //     }
+                //     ++columnPosition;
+                // }
+                if (exportedPartitioningColumns.isEmpty()) {
+                    throw new PlanningErrorException(
+                            "The partitioning column '" + partitioningColumn.getName() +
+                            "' of the partitioned table '" + targetTable.getTypeName() +
+                            "' must be explicitly set to a partitioning column in the SELECT clause.");
+                }
+                // It is a requirement that the partitioning column of the target table be set to
+                // one of these exported partitioning columns.
+                // All other cases, like inserting expressions or non-partitioning columns into the
+                // target table's partitioning column are not supported as a single statement.
+                // The only transactional method of implementing such cases is through multiple
+                // query and DML statements in a multi-partition stored procedure. This approach
+                // is more expensive but allows migration of data among the partitions.
+            }
 
             // for each column in the table in order...
             int ii = 0;
             for (Column column : columns) {
                 //TODO: construct a column-by-column projection of subquery results and defined defaults
-                // to the defined target columns -- this is probably better done prior to the subquery
-                // planning to allow it to optimize (possibly inline) the projection.
-                // Default values, cases requiring type casts, or any
-                // other kind of projection capabilities. Long-term, these will be implemented at the
-                // insert node -- likely with the help of an inline projection node OR a jsonified
+                // to the defined target columns.
+                // Default values, cases requiring type casts, or any other projection capabilities 
+                // are the responsibilities of the insert node
+                // likely with the help of an inline projection node and/OR a jsonified
                 // representation of the target table's default value expressions that can be cached
                 // in the DDL per target table instead of reserialized (in whole or in part) per insert
                 // statement plan.
-                // For POC purposes, don't support defaults or casting or out-of-order listing of column names!
-                assert(VoltType.get((byte)column.getType()) == subselect.displayColumns().get(ii++).expression.getValueType());
+                //FIXME. For POC purposes, not supporting defaults or casting or out-of-order listing of column names!
+                VoltType exprType = subselectStmt.displayColumns().get(ii).expression.getValueType();
+                assert(VoltType.get((byte)column.getType()) == exprType);
+                if (column.equals(partitioningColumn)) {
+                    if (( ! exportedPartitioningColumns.isEmpty()) && ! exportedPartitioningColumns.contains(ii)) {
+                        throw new PlanningErrorException(
+                                "The value being assigned to the partitioning column '" + partitioningColumn.getName() +
+                                "' of the partitioned table '" + targetTable.getTypeName() +
+                                "' is not a partitioning column value in the SELECT clause. index=" + ii);
+                    }
+                }
+                ++ii;
             }
+
+            // The subselectPlan is a close approximation of the result needed here, except
+            // that it needs the DML part at the top of its plan and needs to be marked as DML.
+            retval = subselectPlan;
+            retval.readOnly = false;
+
             // connect the insert to the subselect tree.
-            insertNode.addAndLinkChild(selectPlan.rootPlanGraph);
+            insertNode.addAndLinkChild(subselectPlan.rootPlanGraph);
 
+            //TODO: rethink these criteria
+            // Consider factoring out common code between this case and the
+            // INSERT ... VALUES case below, either by putting the original
+            // INSERT ... VALUES code in an else block OR by passing the return value
+            // through a common post-process function.
             if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+                assert( ! targetIsReplicated);
+                retval.replicatedTableDML = false;
                 insertNode.setMultiPartition(false);
-                return insertNode;
+                retval.rootPlanGraph = insertNode;
+                return retval;
             }
 
-            insertNode.setMultiPartition(true); //TODO: rethink???
+            insertNode.setMultiPartition(true);
             // The following is the moral equivalent of addSendReceivePair
             AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
-            // add a count or a limit and send on top of the union
-            return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+            // add a sum of counts (for partitioned inserts)
+            // or a limit to one received count row (for replicated inserts)
+            // and a send on top of the plan.
+            retval.replicatedTableDML = targetIsReplicated;
+            retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
+            return retval;
         }
+
+        retval = new CompiledPlan();
+        retval.readOnly = false;
+        retval.statementGuaranteesDeterminism(false, true);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
@@ -1018,7 +1090,6 @@ public class PlanAssembler {
                     throw new PlanningErrorException("Column " + column.getName()
                             + " has no default and is not nullable.");
                 }
-
 
                 boolean isConstantValue = true;
                 if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
@@ -1067,7 +1138,7 @@ public class PlanAssembler {
             }
 
             // Hint that this statement can be executed SP.
-            if (column.equals(m_partitioning.getColumn())) {
+            if (column.equals(partitioningColumn)) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
@@ -1086,16 +1157,23 @@ public class PlanAssembler {
         insertNode.addAndLinkChild(materializeNode);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+            assert( ! targetIsReplicated);
+            retval.replicatedTableDML = false;
             insertNode.setMultiPartition(false);
-            return insertNode;
+            retval.rootPlanGraph = insertNode;
+            return retval;
         }
 
         insertNode.setMultiPartition(true);
         // The following is the moral equivalent of addSendReceivePair
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
-        // add a count or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        // add a sum of counts (for partitioned inserts)
+        // or a limit to one received count row (for replicated inserts)
+        // and a send on top of the plan.
+        retval.replicatedTableDML = targetIsReplicated;
+        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
+        return retval;
     }
 
     /**
@@ -2032,46 +2110,48 @@ public class PlanAssembler {
 
     /**
      * Remove the coordinator send/receive pair if any from the graph.
+     *FIXME? As noted at the point of call, it may be smarter not to generate these nodes at all in
+     * subquery cases where they are not needed, just to pull them out later.
      *
      * @param root the complete plan node.
      * @return the plan without the send/receive pair.
      */
-    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
+    private static AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
         assert(root != null);
-        return removeCoordinatorSendReceivePairRecurcive(root, root);
-    }
-
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root, AbstractPlanNode current) {
-        if (current instanceof ReceivePlanNode) {
+        AbstractPlanNode current = root;
+        while ( ! (current instanceof ReceivePlanNode)) {
+            //FIXME? We might want to be more selective about the types of nodes (if any?)
+            // we are willing to skip to find the target send/receive pair. --paul
+            // This causes us to quit rather than skip NestLoopJoins or leaf nodes.
             if (current.getChildCount() == 1) {
-                AbstractPlanNode child = current.getChild(0);
-                if (child instanceof SendPlanNode) {
-                    assert(child.getChildCount() == 1);
-                    child = child.getChild(0);
-                    if (child instanceof ProjectionPlanNode) {
-                        assert(child.getChildCount() == 1);
-                        child = child.getChild(0);
-                    }
-                    child.clearParents();
-                    if (current.getParentCount() == 0) {
-                        return child;
-                    } else {
-                        assert(current.getParentCount() == 1);
-                        AbstractPlanNode parent = current.getParent(0);
-                        parent.unlinkChild(current);
-                        parent.addAndLinkChild(child);
-                        return root;
-                    }
-                }
+                // This is still a coordinator node
+                current = current.getChild(0);
+            } else {
+                // We are about to branch and leave the coordinator
+                return root;
             }
-            return root;
-        } else if (current.getChildCount() == 1) {
-            // This is still a coordinator node
-            return removeCoordinatorSendReceivePairRecurcive(root, current.getChild(0));
-        } else {
-            // We are about to branch and leave the coordinator
-            return root;
         }
+        assert(current.getChildCount() == 1);
+        AbstractPlanNode child = current.getChild(0);
+        assert(child instanceof SendPlanNode);
+        assert(child.getChildCount() == 1);
+        child = child.getChild(0);
+        //FIXME? Not sure why it would be necessary or correct to specifically
+        // drop a non-inline projection node. --paul
+        if (child instanceof ProjectionPlanNode) {
+            assert(child.getChildCount() == 1);
+            child = child.getChild(0);
+        }
+        child.clearParents();
+        if (current == root) {
+            return child;
+        } else {
+            assert(current.getParentCount() == 1);
+            AbstractPlanNode parent = current.getParent(0);
+            parent.unlinkChild(current);
+            parent.addAndLinkChild(child);
+        }
+        return root;
     }
 
     /**

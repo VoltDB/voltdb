@@ -279,23 +279,6 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * accessor
-     * @param partitioncolumn
-     */
-    public void setPartitioningColumn(Column partitioncolumn) {
-        if (m_inferPartitioning) {
-            m_partitionCol = partitioncolumn; // Not used in SELECT plans.
-        }
-    }
-
-    /**
-     * @return
-     */
-    public Column getColumn() {
-        return m_partitionCol;
-    }
-
-    /**
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
      * This is only the case when they include equality comparisons between partition key columns.
