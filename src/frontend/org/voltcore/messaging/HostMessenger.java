@@ -36,6 +36,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -178,23 +180,25 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
 
+    private final Object m_mapLock = new Object();
+
     /*
      * References to other hosts in the mesh.
      * Updates via COW
      */
-    final COWMap<Integer, ForeignHost> m_foreignHosts = new COWMap<Integer, ForeignHost>();
+    volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
 
     /*
      * References to all the local mailboxes
      * Updates via COW
      */
-    final COWMap<Long, Mailbox> m_siteMailboxes = new COWMap<Long, Mailbox>();
+    volatile ImmutableMap<Long, Mailbox> m_siteMailboxes = ImmutableMap.of();
 
     /*
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private final COWNavigableSet<Integer> m_knownFailedHosts = new COWNavigableSet<Integer>();
+    private volatile ImmutableSet<Integer> m_knownFailedHosts = ImmutableSet.of();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
@@ -238,6 +242,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
         }
     };
+
+    private final void addFailedHost(int hostId) {
+        if (!m_knownFailedHosts.contains(hostId)) {
+            synchronized (m_mapLock) {
+                if (!m_knownFailedHosts.contains(hostId)) {
+                    ImmutableSet.Builder<Integer> b = ImmutableSet.builder();
+                    b.addAll(m_knownFailedHosts);
+                    b.add(hostId);
+                    m_knownFailedHosts = b.build();
+                }
+            }
+        }
+    }
 
     public synchronized void prepareForShutdown()
     {
@@ -436,14 +453,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Convenience method for doing the verbose COW insert into the map
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
-        m_foreignHosts.put(hostId, fh);
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
+            b.putAll(m_foreignHosts);
+            b.put(hostId, fh);
+            m_foreignHosts = b.build();
+        }
     }
 
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(int hostId) {
-        ForeignHost fh = m_foreignHosts.remove(hostId);
+        ForeignHost fh = null;
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
+            for (Map.Entry<Integer, ForeignHost> e : m_foreignHosts.entrySet()) {
+                if (e.getKey().equals(hostId)) continue;
+                b.put(e.getKey(), e.getValue());
+            }
+            m_foreignHosts = b.build();
+        }
         if (fh != null) {
             fh.close();
         }
@@ -785,7 +815,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (!m_siteMailboxes.containsKey(mailbox.getHSId())) {
                 throw new RuntimeException("Can only register a mailbox with an hsid alreadly generated");
         }
-        m_siteMailboxes.put(mailbox.getHSId(), mailbox);
+
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
+                if (e.getKey().equals(mailbox.getHSId())) {
+                    b.put(e.getKey(), mailbox);
+                } else {
+                    b.put(e.getKey(), e.getValue());
+                }
+            }
+            m_siteMailboxes = b.build();
+        }
     }
 
     /*
@@ -794,7 +835,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public long generateMailboxId(Long mailboxId) {
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
-        m_siteMailboxes.put(hsId, new Mailbox() {
+        addMailbox(hsId, new Mailbox() {
             @Override
             public void send(long hsId, VoltMessage message) {}
             @Override
@@ -833,15 +874,31 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         final int siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
-        m_siteMailboxes.put(hsId, sm);
+        addMailbox(hsId, sm);
         return sm;
+    }
+
+    private void addMailbox(long hsId, Mailbox m) {
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            b.putAll(m_siteMailboxes);
+            b.put(hsId, m);
+            m_siteMailboxes = b.build();
+        }
     }
 
     /**
      * Discard a mailbox
      */
     public void removeMailbox(long hsId) {
-        m_siteMailboxes.remove(hsId);
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
+                if (e.getKey().equals(hsId)) continue;
+                b.put(e.getKey(), e.getValue());
+            }
+            m_siteMailboxes = b.build();
+        }
     }
 
     public void send(final long destinationHSId, final VoltMessage message)
@@ -939,7 +996,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             mailbox.setHSId(hsId);
         }
 
-        m_siteMailboxes.put(hsId, mailbox);
+        addMailbox(hsId, mailbox);
     }
 
     /**

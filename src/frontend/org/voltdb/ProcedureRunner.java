@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -63,6 +64,10 @@ import org.voltdb.utils.MiscUtils;
 public class ProcedureRunner {
 
     private static final VoltLogger log = new VoltLogger("HOST");
+    private static final boolean HOST_TRACE_ENABLED;
+    static {
+        HOST_TRACE_ENABLED = log.isTraceEnabled();
+    }
 
     // SQL statement queue info
     //
@@ -109,6 +114,8 @@ public class ProcedureRunner {
     protected ProcedureStatsCollector m_statsCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
+    protected final int m_partitionColumn;
+    protected final VoltType m_partitionColumnType;
     protected final Language m_language;
 
     // dependency ids for ad hoc
@@ -165,6 +172,9 @@ public class ProcedureRunner {
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
+        ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
+        m_partitionColumn = ppi.index;
+        m_partitionColumnType = ppi.type;
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
@@ -281,7 +291,7 @@ public class ProcedureRunner {
             if (m_catProc.getHasjava()) {
                 try {
                     if (m_language == Language.JAVA) {
-                        if (log.isTraceEnabled()) {
+                        if (HOST_TRACE_ENABLED) {
                             log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
                         }
                         try {
@@ -293,7 +303,7 @@ public class ProcedureRunner {
                         }
                     }
                     else if (m_language == Language.GROOVY) {
-                        if (log.isTraceEnabled()) {
+                        if (HOST_TRACE_ENABLED) {
                             log.trace("invoking... groovy closure on class=" + getClass().getName());
                         }
                         GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
@@ -411,18 +421,17 @@ public class ProcedureRunner {
             }
 
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            int parameterType;
+            VoltType parameterType;
             Object parameterAtIndex;
 
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {
                 // ClientInterface should pre-validate this param is valid
                 parameterAtIndex = invocation.getParameterAtIndex(0);
-                parameterType = (Byte) invocation.getParameterAtIndex(1);
+                parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
             } else {
-                parameterType = m_catProc.getPartitioncolumn().getType();
-                int partitionparameter = m_catProc.getPartitionparameter();
-                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+                parameterType = m_partitionColumnType;
+                parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);
             }
 
             // Note that @LoadSinglepartitionTable has problems if the parititoning param
@@ -437,7 +446,7 @@ public class ProcedureRunner {
                     return true;
                 } else {
                     // Wrong partition, should restart the txn
-                    if (log.isTraceEnabled()) {
+                    if (HOST_TRACE_ENABLED) {
                         log.trace("Txn " + txnState.getInvocation().getProcName() +
                                 " will be restarted");
                     }

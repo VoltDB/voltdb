@@ -109,7 +109,7 @@ abstract public class ProcedureTask extends TransactionTask
                 // Check partitioning of single-partition and n-partition transactions.
                 if (runner.checkPartition(m_txnState, siteConnection.getCurrentHashinator())) {
                     runner.setupTransaction(m_txnState);
-                    cr = runner.call(task.getParameters());
+                    cr = runner.call(callerParams);
 
                     m_txnState.setHash(cr.getHash());
 

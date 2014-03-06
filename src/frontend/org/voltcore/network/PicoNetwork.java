@@ -163,18 +163,25 @@ public class PicoNetwork implements Runnable, Connection
         }
     }
 
+    private boolean m_hadWork = false;
     @Override
     public void run() {
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
             while (m_shouldStop == false) {
+                m_hadWork = false;
                 Runnable task = null;
                 while ((task = m_tasks.poll()) != null) {
+                    m_hadWork = true;
                     task.run();
                 }
                 dispatchReadStream();
                 drainWriteStream();
-                m_selector.select();
+                if (m_hadWork) {
+                    m_selector.selectNow();
+                } else {
+                    m_selector.select();
+                }
             }
         } catch (CancelledKeyException e) {
             networkLog.warn(
@@ -207,7 +214,7 @@ public class PicoNetwork implements Runnable, Connection
 
     private void dispatchReadStream() throws IOException {
         if (readyForRead()) {
-            fillReadStream();
+            if (fillReadStream() > 0) m_hadWork = true;
             ByteBuffer message;
 
             /*
@@ -260,8 +267,8 @@ public class PicoNetwork implements Runnable, Connection
         /*
          * Drain the write stream
          */
-        m_writeStream.swapAndSerializeQueuedWrites(m_pool);
-        m_writeStream.drainTo(m_sc);
+        if (m_writeStream.swapAndSerializeQueuedWrites(m_pool) != 0) m_hadWork = true;
+        if (m_writeStream.drainTo(m_sc) > 0) m_hadWork = true;
         if (m_writeStream.isEmpty()) {
             disableWriteSelection();
 

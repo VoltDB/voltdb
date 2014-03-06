@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.StarvationTracker;
 
@@ -42,7 +43,11 @@ public class SiteTaskerQueue
             return task;
         }
         try {
-            return m_tasks.take();
+            task = m_tasks.poll(200, TimeUnit.MICROSECONDS);
+            if (task == null) {
+                task = m_tasks.take();
+            }
+            return task;
         } finally {
             m_starvationTracker.endStarvation();
         }

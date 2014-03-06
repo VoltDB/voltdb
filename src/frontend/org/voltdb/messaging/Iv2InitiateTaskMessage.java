@@ -115,7 +115,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         assert(m_invocation != null);
         if (m_invocation.getParams() == null)
             return 0;
-        return m_invocation.getParams().toArray().length;
+        return m_invocation.getParams().size();
     }
 
     public Object[] getParameters() {

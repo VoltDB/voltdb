@@ -107,13 +107,15 @@ public abstract class NIOWriteStreamBase {
      * @return
      * @throws IOException
      */
-    final void swapAndSerializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+    final int swapAndSerializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+        int processedWrites = 0;
         final ArrayDeque<DeferredSerialization> oldlist = getQueuedWrites();
-        if (oldlist.isEmpty()) return;
+        if (oldlist.isEmpty()) return 0;
 
         DeferredSerialization ds = null;
         int bytesQueued = 0;
         while ((ds = oldlist.poll()) != null) {
+            processedWrites++;
             final int serializedSize = ds.getSerializedSize();
             if (serializedSize == -1) continue;
             BBContainer outCont = m_queuedBuffers.peekLast();
@@ -159,6 +161,7 @@ public abstract class NIOWriteStreamBase {
             }
         }
         updateQueued(bytesQueued, true);
+        return processedWrites;
     }
 
     private void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
