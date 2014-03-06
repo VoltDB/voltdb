@@ -81,7 +81,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_tableAllocationTargetSize(tableAllocationTargetSize),
     m_pkeyIndex(NULL),
     m_refcount(0),
-    m_compactionThreshold(0.95)
+    m_compactionThreshold(95)
 {
 }
 
@@ -158,11 +158,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     onSetColumns(); // for more initialization
 
-    if (compactionThreshold == 0) {
-        m_compactionThreshold = -1;
-    } else {
-        m_compactionThreshold = compactionThreshold * .01;
-    }
+    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------
