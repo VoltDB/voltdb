@@ -16,8 +16,8 @@
  */
 
 /* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
+ DO NOT MODIFY THIS SOURCE
+ ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
 #ifndef CATALOG_CATALOG_MAP_H_
 #define CATALOG_CATALOG_MAP_H_
@@ -28,153 +28,153 @@
 
 namespace catalog {
 
-class Catalog;
-class CatalogType;
-
-/**
- * A safe interface to a generic map of CatalogType instances. It is safe
- * because it is read-only. (Exception: maps can be cleared.)
- *
- * @param <T> The subclass of CatalogType that this map will contain.
- */
-template <class T>
-class CatalogMap {
-    friend class Catalog;
-    friend class CatalogType;
-
-protected:
-    std::map<std::string, T*> m_items;
-
-    Catalog *m_catalog;
-    std::string m_path;
-    CatalogType *m_parent;
-
-// temporarily public
-public:
-    CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std::string &path);
-    T * add(const std::string &name);
-    bool remove(const std::string &name);
-
-public:
-    /**
-     * Get an item from the map by name
-     * @param name The name of the requested CatalogType instance in the map
-     * @return The item found in the map, or null if not found
-     */
-    T * get(const std::string &name) const;
+    class Catalog;
+    class CatalogType;
 
     /**
-     * Get the nth item in the map in lexographical (en/us for now) order
+     * A safe interface to a generic map of CatalogType instances. It is safe
+     * because it is read-only. (Exception: maps can be cleared.)
+     *
+     * @param <T> The subclass of CatalogType that this map will contain.
      */
-    T * getAtRelativeIndex(int32_t relativeIndex) const;
+    template <class T>
+    class CatalogMap {
+        friend class Catalog;
+        friend class CatalogType;
 
-    /**
-     * How many items are in the map?
-     * @return The number of items in the map
-     */
-    int32_t size() const;
+    protected:
+        std::map<std::string, T*> m_items;
 
-    typedef typename std::map<std::string, T*>::const_iterator field_map_iter;
+        Catalog *m_catalog;
+        std::string m_path;
+        CatalogType *m_parent;
 
-    /**
-     * Get an iterator for the items in the map
-     * @return The iterator for the items in the map
-     */
-    field_map_iter begin() const;
+        // temporarily public
+    public:
+        CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std::string &path);
+        T * add(const std::string &name);
+        bool remove(const std::string &name);
 
-    /**
-     * Get the end iterator for the items in the map
-     * @return The end iterator for the items in the map
-     */
-    field_map_iter end() const;
+    public:
+        /**
+         * Get an item from the map by name
+         * @param name The name of the requested CatalogType instance in the map
+         * @return The item found in the map, or null if not found
+         */
+        T * get(const std::string &name) const;
 
-    /**
-     * Clear the map. Does no destruction.
-     */
-    void clear();
-};
+        /**
+         * Get the nth item in the map in lexographical (en/us for now) order
+         */
+        T * getAtRelativeIndex(int32_t relativeIndex) const;
 
-template <class T>
-CatalogMap<T>::CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std::string &path) {
-    m_catalog = globalCatalog;
-    m_parent = parent;
-    m_path = path;
-}
+        /**
+         * How many items are in the map?
+         * @return The number of items in the map
+         */
+        int32_t size() const;
 
-template <class T>
-T * CatalogMap<T>::add(const std::string &name) {
-    std::string childPath = m_path + "[" + name + "]";
-    T *retval = new T(m_catalog, m_parent, childPath, name);
-    std::string mapKey = name;
-    boost::to_lower(mapKey);
-    m_items[mapKey] = retval;
+        typedef typename std::map<std::string, T*>::const_iterator field_map_iter;
 
-    // assign all the children of this map a relative index
-    int index = 1;
-    typename std::map<std::string, T*>::const_iterator iter;
-    for (iter = m_items.begin(); iter != m_items.end(); iter++)
-        iter->second->m_relativeIndex = index++;
+        /**
+         * Get an iterator for the items in the map
+         * @return The iterator for the items in the map
+         */
+        field_map_iter begin() const;
 
-    return retval;
-}
+        /**
+         * Get the end iterator for the items in the map
+         * @return The end iterator for the items in the map
+         */
+        field_map_iter end() const;
 
-template <class T>
-bool CatalogMap<T>::remove(const std::string &name) {
-    std::string mapKey = name;
-    boost::to_lower(mapKey);
-    typename std::map<std::string, T*>::iterator iter = m_items.find(mapKey);
-    if (iter == m_items.end()) {
-        return false;
-    }
-    m_items.erase(iter);
+        /**
+         * Clear the map. Does no destruction.
+         */
+        void clear();
+    };
 
-    // assign all the children of this map a relative index
-    int index = 1;
-    typename std::map<std::string, T*>::const_iterator iter2;
-    for (iter2 = m_items.begin(); iter2 != m_items.end(); iter2++) {
-        iter2->second->m_relativeIndex = index++;
+    template <class T>
+    CatalogMap<T>::CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std::string &path) {
+        m_catalog = globalCatalog;
+        m_parent = parent;
+        m_path = path;
     }
 
-    return true;
-}
+    template <class T>
+    T * CatalogMap<T>::add(const std::string &name) {
+        std::string childPath = m_path + "[" + name + "]";
+        T *retval = new T(m_catalog, m_parent, childPath, name);
+        std::string mapKey = name;
+        boost::to_upper(mapKey);
+        m_items[mapKey] = retval;
 
-template <class T>
-T * CatalogMap<T>::get(const std::string &name) const {
-    std::string mapKey = name;
-    boost::to_lower(mapKey);
-    const typename std::map<std::string, T*>::const_iterator found = m_items.find(mapKey);
-    return (found == m_items.end()) ? NULL : found->second;
-}
+        // assign all the children of this map a relative index
+        int index = 1;
+        typename std::map<std::string, T*>::const_iterator iter;
+        for (iter = m_items.begin(); iter != m_items.end(); iter++)
+            iter->second->m_relativeIndex = index++;
 
-template <class T>
-T * CatalogMap<T>::getAtRelativeIndex(int32_t relativeIndex) const {
-    typename std::map<std::string, T*>::const_iterator iter;
-    for (iter = m_items.begin(); iter != m_items.end(); iter++)
-        if (iter->second->m_relativeIndex == relativeIndex)
-            return iter->second;
-    return NULL;
-}
+        return retval;
+    }
 
-template <class T>
-int32_t CatalogMap<T>::size() const {
-    return static_cast<int32_t>(m_items.size());
-}
+    template <class T>
+    bool CatalogMap<T>::remove(const std::string &name) {
+        std::string mapKey = name;
+        boost::to_upper(mapKey);
+        typename std::map<std::string, T*>::iterator iter = m_items.find(mapKey);
+        if (iter == m_items.end()) {
+            return false;
+        }
+        m_items.erase(iter);
 
-template <class T>
-typename std::map<std::string, T*>::const_iterator CatalogMap<T>::begin() const {
-    return m_items.begin();
-}
+        // assign all the children of this map a relative index
+        int index = 1;
+        typename std::map<std::string, T*>::const_iterator iter2;
+        for (iter2 = m_items.begin(); iter2 != m_items.end(); iter2++) {
+            iter2->second->m_relativeIndex = index++;
+        }
 
-template <class T>
-typename std::map<std::string, T*>::const_iterator CatalogMap<T>::end() const {
-    return m_items.end();
-}
+        return true;
+    }
 
-// this is totally not const
-template <class T>
-void CatalogMap<T>::clear() {
-    m_items.clear();
-}
+    template <class T>
+    T * CatalogMap<T>::get(const std::string &name) const {
+        std::string mapKey = name;
+        boost::to_upper(mapKey);
+        const typename std::map<std::string, T*>::const_iterator found = m_items.find(mapKey);
+        return (found == m_items.end()) ? NULL : found->second;
+    }
+
+    template <class T>
+    T * CatalogMap<T>::getAtRelativeIndex(int32_t relativeIndex) const {
+        typename std::map<std::string, T*>::const_iterator iter;
+        for (iter = m_items.begin(); iter != m_items.end(); iter++)
+            if (iter->second->m_relativeIndex == relativeIndex)
+                return iter->second;
+        return NULL;
+    }
+
+    template <class T>
+    int32_t CatalogMap<T>::size() const {
+        return static_cast<int32_t>(m_items.size());
+    }
+
+    template <class T>
+    typename std::map<std::string, T*>::const_iterator CatalogMap<T>::begin() const {
+        return m_items.begin();
+    }
+
+    template <class T>
+    typename std::map<std::string, T*>::const_iterator CatalogMap<T>::end() const {
+        return m_items.end();
+    }
+
+    // this is totally not const
+    template <class T>
+    void CatalogMap<T>::clear() {
+        m_items.clear();
+    }
 
 
 } // namespace catalog

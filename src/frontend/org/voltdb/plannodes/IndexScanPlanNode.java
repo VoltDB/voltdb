@@ -449,7 +449,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
+        Table target = db.getTables().getExact(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
 

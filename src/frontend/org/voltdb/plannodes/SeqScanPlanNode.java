@@ -47,7 +47,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
+        Table target = db.getTables().getExact(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         // This maxTuples value estimates the number of tuples fetched from the sequential scan.
