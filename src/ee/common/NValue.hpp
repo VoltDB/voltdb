@@ -1644,7 +1644,7 @@ class NValue {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return compareDoubleValueWithoutNull(static_cast<double>(getTinyInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            const TTInt rhsValue = getDecimal();
+            const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getTinyInt()));
             lhsValue *= NValue::kMaxScaleFactor;
             return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
@@ -1663,7 +1663,7 @@ class NValue {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return compareDoubleValueWithoutNull(static_cast<double>(getSmallInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            const TTInt rhsValue = getDecimal();
+            const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getSmallInt()));
             lhsValue *= NValue::kMaxScaleFactor;
             return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
@@ -1682,7 +1682,7 @@ class NValue {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return compareDoubleValueWithoutNull(static_cast<double>(getInteger()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            const TTInt rhsValue = getDecimal();
+            const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getInteger()));
             lhsValue *= NValue::kMaxScaleFactor;
             return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
@@ -1701,7 +1701,7 @@ class NValue {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return compareDoubleValueWithoutNull(static_cast<double>(getBigInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            const TTInt rhsValue = getDecimal();
+            const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getBigInt());
             lhsValue *= NValue::kMaxScaleFactor;
             return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
@@ -1721,7 +1721,7 @@ class NValue {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return compareDoubleValueWithoutNull(static_cast<double>(getTimestamp()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            const TTInt rhsValue = getDecimal();
+            const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getTimestamp());
             lhsValue *= NValue::kMaxScaleFactor;
             return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);

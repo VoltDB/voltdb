@@ -496,7 +496,7 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     value = value.castAs(type);
     const bool isInlined = columnInfo->inlined;
     char *dataPtr = const_cast<char *> (getDataPtr(columnInfo));
-    const int32_t columnLength = m_schema->columnLength(idx);
+    const int32_t columnLength = columnInfo->length;
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 
