@@ -72,7 +72,6 @@ public class ZKTestBase {
         m_clients.clear();
         for (HostMessenger hm : m_messengers) {
             if (hm != null) {
-                System.err.println("Expect full tear down");
                 hm.shutdown();
             }
         }
