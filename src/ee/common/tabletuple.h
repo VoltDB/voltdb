@@ -489,10 +489,13 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     assert(m_schema);
     assert(m_data);
-    const ValueType type = m_schema->columnType(idx);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+
+    const ValueType type = static_cast<ValueType>(columnInfo->type);;
     value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
+    const bool isInlined = columnInfo->inlined;
+    char *dataPtr = const_cast<char *> (getDataPtr(columnInfo));
     const int32_t columnLength = m_schema->columnLength(idx);
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }

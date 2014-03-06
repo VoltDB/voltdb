@@ -2666,8 +2666,43 @@ inline int NValue::compareWithoutNull(const NValue rhs) const {
  */
 inline void NValue::setNull() {
     tagAsNull(); // This gets overwritten for DECIMAL -- but that's OK.
-    if (m_valueType == VALUE_TYPE_DECIMAL) {
+    switch (getValueType())
+    {
+    case VALUE_TYPE_BOOLEAN:
+        // HACK BOOL NULL
+        *reinterpret_cast<int8_t*>(m_data) = INT8_NULL;
+        break;
+    case VALUE_TYPE_NULL:
+    case VALUE_TYPE_INVALID:
+        return;
+    case VALUE_TYPE_TINYINT:
+        getTinyInt() = INT8_NULL;
+        break;
+    case VALUE_TYPE_SMALLINT:
+        getSmallInt() = INT16_NULL;
+        break;
+    case VALUE_TYPE_INTEGER:
+        getInteger() = INT32_NULL;
+        break;
+    case VALUE_TYPE_TIMESTAMP:
+        getTimestamp() = INT64_NULL;
+        break;
+    case VALUE_TYPE_BIGINT:
+        getBigInt() = INT64_NULL;
+        break;
+    case VALUE_TYPE_DOUBLE:
+        getDouble() = DOUBLE_MIN;
+        break;
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+        *reinterpret_cast<void**>(m_data) = NULL;
+        break;
+    case VALUE_TYPE_DECIMAL:
         getDecimal().SetMin();
+        break;
+    default: {
+        throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
+    }
     }
 }
 
