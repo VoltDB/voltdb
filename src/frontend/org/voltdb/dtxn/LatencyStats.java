@@ -17,10 +17,14 @@
 
 package org.voltdb.dtxn;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.AtomicHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.StatsSelector;
@@ -40,26 +44,21 @@ public class LatencyStats extends SiteStatsSource {
      * Iterator<Object> necessary for getStatsRowKeyIterator()
      *
      */
-    private static class BucketIterator implements Iterator<Object> {
-        private final int buckets;
-        private int current = -1;
-
-        private BucketIterator(int buckets) {
-            // Store the 0-indexed size
-            this.buckets = buckets - 1;
-        }
+    private static class DummyIterator implements Iterator<Object> {
+        boolean oneRow = false;
 
         @Override
         public boolean hasNext() {
-            if (current == buckets) {
-                return false;
+            if (!oneRow) {
+                oneRow = true;
+                return true;
             }
-            return true;
+            return false;
         }
 
         @Override
         public Object next() {
-            return ++current;
+            return null;
         }
 
         @Override
@@ -68,66 +67,17 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    public static class LatencyInfo
-    {
-        private volatile ImmutableList<Long> m_latencyStats;
-        private volatile long m_max;
-
-        public LatencyInfo()
-        {
-            Long[] buckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                0l, 0l, 0l, 0l, 0l, 0l};
-            m_latencyStats = ImmutableList.copyOf(buckets);
-            m_max = (m_latencyStats.size() - 1) * BUCKET_RANGE;
-        }
-
-        public void addSample(int delta)
-        {
-            int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyStats.size() - 1);
-
-            // if the host's clock moves backwards, bucketIndex can be negative
-            // this next line of code is a lie, but a beautiful one that keeps your server up
-            if (bucketIndex < 0) bucketIndex = 0;
-
-            m_max = Math.max(delta, m_max);
-            ImmutableList.Builder<Long> builder = ImmutableList.builder();
-            for (int i = 0; i < m_latencyStats.size(); i++) {
-                if (i == bucketIndex) {
-                    builder.add(m_latencyStats.get(i) + 1);
-                }
-                else {
-                    builder.add(m_latencyStats.get(i));
-                }
-            }
-            m_latencyStats = builder.build();
-        }
-
-        void mergeLatencyInfo(LatencyInfo other)
-        {
-            assert(other != null);
-            assert(m_latencyStats.size() == other.m_latencyStats.size());
-            m_max = Math.max(m_max, other.m_max);
-            ImmutableList.Builder<Long> builder = ImmutableList.builder();
-            for (int i = 0; i < m_latencyStats.size(); i++) {
-                builder.add(m_latencyStats.get(i) + other.m_latencyStats.get(i));
-            }
-            m_latencyStats = builder.build();
-        }
-
-        List<Long> getBuckets()
-        {
-            return m_latencyStats;
-        }
-
-        long getMax()
-        {
-            return m_max;
+    public static AbstractHistogram constructHistogram(boolean threadSafe) {
+        final long highestTrackableValue = 60L * 60L * 1000000L;
+        final int numberOfSignificantValueDigits = 2;
+        if (threadSafe) {
+            return new AtomicHistogram( highestTrackableValue, numberOfSignificantValueDigits);
+        } else {
+            return new Histogram( highestTrackableValue, numberOfSignificantValueDigits);
         }
     }
 
-    private static final long BUCKET_RANGE = 10; // 10ms
-    private LatencyInfo m_totals;
+    private AbstractHistogram m_totals = constructHistogram(false);
 
     public LatencyStats(long siteId) {
         super(siteId, false);
@@ -137,37 +87,27 @@ public class LatencyStats extends SiteStatsSource {
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
-        m_totals = new LatencyInfo();
+        m_totals.reset();
         ClientInterface ci = VoltDB.instance().getClientInterface();
         if (ci != null) {
-            List<LatencyInfo> thisci = ci.getLatencyStats();
-            for (LatencyInfo info : thisci) {
-                m_totals.mergeLatencyInfo(info);
+            List<AbstractHistogram> thisci = ci.getLatencyStats();
+            for (AbstractHistogram info : thisci) {
+                m_totals.add(info);
+                info.reset();
             }
         }
-        return new BucketIterator(m_totals.getBuckets().size());
+        return new DummyIterator();
     }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("BUCKET_MIN", VoltType.INTEGER));
-        columns.add(new ColumnInfo("BUCKET_MAX", VoltType.INTEGER));
-        columns.add(new ColumnInfo("INVOCATIONS", VoltType.BIGINT));
+        columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        final int bucket = (Integer) rowKey;
-
-        rowValues[columnNameToIndex.get("BUCKET_MIN")] = bucket * BUCKET_RANGE;
-        if (bucket < m_totals.getBuckets().size() - 1) {
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = (bucket + 1) * BUCKET_RANGE;
-        } else {
-            // max for the last bucket is the max of the largest latency
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = m_totals.getMax();
-        }
-        rowValues[columnNameToIndex.get("INVOCATIONS")] = m_totals.getBuckets().get(bucket);
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes();
         super.updateStatsRow(rowKey, rowValues);
     }
 }

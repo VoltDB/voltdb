@@ -650,6 +650,10 @@ FileNameMatcher.java and dependencies taken from http://svn.cyberduck.ch/trunk/s
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 ================================================================================
+HdrHistogram https://github.com/HdrHistogram/HdrHistogram 
+ * This code was Written by Gil Tene of Azul Systems, and released to the
+ * public domain, as explained at http://creativecommons.org/publicdomain/zero/1.0/
+================================================================================
 Node.js VoltDB client
 (portions used in VoltDB Node.js client)
 Author Jacob Wright, MIT License (https://github.com/jacwright/voltjs/blob/master/LICENSE)
