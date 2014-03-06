@@ -1014,7 +1014,7 @@ public class PlanAssembler {
             for (Column column : columns) {
                 //TODO: construct a column-by-column projection of subquery results and defined defaults
                 // to the defined target columns.
-                // Default values, cases requiring type casts, or any other projection capabilities 
+                // Default values, cases requiring type casts, or any other projection capabilities
                 // are the responsibilities of the insert node
                 // likely with the help of an inline projection node and/OR a jsonified
                 // representation of the target table's default value expressions that can be cached

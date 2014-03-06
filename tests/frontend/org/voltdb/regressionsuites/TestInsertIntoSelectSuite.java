@@ -211,32 +211,32 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
     {
         testPartitionedTableSelfCopyStoredProc(7);
     }
-    
+
     public void testPartitionedTableSmallSlowSelfCopyStoredProc() throws Exception
     {
         testPartitionedTableSlowSelfCopyStoredProc(7);
     }
-    
+
     public void testPartitionedTableMediumSelfCopyStoredProc() throws Exception
     {
         testPartitionedTableSelfCopyStoredProc(10);
     }
-    
+
     public void testPartitionedTableMediumSlowSelfCopyStoredProc() throws Exception
     {
         testPartitionedTableSlowSelfCopyStoredProc(10);
     }
-    
+
     public void testPartitionedTableLargeSelfCopyStoredProc() throws Exception
     {
         testPartitionedTableSelfCopyStoredProc(13);
     }
-    
+
     public void testPartitionedTableLargeSlowSelfCopyStoredProc() throws Exception
     {
         testPartitionedTableSlowSelfCopyStoredProc(13);
     }
-    
+
     public void testPartitionedTableSelfCopyStoredProc(long iterations) throws Exception
     {
         ClientResponse resp;
@@ -249,7 +249,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         resp = client.callProcedure(MultiRoundInsertIntoSelect.class.getSimpleName(), iterations);
     }
-    
+
     public void testPartitionedTableSlowSelfCopyStoredProc(long iterations) throws Exception
     {
         ClientResponse resp;
@@ -262,7 +262,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         resp = client.callProcedure(MultiRoundSelectThenInsert.class.getSimpleName(), iterations);
     }
-    
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInsertIntoSelectSuite.class);
