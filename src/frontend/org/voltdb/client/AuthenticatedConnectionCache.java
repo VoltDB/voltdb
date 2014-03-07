@@ -58,19 +58,32 @@ public class AuthenticatedConnectionCache {
     }
 
     /**
-     * Provides a callback to be notified on node failure. Note that if we get
-     * a connection closed notification, we'll close all connected clients,
-     * essentially reseting the client cache.
+     * Provides a callback to be notified on node failure. Close
+     * the connection if this callback is invoked.
      */
     class StatusListener extends ClientStatusListenerExt {
+        Connection m_conn = null;
+
+        StatusListener(Connection conn)
+        {
+            m_conn = conn;
+        }
+
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // Reset all connections if we get a disconnect notification
-            if (cause == DisconnectCause.CONNECTION_CLOSED)
-            {
-                new Exception("Client Disconnect").printStackTrace();
-                System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
-                closeAll();
+            // Close the connection. The cause can be CONNECTION_CLOSED or TIMEOUT, we don't care which.
+
+            // debug printstacktrace, to be remove later.  In theory we shouldn't hit this code
+            // because the JSON/HTTP client is within the server.  Speculation that this
+            // can be called if the connection is closed by the server, which is odd because
+            // this client is running *within* the server!
+            new Exception("Client Disconnect").printStackTrace();
+            System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
+            try {
+                if (null != m_conn.client) {
+                    m_conn.client.close();
+                }
+            } catch (InterruptedException ex) {
             }
         }
     }
@@ -232,7 +245,7 @@ public class AuthenticatedConnectionCache {
             // Add a callback listener for this client, to detect if
             // a connection gets closed/disconnected.  If this happens,
             // we need to remove it from the m_conections cache.
-            ClientConfig config = new ClientConfig(userName, password, true, new StatusListener());
+            ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn));
 
             conn.user = userName;
             conn.client = (ClientImpl) ClientFactory.createClient(config);
