@@ -43,6 +43,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     long m_clientInterfaceHandle;
     long m_connectionId;
     boolean m_isSinglePartition;
+    //Flag to indicate the the replica applying the write transaction
+    //doesn't need to send back the result tables
+    boolean m_shouldGenerateAResponse = true;
     StoredProcedureInvocation m_invocation;
 
     // not serialized.
@@ -102,6 +105,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
+    public boolean shouldGenerateAResponse() {
+        return m_shouldGenerateAResponse;
+    }
+
     public StoredProcedureInvocation getStoredProcedureInvocation() {
         return m_invocation;
     }
@@ -149,6 +156,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
+        msgsize += 1; // should generate a response
         msgsize += m_invocation.getSerializedSize();
         return msgsize;
     }
@@ -161,6 +169,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
+        buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
@@ -173,6 +182,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
+        m_shouldGenerateAResponse = buf.get() != 0;
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }

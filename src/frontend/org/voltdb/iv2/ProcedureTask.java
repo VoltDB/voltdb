@@ -112,6 +112,11 @@ abstract public class ProcedureTask extends TransactionTask
                     cr = runner.call(callerParams);
 
                     m_txnState.setHash(cr.getHash());
+                    //Don't pay the cost of returning the result tables for a replicated write
+                    //With reads don't apply the optimization just in case
+                    if (!task.shouldGenerateAResponse() && !task.isReadOnly()) {
+                        cr.dropResultTable();
+                    }
 
                     response.setResults(cr);
                     // record the results of write transactions to the transaction state

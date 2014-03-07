@@ -340,4 +340,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         t.addRow(hash);
         results = new VoltTable[] { t };
     }
+
+    public void dropResultTable() {
+        results = new VoltTable[] {};
+    }
 }
