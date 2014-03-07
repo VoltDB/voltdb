@@ -217,6 +217,8 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
             valueSize = 2; break;
         case VALUE_TYPE_TINYINT:
             valueSize = 1; break;
+        default:
+            break;
         }
     }
 
