@@ -201,7 +201,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     }
 
     // add the value size
-    int valueSize;
+    int valueSize = -1;
     if (obj.hasNonNullKey("VALUE_SIZE")) {
         valueSize = obj.valueForKey("VALUE_SIZE").asInt();
     } else {
@@ -217,8 +217,6 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
             valueSize = 2; break;
         case VALUE_TYPE_TINYINT:
             valueSize = 1; break;
-        default:
-            assert(false); break;
         }
     }
 
