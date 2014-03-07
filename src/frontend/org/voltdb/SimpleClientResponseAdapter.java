@@ -156,6 +156,11 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public void fastEnqueue(DeferredSerialization ds) {
+        enqueue(ds);
+    }
+
+    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             // serialize() touches not-threadsafe state around Initiator

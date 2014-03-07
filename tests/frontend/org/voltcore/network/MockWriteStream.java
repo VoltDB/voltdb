@@ -39,6 +39,11 @@ public class MockWriteStream implements WriteStream {
     }
 
     @Override
+    public void fastEnqueue(DeferredSerialization ds) {
+        enqueue(ds);
+    }
+
+    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());

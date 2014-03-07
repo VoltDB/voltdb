@@ -1131,7 +1131,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
-                        ((NIOWriteStream)cihm.connection.writeStream()).fastEnqueue(new ClientResponseWork(response, cihm, procedure));
+                        cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -2564,6 +2564,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public int getOutstandingMessageCount()
         {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void fastEnqueue(final org.voltcore.utils.DeferredSerialization ds) {
+            enqueue(ds);
         }
 
         @Override
