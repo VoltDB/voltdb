@@ -32,7 +32,7 @@ import org.voltdb.VoltTable;
 
 public class MultiRoundInsertIntoSelect extends VoltProcedure
 {
-    public final SQLStmt insertSelectAll = new SQLStmt("INSERT INTO P1 (B1, A2) SELECT B1, 'y' || A2 FROM P1;");
+    public final SQLStmt insertSelectAll = new SQLStmt("INSERT INTO P3 (B1, A2) SELECT B1, 'x' || A2 FROM P3;");
 
     public long run(int iterations) {
         long added = 0;

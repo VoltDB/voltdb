@@ -154,4 +154,13 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
     }
 
+    @Override
+    public boolean isPartitionedOnColumnIndex(int columnIndex) {
+        // TODO: Implement a method of identifying whether the indexed display column
+        // of the subquery is projecting out a partitioning key of an underlying table or subquery
+        // All such keys are interchangeable here. They must have been constrained to be
+        // members of a single equivalence set in the partitioning for the statement.
+        return false;
+    }
+
 }

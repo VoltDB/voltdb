@@ -885,14 +885,15 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
+            String targetName = col.getKey().getTypeName();
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    "VOLT_TEMP_TABLE",
-                                                   col.getKey().getTypeName(),
-                                                   col.getKey().getTypeName(),
+                                                   targetName,
+                                                   targetName,
                                                    col.getValue()));
 
             // check if this column is an indexed column
-            if (affectedColumns.contains(col.getKey().getTypeName()))
+            if (affectedColumns.contains(targetName))
             {
                 updateNode.setUpdateIndexes(true);
             }
@@ -953,14 +954,14 @@ public class PlanAssembler {
         }
         CompiledPlan retval;
 
-        ParsedSelectStmt subselectStmt = m_parsedInsert.getSubselect();
-        if (subselectStmt != null) {
+        AbstractParsedStmt subStmt = m_parsedInsert.getSubselect();
+        if (subStmt != null) {
             // TODO: Maybe most or all of this processing should be taken care of much earlier,
             // as soon as the subselect is parsed?
-            CompiledPlan subselectPlan = getBestCostPlan(subselectStmt, false);
-            // TODO: Add a guard or a speed bump (trivial projection or filter) to the special case of
-            // "insert into XXX values (...) select * from XXX<table>" which will infinitely replicate
-            // its table if it is not given some reason to break the process up into two phases,
+            CompiledPlan subselectPlan = getBestCostPlan(subStmt, false);
+            // TODO: Add a speed bump (e.g. limit MAX_INT or OFFSET 0 or trivial projection) to the
+            // special case of "insert into XXX values (...) select * from XXX" which could infinitely
+            // replicate its table if it is not given some reason to break the process up into 2 phases,
             // reading the target table (completely) to fill a temp table BEFORE starting to insert
             // new rows into the target table.
             int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
@@ -969,69 +970,106 @@ public class PlanAssembler {
             // The EE's insert filters allow querying replicated data even when inserting into a
             // partitioned target table.  Test that either the subquery is solely on replicated data ...
             if (partitionedTableCount > 0) {
-                //TODO: OR is on partitioned data but exports one or more partitioning column(s).
-                // Test that in the partitioned case, the target table is partitioned.
+                // ... OR is on partitioned data but exports one or more partitioning column(s).
+                // Ensure that in the partitioned select case, the target table is also partitioned.
                 if (targetIsReplicated) {
-                    throw new PlanningErrorException("The replicated table, '" + targetTable.getTypeName() +
+                    throw new PlanningErrorException(
+                            "The replicated table, '" + targetTable.getTypeName() +
                             "', must not be the recipient of partitioned data in a single statement. " +
-                            " Use separate INSERT and SELECT statements, " +
+                            " Use separate INSERT and SELECT statements," +
                             " optionally within a stored procedure." );
                 }
+                // There is currently no support for unions on partitioned data in this context.
+                if ( ! (subStmt instanceof ParsedSelectStmt)) {
+                    throw new PlanningErrorException(
+                            "The partitioned table '" + targetTable.getTypeName() +
+                            "' must not be updated directly from a UNION or other set operation.");
+                }
+                ParsedSelectStmt subselectStmt = (ParsedSelectStmt)subStmt;
                 // An exported partitioning column has the following attributes:
                 // -- it is based on a TupleValueExpression.
                 // -- the index of the TupleValueExpression is that of its table's partitioning column.
                 // -- (some day it can also be an exported partitioning column from a nested subquery).
                 // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
                 //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
-                //    rollups.
-                //FIXME. For POC purposes, use any column you like for the partitioning key,
-                // as long as it's the first in the table DDL and first in the VALUES list and SELECT list!
-                exportedPartitioningColumns.add(0); // HACK FOR POC
-                // int columnPosition = 0;
-                // foreach (displayCol : substatement-display-columns) {
-                //     if (displayCol has a TVE expression and the TVE expression is among the equivalent partitioning expressions analyzed for the subselect) {
-                //         exportedPartitioningColumns.add(columnPosition);
-                //     }
-                //     ++columnPosition;
-                // }
+                //    roll-ups.
+                int columnPosition = 0;
+                for (ParsedColInfo displayCol : subselectStmt.displayColumns()) {
+                    AbstractExpression expr = displayCol.expression;
+                    if (expr instanceof TupleValueExpression) {
+                        TupleValueExpression tve = (TupleValueExpression)expr;
+                        StmtTableScan scan = subselectStmt.m_tableAliasMap.get(tve.getTableAlias());
+                        if (scan.isPartitionedOnColumnIndex(tve.getColumnIndex())) {
+                            exportedPartitioningColumns.add(columnPosition);
+                        }
+                    }
+                    ++columnPosition;
+                }
                 if (exportedPartitioningColumns.isEmpty()) {
                     throw new PlanningErrorException(
                             "The partitioning column '" + partitioningColumn.getName() +
                             "' of the partitioned table '" + targetTable.getTypeName() +
-                            "' must be explicitly set to a partitioning column in the SELECT clause.");
+                            "' must be explicitly set to a partitioning column in the SELECT clause." +
+                            " Use separate INSERT and SELECT statements," +
+                            " optionally within a stored procedure." );
                 }
-                // It is a requirement that the partitioning column of the target table be set to
+                //TODO: It is a requirement that the partitioning column of the target table be set to
                 // one of these exported partitioning columns.
                 // All other cases, like inserting expressions or non-partitioning columns into the
                 // target table's partitioning column are not supported as a single statement.
                 // The only transactional method of implementing such cases is through multiple
                 // query and DML statements in a multi-partition stored procedure. This approach
                 // is more expensive but allows migration of data among the partitions.
-            }
 
-            // for each column in the table in order...
-            int ii = 0;
-            for (Column column : columns) {
-                //TODO: construct a column-by-column projection of subquery results and defined defaults
-                // to the defined target columns.
-                // Default values, cases requiring type casts, or any other projection capabilities
-                // are the responsibilities of the insert node
-                // likely with the help of an inline projection node and/OR a jsonified
-                // representation of the target table's default value expressions that can be cached
-                // in the DDL per target table instead of reserialized (in whole or in part) per insert
-                // statement plan.
-                //FIXME. For POC purposes, not supporting defaults or casting or out-of-order listing of column names!
-                VoltType exprType = subselectStmt.displayColumns().get(ii).expression.getValueType();
-                assert(VoltType.get((byte)column.getType()) == exprType);
-                if (column.equals(partitioningColumn)) {
-                    if (( ! exportedPartitioningColumns.isEmpty()) && ! exportedPartitioningColumns.contains(ii)) {
+                // for each column in the table that is in the target column list...
+                int ii = 0;
+                for (Column column : columns) {
+                    //TODO: construct a column-by-column projection of subquery results and defined defaults
+                    // to the defined target columns.
+                    // Default values, cases requiring type casts, or any other projection capabilities
+                    // are the responsibilities of the insert node
+                    // likely with the help of an inline projection node and/OR a jsonified
+                    // representation of the target table's default value expressions that can be cached
+                    // in the DDL per target table instead of reserialized (in whole or in part) per insert
+                    // statement plan.
+                    //FIXME. For POC purposes, not supporting defaults or casting or
+                    // out-of-order listing of column names!
+                    int jj = m_parsedInsert.m_targetNames.indexOf(column.getTypeName());
+                    if (jj == -1) {
+                        //TODO: Here's where we would make proper arrangements for a default value.
                         throw new PlanningErrorException(
-                                "The value being assigned to the partitioning column '" + partitioningColumn.getName() +
-                                "' of the partitioned table '" + targetTable.getTypeName() +
-                                "' is not a partitioning column value in the SELECT clause. index=" + ii);
+                                "Default values are not supported in 'INSERT ONTO SELECT FROM'." +
+                                " Each column in table '" + targetTable.getTypeName() +
+                                "' must be provided an explicit value.");
                     }
+                    if (jj != ii) {
+                        //TODO: Honor any order the columns may have been listed in.
+                        throw new PlanningErrorException(
+                                "Columns in 'INSERT ONTO SELECT FROM'." +
+                                " for table '" + targetTable.getTypeName() +
+                                "' must be listed in the order that they were defined.");
+                    }
+                    VoltType exprType = subselectStmt.displayColumns().get(jj).expression.getValueType();
+                    if (VoltType.get((byte)column.getType()) != exprType) {
+                        //TODO: Support trivial casts.
+                        throw new PlanningErrorException(
+                                "Column '" + column.getName() + "' in 'INSERT ONTO SELECT FROM'." +
+                                " for table '" + targetTable.getTypeName() +
+                                "' must be set to value of the same exact type.");
+
+                    }
+                    if (column.equals(partitioningColumn)) {
+                        if (( ! exportedPartitioningColumns.isEmpty()) &&
+                                ! exportedPartitioningColumns.contains(ii)) {
+                            throw new PlanningErrorException(
+                                    "The value being assigned to the partitioning column '" +
+                                    partitioningColumn.getName() +
+                                    "' of the partitioned table '" + targetTable.getTypeName() +
+                                    "' is not a partitioning column value in the SELECT clause. index=" + ii);
+                        }
+                    }
+                    ++ii;
                 }
-                ++ii;
             }
 
             // The subselectPlan is a close approximation of the result needed here, except
@@ -2119,6 +2157,7 @@ public class PlanAssembler {
     private static AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
         assert(root != null);
         AbstractPlanNode current = root;
+        AbstractPlanNode expectable = current;
         while ( ! (current instanceof ReceivePlanNode)) {
             //FIXME? We might want to be more selective about the types of nodes (if any?)
             // we are willing to skip to find the target send/receive pair. --paul
@@ -2126,10 +2165,16 @@ public class PlanAssembler {
             if (current.getChildCount() == 1) {
                 // This is still a coordinator node
                 current = current.getChild(0);
+                if ((expectable.getChild(0) == current) && expectable instanceof ProjectionPlanNode) {
+                    expectable = current;
+                }
             } else {
                 // We are about to branch and leave the coordinator
                 return root;
             }
+        }
+        if (current != expectable) {
+            throw new RuntimeException("Paul was not expecting this.");
         }
         assert(current.getChildCount() == 1);
         AbstractPlanNode child = current.getChild(0);
@@ -2137,10 +2182,11 @@ public class PlanAssembler {
         assert(child.getChildCount() == 1);
         child = child.getChild(0);
         //FIXME? Not sure why it would be necessary or correct to specifically
-        // drop a non-inline projection node. --paul
+        // drop a non-inline projection node found below the send node. --paul
         if (child instanceof ProjectionPlanNode) {
             assert(child.getChildCount() == 1);
             child = child.getChild(0);
+            throw new RuntimeException("Paul was not expecting this, either.");
         }
         child.clearParents();
         if (current == root) {

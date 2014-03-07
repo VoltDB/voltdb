@@ -26,10 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundInsertIntoSelect;
 import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundInsertIntoSelect;
 import org.voltdb_testprocs.regressionsuites.doubledown.MultiRoundSelectThenInsert;
 
@@ -207,42 +207,73 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertEquals(4, resp.getResults()[0].asScalarLong());
     }
 
+    public void testValidatePartitionedTableSmallSelfCopyStoredProc() throws Exception
+    {
+        partitionedTableSelfCopyStoredProc(5);
+        partitionedTableSlowSelfCopyStoredProc(5);
+        final Client client = getClient();
+        ClientResponse resp;
+        resp = client.callProcedure("@AdHoc", "select A2, B1 from P1 order by 1, 2");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable fastResult = resp.getResults()[0];
+        resp = client.callProcedure("@AdHoc", "select A2, B1 from P3 order by 1, 2");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable slowResult = resp.getResults()[0];
+        while (fastResult.advanceRow()) {
+            assertTrue(slowResult.advanceRow());
+            assertEquals(slowResult.getString(0), fastResult.getString(0));
+            assertEquals(slowResult.getLong(1), fastResult.getLong(1));
+        }
+        assertFalse(slowResult.advanceRow());
+    }
+
     public void testPartitionedTableSmallSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSelfCopyStoredProc(7);
+        partitionedTableSelfCopyStoredProc(5);
     }
 
     public void testPartitionedTableSmallSlowSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSlowSelfCopyStoredProc(7);
+        partitionedTableSlowSelfCopyStoredProc(5);
     }
 
     public void testPartitionedTableMediumSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSelfCopyStoredProc(10);
+        partitionedTableSelfCopyStoredProc(10);
     }
 
     public void testPartitionedTableMediumSlowSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSlowSelfCopyStoredProc(10);
+        partitionedTableSlowSelfCopyStoredProc(10);
     }
 
     public void testPartitionedTableLargeSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSelfCopyStoredProc(13);
+        partitionedTableSelfCopyStoredProc(15);
     }
 
-    public void testPartitionedTableLargeSlowSelfCopyStoredProc() throws Exception
+    public void UNtestPartitionedTableLargeSlowSelfCopyStoredProc() throws Exception
     {
-        testPartitionedTableSlowSelfCopyStoredProc(13);
+        partitionedTableSlowSelfCopyStoredProc(15);
     }
 
-    public void testPartitionedTableSelfCopyStoredProc(long iterations) throws Exception
+    // Too slow to run normally
+    // public void UNtestPartitionedTableHugeSelfCopyStoredProc() throws Exception
+    //{
+    //    partitionedTableSelfCopyStoredProc(20);
+    //}
+    //
+    //public void UNtestPartitionedTableHugeSlowSelfCopyStoredProc() throws Exception
+    //{
+    //    partitionedTableSlowSelfCopyStoredProc(20);
+    //}
+
+    public void partitionedTableSelfCopyStoredProc(long iterations) throws Exception
     {
         ClientResponse resp;
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
-            resp = client.callProcedure("P1.insert", i, Integer.toHexString(i));
+            resp = client.callProcedure("P3.insert", i, Integer.toHexString(i));
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             assertEquals(1, resp.getResults()[0].asScalarLong());
         }
@@ -250,7 +281,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         resp = client.callProcedure(MultiRoundInsertIntoSelect.class.getSimpleName(), iterations);
     }
 
-    public void testPartitionedTableSlowSelfCopyStoredProc(long iterations) throws Exception
+    public void partitionedTableSlowSelfCopyStoredProc(long iterations) throws Exception
     {
         ClientResponse resp;
         final Client client = getClient();
@@ -261,6 +292,58 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         resp = client.callProcedure(MultiRoundSelectThenInsert.class.getSimpleName(), iterations);
+    }
+
+    public void FIXMEtestFailingProjection() throws Exception {
+        final Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        ClientResponse resp;
+        String insertIntoSelect = "insert into R2 (a1) select 100+b1 from R1 where b1 >= 6";
+
+        //* enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
+        VoltTable vt = resp.getResults()[0];
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        insertIntoSelect = "insert into R2 (a1) values (9)";
+        //*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
+        vt = resp.getResults()[0];
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        insertIntoSelect = "insert into R2 (a2, a1) values ('x', 9)";
+
+        //*/ enable for debug ...
+        resp = client.callProcedure("@Explain", insertIntoSelect);
+        vt = resp.getResults()[0];
+        System.out.println("DEBUGGING:\n" + vt);
+        // ... enable for debug */
+
+        insertIntoSelect = "insert into R2 (a2, a1) select a2||'.', 100+b1 from R1 where b1 >= 6";
+
+        resp = client.callProcedure("@AdHoc", insertIntoSelect);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("CountR1");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(10, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("CountR2");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+
+        resp = client.callProcedure("@AdHoc", "select count(*) from R2 where a1 >= 100");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(4, resp.getResults()[0].asScalarLong());
+
     }
 
     static public junit.framework.Test suite() {
@@ -280,9 +363,12 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                     "PARTITION TABLE p2 ON COLUMN a1;" +
                     "CREATE UNIQUE INDEX p2_tree_idx ON p2(a1);" +
 
+                    "CREATE TABLE p3(b1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL);" +
+                    "PARTITION TABLE p3 ON COLUMN b1;" +
+
                     "CREATE TABLE r1(b1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL, PRIMARY KEY (b1));" +
 
-                    "CREATE TABLE r2(a1 BIGINT NOT NULL, a2 VARCHAR(100) NOT NULL, PRIMARY KEY (a1));" +
+                    "CREATE TABLE r2(a1 BIGINT NOT NULL, a2 VARCHAR(100) DEFAULT 'xyz' NOT NULL, PRIMARY KEY (a1));" +
 
                     "CREATE PROCEDURE CountP1 AS select count(*) from p1;" +
                     "CREATE PROCEDURE CountP2 AS select count(*) from p2;" +
@@ -300,12 +386,12 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER
+        //*/ CLUSTER (disable to opt for speed over coverage...
         config = new LocalCluster("iisf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
-
+        // ... disable for speed) */
         return builder;
     }
 }

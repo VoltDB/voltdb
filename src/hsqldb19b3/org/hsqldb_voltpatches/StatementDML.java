@@ -1253,7 +1253,12 @@ public class StatementDML extends StatementDMQL {
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        VoltXMLElement columns = new VoltXMLElement("columns");
+        VoltXMLElement columns;
+        if (expressions == null) {
+            columns = new VoltXMLElement("targets");
+        } else {
+            columns = new VoltXMLElement("columns");
+        }
         xml.children.add(columns);
 
         for (int i = 0; i < columnMap.length; i++)
@@ -1261,7 +1266,9 @@ public class StatementDML extends StatementDMQL {
             VoltXMLElement column = new VoltXMLElement("column");
             columns.children.add(column);
             column.attributes.put("name", targetTable.getColumn(columnMap[i]).getName().name);
-            column.children.add(expressions[i].voltGetXML(session));
+            if (expressions != null) {
+                column.children.add(expressions[i].voltGetXML(session));
+            }
         }
     }
 
@@ -1315,6 +1322,7 @@ public class StatementDML extends StatementDMQL {
             if (queryExpression == null) {
                 voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
             } else {
+                voltAppendTargetColumns(session, insertColumnMap, null, xml);
                 VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
                 xml.children.add(child);
             }

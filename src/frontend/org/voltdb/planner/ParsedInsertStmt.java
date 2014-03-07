@@ -17,7 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -33,7 +35,8 @@ import org.voltdb.expressions.AbstractExpression;
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
     private final HashMap<Column, AbstractExpression> m_columns = new HashMap<Column, AbstractExpression>();
-    private ParsedSelectStmt m_subselect;
+    final List<String> m_targetNames =  new ArrayList<String>();
+    private AbstractParsedStmt m_subselect;
 
     /**
     * Class constructor
@@ -58,7 +61,16 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(node, table, m_columns);
+                parseTargetColumns(node, table, m_targetNames, m_columns);
+            }
+            else if (node.name.equalsIgnoreCase("targets")) {
+                for (VoltXMLElement nameNode : node.children) {
+                    assert(nameNode.name.equals("column"));
+                    String name = nameNode.attributes.get("name");
+                    assert(name != null);
+                    m_targetNames.add(name);
+                    assert(nameNode.children.isEmpty());
+                }
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 // TODO: When INSERT ... SELECT is supported, it's unclear whether the source tables need to be
@@ -68,6 +80,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 // clause will need to allow joins.
                 m_subselect = parseSubquery(node);
             }
+        }
+        if (m_subselect != null) {
+
         }
     }
 
@@ -95,7 +110,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     /**
      * @return the m_subselect
      */
-    public ParsedSelectStmt getSubselect() {
+    public AbstractParsedStmt getSubselect() {
         return m_subselect;
     }
 

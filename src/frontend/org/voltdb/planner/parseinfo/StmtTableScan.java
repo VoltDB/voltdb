@@ -75,4 +75,6 @@ public abstract class StmtTableScan {
 
     abstract public void resolveTVE(TupleValueExpression expr, String columnName);
 
+    abstract public boolean isPartitionedOnColumnIndex(int columnIndex);
+
 }

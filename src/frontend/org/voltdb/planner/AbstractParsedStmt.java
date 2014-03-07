@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -175,13 +176,16 @@ public abstract class AbstractParsedStmt {
      */
     abstract void parse(VoltXMLElement stmtElement);
 
-    void parseTargetColumns(VoltXMLElement columnsNode, Table table, HashMap<Column, AbstractExpression> columns)
+    void parseTargetColumns(VoltXMLElement columnsNode, Table table, List<String> targetNames, HashMap<Column, AbstractExpression> columns)
     {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("column"));
 
             String name = child.attributes.get("name");
             assert(name != null);
+            if (targetNames != null) {
+                targetNames.add(name);
+            }
             Column col = table.getColumns().getIgnoreCase(name.trim());
 
             assert(child.children.size() == 1);
@@ -593,7 +597,7 @@ public abstract class AbstractParsedStmt {
                 continue;
             }
             if (childNode.children.isEmpty()) {
-                break;
+                continue;
             }
             subquery = parseSubquery(childNode.children.get(0));
             break;
@@ -751,13 +755,13 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    protected ParsedSelectStmt parseSubquery(VoltXMLElement queryNode) {
-        ParsedSelectStmt subQuery = new ParsedSelectStmt(m_paramValues, m_db);
+    protected AbstractParsedStmt parseSubquery(VoltXMLElement queryNode) {
+        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
-        subQuery.m_paramsById.putAll(m_paramsById);
-        ((AbstractParsedStmt)subQuery).m_paramList = m_paramList;
-        AbstractParsedStmt.parse(subQuery, m_sql, queryNode, m_paramValues, m_db, m_joinOrder);
-        return subQuery;
+        subquery.m_paramsById.putAll(m_paramsById);
+        subquery.m_paramList = m_paramList;
+        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_paramValues, m_db, m_joinOrder);
+        return subquery;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.
