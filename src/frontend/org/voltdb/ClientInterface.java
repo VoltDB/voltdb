@@ -66,6 +66,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.NIOWriteStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
@@ -1130,7 +1131,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
-                        cihm.connection.writeStream().enqueue(new ClientResponseWork(response, cihm, procedure));
+                        ((NIOWriteStream)cihm.connection.writeStream()).fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);

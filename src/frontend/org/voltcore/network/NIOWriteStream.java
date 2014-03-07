@@ -197,6 +197,22 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return;
     }
 
+    /*
+     * For the server we run everything backpressure
+     * related on the network thread, so the entire thing can just
+     * go in the queue directly without acquiring any additional locks
+     */
+    public void fastEnqueue(final DeferredSerialization ds) {
+        m_port.queueTask(new Runnable() {
+            @Override
+            public void run() {
+                updateLastPendingWriteTimeAndQueueBackpressure();
+                m_queuedWrites.offer(ds);
+                m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            }
+        });
+    }
+
     @Override
     public void enqueue(final ByteBuffer b) {
         enqueue(new ByteBuffer[] { b });
