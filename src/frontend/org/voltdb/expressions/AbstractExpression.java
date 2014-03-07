@@ -532,7 +532,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private static AbstractExpression fromJSONObject(JSONObject obj,  StmtTableScan tableScan) throws JSONException
     {
-        ExpressionType type = ExpressionType.valueOf(obj.getString(Members.TYPE.name()));
+        ExpressionType type = ExpressionType.get(obj.getInt(Members.TYPE.name()));
         AbstractExpression expr;
         try {
             expr = type.getExpressionClass().newInstance();
@@ -546,8 +546,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         expr.m_type = type;
 
-        expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
-        expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        expr.m_valueType = VoltType.get((byte) obj.getInt(Members.VALUE_TYPE.name()));
+        if (obj.has(Members.VALUE_SIZE.name())) {
+            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        } else {
+            expr.m_valueSize = VoltType.getNumericTypeFixedLengthInBytes(expr.m_valueType.toString());
+        }
 
         expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
         expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name(), tableScan);
