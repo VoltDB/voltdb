@@ -34,7 +34,7 @@ public interface TransactionCreator
             boolean isEverySite,
             int partition,
             int messageSize,
-            long now);
+            long nowNanos);
 
     // Create a transaction using the provided txnId.
     public boolean createTransaction(
@@ -47,7 +47,7 @@ public interface TransactionCreator
             boolean isEverySite,
             int partition,
             int messageSize,
-            long now);
+            long nowNanos);
 
     /*
      * Only used in IV2. Send a marker for the position of a multi-part transaction in

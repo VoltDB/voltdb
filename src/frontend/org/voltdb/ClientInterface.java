@@ -51,6 +51,8 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -93,7 +95,6 @@ import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -859,15 +860,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (clientData == null) {
                 return new ByteBuffer[] {};
             }
-            final long now = System.currentTimeMillis();
-            final int delta = (int)(now - clientData.m_creationTime);
 
             // Reuse the creation time of the original invocation to have accurate internal latency
-            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTime)) {
+            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
                 return new ByteBuffer[] {};
             }
+
+            final long now = System.nanoTime();
+            final long delta = now - clientData.m_creationTimeNanos;
 
             /*
              * Log initiator stats
@@ -880,7 +882,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     clientResponse.getStatus());
 
             clientResponse.setClientHandle(clientData.m_clientHandle);
-            clientResponse.setClusterRoundtrip(delta);
+            clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
 
             ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
@@ -904,7 +906,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @param now the current timestamp
          * @return true if the transaction is restarted successfully, false otherwise.
          */
-        private boolean restartTransaction(int messageSize, long now)
+        private boolean restartTransaction(int messageSize, long nowNanos)
         {
             if (response.isMispartitioned()) {
                 // Restart a mis-partitioned transaction
@@ -939,7 +941,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             false, // Only SP could be mis-partitioned
                             partition,
                             messageSize,
-                            now);
+                            nowNanos);
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -961,7 +963,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isEveryPartition,
             final int partition,
             final int messageSize,
-            final long now)
+            final long nowNanos)
     {
         return createTransaction(
                 connectionId,
@@ -973,7 +975,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isEveryPartition,
                 partition,
                 messageSize,
-                now,
+                nowNanos,
                 false);  // is for replay.
     }
 
@@ -988,7 +990,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isEveryPartition,
             final int partition,
             final int messageSize,
-            final long now,
+            long nowNanos,
             final boolean isForReplay)
     {
         assert(!isSinglePartition || (partition >= 0));
@@ -1028,7 +1030,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
-                messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
+                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
             new Iv2InitiateTaskMessage(m_siteId,
@@ -1529,7 +1531,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                           catProc.getEverysite(),
                           partition,
                           buf.capacity(),
-                          System.currentTimeMillis());
+                          System.nanoTime());
         return null;
     }
 
@@ -1581,14 +1583,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param size
      * @param invocation
      */
-    void dispatchSendSentinel(long connectionId, long now, int size,
+    void dispatchSendSentinel(long connectionId, long nowNanos, int size,
                               StoredProcedureInvocation invocation)
     {
         ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         // First parameter of the invocation is the partition ID
         int pid = (Integer) invocation.getParameterAtIndex(0);
         final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(pid);
-        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, now,
+        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, nowNanos,
                 invocation.getProcName(), initiatorHSId, true, false);
 
         /*
@@ -1639,7 +1641,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getEverysite(),
                 0,//No partition needed for multi-part
                 buf.capacity(),
-                System.currentTimeMillis());
+                System.nanoTime());
 
         return null;
     }
@@ -1650,7 +1652,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * * return True if an error was generated and needs to be returned to the client
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
-        final long now = System.currentTimeMillis();
+        final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         try {
             task.initFromBuffer(buf);
@@ -1712,7 +1714,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
             else if (task.procName.equals("@SendSentinel")) {
-                dispatchSendSentinel(handler.connectionId(), now, buf.capacity(), task);
+                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
         }
@@ -1862,7 +1864,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getEverysite(),
                         partition,
                         buf.capacity(),
-                        now);
+                        nowNanos);
         if (!success) {
             // HACK: this return is for the DR agent so that it
             // will move along on duplicate replicated transactions
@@ -2018,7 +2020,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partition,
-                task.getSerializedSize(), EstTime.currentTimeMillis());
+                task.getSerializedSize(), System.nanoTime());
     }
 
     /*
@@ -2119,7 +2121,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // procedure are horrible, horrible, horrible.
                             createTransaction(changeResult.connectionId,
                                     task, false, false, false, 0, task.getSerializedSize(),
-                                    EstTime.currentTimeMillis());
+                                    System.nanoTime());
                         }
                     }
                     else {
@@ -2465,7 +2467,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
                 0,
-                0, EstTime.currentTimeMillis());
+                0, System.nanoTime());
     }
 
     /**
@@ -2673,8 +2675,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return statsIterators;
     }
 
-    public List<LatencyInfo> getLatencyStats() {
-        List<LatencyInfo> latencyStats = new ArrayList<LatencyInfo>();
+    public List<AbstractHistogram> getLatencyStats() {
+        List<AbstractHistogram> latencyStats = new ArrayList<AbstractHistogram>();
         for (AdmissionControlGroup acg : m_allACGs) {
             latencyStats.add(acg.getLatencyInfo());
         }
