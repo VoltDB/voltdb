@@ -105,8 +105,15 @@ public class DuplicateCounter
             /*
              * Replicas will return a response to a write with no result tables
              * always keep the local response which has the result tables
+             *
+             * This is bizarre, but you can have a non null last response
+             * but null last result tables AND non null result tables. It should
+             * be consistent since ClientResponseImpl should never return a null array
+             * for result tables yet somehow in some case it does.
+             *
+             * Is this a symptom of a larger issue?
              */
-            if (m_lastResponse != null && resultTables != null) {
+            if (m_lastResponse != null && m_lastResultTables != null && resultTables != null) {
                 if (m_lastResultTables.length < resultTables.length) {
                     m_lastResponse = message;
                     m_lastResultTables = resultTables;
