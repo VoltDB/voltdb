@@ -25,7 +25,7 @@ import org.voltdb.StarvationTracker;
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerQueue
 {
-    public static final long SITE_SPIN_MICROS = Long.getLong("SITE_SPIN_MICROS", 1000);
+    public static final long SITE_SPIN_MICROS = Long.getLong("SITE_SPIN_MICROS", 0);
     private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
     private StarvationTracker m_starvationTracker;
 
