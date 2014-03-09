@@ -600,7 +600,7 @@ public abstract class CatalogUtil {
         }
 
         //Check that it is a properly formed verstion string
-        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
             throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
         }
