@@ -2323,6 +2323,10 @@ public class VoltCompiler {
                         ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
                         : VoltDB.Configuration.getPathToCatalogForTest(textName));
 
+                consoleLog.info(String.format(
+                        "Version %s catalog will be automatically upgraded to version %s.",
+                        versionFromCatalog, versionFromVoltDB));
+
                 // Do the compilation work.
                 boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
 

@@ -1064,12 +1064,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return topo;
     }
 
+    private List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
     /**
      * Schedule all the periodic works
      */
     private void schedulePeriodicWorks() {
         // JMX stats broadcast
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 // A null here was causing a steady stream of annoying but apparently inconsequential
@@ -1078,31 +1079,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_statsManager.sendNotification();
                 }
             }
-        }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS);
+        }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS));
 
         // small stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(false, false);
             }
-        }, 0, 5, TimeUnit.SECONDS);
+        }, 0, 5, TimeUnit.SECONDS));
 
         // medium stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(true, false);
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES));
 
         // large stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
-        }, 0, 6, TimeUnit.MINUTES);
+        }, 0, 6, TimeUnit.MINUTES));
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
@@ -1689,9 +1690,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
+
+                /*
+                 * Various scheduled tasks get crashy in unit tests if they happen to run
+                 * while other stuff is being shut down
+                 */
+                for (ScheduledFuture<?> sc : m_periodicWorks) {
+                    sc.cancel(false);
+                    try {
+                        sc.get();
+                    } catch (Throwable t) {}
+                }
+                m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
+                m_periodicWorkThread.awaitTermination(356, TimeUnit.DAYS);
                 m_periodicPriorityWorkThread.shutdown();
+                m_periodicPriorityWorkThread.awaitTermination(356, TimeUnit.DAYS);
 
                 if (m_elasticJoinService != null) {
                     m_elasticJoinService.shutdown();
