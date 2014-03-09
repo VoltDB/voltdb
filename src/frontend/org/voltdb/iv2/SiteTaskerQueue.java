@@ -44,11 +44,15 @@ public class SiteTaskerQueue
             return task;
         }
         try {
-            task = m_tasks.poll(SITE_SPIN_MICROS, TimeUnit.MICROSECONDS);
-            if (task == null) {
-                task = m_tasks.take();
+            if (SITE_SPIN_MICROS > 0) {
+                task = m_tasks.poll(SITE_SPIN_MICROS, TimeUnit.MICROSECONDS);
+                if (task == null) {
+                    task = m_tasks.take();
+                }
+                return task;
+            } else {
+                return m_tasks.take();
             }
-            return task;
         } finally {
             m_starvationTracker.endStarvation();
         }
