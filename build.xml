@@ -234,7 +234,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="distcheck" />
@@ -252,7 +252,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_noclustering" />
         <arg value="distcheck" />
@@ -270,7 +270,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="licensecheck" />
         <arg value="junit_quick" />
         <arg value="distcheck" />
@@ -288,7 +288,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_sql" />
         <arg value="distcheck" />
@@ -307,7 +307,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="junit_quarantine" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
