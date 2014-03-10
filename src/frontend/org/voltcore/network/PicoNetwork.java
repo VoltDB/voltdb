@@ -84,11 +84,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 
-/** Produces work for registered ports that are selected for read, write */
-public class PicoNetwork implements Runnable, Connection
+/**
+ * The least amount of code possible to produce a working
+ * NIO selector loop. Simpler than VoltNetwork + VoltPort
+ * because it doesn't try to tackle backpressure or tracking
+ * multiple sockets
+ */
+public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 {
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -114,7 +120,8 @@ public class PicoNetwork implements Runnable, Connection
     private Set<Long> m_verbotenThreads;
 
     /**
-     * Start this VoltNetwork's thread;
+     * Start this VoltNetwork's thread. populate the verbotenThreads set
+     * with the id of the thread that is created
      */
     public void start(InputHandler ih, Set<Long> verbotenThreads) {
         m_ih = ih;
@@ -122,11 +129,6 @@ public class PicoNetwork implements Runnable, Connection
         m_thread.start();
     }
 
-    /**
-     * Initialize a m_selector and become ready to perform real work
-     * If the network is not going to provide any threads provideOwnThread should be false
-     * and runOnce should be called periodically
-     **/
     public PicoNetwork(SocketChannel sc) {
         m_sc = sc;
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
@@ -163,7 +165,10 @@ public class PicoNetwork implements Runnable, Connection
         }
     }
 
+    //Track how busy the thread is and spin once
+    //if there is always work
     private boolean m_hadWork = false;
+
     @Override
     public void run() {
         m_verbotenThreads.add(Thread.currentThread().getId());
@@ -177,6 +182,8 @@ public class PicoNetwork implements Runnable, Connection
                 }
                 dispatchReadStream();
                 drainWriteStream();
+
+                //Choose a non-blocking select if things are busy
                 if (m_hadWork) {
                     m_selector.selectNow();
                 } else {
@@ -374,7 +381,7 @@ public class PicoNetwork implements Runnable, Connection
             return retval;
     }
 
-    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+    public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {

@@ -33,19 +33,9 @@ import org.voltcore.utils.RateLimitedLogger;
 
 /**
 *
-*  Provide a queue for ByteBuffers and DeferredSerializations and drain them to gathering ByteChannel.
-*  Uses a thread local memory pool for serializing messages that are < MAX_GATHERING_WRITE size and HeapByteBuffers
-*  otherwise. Jumps through serious hoops to avoid ever writing large HeapByteBuffers to the channel
-*  because Java will allocate a DirectByteBuffer and copy ALL the data into the DirectByteBuffer even if only
-*  a small fraction can reasonably be written to the channel. This wastes time in copying data that can never possibly
-*  make it into the channel in non blocking mode and space because the DirectByteBuffer is never released unlike
-*  the pool which shrinks after a long time without usage.
-*
-*  The value m_port.m_expectedOutgoingMessageSize is used to set the initial storage a FastSerializer will
-*  allocate for when doing deferred serialization of FastSerializables. FastSerializable + enqueue is the
-*  best way to serialize data unless you can't pick a good value for m_port.m_expectedOutgoingMessageSize.
-*  In most cases you are optimizing for the bulk of your message and it is fine to guess a little high as the memory
-*  allocation works well.
+* Base class for tracking pending writes to a socket and dealing with serializing them
+* to a series of buffers. Actually draining to a socket is delegated to subclasses as
+* is queuing writes which have different locking and backpressure policies
 */
 public abstract class NIOWriteStreamBase {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -102,8 +92,8 @@ public abstract class NIOWriteStreamBase {
     protected abstract ArrayDeque<DeferredSerialization> getQueuedWrites();
 
     /**
-     * Swap the two queues of DeferredSerializations and serialize everything in the queue
-     * and return the resulting ByteBuffers as an array.
+     * Swap the two queues of DeferredSerializations and serialize everything into the queue
+     * of pending buffers
      * @return
      * @throws IOException
      */
@@ -164,11 +154,20 @@ public abstract class NIOWriteStreamBase {
         return processedWrites;
     }
 
+    private static final boolean ASSERT_ON;
+    static {
+        boolean assertOn = false;
+        assert (assertOn = true);
+        ASSERT_ON = assertOn;
+    }
+
+    /*
+     * Validate that serialization is accurately reporting the amount of data necessary
+     * to serialize the message
+     */
     private void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
         if (buf.limit() != buf.capacity()) {
-            boolean assertOn = false;
-            assert (assertOn = true);
-            if (assertOn) {
+            if (ASSERT_ON) {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);
                 System.exit(-1);
             }
@@ -202,5 +201,8 @@ public abstract class NIOWriteStreamBase {
         updateQueued(-bytesReleased, false);
     }
 
+    /*
+     * Track bytes queued for backpressure
+     */
     protected abstract void updateQueued(int queued, boolean noBackpressureSignal);
 }

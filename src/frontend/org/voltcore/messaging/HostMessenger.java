@@ -33,6 +33,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -49,10 +50,12 @@ import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.Pair;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -442,8 +445,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void prepSocketChannel(SocketChannel sc) {
         try {
-            sc.socket().setSendBufferSize(1024*1024*2);
-            sc.socket().setReceiveBufferSize(1024*1024*2);
+            sc.socket().setSendBufferSize(1024 * 1024 * 2);
+            sc.socket().setReceiveBufferSize(1024 * 1024 * 2);
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -837,31 +840,60 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
         addMailbox(hsId, new Mailbox() {
             @Override
-            public void send(long hsId, VoltMessage message) {}
+            public void send(long hsId, VoltMessage message) {
+            }
+
             @Override
-            public void send(long[] hsIds, VoltMessage message) {}
+            public void send(long[] hsIds, VoltMessage message) {
+            }
+
             @Override
             public void deliver(VoltMessage message) {
                 hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
+
             @Override
-            public void deliverFront(VoltMessage message) {}
+            public void deliverFront(VoltMessage message) {
+            }
+
             @Override
-            public VoltMessage recv() {return null;}
+            public VoltMessage recv() {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking() {return null;}
+            public VoltMessage recvBlocking() {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(long timeout) {return null;}
+            public VoltMessage recvBlocking(long timeout) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recv(Subject[] s) {return null;}
+            public VoltMessage recv(Subject[] s) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(Subject[] s) {return null;}
+            public VoltMessage recvBlocking(Subject[] s) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) { return null;}
+            public VoltMessage recvBlocking(Subject[] s, long timeout) {
+                return null;
+            }
+
             @Override
-            public long getHSId() {return 0L;}
+            public long getHSId() {
+                return 0L;
+            }
+
             @Override
-            public void setHSId(long hsId) {}
+            public void setHSId(long hsId) {
+            }
 
         });
         return hsId;
@@ -1052,4 +1084,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             fh.updateDeadHostTimeout(timeout);
         }
     }
+
+    public Map<Long, Pair<String, long[]>>
+        getIOStats(final boolean interval) throws InterruptedException, ExecutionException {
+        final ImmutableMap<Integer, ForeignHost> fhosts = m_foreignHosts;
+        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>(fhosts.size());
+
+        for (ForeignHost fh : fhosts.values()) {
+            picoNetworks.add(fh.m_network);
+        }
+
+        return m_network.getIOStats(interval, picoNetworks);
+    }
+
 }

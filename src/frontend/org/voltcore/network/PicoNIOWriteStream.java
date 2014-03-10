@@ -33,19 +33,9 @@ import org.voltcore.utils.RateLimitedLogger;
 
 /**
 *
-*  Provide a queue for ByteBuffers and DeferredSerializations and drain them to gathering ByteChannel.
-*  Uses a thread local memory pool for serializing messages that are < MAX_GATHERING_WRITE size and HeapByteBuffers
-*  otherwise. Jumps through serious hoops to avoid ever writing large HeapByteBuffers to the channel
-*  because Java will allocate a DirectByteBuffer and copy ALL the data into the DirectByteBuffer even if only
-*  a small fraction can reasonably be written to the channel. This wastes time in copying data that can never possibly
-*  make it into the channel in non blocking mode and space because the DirectByteBuffer is never released unlike
-*  the pool which shrinks after a long time without usage.
+* Write stream implementation optimized for use on the server. Does no locking and
+* backpressure tracking
 *
-*  The value m_port.m_expectedOutgoingMessageSize is used to set the initial storage a FastSerializer will
-*  allocate for when doing deferred serialization of FastSerializables. FastSerializable + enqueue is the
-*  best way to serialize data unless you can't pick a good value for m_port.m_expectedOutgoingMessageSize.
-*  In most cases you are optimizing for the bulk of your message and it is fine to guess a little high as the memory
-*  allocation works well.
 */
 public class PicoNIOWriteStream extends NIOWriteStreamBase {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -89,10 +79,7 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
     protected void updateQueued(int queued, boolean noBackpressureSignal) {}
 
     /**
-     * Does the work of queueing addititional buffers that have been serialized
-     * and choosing between gathering and regular writes to the channel. Also splits up very large
-     * writes of HeapByteBuffers into many smaller writes so Java doesn't allocate a monster DirectByteBuffer
-     * that will never be freed
+     * Drain pending buffers one at a time into the socket
      * @param channel
      * @return
      * @throws IOException

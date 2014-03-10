@@ -80,11 +80,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable, IOStatsIntf
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -465,7 +466,7 @@ class VoltNetwork implements Runnable
             return retval;
     }
 
-    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+    public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {

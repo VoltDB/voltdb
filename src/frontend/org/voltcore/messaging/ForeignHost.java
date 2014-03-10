@@ -48,7 +48,7 @@ public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
 
-    private final PicoNetwork m_network;
+    final PicoNetwork m_network;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
     private final Integer m_hostId;
