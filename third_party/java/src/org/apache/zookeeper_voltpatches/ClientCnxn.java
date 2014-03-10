@@ -1084,6 +1084,7 @@ public class ClientCnxn {
             long now = System.currentTimeMillis();
             long lastHeard = now;
             long lastSend = now;
+            try {
             while (zooKeeper.state.isAlive()) {
                 try {
                     if (sockKey == null) {
@@ -1214,8 +1215,10 @@ public class ClientCnxn {
                     }
                 }
             }
-            verbotenThreads.remove(Thread.currentThread().getId());
-            cleanup();
+            } finally {
+                verbotenThreads.remove(Thread.currentThread().getId());
+                cleanup();
+            }
             try {
                 selector.close();
             } catch (IOException e) {
