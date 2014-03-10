@@ -45,7 +45,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     boolean m_isSinglePartition;
     //Flag to indicate the the replica applying the write transaction
     //doesn't need to send back the result tables
-    boolean m_shouldGenerateAResponse = true;
+    boolean m_shouldReturnResultTables = true;
     StoredProcedureInvocation m_invocation;
 
     // not serialized.
@@ -105,8 +105,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
-    public boolean shouldGenerateAResponse() {
-        return m_shouldGenerateAResponse;
+    public boolean shouldReturnResultTables() {
+        return m_shouldReturnResultTables;
     }
 
     public StoredProcedureInvocation getStoredProcedureInvocation() {
@@ -182,7 +182,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
-        m_shouldGenerateAResponse = buf.get() != 0;
+        m_shouldReturnResultTables = buf.get() != 0;
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }

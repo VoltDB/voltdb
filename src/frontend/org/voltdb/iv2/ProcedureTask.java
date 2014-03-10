@@ -114,7 +114,7 @@ abstract public class ProcedureTask extends TransactionTask
                     m_txnState.setHash(cr.getHash());
                     //Don't pay the cost of returning the result tables for a replicated write
                     //With reads don't apply the optimization just in case
-                    if (!task.shouldGenerateAResponse() && !task.isReadOnly()) {
+                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {
                         cr.dropResultTable();
                     }
 
