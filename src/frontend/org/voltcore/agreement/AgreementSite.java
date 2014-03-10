@@ -345,7 +345,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         long txnId = m_idManager.getNextUniqueTransactionId();
         for (long initiatorId : hsIds) {
             HeartbeatMessage heartbeat =
-                new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
+                new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestGloballySafeTxnId());
             m_mailbox.send( initiatorId, heartbeat);
         }
     }
@@ -425,7 +425,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                                     r,
                                     txnId,
                                     m_hsId,
-                                    m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
+                                    m_safetyState.getNewestGloballySafeTxnId());
                         m_mailbox.send( initiatorHSId, atm);
                     }
                 }
@@ -438,7 +438,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                             r,
                             txnId,
                             m_hsId,
-                            m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
+                            m_safetyState.getNewestGloballySafeTxnId());
                 atm.m_sourceHSId = m_hsId;
                 processMessage(atm);
 
@@ -778,7 +778,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
                     m_txnQueue.noteTransactionRecievedAndReturnLastSeen(m_hsId,
                             txnId,
-                            m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
+                            m_safetyState.getNewestGloballySafeTxnId());
 
                     AgreementRejoinTransactionState arts =
                         new AgreementRejoinTransactionState( txnId, m_hsId, joiningSite, cdl );
