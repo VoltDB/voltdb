@@ -87,6 +87,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
+        cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
+        cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -585,6 +587,14 @@ public class CommandLine extends VoltDB.Configuration
 
         if (target() == BackendTarget.NATIVE_EE_IPC) {
             cmdline.add("ipc");
+        }
+
+        // handle overrides for testing hotfix version compatibility
+        if (m_versionStringOverrideForTest != null) {
+            assert(m_versionCompatibilityRegexOverrideForTest != null);
+            cmdline.add("versionoverride");
+            cmdline.add(m_versionStringOverrideForTest);
+            cmdline.add(m_versionCompatibilityRegexOverrideForTest);
         }
 
         if (m_tag != null) {

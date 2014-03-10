@@ -800,6 +800,7 @@ JAR BUILDING
 	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/spearce_voltpatches/**" />
         </fileset>
@@ -885,6 +886,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/**" />
             <include name="vanilla/**" />
@@ -1022,6 +1024,7 @@ JAVA COMPILATION
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
                   javax/annotation_voltpatches/**/*.java

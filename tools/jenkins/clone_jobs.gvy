@@ -13,18 +13,20 @@ def str_oldbranch = "master"
 def str_viewname="system tests-elastic"
 //def str_viewname="system tests-noelastic"
 
-def str_branch = "ENG-5664"
-boolean enable_performance = false
-def trigger_performance = "kit" // trigger or kit
-boolean enable_systemtest = true
-boolean enable_endurance = false
-boolean enable_cl_truncation = false
-boolean enable_supers = false
-boolean makenew = false // true=delete existing jobs, false=keep existing jobs but change job enable/disable settings
+// DONT CHANGE IT HERE, USE BUILD PARAMETERS
+
+def str_branch = build.buildVariableResolver.resolve("branch")
+boolean enable_performance =  build.buildVariableResolver.resolve("enable_performance").toBoolean()
+def trigger_performance = "kit" //build.buildVariableResolver.resolve("schedue_performance")
+boolean enable_systemtest = build.buildVariableResolver.resolve("enable_systemtest").toBoolean()
+boolean enable_endurance = build.buildVariableResolver.resolve("enable_endurance").toBoolean()
+boolean enable_cl_truncation = build.buildVariableResolver.resolve("enable_cl_truncation").toBoolean()
+boolean enable_supers = false //build.buildVariableResolver.resolve("enable_supers").toBoolean()
+boolean makenew = build.buildVariableResolver.resolve("makeNew").toBoolean() // true=delete existing jobs, false=keep existing jobs but change job enable/disable settings
+boolean deletejob = build.buildVariableResolver.resolve("deletejobs").toBoolean()
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
-//whitespace separated list of email addresses
-def recipientlist = "qa@voltdb.com"
+def recipientlist = build.buildVariableResolver.resolve("email_list")
 
 AbstractProject kit = null
 downstream = ""
@@ -40,7 +42,7 @@ for (item in Hudson.instance.items) {
                            item.getName().contains(str_search_3))) {
 */
 for(item in view.getItems()) {
-    if (item.getName().startsWith("kit-"))
+    if (item.getName().contains("kit-"))
       alljobs.add(0, item)
     else
       alljobs.add(item)
@@ -51,12 +53,14 @@ for(item in alljobs)
       println("\n\nprocessing JOB : "+item.name)
 
       //create the new project name
-      newName = item.getName().replace(str_nextrelease, str_branch)
+      newName = "branch-" + item.getName().replace(str_nextrelease+"-", "") + "-" + str_branch
 
       // delete existing job with new name
       if (Hudson.instance.getJob(newName))
-            if (makenew)
+            if (makenew || deletejob)
                 Hudson.instance.getJob(newName).delete()
+      if (deletejob)
+           continue
 
       if ( ! Hudson.instance.getJob(newName)) {
             // copy the job, save it
@@ -72,21 +76,23 @@ for(item in alljobs)
 
       if (item.disabled)
          project.disabled = true
-      else if (project.getName().startsWith("performance-"))
+      else if (project.getName().startsWith("branch-performance-"))
           project.disabled = !enable_performance
       else if (project.getName().endsWith("-cl-truncation"))
           project.disabled = !enable_cl_truncation
-      else if (project.getName().startsWith("system-test-"))
+      else if (project.getName().startsWith("branch-system-test-"))
           project.disabled = !enable_systemtest
-      else if (project.getName().startsWith("test-"))
+      else if (project.getName().startsWith("branch-test-"))
           project.disabled = !enable_supers
-      else if (project.getName().startsWith("endurance-"))
+      else if (project.getName().startsWith("branch-endurance-"))
           project.disabled = !enable_endurance
      else
-          project.disabled = false
+          project.disabled = true
+
 
       // save the kit-build project ref
-      if (job.getName().startsWith("kit-")) kit = project
+      if (job.getName().startsWith("branch-kit-"))
+        kit = project
       else if (kit == null) {
         // kit-build job must be processed first
         assert(false)
@@ -152,14 +158,15 @@ for(item in alljobs)
 
       println(" $item.name copied as $newName")
 }
-
-if (downstream.length() > 0) {
-// finally, set all projects to be downstream of/triggered-by the kit build job
-  bt = new tasks.BuildTrigger(downstream.substring(1), false)
-  try {
-     kit.getPublishersList().replace(bt)
-  } catch(e) {
-     kit.getPublishersList().add(bt)
-  }
+if (!deletejob) {
+   if (downstream.length() > 0) {
+   // finally, set all projects to be downstream of/triggered-by the kit build job
+     bt = new tasks.BuildTrigger(downstream.substring(1), false)
+     try {
+        kit.getPublishersList().replace(bt)
+     } catch(e) {
+        kit.getPublishersList().add(bt)
+     }
+   }
+   kit.save()
 }
-kit.save()
