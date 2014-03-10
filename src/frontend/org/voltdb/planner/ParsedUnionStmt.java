@@ -101,10 +101,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             selectStmt.postParse(sql, joinOrder);
         }
 
-        this.m_sql = sql;
-        this.m_joinOrder = joinOrder;
+        m_sql = sql;
+        m_joinOrder = joinOrder;
     }
 
+    @Override
     public boolean isOrderDeterministic() {
         for (AbstractParsedStmt childStmt : m_children) {
             if ( ! childStmt.isOrderDeterministic()) {
@@ -114,6 +115,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return true;
     }
 
+    @Override
     public boolean hasLimitOrOffset() {
         for (AbstractParsedStmt childStmt : m_children) {
             if ( childStmt.hasLimitOrOffset()) {

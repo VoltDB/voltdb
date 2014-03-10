@@ -1039,7 +1039,6 @@ public class PlanAssembler {
         }
 
         insertNode.setMultiPartition(true);
-        // The following is the moral equivalent of addSendReceivePair
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
         // add a count or a limit and send on top of the union
@@ -1639,7 +1638,6 @@ public class PlanAssembler {
         if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
-            assert(fromTableAlias != null);
             StmtTableScan fromTableScan = m_parsedSelect.m_tableAliasMap.get(fromTableAlias);
             for (Index index : allIndexes) {
                 if ( ! IndexType.isScannable(index.getType())) {

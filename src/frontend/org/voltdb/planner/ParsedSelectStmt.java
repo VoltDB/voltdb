@@ -43,8 +43,8 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.planner.parseinfo.StmtTableScan.TABLE_SCAN_TYPE;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
@@ -1055,7 +1055,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 return false;
             }
 
-            if (tableScan.getScanType() != TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
+            if (tableScan instanceof StmtSubqueryScan) {
                 return false; // don't yet handle FROM clause subquery, here.
             }
 

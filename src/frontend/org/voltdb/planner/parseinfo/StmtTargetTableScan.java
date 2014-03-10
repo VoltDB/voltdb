@@ -24,7 +24,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -40,11 +39,6 @@ public class StmtTargetTableScan extends StmtTableScan {
         super(tableAlias);
         assert (table != null);
         m_table = table;
-    }
-
-    @Override
-    public TABLE_SCAN_TYPE getScanType() {
-        return TABLE_SCAN_TYPE.TARGET_TABLE_SCAN;
     }
 
     @Override
@@ -101,13 +95,7 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public void resolveTVE(TupleValueExpression expr, String columnName) {
+    public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
-        if (!m_scanColumnNameSet.contains(columnName)) {
-            SchemaColumn scol = new SchemaColumn(m_table.getTypeName(), m_tableAlias,
-                    columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(columnName);
-            m_scanColumnsList.add(scol);
-        }
     }
 }

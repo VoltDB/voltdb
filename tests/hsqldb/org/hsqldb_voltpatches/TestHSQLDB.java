@@ -231,9 +231,9 @@ public class TestHSQLDB extends TestCase {
         expectFailStmt(hsql, "select * from new_order where no_w_id <> (5, 7, 8);",
                 "row column count mismatch");
         expectFailStmt(hsql, "select * from new_order where exists (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
+                "Unsupported subquery");
         expectFailStmt(hsql, "select * from new_order where not exists (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
+                "Unsupported subquery");
     }
 
     public void testVarbinary() {

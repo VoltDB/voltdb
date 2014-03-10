@@ -53,6 +53,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     public StmtSubqueryScan(AbstractParsedStmt subquery, String tableAlias) {
         super(tableAlias);
         m_subquery = subquery;
+        // A union or other set operator uses the output columns of its left-most leaf child statement.
         while (subquery instanceof ParsedUnionStmt) {
             assert( ! ((ParsedUnionStmt)subquery).m_children.isEmpty());
             subquery = ((ParsedUnionStmt)subquery).m_children.get(0);
@@ -68,11 +69,6 @@ public class StmtSubqueryScan extends StmtTableScan {
             i++;
         }
 
-    }
-
-    @Override
-    public TABLE_SCAN_TYPE getScanType() {
-        return TABLE_SCAN_TYPE.TEMP_TABLE_SCAN;
     }
 
     @Override
@@ -134,7 +130,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public void resolveTVE(TupleValueExpression expr, String columnName) {
+    public void processTVE(TupleValueExpression expr, String columnName) {
         Integer idx = m_outputColumnIndexMap.get(columnName);
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
@@ -144,14 +140,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setColumnIndex(idx.intValue());
         expr.setValueType(schemaCol.getType());
         expr.setValueSize(schemaCol.getSize());
-
-
-        if (!m_scanColumnNameSet.contains(columnName)) {
-            SchemaColumn scol = new SchemaColumn("", m_tableAlias,
-                    columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(columnName);
-            m_scanColumnsList.add(scol);
-        }
     }
 
 }

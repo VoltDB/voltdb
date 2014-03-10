@@ -74,6 +74,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.TimestampData;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+// End of VoltDB extension
+
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -83,10 +89,8 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.persist.PersistentStore;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.NullType;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -447,7 +451,6 @@ public class Expression {
         }
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -461,7 +464,6 @@ public class Expression {
         return false;
     }
 
-    @Override
     public int hashCode() {
 
         int val = opType + exprSubType;
@@ -1721,8 +1723,7 @@ public class Expression {
 
         case OpTypes.TABLE_SUBQUERY:
             if (subQuery == null || subQuery.queryExpression == null) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                        "VoltDB could not determine the SubQuery");
+                throw new HSQLParseException("VoltDB could not determine the subquery");
             }
             // @TODO: SubQuery doesn't have an information about the query parameters
             // Or maybe there is a way?
@@ -1800,8 +1801,7 @@ public class Expression {
         case OpTypes.ROW:
         case OpTypes.TABLE:
         case OpTypes.EXISTS:
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support subqueries within expressions, consider using views or multiple statements instead");
+            throw new HSQLParseException("Unsupported subquery syntax within an expression. Consider using a join or multiple statements instead");
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 

@@ -120,8 +120,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             node->getTargetTable();
 
     assert(input_table);
-    Table* target_table = node->getTargetTable();
-    assert(target_table);
 
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
@@ -193,7 +191,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
-        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? target_table : (Table*)NULL);
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
