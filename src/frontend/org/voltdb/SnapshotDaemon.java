@@ -290,6 +290,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     // Wait for responses from all hosts for a certain amount of time
                     Map<Integer, VoltTable> responses = Maps.newHashMap();
                     final long timeoutMs = 10 * 1000; // 10s timeout
+                    final long endTime = System.currentTimeMillis() + timeoutMs;
                     SnapshotCheckResponseMessage response;
                     while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
                         // ignore responses to previous requests
@@ -298,7 +299,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                         }
 
-                        if (responses.size() == liveHosts.size()) {
+                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() < endTime) {
                             break;
                         }
                     }
