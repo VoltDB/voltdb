@@ -289,15 +289,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                     // Wait for responses from all hosts for a certain amount of time
                     Map<Integer, VoltTable> responses = Maps.newHashMap();
-                    final long endTime = System.currentTimeMillis() + 10 * 1000; // 10s timeout
-                    while (responses.size() != liveHosts.size() && System.currentTimeMillis() < endTime) {
-                        SnapshotCheckResponseMessage response;
-                        while ((response = (SnapshotCheckResponseMessage) m_mb.recv()) != null) {
-                            // ignore responses to previous requests
-                            if (jsObj.getString("path").equals(response.getPath()) &&
-                                jsObj.getString("nonce").equals(response.getNonce())) {
-                                responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
-                            }
+                    final long timeoutMs = 10 * 1000; // 10s timeout
+                    SnapshotCheckResponseMessage response;
+                    while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
+                        // ignore responses to previous requests
+                        if (jsObj.getString("path").equals(response.getPath()) &&
+                            jsObj.getString("nonce").equals(response.getNonce())) {
+                            responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
+                        }
+
+                        if (responses.size() == liveHosts.size()) {
+                            break;
                         }
                     }
 
