@@ -757,11 +757,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             stringer.value(node.getPlanNodeId().intValue());
         }
-        stringer.endArray().key(Members.PARENT_IDS.name()).array();
-
-        for (AbstractPlanNode node : m_parents) {
-            stringer.value(node.getPlanNodeId().intValue());
-        }
         stringer.endArray(); //end inlineNodes
 
         outputSchemaToJSON(stringer);

@@ -53,10 +53,9 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -234,6 +233,42 @@ public class Inits {
         }
     }
 
+    /**
+     * Read catalog bytes from URL
+     *
+     * @param catalogUrl
+     * @return catalog bytes
+     * @throws IOException
+     */
+    private static byte[] readCatalog(String catalogUrl) throws IOException
+    {
+        assert (catalogUrl != null);
+
+        final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
+
+        InputStream fin = null;
+        try {
+            URL url = new URL(catalogUrl);
+            fin = url.openStream();
+        } catch (MalformedURLException ex) {
+            // Invalid URL. Try as a file.
+            fin = new FileInputStream(catalogUrl);
+        }
+        byte[] buffer = new byte[MAX_CATALOG_SIZE];
+        int readBytes = 0;
+        int totalBytes = 0;
+        try {
+            while (readBytes >= 0) {
+                totalBytes += readBytes;
+                readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+            }
+        } finally {
+            fin.close();
+        }
+
+        return Arrays.copyOf(buffer, totalBytes);
+    }
+
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
             dependsOn(CreateRestoreAgentAndPlan.class);
@@ -243,7 +278,6 @@ public class Inits {
         public void run() {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
-                final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
 
                 if (m_rvdb.m_pathToStartupCatalog == null) {
                     VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
@@ -252,33 +286,15 @@ public class Inits {
                 }
 
                 try {
-                    InputStream fin = null;
-                    try {
-                        URL url = new URL(m_rvdb.m_pathToStartupCatalog);
-                        fin = url.openStream();
-                    } catch (MalformedURLException ex) {
-                        // Invalid URL. Try as a file.
-                        fin = new FileInputStream(m_rvdb.m_pathToStartupCatalog);
-                    }
-                    byte[] buffer = new byte[MAX_CATALOG_SIZE];
-                    int readBytes = 0;
-                    int totalBytes = 0;
-                    try {
-                        while (readBytes >= 0) {
-                            totalBytes += readBytes;
-                            readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
-                        }
-                    } finally {
-                        fin.close();
-                    }
+                    // Get the catalog bytes and byte count.
+                    byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
+
                     //Export needs a cluster global unique id for the initial catalog version
                     long catalogUniqueId =
                             UniqueIdGenerator.makeIdFromComponents(
                                     System.currentTimeMillis(),
                                     0,
                                     MpInitiator.MP_INIT_PID);
-                    byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
-                    buffer = null;
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     long catalogTxnId;
@@ -336,7 +352,7 @@ public class Inits {
             } while (catalogStuff == null);
 
             try {
-                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
+                m_rvdb.m_serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
@@ -705,11 +721,39 @@ public class Inits {
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {
-                    hostLog.debug("Found catalog to load on host " + catalog.getFirst() +
-                                  ": " + catalog.getSecond());
-                    m_rvdb.m_hostIdWithStartupCatalog = catalog.getFirst().intValue();
+                    // Make sure the catalog corresponds to the current server version.
+                    // Prevent automatic upgrades by rejecting mismatched versions.
+                    int hostId = catalog.getFirst().intValue();
+                    String catalogPath = catalog.getSecond();
+                    // Perform a version check when the catalog jar is available
+                    // on the current host.
+                    // Check that this host is the one providing the catalog.
+                    if (m_rvdb.m_myHostId == hostId) {
+                        try {
+                            byte[] catalogBytes = readCatalog(catalogPath);
+                            InMemoryJarfile inMemoryJar = CatalogUtil.loadInMemoryJarFile(catalogBytes);
+                            // This call pre-checks and returns the build info/version.
+                            String[] buildInfo = CatalogUtil.getBuildInfoFromJar(inMemoryJar);
+                            String catalogVersion = buildInfo[0];
+                            String serverVersion = m_rvdb.getVersionString();
+                            if (!catalogVersion.equals(serverVersion)) {
+                                VoltDB.crashLocalVoltDB(String.format(
+                                        "Unable to load version %s catalog \"%s\" "
+                                        + "from snapshot into a version %s server.",
+                                        catalogVersion, catalogPath, serverVersion), false, null);
+                            }
+                        }
+                        catch (IOException e) {
+                            // Make it non-fatal with no check performed.
+                            hostLog.warn(String.format(
+                                    "Unable to load catalog for version check due to exception: %s.",
+                                    e.getMessage()));
+                        }
+                    }
+                    hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    m_rvdb.m_hostIdWithStartupCatalog = hostId;
                     assert(m_rvdb.m_hostIdWithStartupCatalog >= 0);
-                    m_rvdb.m_pathToStartupCatalog = catalog.getSecond();
+                    m_rvdb.m_pathToStartupCatalog = catalogPath;
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }

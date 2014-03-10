@@ -23,6 +23,9 @@ import java.io.StringReader;
 
 import org.voltdb.utils.InMemoryJarfile;
 
+/**
+ * Catalog compilation reader for individual jar file items.
+ */
 public class VoltCompilerJarFileReader extends VoltCompilerReader
 {
     private final InMemoryJarfile m_jarFile;

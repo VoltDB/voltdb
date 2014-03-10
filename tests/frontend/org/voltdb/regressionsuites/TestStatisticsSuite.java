@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -62,19 +63,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     public TestStatisticsSuite(String name) {
         super(name);
-    }
-
-    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
-    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
-    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
-    // SAME METADATA.
-    public void validateSchema(VoltTable result, VoltTable expected)
-    {
-        assertEquals(expected.getColumnCount(), result.getColumnCount());
-        for (int i = 0; i < result.getColumnCount(); i++) {
-            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
-            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
-        }
     }
 
     // For the provided table, verify that there is a row for each host in the cluster where
@@ -187,14 +175,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING LATENCY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[7];
+        ColumnInfo[] expectedSchema = new ColumnInfo[5];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        expectedSchema[4] = new ColumnInfo("BUCKET_MIN", VoltType.INTEGER);
-        expectedSchema[5] = new ColumnInfo("BUCKET_MAX", VoltType.INTEGER);
-        expectedSchema[6] = new ColumnInfo("INVOCATIONS", VoltType.BIGINT);
+        expectedSchema[4] = new ColumnInfo("HISTOGRAM", VoltType.VARBINARY);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -213,12 +199,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         // actually, there are 26 rows per host so:
-        assertEquals(26 * HOSTS, results[0].getRowCount());
+        assertEquals(HOSTS, results[0].getRowCount());
         // Check for non-zero invocations (ENG-4668)
         long invocations = 0;
         results[0].resetRowPosition();
         while (results[0].advanceRow()) {
-            invocations += results[0].getLong("INVOCATIONS");
+            invocations += AbstractHistogram.fromCompressedBytes(results[0].getVarbinary("HISTOGRAM")).getHistogramData().getTotalCount();
         }
         assertTrue(invocations > 0);
     }
@@ -248,7 +234,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         //
         VoltTable results[] = null;
         // This should get us an invocation at each host
-        for (int i = 0; i < SITES * HOSTS; i++) {
+        for (int i = 0; i < 1000; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
@@ -271,7 +257,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 counts += results[0].getLong("INVOCATIONS");
             }
         }
-        assertEquals(HOSTS * SITES, counts);
+        assertEquals(1000, counts);
         // verify that each node saw a NEW_ORDER.insert initiation
         validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
     }
@@ -303,7 +289,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema = new ColumnInfo[12];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -315,6 +301,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

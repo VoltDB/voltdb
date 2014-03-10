@@ -145,7 +145,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
           m_currentInputDepId(-1),
           m_isELEnabled(false),
           m_numResultDependencies(0),
-          m_logManager(new StdoutLogProxy()), m_templateSingleLongTable(NULL), m_topend(NULL)
+          m_logManager(new StdoutLogProxy()),
+          m_templateSingleLongTable(NULL),
+          m_topend(NULL),
+          m_compactionThreshold(95)
         {
         }
 
@@ -155,7 +158,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
-                        int64_t tempTableMemoryLimit);
+                        int64_t tempTableMemoryLimit,
+                        int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
@@ -647,6 +651,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         DefaultTupleSerializer m_tupleSerializer;
 
         ThreadLocalPool m_tlPool;
+
+        int32_t m_compactionThreshold;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize) {

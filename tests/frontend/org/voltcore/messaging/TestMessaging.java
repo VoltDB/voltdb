@@ -32,9 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.voltcore.utils.PortGenerator;
-
 import junit.framework.TestCase;
+
+import org.voltcore.utils.PortGenerator;
 
 public class TestMessaging extends TestCase {
 

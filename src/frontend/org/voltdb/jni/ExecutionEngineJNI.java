@@ -53,6 +53,22 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class ExecutionEngineJNI extends ExecutionEngine {
 
+    /*
+     * Threshold of fullness where the EE will start compacting a table's blocks together
+     * to free memory and return to the OS. Block will always be freed if they are emptied
+     * and since rows are fixed size for a table they are always available for reuse.
+     *
+     * Valid values are 0-99, where 0 disables compaction completely and 99 compacts the table
+     * if it is even 1% empty.
+     */
+    public static final int EE_COMPACTION_THRESHOLD;
+    static {
+        EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
+        if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
+            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
+        }
+    }
+
     /** java.util.logging logger. */
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
@@ -120,7 +136,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
-                    tempTableMemory * 1024 * 1024);
+                    tempTableMemory * 1024 * 1024,
+                    EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)

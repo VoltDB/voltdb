@@ -74,7 +74,13 @@ public class VoltLogger {
      * but don't wait for the task to complete for info, debug, trace, and warn
      */
     private void submit(final Level l, final Object message, final Throwable t, boolean wait) {
-        if (m_disableAsync) m_logger.log(l, message, t);
+        if (m_disableAsync) {
+            m_logger.log(l, message, t);
+            return;
+        }
+
+        if (!m_logger.isEnabledFor(l)) return;
+
         final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override
@@ -99,7 +105,13 @@ public class VoltLogger {
     }
 
     private void submitl7d(final Level level, final String key, final Object[] params, final Throwable t) {
-        if (m_disableAsync) m_logger.l7dlog(level, key, params, t);
+        if (m_disableAsync) {
+            m_logger.l7dlog(level, key, params, t);
+            return;
+        }
+
+        if (!m_logger.isEnabledFor(level)) return;
+
         final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override

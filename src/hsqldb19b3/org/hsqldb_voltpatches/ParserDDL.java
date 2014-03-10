@@ -70,6 +70,7 @@ public class ParserDDL extends ParserRoutine {
         super(session, scanner);
     }
 
+    @Override
     void reset(String sql) {
         super.reset(sql);
     }
@@ -1016,6 +1017,7 @@ public class ParserDDL extends ParserRoutine {
                 // End of VoltDB extension
                 case Tokens.UNIQUE :
                 case Tokens.CHECK :
+                case Tokens.LIMIT :
                     if (!startPart) {
                         throw unexpectedToken();
                     }
@@ -1310,7 +1312,7 @@ public class ParserDDL extends ParserRoutine {
                             throw Error.error(ErrorCode.X_42522);
                         }
                     }
-                    else 
+                    else
                     // End of VoltDB extension
                     if (table.getUniqueConstraintForColumns(c.core.mainCols)
                             != null) {
@@ -1365,6 +1367,12 @@ public class ParserDDL extends ParserRoutine {
                         table.setColumnTypeVars(c.notNullColumnIndex);
                     }
 
+                    session.database.schemaManager.addSchemaObject(c);
+
+                    break;
+                }
+                case Constraint.LIMIT : {
+                    table.addConstraint(c);
                     session.database.schemaManager.addSchemaObject(c);
 
                     break;
@@ -2808,6 +2816,21 @@ public class ParserDDL extends ParserRoutine {
                                               Constraint.CHECK);
 
                 readCheckConstraintCondition(c);
+                constraintList.add(c);
+
+                break;
+            }
+            case Tokens.LIMIT : {
+                read();
+
+                if (constName == null) {
+                    constName = database.nameManager.newAutoName("LIMIT",
+                            schemaObject.getSchemaName(),
+                            schemaObject.getName(), SchemaObject.CONSTRAINT);
+                }
+
+                Constraint c = new Constraint(constName, null, Constraint.LIMIT);
+                readLimitConstraintCondition(c);
                 constraintList.add(c);
 
                 break;
@@ -4931,7 +4954,21 @@ public class ParserDDL extends ParserRoutine {
         session.checkDDLWrite();
     }
 
+
     /************************* Volt DB Extensions *************************/
+    /**
+     * Responsible for handling Volt limit constraints section of CREATE TABLE ...
+     *
+     * @param c check constraint
+     */
+    void readLimitConstraintCondition(Constraint c) {
+        readThis(Tokens.PARTITION);
+        readThis(Tokens.ROWS);
+
+        int rowsLimit = readInteger();
+        c.rowsLimit = rowsLimit;
+    }
+
     /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
     /// adding support for indexed expressions.
     private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {

@@ -83,7 +83,9 @@ public:
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
-        int tableAllocationTargetSize = 0);
+        int tableAllocationTargetSize = 0,
+        int tuplelimit = INT_MAX,
+        int32_t compactionThreshold = 95);
 
     /**
     * Creates an empty temp table with given name and columns.
@@ -114,7 +116,8 @@ private:
         const std::string &name,
         TupleSchema *schema,
         const std::vector<std::string> &columnNames,
-        const bool ownsTupleSchema);
+        const bool ownsTupleSchema,
+        const int32_t compactionThreshold = 95);
 
     static void configureStats(
         voltdb::CatalogId databaseId,
