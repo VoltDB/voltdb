@@ -1068,6 +1068,10 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
+        char errMsg[1024];
+        snprintf(errMsg, 1024, "No table streamer for table %s.", name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
