@@ -326,6 +326,7 @@ class VoltNetwork implements Runnable
             try {
                 p_shutdown();
             } catch (Throwable t) {
+                m_logger.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
@@ -339,8 +340,8 @@ class VoltNetwork implements Runnable
             if (port != null) {
                 try {
                     getUnregisterRunnable(port).run();
-                } catch (Exception e) {
-                    networkLog.error("Exception unregisering port " + port, e);
+                } catch (Throwable e) {
+                    networkLog.error("Exception unregistering port " + port, e);
                 }
             }
         }

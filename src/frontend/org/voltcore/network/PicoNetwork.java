@@ -207,6 +207,7 @@ public class PicoNetwork implements Runnable, Connection
             try {
                 p_shutdown();
             } catch (Throwable t) {
+                m_logger.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
