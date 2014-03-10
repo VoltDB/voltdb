@@ -199,6 +199,14 @@ public class VoltDB {
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public String m_commandLogBinding = null;
 
+        /**
+         * Allow a secret CLI config option to test multiple versions of VoltDB running together.
+         * This is used to test online upgrade (currently, for hotfixes).
+         * Also used to test error conditons like incompatible versions running together.
+         */
+        public String m_versionStringOverrideForTest = null;
+        public String m_versionCompatibilityRegexOverrideForTest = null;
+
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
@@ -423,16 +431,24 @@ public class VoltDB {
                 }
                 else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
-                } else if (arg.equals("license")) {
+                }
+                else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcport")) {
+                }
+                else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
                 }
                 else if (arg.equals("forcecatalogupgrade")) {
                     hostLog.info("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
-                } else {
+                }
+                // version string override for testing online upgrade
+                else if (arg.equalsIgnoreCase("versionoverride")) {
+                    m_versionStringOverrideForTest = args[++i].trim();
+                    m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
+                }
+                else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
