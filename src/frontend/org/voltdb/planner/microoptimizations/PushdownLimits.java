@@ -31,18 +31,15 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 public class PushdownLimits extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
+    public void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    {
         AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph);
         plan.rootPlanGraph = planGraph;
-
-        retval.add(plan);
-        return retval;
     }
 
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
+    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    {
         assert(plan != null);
 
         // depth first:
