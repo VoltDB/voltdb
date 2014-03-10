@@ -53,6 +53,11 @@ public class AgreementTxnIdSafetyState {
         return ss.newestConfirmedTxnId;
     }
 
+    public long getNewestGloballySafeTxnId()
+    {
+        return m_newestConfirmedTxnId;
+    }
+
     public void updateLastSeenTxnIdFromExecutorBySiteId(long agreementHSId, long lastSeenTxnId)
     {
         // ignore these by convention
