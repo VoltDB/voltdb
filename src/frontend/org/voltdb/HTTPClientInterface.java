@@ -74,7 +74,14 @@ public class HTTPClientInterface {
             response.setStatus(HttpServletResponse.SC_OK);
             m_request.setHandled(true);
             response.getWriter().print(msg);
-            m_continuation.complete();
+            try{
+                m_continuation.complete();
+             } catch (IllegalStateException e){
+                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                // Essentially we're closing everything down from underneath the HTTP request.
+                 VoltLogger log = new VoltLogger("HOST");
+                 log.warn("JSON request completion exception: ", e);
+             }
             m_latch.countDown();
         }
 
