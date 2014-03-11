@@ -43,7 +43,10 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
 
     static {
-        HOST.info("Strict java memory checking is enabled");
+        final String msg = "Strict java memory checking is enabled, don't do release builds " +
+                     "or performance runs with this enabled";
+        HOST.warn(msg);
+        System.err.println(msg);
     }
 #endif
 
