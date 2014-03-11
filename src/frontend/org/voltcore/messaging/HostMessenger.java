@@ -49,6 +49,7 @@ import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
@@ -220,6 +221,31 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_config.internalInterface,
                 m_config.internalPort,
                 this);
+
+        // Register a clean shutdown hook for the network threads.  This gets cranky
+        // when crashLocalVoltDB() is called because System.exit() can get called from
+        // a random network thread which is already shutting down and we'll get delicious
+        // deadlocks.  Take the coward's way out and just don't do this if we're already
+        // crashing (read as: I refuse to hunt for more shutdown deadlocks).
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, new Runnable() {
+            @Override
+            public void run()
+            {
+                for (ForeignHost host : m_foreignHosts.values())
+                {
+                    // null is OK. It means this host never saw this host id up
+                    if (host != null)
+                    {
+                        host.close();
+                    }
+                }
+                try {
+                    m_network.shutdown();
+                }
+                catch (InterruptedException ie) {}
+            }
+        });
+
     }
 
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
@@ -905,7 +931,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized boolean isLocalHostReady() {
         return m_localhostReady;
     }
-
 
     public void shutdown() throws InterruptedException
     {
