@@ -516,7 +516,7 @@ public class MpScheduler extends Scheduler
      */
     private static Constructor<?> loadNpProcedureTaskClass()
     {
-        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", MiscUtils.isPro());
+        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", !MiscUtils.isPro());
         if (klass != null) {
             try {
                 return klass.getConstructor(Mailbox.class, String.class, TransactionTaskQueue.class,

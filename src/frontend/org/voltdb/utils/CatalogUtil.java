@@ -132,17 +132,43 @@ public abstract class CatalogUtil {
      * @param catalogBytes
      * @param log
      * @return The serialized string of the catalog content.
-     * @throws IOException
+     * @throws Exception
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log)
-            throws IOException
-    {
-        // Throws IOException on load failure.
-        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
+        assert(catalogBytes != null);
+
+        String serializedCatalog = null;
+        String voltVersionString = null;
+        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
+        }
+
+        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+
+        // Get Volt version string
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+        }
+        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String[] buildInfoLines = buildInfo.split("\n");
+        if (buildInfoLines.length != 5) {
+            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
+        }
+        voltVersionString = buildInfoLines[0].trim();
+
+        // Check if it's compatible
+        if (!isCatalogCompatible(voltVersionString)) {
+            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
+                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
+        }
+
+        return serializedCatalog;
     }
 
     /**
@@ -559,6 +585,34 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Check if a catalog compiled with the given version of VoltDB is
+     * compatible with the current version of VoltDB.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's compatible, false otherwise.
+     */
+
+    public static boolean isCatalogCompatible(String catalogVersionStr)
+    {
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        //Check that it is a properly formed verstion string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        if (catalogVersion == null) {
+            throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
+        }
+
+        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Check if a catalog version string is valid.
      *
      * @param catalogVersionStr
@@ -573,8 +627,8 @@ public abstract class CatalogUtil {
             return false;
         }
 
-        // Is it properly formed?
-        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        //Check that it is a properly formed version string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
             return false;
         }

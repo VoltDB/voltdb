@@ -725,22 +725,30 @@ public class Inits {
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
                     String catalogPath = catalog.getSecond();
-                    try {
-                        byte[] catalogBytes = readCatalog(catalogPath);
-                        InMemoryJarfile inMemoryJar = CatalogUtil.loadInMemoryJarFile(catalogBytes);
-                        // This call pre-checks and returns the build info/version.
-                        String[] buildInfo = CatalogUtil.getBuildInfoFromJar(inMemoryJar);
-                        String catalogVersion = buildInfo[0];
-                        String serverVersion = m_rvdb.getVersionString();
-                        if (!catalogVersion.equals(serverVersion)) {
-                            VoltDB.crashLocalVoltDB(String.format(
-                                    "Unable to load version %s catalog \"%s\" "
-                                    + "from snapshot into a version %s server.",
-                                    catalogVersion, catalogPath, serverVersion), false, null);
+                    // Perform a version check when the catalog jar is available
+                    // on the current host.
+                    // Check that this host is the one providing the catalog.
+                    if (m_rvdb.m_myHostId == hostId) {
+                        try {
+                            byte[] catalogBytes = readCatalog(catalogPath);
+                            InMemoryJarfile inMemoryJar = CatalogUtil.loadInMemoryJarFile(catalogBytes);
+                            // This call pre-checks and returns the build info/version.
+                            String[] buildInfo = CatalogUtil.getBuildInfoFromJar(inMemoryJar);
+                            String catalogVersion = buildInfo[0];
+                            String serverVersion = m_rvdb.getVersionString();
+                            if (!catalogVersion.equals(serverVersion)) {
+                                VoltDB.crashLocalVoltDB(String.format(
+                                        "Unable to load version %s catalog \"%s\" "
+                                        + "from snapshot into a version %s server.",
+                                        catalogVersion, catalogPath, serverVersion), false, null);
+                            }
                         }
-                    }
-                    catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Unable to load catalog for version check.", false, e);
+                        catch (IOException e) {
+                            // Make it non-fatal with no check performed.
+                            hostLog.warn(String.format(
+                                    "Unable to load catalog for version check due to exception: %s.",
+                                    e.getMessage()));
+                        }
                     }
                     hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
                     m_rvdb.m_hostIdWithStartupCatalog = hostId;

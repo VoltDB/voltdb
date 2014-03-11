@@ -160,6 +160,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int SNAPSHOTSCAN_SITE_ID = -7;
     public static final int SNAPSHOTDELETE_SITE_ID = -8;
     public static final int REBALANCE_SITE_ID = -9;
+    public static final int SNAPSHOT_DAEMON_ID = -10;
+    public static final int SNAPSHOT_IO_AGENT_ID = -11;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
