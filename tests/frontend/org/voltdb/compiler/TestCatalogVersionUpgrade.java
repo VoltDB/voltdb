@@ -69,14 +69,20 @@ public class TestCatalogVersionUpgrade extends TestCase {
         memCatalog.put(key, ddl.getBytes());
     }
 
-    private static InMemoryJarfile loadCatalog(byte[] catalogBytes, boolean upgrade)
+    private InMemoryJarfile loadCatalog(byte[] catalogBytes, boolean upgrade)
             throws IOException
     {
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(catalogBytes);
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
-        compiler.upgradeCatalogAsNeeded(jarfile);
+        String upgradeFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
+        if (upgrade) {
+            assertTrue(upgradeFromVersion!=null);
+        }
+        else {
+            assertTrue(upgradeFromVersion==null);
+        }
         return jarfile;
     }
 

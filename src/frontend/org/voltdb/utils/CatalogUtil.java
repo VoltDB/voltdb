@@ -55,6 +55,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -177,12 +178,12 @@ public abstract class CatalogUtil {
      *
      * @param catalogBytes
      * @param log
-     * @return The serialized string of the catalog content.
+     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
             throws IOException
     {
         // Throws IOException on load failure.
@@ -190,9 +191,10 @@ public abstract class CatalogUtil {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
-        compiler.upgradeCatalogAsNeeded(jarfile);
+        String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+        String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
     }
 
     /**
