@@ -49,6 +49,9 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
     }
 
+/// I consider the "SYSTEM_SUBQUERY" name to be a small part of an implementation side effect.
+/// We should not be testing for side effects, we should be testing for meaningful plan structure.
+/// Testing should not depend on this name appearing anywhere because we would like to minimize where it shows up.
     final String SYSTEM_SUBQUERY = "SYSTEM_SUBQUERY";
     //  final String tableAliases [] = {" ", " T1"};
     //  final String fromTables [] = {SYSTEM_SUBQUERY, "T1"};
@@ -77,6 +80,7 @@ public class TestSubQueries extends PlannerTestCase {
             }
 
             // Try to check column. If not available, check its column alias instead.
+/// There's no reason for columns[i] to be null unless there is a test bug that needs fixing.
             if (columns[i] != null) {
                 if (col.getColumnName() == null || col.getColumnName().equals("")) {
                     assertNotNull(col.getColumnAlias());
@@ -97,6 +101,8 @@ public class TestSubQueries extends PlannerTestCase {
             if (tableName.startsWith(SYSTEM_SUBQUERY)) {
                 assertTrue(snode.getTargetTableName().contains(SYSTEM_SUBQUERY));
             } else {
+/// I don't know why I should care whether SeqScan for a subquery even HAS a table name. It could be null and that would be fine for me.
+/// It is the alias name of the scan that matters. You should test that.
                 assertEquals(tableName, snode.getTargetTableName());
             }
         }
@@ -109,6 +115,9 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(expr instanceof ComparisonExpression);
         expr = expr.getLeft();
         assertTrue(expr instanceof TupleValueExpression);
+/// Again table ALIAS is the important thing. The column's table ALIAS should match the table ALIAS. Table name is not important.
+/// It would also be helpful to vary the column index from one case to the other and to make sure that that the column index comes out
+/// as expected as we filter different columns and rearrange the columns in the subquery, and use simple columns or aliases in the subquery.
         if (tableName.startsWith(SYSTEM_SUBQUERY)) {
             assertTrue(((TupleValueExpression) expr).getTableAlias().contains(tableName));
         } else {
@@ -177,6 +186,7 @@ public class TestSubQueries extends PlannerTestCase {
             pn = compile(String.format("select C1 FROM (SELECT A A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
             pn = pn.getChild(0);
             checkSimpleSubSelects(pn, tbName,  "C1");
+/// This could be clearer and more thorough by asserting that the inline node is spoecifically a projection node.
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
@@ -215,6 +225,9 @@ public class TestSubQueries extends PlannerTestCase {
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
             checkSimpleSubSelects(pn, "R1", "A", "D");
+
+/// Another interesting test case would be to filter on a subselect column D that is implied by "SELECT *" in the subquery,
+/// while selecting only A and C for the display columns.
         }
     }
 
@@ -526,6 +539,7 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 WHERE T1.A = 1 AND T2.A = 2", errorJoinMsg);
 
 
+/// The language in this error message needs work. More like: "Subqueries on partitioned data are only supported in single partition stored procedures."
         String tmpErrorMsg = "Subselect queries only are supported in single partition stored procedure.";
 
         // parent partition table join with subselect partitioned temp table
@@ -533,6 +547,7 @@ public class TestSubQueries extends PlannerTestCase {
                 tmpErrorMsg);
 
         // FIXME(xin): This should be supported
+/// Explain/add comment detail: WHY should this query be supported but not the previous query?
         failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D = T2.D1",
                 tmpErrorMsg);
     }
@@ -767,6 +782,8 @@ public class TestSubQueries extends PlannerTestCase {
         //        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
 
         pn = compile("select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A ");
+/// This test case needs to be beefed up to dive into the union structure of the subquery and make sure that it is correct.
+/// Also add a test case where the union's children have different output column names to show that the parent query uses the column names of the first child.
         System.out.println(pn.toExplainPlanString());
     }
 
