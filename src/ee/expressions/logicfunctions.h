@@ -43,7 +43,7 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
             // expression tree that had the possibility of passing through a tuple value untouched from
             // a narrowly sized variable length column all the way to a potentially wide one.
             if ( result.m_sourceInlined ) {
-                result.allocateObjectFromInlinedValue(getTempStringPool());
+                result.allocateObjectFromInlinedValue();
             }
             return result;
         }
@@ -53,7 +53,7 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
         NValue defaultResult = arguments[size-1];
         // See the comment above about the reason for un-inlining, here.
         if ( defaultResult.m_sourceInlined ) {
-            defaultResult.allocateObjectFromInlinedValue(getTempStringPool());
+            defaultResult.allocateObjectFromInlinedValue();
         }
         return defaultResult;
     }
