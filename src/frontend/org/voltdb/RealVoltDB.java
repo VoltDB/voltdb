@@ -226,6 +226,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private JoinCoordinator m_joinCoordinator = null;
     private ElasticJoinService m_elasticJoinService = null;
 
+    // Snapshot IO agent
+    private SnapshotIOAgent m_snapshotIOAgent = null;
+
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
     String m_pathToStartupCatalog;
@@ -399,6 +402,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+
+            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", false);
+            if (snapshotIOAgentClass != null) {
+                try {
+                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
+                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
+                }
+            }
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
@@ -778,7 +792,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             assert (m_clientInterface != null);
-            m_clientInterface.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
 
             // Start elastic join service
             try {
@@ -1757,6 +1771,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                }
+
+                if (m_snapshotIOAgent != null) {
+                    m_snapshotIOAgent.shutdown();
                 }
 
                 // shut down the network/messaging stuff
