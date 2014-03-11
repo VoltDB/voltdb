@@ -1148,8 +1148,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(response.getStatus() == ClientResponse.SUCCESS);
         try {
             response = client.callProcedure("Eng5926Insert", 7, "HOO", 7.5);
+            fail("Failed to throw ProcCallException for runtime varchar length exceeded.");
         } catch(ProcCallException pce) {
-            System.out.println("Got error? " + pce.getMessage());
         }
         response = client.callProcedure("@AdHoc", "select * from PWEE ORDER BY ID DESC");
         result = response.getResults()[0];
