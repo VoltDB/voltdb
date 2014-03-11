@@ -299,7 +299,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                         }
 
-                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() < endTime) {
+                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
                             break;
                         }
                     }
