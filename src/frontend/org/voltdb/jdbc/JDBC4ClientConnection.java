@@ -70,7 +70,7 @@ public class JDBC4ClientConnection implements Closeable {
      * The number of active users on the connection. Used and managed by the pool to determine when
      * a specific {@link Client} wrapper has reached capacity (and a new one should be created).
      */
-    protected short users;
+    protected short users = 0;
 
     /**
      * The default asynchronous operation timeout for Future-based executions (while the operation
@@ -141,31 +141,19 @@ public class JDBC4ClientConnection implements Closeable {
             config.setMaxOutstandingTxns(maxOutstandingTxns);
 
         // Create client and connect.
-        initializeClientConnection();
+        createClientAndConnect();
     }
 
     /**
      * Private method to (re)initialize a client connection.
+     * @return new ClientImpl
      * @throws UnknownHostException
      * @throws IOException
      */
-    private synchronized void initializeClientConnection() throws UnknownHostException, IOException
+    private ClientImpl createClientAndConnect() throws UnknownHostException, IOException
     {
-        // Make sure client is non-null only when fully connected.
-        Client clientTmp = this.client.get();
-        this.users = 0;
-        this.client.set(null);
-        if (clientTmp != null) {
-            try {
-                clientTmp.close();
-            }
-            catch (InterruptedException e) {
-                // ignore
-            }
-        }
-
         // Make client connections.
-        clientTmp = ClientFactory.createClient(this.config);
+        ClientImpl clientTmp = (ClientImpl) ClientFactory.createClient(this.config);
         for (String server : this.servers) {
             clientTmp.createConnection(server);
         }
@@ -173,20 +161,28 @@ public class JDBC4ClientConnection implements Closeable {
         // If no exception escaped this method it's a good client.
         this.client.set(clientTmp);
         this.users++;
+        return clientTmp;
     }
 
     /**
      * Get current client or reconnect one as needed.
+     * Concurrency strategy: If the connection is lost while providing one the
+     * caller will get a non-null, but ultimately bad connection that will fail.
+     * But it won't cause an NPE. This method is synchronized so that a
+     * reconnection won't happen simultaneously. The client won't get dropped
+     * if a parallel thread comes in later trying to drop the original client
+     * because dropClient() only does it if the request matches the current client.
      * @return  client
      * @throws UnknownHostException
      * @throws IOException
      */
-    protected ClientImpl getClient() throws UnknownHostException, IOException
+    protected synchronized ClientImpl getClient() throws UnknownHostException, IOException
     {
-        if (this.client.get() == null) {
-            this.initializeClientConnection();
+        ClientImpl retClient = (ClientImpl) this.client.get() ;
+        if (retClient != null) {
+            return retClient;
         }
-        return (ClientImpl) this.client.get();
+        return this.createClientAndConnect();
     }
 
     /**
@@ -220,9 +216,11 @@ public class JDBC4ClientConnection implements Closeable {
     /**
      * Drop the client connection, e.g. when a NoConnectionsException is caught.
      * It will try to reconnect as needed and appropriate.
+     * @param clientToDrop caller-provided client to avoid re-nulling from another thread that comes in later
      */
-    protected synchronized void dropClient() {
-        if (this.client.get() != null) {
+    protected synchronized void dropClient(ClientImpl clientToDrop) {
+        Client currentClient = this.client.get();
+        if (currentClient != null && currentClient == clientToDrop) {
             try {
                 this.client.get().close();
                 this.client.set(null);
@@ -261,9 +259,10 @@ public class JDBC4ClientConnection implements Closeable {
     public ClientResponse execute(String procedure, long timeout, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
         long start = System.currentTimeMillis();
+        ClientImpl currentClient = this.getClient();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = this.getClient().callProcedureWithTimeout(procedure, timeout, parameters);
+            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, parameters);
             this.statistics.update(procedure, response);
             return response;
         }
@@ -273,7 +272,7 @@ public class JDBC4ClientConnection implements Closeable {
         }
         catch (NoConnectionsException e) {
             this.statistics.update(procedure, System.currentTimeMillis() - start, false);
-            this.dropClient();
+            this.dropClient(currentClient);
             throw e;
         }
     }
@@ -334,13 +333,15 @@ public class JDBC4ClientConnection implements Closeable {
      *         to post the request to the server, true otherwise.
      */
     public boolean executeAsync(ProcedureCallback callback, String procedure, Object... parameters)
-            throws NoConnectionsException, IOException {
+            throws NoConnectionsException, IOException
+    {
+        ClientImpl currentClient = this.getClient();
         try {
-            return this.getClient().callProcedure(new TrackingCallback(this, procedure, callback),
+            return currentClient.callProcedure(new TrackingCallback(this, procedure, callback),
                     procedure, parameters);
         }
         catch (NoConnectionsException e) {
-            this.dropClient();
+            this.dropClient(currentClient);
             throw e;
         }
     }
@@ -356,10 +357,12 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the Future created to wrap around the asynchronous process.
      */
     public Future<ClientResponse> executeAsync(String procedure, Object... parameters)
-            throws NoConnectionsException, IOException {
+            throws NoConnectionsException, IOException
+    {
+        ClientImpl currentClient = this.getClient();
         final JDBC4ExecutionFuture future = new JDBC4ExecutionFuture(this.defaultAsyncTimeout);
         try {
-            this.getClient().callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
+            currentClient.callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
                 @SuppressWarnings("unused")
                 final JDBC4ExecutionFuture result;
                 {
@@ -373,7 +376,7 @@ public class JDBC4ClientConnection implements Closeable {
             }), procedure, parameters);
         }
         catch (NoConnectionsException e) {
-            this.dropClient();
+            this.dropClient(currentClient);
             throw e;
         }
         return future;
@@ -470,14 +473,15 @@ public class JDBC4ClientConnection implements Closeable {
      * @see Client#drain()
      */
     public void drain() throws InterruptedException, IOException {
-        if (this.client.get() == null) {
+        ClientImpl currentClient = this.getClient();
+        if (currentClient == null) {
             throw new IOException("Client is unavailable for drain().");
         }
         try {
             this.client.get().drain();
         }
         catch (NoConnectionsException e) {
-            this.dropClient();
+            this.dropClient(currentClient);
             throw e;
         }
     }
@@ -511,12 +515,14 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws ProcCallException
      */
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
-            throws IOException, NoConnectionsException, ProcCallException {
+            throws IOException, NoConnectionsException, ProcCallException
+    {
+        ClientImpl currentClient = this.getClient();
         try {
-            return this.getClient().updateApplicationCatalog(catalogPath, deploymentPath);
+            return currentClient.updateApplicationCatalog(catalogPath, deploymentPath);
         }
         catch (NoConnectionsException e) {
-            this.dropClient();
+            this.dropClient(currentClient);
             throw e;
         }
     }
