@@ -89,6 +89,8 @@ private:
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
 
+    // avoid if possible -- less safe
+    TableIterator(Table *);
 
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
@@ -137,8 +139,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
 
 
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
-    :
-      m_table(parent),
+    : m_table(parent),
       m_blockIterator(start),
       m_dataPtr(NULL),
       m_location(0),
@@ -149,6 +150,20 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_tempTableIterator(false)
     {
     }
+
+inline TableIterator::TableIterator(Table *parent)
+    : m_table(parent),
+      m_blockIterator(TBMapI()),
+      m_dataPtr(NULL),
+      m_location(0),
+      m_blockOffset(0),
+      m_activeTuples(0),
+      m_foundTuples(0), m_tupleLength(0),
+      m_tuplesPerBlock(1), m_currentBlock(NULL),
+      m_tempTableIterator(false)
+    {
+    }
+
 
 inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tempBlockIterator = start;
