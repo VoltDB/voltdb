@@ -68,7 +68,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void notestSubSelects_Simple() throws NoConnectionsException, IOException, ProcCallException
+    public void testSubSelects_Simple() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);
@@ -104,7 +104,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void notestSubSelects_Aggregations() throws NoConnectionsException, IOException, ProcCallException
+    public void testSubSelects_Aggregations() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);

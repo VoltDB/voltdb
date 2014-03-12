@@ -73,7 +73,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public String getTableName() {
-        // derived table name is generated as "SYSTEM_SUBQUERY" + "hashCode".
         // Because derived table must have specify an alias, use its alias instead.
         return m_tableAlias;
     }
