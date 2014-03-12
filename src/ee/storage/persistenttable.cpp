@@ -958,7 +958,8 @@ std::string PersistentTable::debug() {
 void PersistentTable::onSetColumns() {
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        m_allowNulls[i] = m_schema->columnAllowNull(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
     }
 
     // Also clear some used block state. this structure doesn't have
