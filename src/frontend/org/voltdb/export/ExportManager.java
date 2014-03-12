@@ -44,10 +44,10 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -548,6 +548,8 @@ public class ExportManager
             ByteBuffer buffer,
             boolean sync,
             boolean endOfStream) {
+        //For validating that the memory is released
+        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
             ExportGeneration generation = instance.m_generations.get(exportGeneration);

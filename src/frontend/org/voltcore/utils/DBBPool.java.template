@@ -407,6 +407,12 @@ public final class DBBPool {
             }
         }
     }
+
+    public static void registerUnsafeMemory(long pointer) {
+#ifdef MEMCHECK_FULL
+        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" registered " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+#endif
+    }
 #ifdef MEMCHECK_FULL
 
     private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
