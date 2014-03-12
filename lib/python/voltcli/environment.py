@@ -74,8 +74,12 @@ java_opts = []
 #If this is a large memory system commit the full heap
 specify_minimum_heap = False
 if platform.system() == "Linux":
-    totalMemory = int(utility.pipe_cmd('free', '-m').next())
-    specify_minimum_heap = totalMemory > 1024 * 16
+    memory = os.popen("free -m")
+    try:
+        totalMemory = int(memory.readlines()[1].split()[1])
+        specifyMinimumHeapSize = totalMemory > 1024 * 16
+    finally:
+        memory.close()
 
 if 'VOLTDB_HEAPMAX' in os.environ:
     try:
