@@ -89,7 +89,7 @@ TableTuple keyTuple;
 
 PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this, m_data.begin()),
+    m_iter(this),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
@@ -98,6 +98,9 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this)
 {
+    // this happens here because m_data might not be initialized above
+    m_iter.reset(m_data.begin());
+
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

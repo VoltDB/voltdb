@@ -56,6 +56,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -1776,6 +1777,9 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
+        // Ugh, need to keep the ShutdownHooks from printing the shutdown message
+        // because using VoltLogger causes it to get pulled in
+        ShutdownHooks.useOnlyCrashHooks();
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {

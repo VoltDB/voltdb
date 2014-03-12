@@ -290,7 +290,7 @@ class NValue {
     void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
-    void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
+    void allocateObjectFromInlinedValue();
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -2796,8 +2796,8 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 }
 
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
-inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
+ *  for use with a wider/widened tuple column, always from the temp pool**/
+inline void NValue::allocateObjectFromInlinedValue()
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -2821,7 +2821,7 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 
     int32_t length = getObjectLength();
     // inlined objects always have a minimal (1-byte) length field.
-    StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, stringPool);
+    StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, getTempStringPool());
     char* storage = sref->get();
     // Copy length and value into the allocated out-of-line storage
     ::memcpy(storage, source, length + SHORT_OBJECT_LENGTHLENGTH);
