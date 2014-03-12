@@ -53,6 +53,9 @@ if compiler_name == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
 
+if compiler_name == 'clang':
+    CTX.CPPFLAGS += " -Wno-varargs"
+
 if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
