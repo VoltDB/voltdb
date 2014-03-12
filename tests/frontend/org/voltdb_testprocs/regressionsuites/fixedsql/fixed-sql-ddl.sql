@@ -127,6 +127,17 @@ CREATE TABLE P3 (
   PRIMARY KEY (ID)
 );
 PARTITION TABLE P3 ON COLUMN ID;
+
+-- to test inline varchar.
+CREATE TABLE PWEE (
+  ID INTEGER DEFAULT '0' NOT NULL,
+  WEE VARCHAR(3),
+  NUM INTEGER,
+  RATIO FLOAT,
+  PRIMARY KEY (ID)
+);
+PARTITION TABLE PWEE ON COLUMN ID;
+
 --
 CREATE VIEW V_P3 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS 
 SELECT wage, dept, count(*), sum(age), sum(rent) FROM P3
