@@ -38,6 +38,19 @@ namespace voltdb {
  */
 class TupleSchema {
 public:
+    // holds per column info
+    struct ColumnInfo {
+        uint32_t offset;
+        uint32_t length;   // does not include length prefix for ObjectTypes
+        char type;
+        char allowNull;
+        bool inlined;      // Stored inside the tuple or outside the tuple.
+
+        const ValueType getVoltType() const {
+            return static_cast<ValueType>(type);
+        }
+    };
+
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
@@ -110,22 +123,14 @@ public:
 
     bool equals(const TupleSchema *other) const;
 
+    const ColumnInfo* getColumnInfo(int columnIndex) const;
 private:
-    // holds per column info
-    struct ColumnInfo {
-        uint32_t offset;
-        uint32_t length;   // does not include length prefix for ObjectTypes
-        char type;
-        char allowNull;
-        bool inlined;      // Stored inside the tuple or outside the tuple.
-    };
 
     /*
      * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
      */
     uint32_t columnLengthPrivate(const int index) const;
 
-    const ColumnInfo* getColumnInfo(int columnIndex) const;
     ColumnInfo* getColumnInfo(int columnIndex);
 
     void setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex);

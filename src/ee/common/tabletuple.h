@@ -272,10 +272,11 @@ public:
         assert(m_data);
         assert(idx < m_schema->columnCount());
 
-        //assert(isActive());
-        const voltdb::ValueType columnType = m_schema->columnType(idx);
-        const char* dataPtr = getDataPtr(idx);
-        const bool isInlined = m_schema->columnIsInlined(idx);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
@@ -369,6 +370,12 @@ private:
         assert(m_schema);
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
+    }
+
+    inline const char* getDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
+        assert(m_schema);
+        assert(m_data);
+        return &m_data[colInfo->offset + TUPLE_HEADER_SIZE];
     }
 };
 
@@ -482,11 +489,12 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     assert(m_schema);
     assert(m_data);
-    const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    value = value.castAs(columnInfo->getVoltType());
+    const bool isInlined = columnInfo->inlined;
+    char *dataPtr = const_cast<char *> (getDataPtr(columnInfo));
+    const int32_t columnLength = columnInfo->length;
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 
