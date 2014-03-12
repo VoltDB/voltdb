@@ -386,6 +386,17 @@ def getCompilerVersion():
     # This is pretty dumb code that could be improved as we support more
     #  compilers and versions.
     if output.find('clang') != -1:
+        # this is a hacky way to find the real clang version from the output of
+        # gcc -v on the mac. The version is right after the string "based on LLVM ".
+        token = "based on LLVM "
+        pos = vinfo.find(token)
+        if pos != -1:
+            pos += len(token)
+            vinfo = vinfo[pos:pos+3]
+            vinfo = vinfo.split(".")
+            return "clang", vinfo, vinfo, 0
+        # if not the expected apple clang format
+        # this probably needs to be adjusted for clang on linux or from source
         return "clang", 0, 0, 0
     else:
         vinfo = vinfo.strip().split("\n")
