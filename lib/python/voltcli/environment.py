@@ -34,6 +34,7 @@ import os
 import glob
 import re
 import shlex
+import platform
 
 from voltcli import utility
 
@@ -72,7 +73,7 @@ java_opts = []
 
 #If this is a large memory system commit the full heap
 specifyMinimumHeapSize = False;
-if os.name == "posix":
+if platform.system() == "Linux":
     totalMemory = int(os.popen("free -m").readlines()[1].split()[1])
     specifyMinimumHeapSize = totalMemory > 1024 * 16
 
