@@ -108,8 +108,6 @@
 using namespace std;
 namespace voltdb {
 
-const int64_t AD_HOC_FRAG_ID = -1;
-
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(0),
       m_allTuplesScanned(0),

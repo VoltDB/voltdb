@@ -239,10 +239,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         host.close();
                     }
                 }
-                try {
-                    m_network.shutdown();
-                }
-                catch (InterruptedException ie) {}
             }
         });
 
