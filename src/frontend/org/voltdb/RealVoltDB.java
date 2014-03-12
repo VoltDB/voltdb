@@ -134,6 +134,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
+
+    private static final boolean DISABLE_JMX;
+    static {
+        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    }
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -705,7 +711,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 final Class<?> statsManagerClass =
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
-                if (statsManagerClass != null) {
+                if (statsManagerClass != null && !DISABLE_JMX) {
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
                     m_statsManager.initialize();
                 }
