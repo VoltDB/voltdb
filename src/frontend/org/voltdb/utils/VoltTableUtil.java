@@ -21,6 +21,7 @@ import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -165,7 +166,7 @@ public class VoltTableUtil {
      * Utility to aggregate a list of tables sharing a schema. Common for
      * sysprocs to do this, to aggregate results.
      */
-    public static VoltTable unionTables(List<VoltTable> operands) {
+    public static VoltTable unionTables(Collection<VoltTable> operands) {
         VoltTable result = null;
 
         // Locate the first non-null table to get the schema
@@ -191,6 +192,8 @@ public class VoltTableUtil {
                     }
                 }
             }
+
+            result.resetRowPosition();
         }
 
         return result;

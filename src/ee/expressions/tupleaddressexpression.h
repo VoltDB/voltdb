@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETUPLEADDRESSXPRESSION_H
+#ifndef HSTORETUPLEADDRESSEXPRESSION_H
 #define HSTORETUPLEADDRESSEXPRESSION_H
 
 #include "common/common.h"
@@ -75,4 +75,4 @@ class TupleAddressExpression : public AbstractExpression {
 };
 
 }
-#endif
+#endif // HSTORETUPLEADDRESSEXPRESSION_H

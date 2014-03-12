@@ -1127,6 +1127,42 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable result = response.getResults()[0];
         assertEquals("NULL", result.fetchRow(0).get(0, VoltType.STRING));
 
+        // Additional verification that inserts are not bothered by math that used to
+        // generate unexpectedly formatted temp tuples and garbled persistent tuples.
+        // ENG-5926
+        response = client.callProcedure("@AdHoc", "select * from P1");
+        result = response.getResults()[0];
+        result.advanceRow();
+        assertEquals(6, result.getLong(0));
+        assertEquals("NULL", result.getString(1));
+        result.getLong(2);
+        // Not sure what's up with HSQL failing to find null here.
+        if ( ! isHSQL()) {
+            assertTrue(result.wasNull());
+        }
+        assertEquals(6.5, result.getDouble(3));
+
+        // Further verify that inline varchar columns still properly handle potentially larger values
+        // even after the temp tuple formatting fix for ENG-5926.
+        response = client.callProcedure("Eng5926Insert", 5, "", 5.5);
+        assertTrue(response.getStatus() == ClientResponse.SUCCESS);
+        try {
+            response = client.callProcedure("Eng5926Insert", 7, "HOO", 7.5);
+            fail("Failed to throw ProcCallException for runtime varchar length exceeded.");
+        } catch(ProcCallException pce) {
+        }
+        response = client.callProcedure("@AdHoc", "select * from PWEE ORDER BY ID DESC");
+        result = response.getResults()[0];
+        result.advanceRow();
+        assertEquals(6, result.getLong(0));
+        assertEquals("WEE", result.getString(1));
+        result.getLong(2);
+        // Not sure what's up with HSQL failing to find null here.
+        if ( ! isHSQL()) {
+            assertTrue(result.wasNull());
+        }
+        assertEquals(6.5, result.getDouble(3));
+
         // this is the actual bug
         try {
             client.callProcedure("@AdHoc", "insert into P1 (ID,DESC,NUM,RATIO) VALUES('?',?,?,?);");
@@ -1239,7 +1275,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     // Ticket: ENG-5486
-    public void  testNULLcomparison() throws IOException, ProcCallException {
+    public void testNULLcomparison() throws IOException, ProcCallException {
         System.out.println("STARTING default null test...");
         Client client = getClient();
         VoltTable result = null;
@@ -1413,6 +1449,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
                                  "STRINGPART.NAME: 0");
         project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");
+        project.addStmtProcedure("Eng5926Insert", "insert into PWEE (ID,WEE,NUM,RATIO) VALUES(1+?,?||'WEE',NULL,1+?);");
 
         project.addStmtProcedure("Eng1316Insert_R", "insert into R1 values (?, ?, ?, ?);");
         project.addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104");

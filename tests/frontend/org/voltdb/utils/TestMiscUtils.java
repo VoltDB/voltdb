@@ -32,10 +32,9 @@ import org.voltcore.utils.CoreUtils.RetryException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestMiscUtils {
     @Test
@@ -98,10 +97,35 @@ public class TestMiscUtils {
                 throw new RetryException();
             }
         };
-        CoreUtils.retryHelper(stpe, es, c, null, 1, TimeUnit.MILLISECONDS, 10, TimeUnit.MILLISECONDS);
+        CoreUtils.retryHelper(stpe, es, c, 0, 1, TimeUnit.MILLISECONDS, 10, TimeUnit.MILLISECONDS);
         sem.acquire();
         stpe.shutdown();
         es.shutdown();
+    }
+
+    @Test
+    public void testRetryMaxAttempts() throws InterruptedException, ExecutionException
+    {
+        ScheduledExecutorService stpe = Executors.newScheduledThreadPool(1);
+        ExecutorService es = Executors.newFixedThreadPool(1);
+        final AtomicInteger count = new AtomicInteger();
+        Callable<Object> c = new Callable<Object>() {
+            public Object call() throws Exception {
+                count.incrementAndGet();
+                throw new RetryException();
+            }
+        };
+
+        // attempt 5 times
+        try {
+            CoreUtils.retryHelper(stpe, es, c, 5, 1, TimeUnit.MILLISECONDS, 10, TimeUnit.MILLISECONDS).get();
+            fail();
+        } catch (Exception e) {}
+
+        stpe.shutdown();
+        es.shutdown();
+
+        assertEquals(5, count.get());
     }
 
     private static void zipKeysAndValuesAndCheck(int[] keys, int[] values)

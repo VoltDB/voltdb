@@ -26,6 +26,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.voltcore.logging.VoltLogger.CoreVoltLogger;
+import org.voltcore.utils.ShutdownHooks;
 
 /**
  * Implements the core logging functionality for VoltLogger specific to
@@ -45,8 +46,10 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         }
         Logger.getRootLogger().setResourceBundle(rb);
 
-        Runtime.getRuntime().addShutdownHook(
-                new Thread() {
+        // Make the LogManager shutdown hook the last thing to be done,
+        // so that we'll get logging from any other shutdown behavior.
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOG4J, true,
+                new Runnable() {
                     @Override
                     public void run() {
                         LogManager.shutdown();

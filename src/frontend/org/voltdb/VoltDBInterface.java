@@ -68,6 +68,10 @@ public interface VoltDBInterface
     public CatalogContext getCatalogContext();
     public String getBuildString();
     public String getVersionString();
+    /** Can this version of VoltDB run with the version string given? */
+    public boolean isCompatibleVersionString(String versionString);
+    /** Version string that isn't overriden for test used to find native lib */
+    public String getEELibraryVersionString();
     public HostMessenger getHostMessenger();
     public ClientInterface getClientInterface();
     public OpsAgent getOpsAgent(OpsSelector selector);
