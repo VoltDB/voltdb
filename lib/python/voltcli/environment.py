@@ -72,10 +72,10 @@ if not java:
 java_opts = []
 
 #If this is a large memory system commit the full heap
-specifyMinimumHeapSize = False;
+specify_minimum_heap = False
 if platform.system() == "Linux":
-    totalMemory = int(os.popen("free -m").readlines()[1].split()[1])
-    specifyMinimumHeapSize = totalMemory > 1024 * 16
+    totalMemory = int(utility.pipe_cmd('free', '-m').next())
+    specify_minimum_heap = totalMemory > 1024 * 16
 
 if 'VOLTDB_HEAPMAX' in os.environ:
     try:
@@ -90,27 +90,27 @@ if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx2048m')
-    if specifyMinimumHeapSize:
+    if specify_minimum_heap:
         java_opts.append('-Xms2048m')
 
 # Set common options now.
-java_opts.append('-server');
-java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600');
-java_opts.append('-XX:+HeapDumpOnOutOfMemoryError');
-java_opts.append('-XX:HeapDumpPath=/tmp');
-java_opts.append('-XX:+UseParNewGC');
-java_opts.append('-XX:+UseConcMarkSweepGC');
-java_opts.append('-XX:+CMSParallelRemarkEnabled');
-java_opts.append('-XX:+UseTLAB');
-java_opts.append('-XX:CMSInitiatingOccupancyFraction=75');
-java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly');
-java_opts.append('-XX:+UseCondCardMark');
-java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775808');
-java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775808');
-java_opts.append('-XX:CMSWaitDuration=120000');
-java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000');
-java_opts.append('-XX:+ExplicitGCInvokesConcurrent');
-java_opts.append('-XX:+CMSScavengeBeforeRemark');
+java_opts.append('-server')
+java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600')
+java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
+java_opts.append('-XX:HeapDumpPath=/tmp')
+java_opts.append('-XX:+UseParNewGC')
+java_opts.append('-XX:+UseConcMarkSweepGC')
+java_opts.append('-XX:+CMSParallelRemarkEnabled')
+java_opts.append('-XX:+UseTLAB')
+java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
+java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
+java_opts.append('-XX:+UseCondCardMark')
+java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775808')
+java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775808')
+java_opts.append('-XX:CMSWaitDuration=120000')
+java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
+java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
+java_opts.append('-XX:+CMSScavengeBeforeRemark')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
