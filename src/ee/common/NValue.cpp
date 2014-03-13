@@ -152,14 +152,14 @@ std::string NValue::debug() const {
         buffer << getDouble();
         break;
     case VALUE_TYPE_VARCHAR:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+        ptr = reinterpret_cast<const char*>(getObjectValueWithoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
         out_val = std::string(ptr, getObjectLength());
         buffer << "[" << getObjectLength() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
     case VALUE_TYPE_VARBINARY:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+        ptr = reinterpret_cast<const char*>(getObjectValueWithoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
         out_val = std::string(ptr, getObjectLength());
         buffer << "[" << getObjectLength() << "]";
@@ -463,7 +463,7 @@ bool NValue::inList(const NValue& rhs) const
     if (rhsType != VALUE_TYPE_ARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
-    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValueWithoutNull();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values

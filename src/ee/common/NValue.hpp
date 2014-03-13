@@ -690,7 +690,7 @@ class NValue {
     /**
      * Used by varchar or varbinary.
      */
-    int32_t getObjectLengthForVarsWithoutNull() const {
+    int32_t getObjectLengthWithoutNull() const {
         assert(isNull() == false);
         assert(getValueType() == VALUE_TYPE_VARCHAR || getValueType() == VALUE_TYPE_VARBINARY);
         // now safe to read and return the length preceding value.
@@ -764,13 +764,7 @@ class NValue {
         *reinterpret_cast<void**>(m_data) = object;
     }
 
-    /**
-     * Get a pointer to the value of an Object that lies beyond the storage of the length information
-     */
-    void* getObjectValue() const {
-        if (isNull()) {
-            return NULL;
-        }
+    void* getObjectValueWithoutNull() const {
         void* value;
         if (m_sourceInlined) {
             value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
@@ -782,16 +776,14 @@ class NValue {
         return value;
     }
 
-    void* getObjectValueWithoutNull() const {
-        void* value;
-        if (m_sourceInlined) {
-            value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+    /**
+     * Get a pointer to the value of an Object that lies beyond the storage of the length information
+     */
+    void* getObjectValue() const {
+        if (isNull()) {
+            return NULL;
         }
-        else {
-            StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
-            value = sref->get() + getObjectLengthLength();
-        }
-        return value;
+        return getObjectValueWithoutNull();
     }
 
     // getters
@@ -1752,8 +1744,8 @@ class NValue {
 
         assert(m_valueType == VALUE_TYPE_VARCHAR);
 
-        const int32_t leftLength = getObjectLengthForVarsWithoutNull();
-        const int32_t rightLength = rhs.getObjectLengthForVarsWithoutNull();
+        const int32_t leftLength = getObjectLengthWithoutNull();
+        const int32_t rightLength = rhs.getObjectLengthWithoutNull();
         const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
         const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
 
@@ -1788,8 +1780,8 @@ class NValue {
                                data_exception_most_specific_type_mismatch,
                                message);
         }
-        const int32_t leftLength = getObjectLengthForVarsWithoutNull();
-        const int32_t rightLength = rhs.getObjectLengthForVarsWithoutNull();
+        const int32_t leftLength = getObjectLengthWithoutNull();
+        const int32_t rightLength = rhs.getObjectLengthWithoutNull();
 
         const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
         const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
@@ -3454,8 +3446,8 @@ inline NValue NValue::like_withoutNull(const NValue rhs) const {
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
-    const int32_t valueUTF8Length = getObjectLength();
-    const int32_t patternUTF8Length = rhs.getObjectLength();
+    const int32_t valueUTF8Length = getObjectLengthWithoutNull()();
+    const int32_t patternUTF8Length = rhs.getObjectLengthWithoutNull();
 
     if (0 == patternUTF8Length) {
         if (0 == valueUTF8Length) {
@@ -3465,8 +3457,8 @@ inline NValue NValue::like_withoutNull(const NValue rhs) const {
         }
     }
 
-    char *valueChars = reinterpret_cast<char*>(getObjectValue());
-    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValue());
+    char *valueChars = reinterpret_cast<char*>(getObjectValueWithoutNull());
+    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValueWithoutNull());
     assert(valueChars);
     assert(patternChars);
 
