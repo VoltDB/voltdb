@@ -146,7 +146,9 @@ TEST_F(TableTest, ValueTypes) {
     while (iterator.next(tuple)) {
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
             EXPECT_EQ(COLUMN_TYPES[ctr], this->table->schema()->columnType(ctr));
-            EXPECT_EQ(COLUMN_TYPES[ctr], tuple.getType(ctr));
+
+            const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(ctr);
+            EXPECT_EQ(COLUMN_TYPES[ctr], columnInfo->getVoltType());
         }
     }
 }
@@ -182,7 +184,8 @@ TEST_F(TableTest, TupleInsert) {
     iterator = this->table->iterator();
     ASSERT_EQ(true, iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
-        EXPECT_EQ(COLUMN_TYPES[col_ctr], tuple.getType(col_ctr));
+        const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(col_ctr);
+        EXPECT_EQ(COLUMN_TYPES[col_ctr], columnInfo->getVoltType());
         EXPECT_TRUE(temp_tuple.getNValue(col_ctr).op_equals(tuple.getNValue(col_ctr)).isTrue());
     }
 }
