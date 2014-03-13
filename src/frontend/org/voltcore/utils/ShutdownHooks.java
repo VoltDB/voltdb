@@ -82,9 +82,9 @@ public class ShutdownHooks
      * having every command line utility have to instruct the shutdown hooks, we'll default to
      * not being a server and then have RealVoltDB do the right thing, Spike-Lee-style
      */
-    public static void thisIsActuallyAServer()
+    public static void enableServerStopLogging()
     {
-        m_instance.youAreAServer();
+        m_instance.youAreNowAServer();
     }
 
     /**
@@ -144,7 +144,7 @@ public class ShutdownHooks
         m_crashing = true;
     }
 
-    private synchronized void youAreAServer()
+    private synchronized void youAreNowAServer()
     {
         m_iAmAServer = true;
     }
