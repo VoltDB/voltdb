@@ -76,6 +76,18 @@ public class ShutdownHooks
     }
 
     /**
+     * Unfortunately, lots of stuff pulls in VoltLogger, which pulls in this shutdown hook,
+     * which then prints scary warnings about shutdowns.  Flail arms around and indicate to the shutdown
+     * hooks that they're actually being called from within a VoltDB server.  To avoid
+     * having every command line utility have to instruct the shutdown hooks, we'll default to
+     * not being a server and then have RealVoltDB do the right thing, Spike-Lee-style
+     */
+    public static void thisIsActuallyAServer()
+    {
+        m_instance.youAreAServer();
+    }
+
+    /**
      * Indicate that only actions that should run on crashVoltDB() should be run.
      */
     public static void useOnlyCrashHooks()
@@ -92,6 +104,7 @@ public class ShutdownHooks
 
     private SortedMap<Integer, List<ShutdownTask>> m_shutdownTasks;
     private boolean m_crashing = false;
+    private boolean m_iAmAServer = false;
 
     private ShutdownHooks() {
         m_shutdownTasks = new TreeMap<Integer, List<ShutdownTask>>();
@@ -110,7 +123,7 @@ public class ShutdownHooks
 
     private synchronized void runHooks()
     {
-        if (!m_crashing) {
+        if (m_iAmAServer && !m_crashing) {
             consoleLog.warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
@@ -129,5 +142,10 @@ public class ShutdownHooks
     private synchronized void crashing()
     {
         m_crashing = true;
+    }
+
+    private synchronized void youAreAServer()
+    {
+        m_iAmAServer = true;
     }
 };
