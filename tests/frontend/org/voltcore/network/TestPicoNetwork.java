@@ -32,11 +32,11 @@ import java.util.HashSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import junit.framework.TestCase;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import junit.framework.TestCase;
 
 public class TestPicoNetwork extends TestCase {
 
@@ -122,6 +122,7 @@ public class TestPicoNetwork extends TestCase {
             return 0;
         }
     }
+    @Override
     @Before
     public void setUp() throws Exception {
         ssc = ServerSocketChannel.open();
@@ -138,6 +139,7 @@ public class TestPicoNetwork extends TestCase {
         pn.start(handler, new HashSet<Long>());
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         ssc.close();
@@ -187,7 +189,7 @@ public class TestPicoNetwork extends TestCase {
         assertEquals(receipt.capacity(), buf.capacity() - 4);
 
         buf.clear();
-        pn.enqueue(buf);
+        pn.enqueue(buf.duplicate());
 
         buf.clear();
         while (buf.hasRemaining()) {
