@@ -1203,11 +1203,11 @@ public class TestVoltBulkLoader extends TestCase {
                     --rowCnt1, my_tableName1, --rowCnt2, my_tableName2));
 
             if (abort1) {
-                bulkLoader1.abort();
+                bulkLoader1.cancelQueued();
             }
             else
             if (abort2)
-                bulkLoader2.abort();
+                bulkLoader2.cancelQueued();
 
             if (!abort1 && rnd.nextInt() % 4 == 0) {
                 // One in 4 tests generate a sync and VoltBulkLoader internal state verification

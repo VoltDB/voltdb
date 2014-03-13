@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class PartitionProcessor implements Runnable {
     // Global object used for testing when to exit the thread
-    final VoltBulkLoaderGlobals m_vblGlobals;
+    final BulkLoaderState m_vblGlobals;
     //Partition for which this processor thread is processing.
     final int m_partitionId;
     //This is just so we can identity thread name.
@@ -39,7 +39,7 @@ public class PartitionProcessor implements Runnable {
     // When true indicates that this is the Multi-Partition row insert processor.
     final boolean m_isMP;
 
-    public PartitionProcessor(int partitionId, boolean isMP, VoltBulkLoaderGlobals vblGlobals) {
+    public PartitionProcessor(int partitionId, boolean isMP, BulkLoaderState vblGlobals) {
         m_partitionId = partitionId;
         m_vblGlobals = vblGlobals;
         if (isMP) {

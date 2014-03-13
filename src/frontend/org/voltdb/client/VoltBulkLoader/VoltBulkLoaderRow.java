@@ -23,9 +23,9 @@ import java.util.concurrent.CountDownLatch;
  * Encapsulation of the applications insert request (also used for passing internal notifications across processors)
  */
 class VoltBulkLoaderRow {
-    final VoltBulkLoader loader;
-    Object rowHandle;
-    final Object[] objectList;
+    final VoltBulkLoader m_loader;
+    Object m_rowHandle;
+    final Object[] m_rowData;
 
     interface BulkLoaderNotification {
         void setBatchCount(int cnt);        // Called to initialize the row to the number of batches that need to be processed
@@ -34,13 +34,14 @@ class VoltBulkLoaderRow {
         CountDownLatch getLatch();
     }
 
+    // Used when a VoltBulkLoader instance requests a synchronous Drain()
     class DrainNotificationCallBack implements BulkLoaderNotification {
         private final CountDownLatch drainLatch;
         int batchCnt;
 
         DrainNotificationCallBack(CountDownLatch latch) {
             drainLatch = latch;
-            rowHandle = this;
+            m_rowHandle = this;
         }
 
         public void setBatchCount(int cnt) {
@@ -60,6 +61,7 @@ class VoltBulkLoaderRow {
         }
     }
 
+    // Used when a VoltBulkLoader instance requests a synchronous Close()
     class CloseNotificationCallBack implements BulkLoaderNotification {
         PerPartitionTable m_tableForClosedBulkLoader;
         final CountDownLatch m_closeCompleteLatch;
@@ -67,7 +69,7 @@ class VoltBulkLoaderRow {
         CloseNotificationCallBack(PerPartitionTable tableForClosedBulkLoader, CountDownLatch latch) {
             m_tableForClosedBulkLoader = tableForClosedBulkLoader;
             m_closeCompleteLatch = latch;
-            rowHandle = this;
+            m_rowHandle = this;
         }
 
         public void setBatchCount(int cnt) {
@@ -81,7 +83,7 @@ class VoltBulkLoaderRow {
         // In this call we are synchronized by the PerPartitionTable object
         public void notifyOfPendingInsert() {
             // First prevent the BulkLoader from accepting new RowInserts
-            loader.m_partitionTable[m_tableForClosedBulkLoader.m_partitionId] = null;
+            m_loader.m_partitionTable[m_tableForClosedBulkLoader.m_partitionId] = null;
         }
 
         public void notifyOfClientResponse() {
@@ -101,19 +103,19 @@ class VoltBulkLoaderRow {
     }
 
     VoltBulkLoaderRow(VoltBulkLoader bulkLoader) {
-        loader = bulkLoader;
-        this.objectList = null;
+        m_loader = bulkLoader;
+        this.m_rowData = null;
     }
 
-    VoltBulkLoaderRow(VoltBulkLoader bulkLoader, Object rowHandle, Object... objectList) {
-        loader = bulkLoader;
-        this.rowHandle = rowHandle;
-        this.objectList = objectList;
+    VoltBulkLoaderRow(VoltBulkLoader bulkLoader, Object rowHandle, Object... rowData) {
+        m_loader = bulkLoader;
+        this.m_rowHandle = rowHandle;
+        this.m_rowData = rowData;
     }
 
     boolean isNotificationRow()
     {
         // Null objectLists are not allowed using VoltBulkLoader.insertRow()
-        return (objectList == null);
+        return (m_rowData == null);
     }
 }

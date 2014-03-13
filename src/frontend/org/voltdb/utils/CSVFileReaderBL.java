@@ -19,6 +19,7 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.Client;
@@ -60,7 +60,6 @@ class CSVFileReaderBL implements Runnable {
     final AtomicLong m_failedInsertCount = new AtomicLong(0);
 
     static {
-        m_blankStrings.put(VoltType.NUMERIC, "0");
         m_blankStrings.put(VoltType.TINYINT, "0");
         m_blankStrings.put(VoltType.SMALLINT, "0");
         m_blankStrings.put(VoltType.INTEGER, "0");
@@ -68,10 +67,9 @@ class CSVFileReaderBL implements Runnable {
         m_blankStrings.put(VoltType.FLOAT, "0.0");
         m_blankStrings.put(VoltType.TIMESTAMP, null);
         m_blankStrings.put(VoltType.STRING, "");
-        m_blankStrings.put(VoltType.DECIMAL, "0");
+        m_blankStrings.put(VoltType.DECIMAL, "0.0");
         m_blankStrings.put(VoltType.VARBINARY, "");
 
-//      m_blankValues.put(VoltType.NUMERIC, VoltType.NUMERIC.getNullValue());
         m_blankValues.put(VoltType.TINYINT, VoltType.TINYINT.getNullValue());
         m_blankValues.put(VoltType.SMALLINT, VoltType.SMALLINT.getNullValue());
         m_blankValues.put(VoltType.INTEGER, VoltType.INTEGER.getNullValue());
@@ -143,14 +141,12 @@ class CSVFileReaderBL implements Runnable {
                 }
                 m_totalRowCount.incrementAndGet();
 
-                String[] correctedLine = lineList.toArray(new String[lineList.size()]);
-
-                if (correctedLine == null || correctedLine.length <= 0) {
+                if (lineList.size() == 0) {
                     continue;
                 }
-                Object row_args[] = new Object[correctedLine.length];
+                Object row_args[] = new Object[lineList.size()];
                 String lineCheckResult;
-                if ((lineCheckResult = checkparams_trimspace(correctedLine, row_args)) != null) {
+                if ((lineCheckResult = checkparams_trimspace(lineList, row_args)) != null) {
                     String[] info = {lineList.toString(), lineCheckResult};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                         m_errored = true;
@@ -159,8 +155,7 @@ class CSVFileReaderBL implements Runnable {
                     continue;
                 }
 
-                // TODO: since we don't deal with failure retries anymore, don't pass correctedLine
-                CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
+                CSVLineWithMetaData lineData = new CSVLineWithMetaData(null, lineList,
                         m_listReader.getLineNumber());
                 bulkLoader.insertRow(lineData, row_args);
             } catch (SuperCsvException e) {
@@ -217,41 +212,41 @@ class CSVFileReaderBL implements Runnable {
         }
     }
 
-    private String checkparams_trimspace(String[] slot, Object row_args[]) {
-        if (slot.length != m_columnCount) {
-            return "Error: Incorrect number of columns. " + slot.length
+    private String checkparams_trimspace(List<String> lineList, Object row_args[]) {
+        if (lineList.size() != m_columnCount) {
+            return "Error: Incorrect number of columns. " + lineList.size()
                     + " found, " + m_columnCount + " expected.";
         }
-
-        for (int i = 0; i < slot.length; i++) {
+        ListIterator<String> it = lineList.listIterator();
+        for (int i = 0; i<lineList.size(); i++) {
+            String field = it.next();
             //supercsv read "" to null
-            if (slot[i] == null) {
+            if (field == null) {
                 if (m_config.blank.equalsIgnoreCase("error")) {
                     return "Error: blank item";
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    slot[i] = m_blankStrings.get(m_columnTypes[i]);
+                    field = m_blankStrings.get(m_columnTypes[i]);
                     row_args[i] = m_blankStrings.get(m_columnTypes[i]);
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
             else {
                 if (m_config.nowhitespace
-                        && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {
+                        && (field.charAt(0) == ' ' || field.charAt(field.length() - 1) == ' ')) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 } else {
-                    slot[i] = slot[i].trim();
+                    field = field.trim();
                 }
                 // treat NULL, \N and "\N" as actual null value
-                if (slot[i].equals("NULL")
-                        || slot[i].equals(Constants.CSV_NULL)
-                        || slot[i].equals(Constants.QUOTED_CSV_NULL)) {
-                    slot[i] = null;
+                if (field.equals("NULL")
+                        || field.equals(Constants.CSV_NULL)
+                        || field.equals(Constants.QUOTED_CSV_NULL)) {
+                    field = null;
                     row_args[i] = m_blankValues.get(m_columnTypes[i]);
                 }
                 else {
                     try {
-                        final VoltType type = m_columnTypes[i];
-                        row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(), slot[i]);
+                        row_args[i] = field;
                     }
                     catch (VoltTypeException e) {
                         return e.getMessage();

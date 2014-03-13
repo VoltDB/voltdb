@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoaderGlobals;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
@@ -74,7 +74,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
 
-    private VoltBulkLoaderGlobals m_vblGlobals = null;
+    private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
 
     /****************************************************
                         Public API
@@ -636,21 +636,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public synchronized VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
     {
-        if (m_vblGlobals == null)
-            m_vblGlobals = new VoltBulkLoaderGlobals(this);
-        return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
-    }
-
-    public synchronized boolean isLastTerminatingVoltBulkLoader() {
-        if (m_vblGlobals != null && m_vblGlobals.getTableNameToLoaderCnt() == 0) {
-            m_vblGlobals = null;
-            return true;
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
         }
-        else
-            return false;
-
     }
-
 }

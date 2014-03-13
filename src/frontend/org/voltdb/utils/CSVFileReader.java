@@ -63,7 +63,6 @@ class CSVFileReader implements Runnable {
     final int m_reportEveryNRows = 10000;
 
     static {
-        m_blankValues.put(VoltType.NUMERIC, "0");
         m_blankValues.put(VoltType.TINYINT, "0");
         m_blankValues.put(VoltType.SMALLINT, "0");
         m_blankValues.put(VoltType.INTEGER, "0");
@@ -71,7 +70,7 @@ class CSVFileReader implements Runnable {
         m_blankValues.put(VoltType.FLOAT, "0.0");
         m_blankValues.put(VoltType.TIMESTAMP, null);
         m_blankValues.put(VoltType.STRING, "");
-        m_blankValues.put(VoltType.DECIMAL, "0");
+        m_blankValues.put(VoltType.DECIMAL, "0.0");
         m_blankValues.put(VoltType.VARBINARY, "");
     }
     //Errors we keep track only upto maxerrors
