@@ -18,7 +18,9 @@
 package org.voltdb;
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -367,6 +369,32 @@ public enum VoltType {
         }
     }
 
+
+    private final static Set<String> m_numericTypes;
+    private final static Map<String, Integer> m_typesFixedLengthInBytes;
+    static {
+        m_numericTypes = new HashSet<String>();
+
+        m_numericTypes.add(TINYINT.toString());
+        m_numericTypes.add(SMALLINT.toString());
+        m_numericTypes.add(INTEGER.toString());
+        m_numericTypes.add(BIGINT.toString());
+        m_numericTypes.add(BIGINT.toString());
+        m_numericTypes.add(FLOAT.toString());
+        m_numericTypes.add(TIMESTAMP.toString());
+
+        m_typesFixedLengthInBytes = new HashMap<String, Integer>();
+        // Note: Keep it in sync with types.h in EE.
+        for (String key: m_numericTypes) {
+            VoltType vt = typeFromString(key);
+            m_typesFixedLengthInBytes.put(key, vt.getLengthInBytesForFixedTypes());
+        }
+    }
+
+    public static Integer getNumericTypeFixedLengthInBytes(String vtype) {
+        return m_typesFixedLengthInBytes.get(vtype);
+    }
+
     /**
      * Gets the byte that corresponds to the enum value (for serialization).
      * @return A byte representing the enum value
@@ -485,7 +513,8 @@ public enum VoltType {
      * <tt>VoltType.typeFromString(voltTypeInstance.toString) == true</tt>.
      * @return The string representation of this type.
      */
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "VoltType." + name();
     }
 

@@ -139,11 +139,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
         m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
     }
 
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
-
     // run the executor
     return p_execute(params);
 }

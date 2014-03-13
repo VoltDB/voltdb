@@ -674,7 +674,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             // This col.index set up is only useful for Materialized view.
             org.voltdb.catalog.Column catalogColumn =
-                    getTableFromDB(groupbyCol.tableName).getColumns().getIgnoreCase(groupbyCol.columnName);
+                    getTableFromDB(groupbyCol.tableName).getColumns().getExact(groupbyCol.columnName);
             groupbyCol.index = catalogColumn.getIndex();
         }
         else

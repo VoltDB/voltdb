@@ -107,23 +107,47 @@ public:
         {
             AbstractExpression* k = m_keys[i];
             SortDirectionType dir = m_dirs[i];
-            int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-            if (dir == SORT_DIRECTION_TYPE_ASC)
-            {
-                if (cmp < 0) return true;
-                if (cmp > 0) return false;
+            NValue vta = k->eval(&ta, NULL);
+            NValue vtb = k->eval(&tb, NULL);
+            int hasNullCompare = vta.compareNull(vtb);
+            if (hasNullCompare == VALUE_COMPARE_INVALID) {
+                int cmp = k->eval(&ta, NULL).compareWithoutNull(k->eval(&tb, NULL));
+                if (dir == SORT_DIRECTION_TYPE_ASC)
+                {
+                    if (cmp < 0) return true;
+                    if (cmp > 0) return false;
+                }
+                else if (dir == SORT_DIRECTION_TYPE_DESC)
+                {
+                    if (cmp < 0) return false;
+                    if (cmp > 0) return true;
+                }
+                else
+                {
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                            "Attempted to sort using"
+                                    " SORT_DIRECTION_TYPE_INVALID");
+                }
+            } else {
+                if (dir == SORT_DIRECTION_TYPE_ASC)
+                {
+                    if (hasNullCompare < 0) return true;
+                    if (hasNullCompare > 0) return false;
+                }
+                else if (dir == SORT_DIRECTION_TYPE_DESC)
+                {
+                    if (hasNullCompare < 0) return false;
+                    if (hasNullCompare > 0) return true;
+                }
+                else
+                {
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                            "Attempted to sort using"
+                                    " SORT_DIRECTION_TYPE_INVALID");
+                }
+
             }
-            else if (dir == SORT_DIRECTION_TYPE_DESC)
-            {
-                if (cmp < 0) return false;
-                if (cmp > 0) return true;
-            }
-            else
-            {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "Attempted to sort using"
-                                              " SORT_DIRECTION_TYPE_INVALID");
-            }
+
         }
         return false; // ta == tb on these keys
     }

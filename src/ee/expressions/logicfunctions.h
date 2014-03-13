@@ -25,7 +25,12 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
     const NValue& baseval = arguments[0];
     for ( int i = 0; i < loopnum; i++ ) {
         const NValue& condval = arguments[2*i+1];
-        if ( condval.compare(baseval) == VALUE_COMPARE_EQUAL ) {
+        int hasNullCompare = condval.compareNull(baseval);
+        if ( hasNullCompare == VALUE_COMPARE_EQUAL
+                || (hasNullCompare == VALUE_COMPARE_INVALID
+                        && condval.compareWithoutNull(baseval) == VALUE_COMPARE_EQUAL)
+                   )
+        {
             NValue result = arguments[2*i+2];
             // The un-inlining of persistent table columns done here is actually only required when
             // the result value is used for a temp table column (typically non-inlined to accomodate

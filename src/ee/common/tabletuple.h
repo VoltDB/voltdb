@@ -272,10 +272,11 @@ public:
         assert(m_data);
         assert(idx < m_schema->columnCount());
 
-        //assert(isActive());
-        const voltdb::ValueType columnType = m_schema->columnType(idx);
-        const char* dataPtr = getDataPtr(idx);
-        const bool isInlined = m_schema->columnIsInlined(idx);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = static_cast<ValueType>(columnInfo->type);
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
@@ -367,6 +368,12 @@ private:
         assert(m_schema);
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
+    }
+
+    inline const char* getDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
+        assert(m_schema);
+        assert(m_data);
+        return &m_data[colInfo->offset + TUPLE_HEADER_SIZE];
     }
 };
 
@@ -480,11 +487,14 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     assert(m_schema);
     assert(m_data);
-    const ValueType type = m_schema->columnType(idx);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+
+    const ValueType type = static_cast<ValueType>(columnInfo->type);;
     value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
+    const bool isInlined = columnInfo->inlined;
+    char *dataPtr = const_cast<char *> (getDataPtr(columnInfo));
+    const int32_t columnLength = columnInfo->length;
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 
@@ -755,7 +765,11 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
-        if (lhs.op_notEquals(rhs).isTrue()) {
+
+        int hasNullCompare = lhs.compareNull(rhs);
+        if (hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+            return false;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID && lhs.compareWithoutNull(rhs) != VALUE_COMPARE_EQUAL) {
             return false;
         }
     }
@@ -778,12 +792,17 @@ inline int TableTuple::compare(const TableTuple &other) const {
     for (int ii = 0; ii < columnCount; ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
-        diff = lhs.compare(rhs);
-        if (diff) {
-            return diff;
+        int hasNullCompare = lhs.compareNull(rhs);
+        if (hasNullCompare == VALUE_COMPARE_GREATERTHAN || hasNullCompare == VALUE_COMPARE_LESSTHAN) {
+            return hasNullCompare;
+        } else if (hasNullCompare == VALUE_COMPARE_INVALID) {
+            diff = lhs.compareWithoutNull(rhs);
+            if (diff) {
+                return diff;
+            }
         }
     }
-    return 0;
+    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {

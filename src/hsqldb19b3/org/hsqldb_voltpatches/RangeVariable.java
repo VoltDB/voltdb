@@ -1158,11 +1158,13 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        scan.attributes.put("table", rangeTable.getName().name);
+        scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
+            tableAlias.name = tableAlias.name.toUpperCase();
             scan.attributes.put("tablealias", tableAlias.name);
         }
+        rangeTable.getName().name = rangeTable.getName().name.toUpperCase();
 
         // note if this is an outer join
         if (isLeftJoin && isRightJoin) {
