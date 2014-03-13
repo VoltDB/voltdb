@@ -36,6 +36,10 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
@@ -76,12 +80,12 @@ public class MaterializedViewFixInfo {
 
     public String getMVTableName () {
         assert(m_mvTableScan != null);
-        return m_mvTableScan.m_table.getTypeName();
+        return m_mvTableScan.getTableName();
     }
 
     public String getMVTableAlias() {
         assert(m_mvTableScan != null);
-        return m_mvTableScan.m_tableAlias;
+        return m_mvTableScan.getTableAlias();
     }
 
     public HashAggregatePlanNode getReAggregationPlanNode () {
@@ -101,7 +105,12 @@ public class MaterializedViewFixInfo {
             List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
 
         // Check valid cases first
-        Table table = mvTableScan.m_table;
+        //@TODO
+        if  ( ! (mvTableScan instanceof StmtTargetTableScan)) {
+            return false;
+        }
+        Table table = ((StmtTargetTableScan)mvTableScan).getTargetTable();
+        assert (table != null);
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
         if (srcTable == null) {
@@ -351,17 +360,16 @@ public class MaterializedViewFixInfo {
 
     private void collectReAggNodePostExpressions(JoinNode joinTree,
             List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
-        if (joinTree.m_leftNode != null) {
-            assert (joinTree.m_rightNode != null);
-            collectReAggNodePostExpressions(joinTree.m_leftNode, needReAggTVEs, aggPostExprs);
-            collectReAggNodePostExpressions(joinTree.m_rightNode, needReAggTVEs, aggPostExprs);
-        } else {
-            assert(joinTree.m_tableAliasIndex != -1);
-            joinTree.m_joinExpr = processFilters(joinTree.m_joinExpr, needReAggTVEs, aggPostExprs);
-
-            // For outer join filters. Inner join or single table query will have whereExpr be null.
-            joinTree.m_whereExpr = processFilters(joinTree.m_whereExpr, needReAggTVEs, aggPostExprs);
+        if (joinTree instanceof BranchNode) {
+            collectReAggNodePostExpressions(((BranchNode)joinTree).getLeftNode(), needReAggTVEs, aggPostExprs);
+            collectReAggNodePostExpressions(((BranchNode)joinTree).getRightNode(), needReAggTVEs, aggPostExprs);
+            return;
         }
+        joinTree.setJoinExpression(processFilters(joinTree.getJoinExpression(),
+                                                  needReAggTVEs, aggPostExprs));
+        // For outer join filters. Inner join or single table query will have whereExpr be null.
+        joinTree.setWhereExpression(processFilters(joinTree.getWhereExpression(),
+                                    needReAggTVEs, aggPostExprs));
     }
 
 

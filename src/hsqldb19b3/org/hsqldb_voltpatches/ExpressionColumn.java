@@ -818,7 +818,13 @@ public class ExpressionColumn extends Expression {
     VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
         if (tableName != null) {
-            exp.attributes.put("table", tableName);
+            if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                    rangeVariable.tableAlias == null &&
+                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+                exp.attributes.put("table", tableName + rangeVariable.rangeTable.getName().hashCode());
+            } else {
+                exp.attributes.put("table", tableName);
+            }
         }
         //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
         exp.attributes.put("column", columnName);
