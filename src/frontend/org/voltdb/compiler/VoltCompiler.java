@@ -1777,9 +1777,6 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
-        // Ugh, need to keep the ShutdownHooks from printing the shutdown message
-        // because using VoltLogger causes it to get pulled in
-        ShutdownHooks.useOnlyCrashHooks();
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
