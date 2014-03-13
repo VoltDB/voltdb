@@ -143,11 +143,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    public static final boolean DISABLE_JMX;
-    static {
-        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
-    }
-
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
         "<?xml version=\"1.0\"?>",
