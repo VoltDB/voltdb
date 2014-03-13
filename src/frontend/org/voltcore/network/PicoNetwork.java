@@ -173,7 +173,16 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     public void run() {
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
+            m_ih.starting(this);
+            m_ih.started(this);
             while (m_shouldStop == false) {
+                //Choose a non-blocking select if things are busy
+                if (m_hadWork) {
+                    m_selector.selectNow();
+                } else {
+                    m_selector.select();
+                }
+
                 m_hadWork = false;
                 Runnable task = null;
                 while ((task = m_tasks.poll()) != null) {
@@ -182,13 +191,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                 }
                 dispatchReadStream();
                 drainWriteStream();
-
-                //Choose a non-blocking select if things are busy
-                if (m_hadWork) {
-                    m_selector.selectNow();
-                } else {
-                    m_selector.select();
-                }
             }
         } catch (CancelledKeyException e) {
             networkLog.warn(
