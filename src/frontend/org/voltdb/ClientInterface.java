@@ -119,6 +119,8 @@ import com.google.common.util.concurrent.MoreExecutors;
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
+    static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
+
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
     public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
@@ -564,7 +566,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             StringBuilder sb = new StringBuilder();
                             sb.append("Timed out authenticating client from ");
                             sb.append(socket.socket().getRemoteSocketAddress().toString());
-                            sb.append(String.format(" after %.2f seconds (timeout target is 1.6 seconds)", seconds));
+                            sb.append(String.format(" after %.2f seconds (timeout target is %.2f seconds)", seconds, AUTH_TIMEOUT_MS / 1000.0));
                             timeoutRef.set(sb.toString());
                             try {
                                 socket.close();
@@ -572,7 +574,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 //Don't care
                             }
                         }
-                    }, 1600, 0, TimeUnit.MILLISECONDS);
+                    }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
             try {
                 while (lengthBuffer.hasRemaining()) {
