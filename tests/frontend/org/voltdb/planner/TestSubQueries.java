@@ -111,26 +111,16 @@ public class TestSubQueries extends PlannerTestCase {
 
     public void testSubSelects_Simple() {
         AbstractPlanNode pn;
-        String alias = " T1";
-        String colRef = " T1.";
         String tbName = "T1";
 
-        pn = compile("select A, C FROM (SELECT A, C FROM R1) " + alias);
+        pn = compile("select A, C FROM (SELECT A, C FROM R1) T1");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A", "C");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "R1", "A", "C");
 
 
-        pn = compile("select A, C FROM (SELECT A, C FROM R1) "+ alias +" WHERE A > 0");
-        pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, tbName,  "A", "C");
-        checkPredicateComparisonExpression(pn, tbName);
-        pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", "A", "C");
-
-
-        pn = compile(String.format("select A, C FROM (SELECT A, C FROM R1) %s WHERE %sA < 0", alias, colRef));
+        pn = compile("select A, C FROM (SELECT A, C FROM R1) T1 WHERE A > 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A", "C");
         checkPredicateComparisonExpression(pn, tbName);
@@ -138,7 +128,15 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1", "A", "C");
 
 
-        pn = compile(String.format("select A1, C1 FROM (SELECT A A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
+        pn = compile("select A, C FROM (SELECT A, C FROM R1) T1 WHERE T1.A < 0");
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, tbName,  "A", "C");
+        checkPredicateComparisonExpression(pn, tbName);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A", "C");
+
+
+        pn = compile("select A1, C1 FROM (SELECT A A1, C C1 FROM R1) T1 WHERE T1.A1 < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A1", "C1");
         checkPredicateComparisonExpression(pn, tbName);
@@ -146,7 +144,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1", "A", "C");
 
         // With projection.
-        pn = compile(String.format("select C1 FROM (SELECT A A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
+        pn = compile("select C1 FROM (SELECT A A1, C C1 FROM R1) T1 WHERE T1.A1 < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
@@ -156,7 +154,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1", "A", "C");
 
         // Complex columns in sub selects
-        pn = compile(String.format("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
+        pn = compile("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) T1 WHERE T1.A1 < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
@@ -166,7 +164,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "R1", "A1", "C");
 
-        pn = compile(String.format("select C1 FROM (SELECT A+3, C C1 FROM R1) %s WHERE %sC1 < 0", alias, colRef));
+        pn = compile("select C1 FROM (SELECT A+3, C C1 FROM R1) T1 WHERE T1.C1 < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
@@ -177,7 +175,7 @@ public class TestSubQueries extends PlannerTestCase {
 
 
         // select *
-        pn = compile(String.format("select A, C FROM (SELECT * FROM R1) %s WHERE %sA < 0", alias, colRef));
+        pn = compile("select A, C FROM (SELECT * FROM R1) T1 WHERE T1.A < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A", "C");
         checkPredicateComparisonExpression(pn, tbName);
@@ -185,7 +183,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1", "A", "C", "D");
 
 
-        pn = compile(String.format("select * FROM (SELECT A, D FROM R1) %s WHERE %sA < 0", alias, colRef));
+        pn = compile("select * FROM (SELECT A, D FROM R1) T1 WHERE T1.A < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A", "D");
         checkPredicateComparisonExpression(pn, tbName);
@@ -193,7 +191,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1", "A", "D");
 
 
-        pn = compile(String.format("select A, C FROM (SELECT * FROM R1 where D > 3) %s WHERE %sA < 0", alias, colRef));
+        pn = compile("select A, C FROM (SELECT * FROM R1 where D > 3) T1 WHERE T1.A < 0");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A", "C");
         checkPredicateComparisonExpression(pn, tbName);
@@ -220,30 +218,29 @@ public class TestSubQueries extends PlannerTestCase {
 
     public void testSubSelects_Function() {
         AbstractPlanNode pn;
-        String alias = " T1";
         String tbName = "T1";
 
         // Function expression
-        pn = compile("select ABS(C) FROM (SELECT A, C FROM R1)" + alias);
+        pn = compile("select ABS(C) FROM (SELECT A, C FROM R1) T1");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1" );
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
         // Should this really be supported ?
-        failToCompile("select A, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias,
+        failToCompile("select A, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
                 "user lacks privilege or object not found: A");
-        failToCompile("select A+1, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias,
+        failToCompile("select A+1, ABS(C) FROM (SELECT A A1, C FROM R1) T1",
                 "user lacks privilege or object not found: A");
 
         // Use alias column from sub select instead.
-        pn = compile("select A1, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias);
+        pn = compile("select A1, ABS(C) FROM (SELECT A A1, C FROM R1) T1");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "A1", "C2" ); // hsql auto generated column alias C2.
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
-        pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias);
+        pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1) T1");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1", "C2" );
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
@@ -252,7 +249,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
 
-        pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1) " + alias + " WHERE ABS(A1) > 3");
+        pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1) T1 WHERE ABS(A1) > 3");
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, tbName,  "C1", "C2" );
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
@@ -409,7 +406,7 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     public void testSubSelects_Distributed() {
-        String tmpErrorMsg = "Subselect queries only are supported in single partition stored procedure.";
+        String tmpErrorMsg = "Subqueries on partitioned data are only supported in single partition stored procedures.";
         // Partitioned sub-query
         failToCompile("select A, C FROM (SELECT A, C FROM P1) T1 ", tmpErrorMsg);
         failToCompile("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1 ", tmpErrorMsg);
@@ -473,11 +470,6 @@ public class TestSubQueries extends PlannerTestCase {
         //        AbstractPlanNode nlpn;
         //        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
 
-//        List<AbstractPlanNode> planNodes =
-//                compileToFragments("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1 ");
-//        assertTrue(planNodes.size() == 2);
-//        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
-
         AbstractPlanNode pn;
 //        pn = compileForSinglePartition("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1");
 //        System.out.println(pn.toExplainPlanString());
@@ -508,7 +500,7 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 WHERE T1.A = 1 AND T2.A = 2", errorJoinMsg);
 
 
-        String tmpErrorMsg = "Subselect queries only are supported in single partition stored procedure.";
+        String tmpErrorMsg = "Subqueries on partitioned data are only supported in single partition stored procedures.";
 
         // parent partition table join with subselect partitioned temp table
         failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1) T1) T2 where p2.D= T2.D1",
@@ -550,10 +542,7 @@ public class TestSubQueries extends PlannerTestCase {
 
         // TODO(xin): hsql does not complain about the ambiguous column A, but use 'T1' as default.
         // FIX(xin): throw compiler exception for this query.
-        // The language in this error message needs work.
-        // More like: "Subqueries on partitioned data are only supported in single partition stored procedures."
         pn = compile("select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
-//      System.out.println(pn.toExplainPlanString());
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         checkOutputSchema("T1", pn, "A");

@@ -136,6 +136,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "       GROUP BY wage ORDER BY wage ASC LIMIT 4) T1" +
                     " Group by a4 order by a4;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{4, 60}, {10, 40}});
+
+            vt = client.callProcedure("@AdHoc",
+                    "select dept_count, count(*) from (select dept, count(*) as dept_count from R1 group by dept) T1 " +
+                    "group by dept_count order by dept_count").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{3, 1}, {4, 1}});
+
+            vt = client.callProcedure("@AdHoc",
+                    "select dept_count, count(*) " +
+                    "from (select dept, count(*) as dept_count " +
+                    "       from (select dept, id from " + tb + " order by dept limit 6) T1 group by dept) T2 " +
+                    "group by dept_count order by dept_count").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{3, 2}});
         }
 
     }
@@ -161,14 +173,21 @@ public class TestSubQueriesSuite extends RegressionSuite {
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{4, 2}, {5, 2}});
 
-//            vt = client.callProcedure("@AdHoc",
-//                    "select id, newid  " +
-//                    "FROM (SELECT id, wage FROM R1) T1 left outer join (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
-//                    "ON T1.id = T2.dept ORDER BY id, newid").getResults()[0];
-//            System.out.println(vt.toString());
-//            validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
-//                    {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
+            vt = client.callProcedure("@AdHoc",
+                    "select id, wage, dept_count from R1, (select dept, count(*) as dept_count " +
+                    "from (select dept, id from R1 order by dept limit 5) T1 group by dept) T2 " +
+                    "where R1.wage / T2.dept_count > 10 order by wage,dept_count").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{3, 30, 2}, {4, 40, 2}, {4, 40, 3},{5, 50, 2},{5, 50, 3}});
 
+            if (!isHSQL()) {
+                vt = client.callProcedure("@AdHoc",
+                        "select id, newid  " +
+                        "FROM (SELECT id, wage FROM R1) T1 left outer join (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
+                        "ON T1.id = T2.dept ORDER BY id, newid").getResults()[0];
+                System.out.println(vt.toString());
+                validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
+                        {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
+            }
         }
 
     }

@@ -638,7 +638,7 @@ public class PlanAssembler {
         if (m_partitioning.requiresTwoFragments()) {
 
             if (m_parsedSelect.m_joinTree.containSubSelects()) {
-                throw new PlanningErrorException("Subselect queries only are supported in single partition stored procedure.");
+                throw new PlanningErrorException("Subqueries on partitioned data are only supported in single partition stored procedures.");
             }
 
             boolean mvFixInfoCoordinatorNeeded = true;
