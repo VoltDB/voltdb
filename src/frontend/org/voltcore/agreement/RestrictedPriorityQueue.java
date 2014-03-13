@@ -65,7 +65,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         @Override
         public String toString() {
-            return "{" + TransactionIdManager.getTimestampFromTransactionId(m_lastSeenTxnId) + "," + TransactionIdManager.getTimestampFromTransactionId(m_lastSeenTxnId) + "}";
+            return "{" + TransactionIdManager.toString(m_lastSeenTxnId) + "," + TransactionIdManager.toString(m_lastSafeTxnId) + "}";
         }
     }
 
@@ -397,6 +397,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         }
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("State: ").append(m_state);
