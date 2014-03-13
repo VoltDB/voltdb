@@ -324,29 +324,46 @@ public class MiscUtils {
 
     /**
      * Parse a version string in the form of x.y.z. It doesn't require that
-     * there are exactly three parts in the version. Each part must be seperated
+     * there are exactly three parts in the version. Each part must be separated
      * by a dot.
      *
      * @param versionString
      * @return an array of each part as integer.
      */
-    public static int[] parseVersionString(String versionString) {
+    public static Object[] parseVersionString(String versionString) {
         if (versionString == null) {
             return null;
         }
 
+        // check for whitespace
+        if (versionString.matches("\\s")) {
+            return null;
+        }
+
+        // split on the dots
         String[] split = versionString.split("\\.");
-        int[] v = new int[split.length];
+        if (split.length == 0) {
+            return null;
+        }
+
+        Object[] v = new Object[split.length];
         int i = 0;
         for (String s : split) {
             try {
-                v[i++] = Integer.parseInt(s.trim());
+                v[i] = Integer.parseInt(s);
             } catch (NumberFormatException e) {
-                return null;
+                v[i] = s;
             }
+            i++;
         }
 
-        return v;
+        // check for a numeric beginning
+        if (v[0] instanceof Integer) {
+            return v;
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -358,31 +375,57 @@ public class MiscUtils {
      * @return -1 if left is smaller than right, 0 if they are equal, 1 if left
      *         is greater than right.
      */
-    public static int compareVersions(int[] left, int[] right) {
+    public static int compareVersions(Object[] left, Object[] right) {
         if (left == null || right == null) {
             throw new IllegalArgumentException("Invalid versions");
         }
 
-        int i = 0;
-        for (int part : right) {
-            // left is shorter than right and share the same prefix, must be smaller
-            if (left.length == i) {
-                return -1;
-            }
-
-            if (left[i] > part) {
+        for (int i = 0; i < left.length; i++) {
+            // right is shorter than left and share the same prefix => left must be larger
+            if (right.length == i) {
                 return 1;
-            } else if (left[i] < part) {
-                return -1;
             }
 
-            i++;
+            if (left[i] instanceof Integer) {
+                if (right[i] instanceof Integer) {
+                    // compare two numbers
+                    if (((Integer) left[i]) > ((Integer) right[i])) {
+                        return 1;
+                    } else if (((Integer) left[i]) < ((Integer) right[i])) {
+                        return -1;
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                else {
+                    // numbers always greater than alphanumeric tags
+                    return 1;
+                }
+            }
+            else if (right[i] instanceof Integer) {
+                // alphanumeric tags always less than numbers
+                return -1;
+            }
+            else {
+                // compare two alphanumeric tags lexicographically
+                int cmp = ((String) left[i]).compareTo((String) right[i]);
+                if (cmp != 0) {
+                    return cmp;
+                }
+                else {
+                    // two alphanumeric tags are the same... so keep comparing
+                    continue;
+                }
+            }
         }
 
-        // left is longer than right and share the same prefix, must be greater
-        if (left.length > i) {
-            return 1;
+        // left is shorter than right and share the same prefix, must be less
+        if (left.length < right.length) {
+            return -1;
         }
+
+        // samesies
         return 0;
     }
 

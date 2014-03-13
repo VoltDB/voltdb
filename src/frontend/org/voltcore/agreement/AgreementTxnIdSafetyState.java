@@ -25,8 +25,6 @@ public class AgreementTxnIdSafetyState {
     private class SiteState {
         public long hsId;
         public long newestConfirmedTxnId;
-        @SuppressWarnings("unused")
-        public long lastSentTxnId;
     }
 
     Map<Long, SiteState> m_stateBySite = new LinkedHashMap<Long, SiteState>();
@@ -52,11 +50,16 @@ public class AgreementTxnIdSafetyState {
             return DtxnConstants.DUMMY_LAST_SEEN_TXN_ID;
         }
         assert(ss.hsId == agreementHSId);
-        ss.lastSentTxnId = m_newestConfirmedTxnId;
         return ss.newestConfirmedTxnId;
     }
 
-    public void updateLastSeenTxnIdFromExecutorBySiteId(long agreementHSId, long lastSeenTxnId, boolean shouldRespond) {
+    public long getNewestGloballySafeTxnId()
+    {
+        return m_newestConfirmedTxnId;
+    }
+
+    public void updateLastSeenTxnIdFromExecutorBySiteId(long agreementHSId, long lastSeenTxnId)
+    {
         // ignore these by convention
         if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID)
             return;
@@ -84,16 +87,6 @@ public class AgreementTxnIdSafetyState {
 
             m_newestConfirmedTxnId = min;
         }
-
-        // see if the sent message is out of date
-        /*if (shouldRespond) {
-            HeartbeatMessage hb = new HeartbeatMessage(m_siteId, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID, ss.partition.newestConfirmedTxnId);
-            try {
-                m_mailbox.send(executorSiteId, VoltDB.DTXN_MAILBOX_ID, hb);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-        }*/
     }
 
     /**
@@ -117,7 +110,6 @@ public class AgreementTxnIdSafetyState {
         ss = new SiteState();
         ss.hsId = agreementHSId;
         ss.newestConfirmedTxnId = m_newestConfirmedTxnId;
-        ss.lastSentTxnId = m_newestConfirmedTxnId;
         m_stateBySite.put(agreementHSId, ss);
     }
 }

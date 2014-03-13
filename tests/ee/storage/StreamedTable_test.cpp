@@ -48,8 +48,6 @@ using namespace voltdb;
 using namespace boost;
 
 const int COLUMN_COUNT = 5;
-// 5 kilobytes of buffer
-const int BUFFER_SIZE = 1024 * 5;
 
 class MockTopend : public Topend {
   public:

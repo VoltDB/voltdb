@@ -134,6 +134,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
+
+    private static final boolean DISABLE_JMX;
+    static {
+        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    }
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -162,8 +168,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "4.1";
+    static final String m_defaultVersionString = "4.1";
+    // by default, 4.1 is only compatible with 4.1
+    static final String m_defaultHotfixableRegexPattern = "^4\\.1\\z";
+    // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
+    private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     HostMessenger m_messenger = null;
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
@@ -180,7 +190,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // globally available
     @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
-    @SuppressWarnings("unused")
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
     long m_depCRC = -1;
@@ -227,6 +236,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Rejoin coordinator
     private JoinCoordinator m_joinCoordinator = null;
     private ElasticJoinService m_elasticJoinService = null;
+
+    // Snapshot IO agent
+    private SnapshotIOAgent m_snapshotIOAgent = null;
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
@@ -296,6 +308,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
+
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {
@@ -373,6 +386,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+            // use CLI overrides for testing hotfix version compatibility
+            if (m_config.m_versionStringOverrideForTest != null) {
+                m_versionString = m_config.m_versionStringOverrideForTest;
+            }
+            if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
+                m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
+            }
 
             buildClusterMesh(isRejoin || m_joining);
 
@@ -393,6 +413,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+
+            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", false);
+            if (snapshotIOAgentClass != null) {
+                try {
+                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
+                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
+                }
+            }
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
@@ -772,7 +803,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             assert (m_clientInterface != null);
-            m_clientInterface.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
 
             // Start elastic join service
             try {
@@ -819,7 +850,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_configLogger.start();
 
             DailyRollingFileAppender dailyAppender = null;
-            Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+            Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
             while (appenders.hasMoreElements()) {
                 Appender appender = (Appender) appenders.nextElement();
                 if (appender instanceof DailyRollingFileAppender){
@@ -891,7 +922,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 stringer.key("pid").value(CLibrary.getpid());
 
                 stringer.key("log4jDst").array();
-                Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+                Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
                 while (appenders.hasMoreElements()) {
                     Appender appender = (Appender) appenders.nextElement();
                     if (appender instanceof FileAppender){
@@ -904,7 +935,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
-                Enumeration loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+                Enumeration<?> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
                 while (loggers.hasMoreElements()) {
                     Logger logger = (Logger) loggers.nextElement();
                     appenders = logger.getAllAppenders();
@@ -1058,12 +1089,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return topo;
     }
 
+    private List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
     /**
      * Schedule all the periodic works
      */
     private void schedulePeriodicWorks() {
         // JMX stats broadcast
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 // A null here was causing a steady stream of annoying but apparently inconsequential
@@ -1072,31 +1104,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_statsManager.sendNotification();
                 }
             }
-        }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS);
+        }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS));
 
         // small stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(false, false);
             }
-        }, 0, 5, TimeUnit.SECONDS);
+        }, 0, 5, TimeUnit.SECONDS));
 
         // medium stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(true, false);
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES));
 
         // large stats samples
-        scheduleWork(new Runnable() {
+        m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
-        }, 0, 6, TimeUnit.MINUTES);
+        }, 0, 6, TimeUnit.MINUTES));
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
@@ -1683,9 +1715,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
+
+                /*
+                 * Various scheduled tasks get crashy in unit tests if they happen to run
+                 * while other stuff is being shut down
+                 */
+                for (ScheduledFuture<?> sc : m_periodicWorks) {
+                    sc.cancel(false);
+                    try {
+                        sc.get();
+                    } catch (Throwable t) {}
+                }
+                m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
+                m_periodicWorkThread.awaitTermination(356, TimeUnit.DAYS);
                 m_periodicPriorityWorkThread.shutdown();
+                m_periodicPriorityWorkThread.awaitTermination(356, TimeUnit.DAYS);
 
                 if (m_elasticJoinService != null) {
                     m_elasticJoinService.shutdown();
@@ -1736,6 +1782,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                }
+
+                if (m_snapshotIOAgent != null) {
+                    m_snapshotIOAgent.shutdown();
                 }
 
                 // shut down the network/messaging stuff
@@ -1947,12 +1997,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public String getBuildString() {
-        return m_buildString;
+        return m_buildString == null ? "VoltDB" : m_buildString;
     }
 
     @Override
     public String getVersionString() {
         return m_versionString;
+    }
+
+    /**
+     * Used for testing when you don't have an instance. Should do roughly what
+     * {@link #isCompatibleVersionString(String)} does.
+     */
+    static boolean staticIsCompatibleVersionString(String versionString) {
+        return versionString.matches(m_defaultHotfixableRegexPattern);
+    }
+
+    @Override
+    public boolean isCompatibleVersionString(String versionString) {
+        return versionString.matches(m_hotfixableRegexPattern);
+    }
+
+    @Override
+    public String getEELibraryVersionString() {
+        return m_defaultVersionString;
     }
 
     @Override

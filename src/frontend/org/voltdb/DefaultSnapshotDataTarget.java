@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -323,6 +324,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
+            try {
+                m_syncTask.get();
+            } catch (CancellationException ignore) {
+                // Ignored because we just called cancel
+            } catch (ExecutionException e) {
+                SNAP_LOG.error("Error cancelling snapshot sync task", e);
+            }
+
             m_channel.force(false);
         } finally {
             m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));

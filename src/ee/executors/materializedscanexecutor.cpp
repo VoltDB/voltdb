@@ -57,8 +57,9 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     assert ((int)output_table->columnCount() == 1);
 
     // get the output type
-    ValueType outputType = output_table->schema()->columnType(0);
-    bool outputCantBeNull = !output_table->schema()->columnAllowNull(0);
+    const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);
+    ValueType outputType = columnInfo->getVoltType();
+    bool outputCantBeNull = !columnInfo->allowNull;
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     assert(rowsExpression);

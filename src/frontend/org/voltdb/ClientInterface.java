@@ -47,12 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.base.Predicate;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Throwables;
-
+import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -93,7 +89,6 @@ import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -107,6 +102,9 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
@@ -121,6 +119,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
+    static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
@@ -512,7 +511,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             StringBuilder sb = new StringBuilder();
                             sb.append("Timed out authenticating client from ");
                             sb.append(socket.socket().getRemoteSocketAddress().toString());
-                            sb.append(String.format(" after %.2f seconds (timeout target is 1.6 seconds)", seconds));
+                            sb.append(String.format(" after %.2f seconds (timeout target is %.2f seconds)", seconds, AUTH_TIMEOUT_MS / 1000.0));
                             timeoutRef.set(sb.toString());
                             try {
                                 socket.close();
@@ -520,7 +519,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 //Don't care
                             }
                         }
-                    }, 1600, 0, TimeUnit.MILLISECONDS);
+                    }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
             try {
                 while (lengthBuffer.hasRemaining()) {
@@ -859,15 +858,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (clientData == null) {
                 return new ByteBuffer[] {};
             }
-            final long now = System.currentTimeMillis();
-            final int delta = (int)(now - clientData.m_creationTime);
 
             // Reuse the creation time of the original invocation to have accurate internal latency
-            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTime)) {
+            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
                 return new ByteBuffer[] {};
             }
+
+            final long now = System.nanoTime();
+            final long delta = now - clientData.m_creationTimeNanos;
 
             /*
              * Log initiator stats
@@ -880,7 +880,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     clientResponse.getStatus());
 
             clientResponse.setClientHandle(clientData.m_clientHandle);
-            clientResponse.setClusterRoundtrip(delta);
+            clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
 
             ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
@@ -904,7 +904,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @param now the current timestamp
          * @return true if the transaction is restarted successfully, false otherwise.
          */
-        private boolean restartTransaction(int messageSize, long now)
+        private boolean restartTransaction(int messageSize, long nowNanos)
         {
             if (response.isMispartitioned()) {
                 // Restart a mis-partitioned transaction
@@ -939,7 +939,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             false, // Only SP could be mis-partitioned
                             partition,
                             messageSize,
-                            now);
+                            nowNanos);
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -961,7 +961,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isEveryPartition,
             final int partition,
             final int messageSize,
-            final long now)
+            final long nowNanos)
     {
         return createTransaction(
                 connectionId,
@@ -973,7 +973,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isEveryPartition,
                 partition,
                 messageSize,
-                now,
+                nowNanos,
                 false);  // is for replay.
     }
 
@@ -988,7 +988,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isEveryPartition,
             final int partition,
             final int messageSize,
-            final long now,
+            long nowNanos,
             final boolean isForReplay)
     {
         assert(!isSinglePartition || (partition >= 0));
@@ -1028,7 +1028,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
-                messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
+                messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
             new Iv2InitiateTaskMessage(m_siteId,
@@ -1265,8 +1265,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon(ZooKeeper zk, GlobalServiceElector gse) {
-        m_snapshotDaemon.init(this, zk, new Runnable() {
+    public void initializeSnapshotDaemon(HostMessenger messenger, GlobalServiceElector gse) {
+        m_snapshotDaemon.init(this, messenger, new Runnable() {
             @Override
             public void run() {
                 bindAdapter(m_snapshotDaemonAdapter);
@@ -1529,7 +1529,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                           catProc.getEverysite(),
                           partition,
                           buf.capacity(),
-                          System.currentTimeMillis());
+                          System.nanoTime());
         return null;
     }
 
@@ -1581,14 +1581,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param size
      * @param invocation
      */
-    void dispatchSendSentinel(long connectionId, long now, int size,
+    void dispatchSendSentinel(long connectionId, long nowNanos, int size,
                               StoredProcedureInvocation invocation)
     {
         ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         // First parameter of the invocation is the partition ID
         int pid = (Integer) invocation.getParameterAtIndex(0);
         final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(pid);
-        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, now,
+        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, nowNanos,
                 invocation.getProcName(), initiatorHSId, true, false);
 
         /*
@@ -1639,7 +1639,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getEverysite(),
                 0,//No partition needed for multi-part
                 buf.capacity(),
-                System.currentTimeMillis());
+                System.nanoTime());
 
         return null;
     }
@@ -1650,7 +1650,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * * return True if an error was generated and needs to be returned to the client
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
-        final long now = System.currentTimeMillis();
+        final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         try {
             task.initFromBuffer(buf);
@@ -1670,6 +1670,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
+        // Deserialize the client's request and map to a catalog stored procedure
+        final CatalogContext catalogContext = m_catalogContext.get();
+        AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
+
         // ping just responds as fast as possible to show the connection is alive
         // nb: ping is not a real procedure, so this is checked before other "sysprocs"
         if (task.procName.startsWith("@")) {
@@ -1682,11 +1686,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@Subscribe")) {
                 return dispatchSubscribe( handler, task);
             }
+            if (task.procName.equals("@GC")) {
+                return dispatchSystemGC(handler, task, user);
+            }
         }
 
-        // Deserialize the client's request and map to a catalog stored procedure
-        final CatalogContext catalogContext = m_catalogContext.get();
-        AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
         Procedure catProc = catalogContext.procedures.get(task.procName);
 
         if (catProc == null) {
@@ -1712,7 +1716,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
             else if (task.procName.equals("@SendSentinel")) {
-                dispatchSendSentinel(handler.connectionId(), now, buf.capacity(), task);
+                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
         }
@@ -1862,7 +1866,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getEverysite(),
                         partition,
                         buf.capacity(),
-                        now);
+                        nowNanos);
         if (!success) {
             // HACK: this return is for the DR agent so that it
             // will move along on duplicate replicated transactions
@@ -1874,6 +1878,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    /*
+     * Allow System.gc() to be invoked remotely even when JMX isn't enabled.
+     * Can be used to perform old gen GCs on a schedule during non-peak times
+     */
+    private ClientResponseImpl dispatchSystemGC(ClientInputHandler handler,
+            StoredProcedureInvocation task, AuthSystem.AuthUser user) {
+        if (user.hasSystemProcPermission()) {
+            final long start = System.nanoTime();
+            System.gc();
+            final long duration = System.nanoTime() - start;
+            return new ClientResponseImpl(
+                    ClientResponseImpl.SUCCESS,
+                    new VoltTable[] {},
+                    Long.toString(duration),
+                    task.clientHandle);
+        } else {
+            return new ClientResponseImpl(
+                    ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[] {},
+                    "User " + handler.m_username + " doesn't have sysproc permission needed to invoke @GC",
+                    task.clientHandle);
+        }
     }
 
     private ClientResponseImpl dispatchSubscribe(ClientInputHandler c, StoredProcedureInvocation task) {
@@ -2018,7 +2046,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partition,
-                task.getSerializedSize(), EstTime.currentTimeMillis());
+                task.getSerializedSize(), System.nanoTime());
     }
 
     /*
@@ -2119,7 +2147,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // procedure are horrible, horrible, horrible.
                             createTransaction(changeResult.connectionId,
                                     task, false, false, false, 0, task.getSerializedSize(),
-                                    EstTime.currentTimeMillis());
+                                    System.nanoTime());
                         }
                     }
                     else {
@@ -2465,7 +2493,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
                 0,
-                0, EstTime.currentTimeMillis());
+                0, System.nanoTime());
     }
 
     /**
@@ -2673,8 +2701,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return statsIterators;
     }
 
-    public List<LatencyInfo> getLatencyStats() {
-        List<LatencyInfo> latencyStats = new ArrayList<LatencyInfo>();
+    public List<AbstractHistogram> getLatencyStats() {
+        List<AbstractHistogram> latencyStats = new ArrayList<AbstractHistogram>();
         for (AdmissionControlGroup acg : m_allACGs) {
             latencyStats.add(acg.getLatencyInfo());
         }
