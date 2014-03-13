@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,6 +21,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+import os
 import re
 from voltcli import utility
 from voltcli import environment
@@ -28,8 +29,16 @@ from voltcli import environment
 # A common OS X mysql installation problem can prevent _mysql.so from loading.
 # Postpone database imports until initialize() is called to avoid errors in
 # non-mysql commands and to provide good messages to help diagnose errors.
-schemaobject = None
 MySQLdb = None
+
+# Find and import the voltdb-patched schemaobject module.
+# It should be in third_party/python/schemaobject.
+# Prepend it to the Python path so that it overrides any local unpatched copy.
+if environment.third_party_python is None:
+    utility.abort('Third party python libraries are not available')
+schemaobject_path = os.path.join(environment.third_party_python, 'schemaobject')
+sys.path.insert(0, schemaobject_path)
+import schemaobject
 
 # IMPORTANT: Any name being generated needs to be post-processed with
 # fix_name() at the point where the DDL is being output, but no sooner. All
@@ -113,14 +122,12 @@ def initialize_mysql_imports():
     Perform the delayed MySQL module imports.
     """
     try:
-        import schemaobject as schemaobject_
         import MySQLdb as MySQLdb_
-        global schemaobject, MySQLdb
-        schemaobject = schemaobject_
+        global MySQLdb
         MySQLdb = MySQLdb_
     except ImportError, e:
         msgs = [
-            'Failed to import MySQL-related module.',
+            'Failed to import MySQL module.',
             'Is MySQL properly installed?',
                 ('http://dev.mysql.com/downloads/',)
         ]

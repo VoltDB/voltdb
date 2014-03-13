@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -51,7 +52,7 @@ public class BabySitter
     private final Callback m_cb; // the callback when children change
     private final ZooKeeper m_zk;
     private final ExecutorService m_es;
-    private List<String> m_children = new ArrayList<String>();
+    private volatile List<String> m_children = ImmutableList.of();
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     /**
@@ -64,7 +65,7 @@ public class BabySitter
     }
 
     /** lastSeenChildren returns the last recorded list of children */
-    public synchronized List<String> lastSeenChildren()
+    public List<String> lastSeenChildren()
     {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested children from shutdown babysitter.");
@@ -174,10 +175,8 @@ public class BabySitter
     {
         Stat stat = new Stat();
         List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
-        ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
-        tmp.addAll(zkchildren);
-        Collections.sort(tmp);
-        m_children = Collections.unmodifiableList(tmp);
+        Collections.sort(zkchildren);
+        m_children = ImmutableList.copyOf(zkchildren);
         return m_children;
     }
 }

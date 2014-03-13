@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,8 +28,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Charsets;
 
 /**
  * ParameterConverter provides a static helper to convert a deserialized
@@ -115,7 +113,7 @@ public class ParameterConverter {
     {
         value = value.trim();
         // detect CSV null
-        if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
+        if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
         // remove commas and escape chars
         value = value.replaceAll("\\,","");
 
@@ -271,7 +269,7 @@ public class ParameterConverter {
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
         else if (inputClz == String.class) {
-            if (((String) param).equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
+            if (((String) param).equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
             else if (expectedClz == byte[].class) {
@@ -288,7 +286,7 @@ public class ParameterConverter {
             // allow byte arrays to be passed into string parameters
             else if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
-                if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
+                if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
                 else return value;
             }
         }
@@ -455,6 +453,11 @@ public class ParameterConverter {
             }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
+        } else if (expectedClz == String.class) {
+            //For VARCHAR columns if not null or not an array send toString value.
+            if (!param.getClass().isArray()) {
+                return String.valueOf(param);
+            }
         }
 
         // handle SystemProcedureExecutionContext without linking to it

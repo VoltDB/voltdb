@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,9 +51,6 @@ public class CorePlan {
      */
     public final boolean isReplicatedTableDML;
 
-    /** Should results be exactly the same across partitions? */
-    public final boolean isNonDeterministic;
-
     /** Does the statement write? */
     public final boolean readOnly;
 
@@ -101,7 +98,6 @@ public class CorePlan {
         }
 
         isReplicatedTableDML = plan.replicatedTableDML;
-        isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
         this.catalogVersion = catalogVersion;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.readOnly;
@@ -113,7 +109,6 @@ public class CorePlan {
      * @param aggregatorFragment        planned aggregator fragment
      * @param collectorFragment         planned collector fragment
      * @param isReplicatedTableDML      replication flag
-     * @param isNonDeterministic        non-deterministic SQL flag
      * @param isReadOnly                does it write
      * @param paramTypes                parameter type array
      * @param catalogVersion            catalog version
@@ -123,7 +118,6 @@ public class CorePlan {
                     byte[] aggregatorHash,
                     byte[] collectorHash,
                     boolean isReplicatedTableDML,
-                    boolean isNonDeterministic,
                     boolean isReadOnly,
                     VoltType[] paramTypes,
                     int catalogVersion) {
@@ -132,7 +126,6 @@ public class CorePlan {
         this.aggregatorHash = aggregatorHash;
         this.collectorHash = collectorHash;
         this.isReplicatedTableDML = isReplicatedTableDML;
-        this.isNonDeterministic = isNonDeterministic;
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
         this.catalogVersion = catalogVersion;
@@ -185,7 +178,6 @@ public class CorePlan {
 
         // booleans
         buf.put((byte) (isReplicatedTableDML ? 1 : 0));
-        buf.put((byte) (isNonDeterministic ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
 
         // catalog version
@@ -216,7 +208,6 @@ public class CorePlan {
 
         // booleans
         boolean isReplicatedTableDML = buf.get() == 1;
-        boolean isNonDeterministic = buf.get() == 1;
         boolean isReadOnly = buf.get() == 1;
 
         // catalog version
@@ -235,7 +226,6 @@ public class CorePlan {
                 aggregatorHash,
                 collectorHash,
                 isReplicatedTableDML,
-                isNonDeterministic,
                 isReadOnly,
                 paramTypes,
                 catalogVersion);
@@ -260,9 +250,6 @@ public class CorePlan {
             return false;
         }
         if (!Arrays.equals(parameterTypes, other.parameterTypes)) {
-            return false;
-        }
-        if (isNonDeterministic != other.isNonDeterministic) {
             return false;
         }
         if (isReplicatedTableDML != other.isReplicatedTableDML) {

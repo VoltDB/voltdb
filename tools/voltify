@@ -2,7 +2,7 @@
 
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,7 +48,7 @@ if not healthy:
 # installed package dependencies.
 vmain(description='External database schema import commands.',
       standalone=True,
-      packages=('mysql-python', 'ez_setup', 'schemaobject'),
+      packages=('mysql-python', 'ez_setup'),
       directory=os.getcwd(),
       verbose=sys.argv[1:]==['-v'],
       libpath=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'lib', 'python'))

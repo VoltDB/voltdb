@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/debuglog.h"
 #include "common/SerializableEEException.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "storage/temptable.h"
@@ -507,7 +508,7 @@ inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &n
 /// Helper method responsible for inserting the results of the
 /// aggregation into a new tuple in the output table as well as passing
 /// through any additional columns from the input table.
-inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
+inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 {
     TempTable* output_table = m_tmpOutputTable;
     TableTuple& tmptup = output_table->tempTuple();
@@ -515,8 +516,7 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        const ValueType columnType = tmptup.getType(columnIndex);
-        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(columnType));
+        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(tmptup.getSchema()->columnType(columnIndex)));
     }
     VOLT_TRACE("Setting passthrough columns");
     // A second pass to set the output columns from the input columns that are being passed through.
@@ -528,11 +528,14 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
                          m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
         VOLT_TRACE("Passthrough columns: %d", output_col_index);
     }
+    bool inserted = false;
     if (m_postPredicate == NULL || m_postPredicate->eval(&tmptup, NULL).isTrue()) {
         output_table->insertTupleNonVirtual(tmptup);
+        inserted = true;
     }
 
     VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
+    return inserted;
 }
 
 inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow)
@@ -576,8 +579,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
+    ProgressMonitorProxy pmp(m_engine, this);
     while (it.next(nxtTuple)) {
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        pmp.countdownProgress();
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
@@ -604,7 +608,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("finalizing..");
     for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
         AggregateRow *aggregateRow = iter->second;
-        insertOutputTuple(aggregateRow);
+        if (insertOutputTuple(aggregateRow)) {
+            pmp.countdownProgress();
+        }
         delete aggregateRow;
     }
 
@@ -635,6 +641,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
+    ProgressMonitorProxy pmp(m_engine, this);
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -653,14 +660,16 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
         if (m_groupByKeySchema->columnCount() == 0) {
             VOLT_TRACE("no input row, but output an empty result row for the whole table.");
             initAggInstances(aggregateRow);
-            insertOutputTuple(aggregateRow);
+            if (insertOutputTuple(aggregateRow)) {
+                pmp.countdownProgress();
+            }
         }
         return true;
     }
 
     TableTuple inProgressGroupByKeyTuple(m_groupByKeySchema);
     while (it.next(nxtTuple)) {
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        pmp.countdownProgress();
         // The nextGroupByKeyTuple now stores the key(s) of the current group in progress.
         // Swap its storage with that of the inProgressGroupByKeyTuple.
         // The inProgressGroupByKeyTuple will be null initially, until the first call to initGroupByKeyTuple below
@@ -684,7 +693,9 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
             if (nextGroupByKeyTuple.getNValue(ii).compare(inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
                 VOLT_TRACE("new group!");
                 // Output old row.
-                insertOutputTuple(aggregateRow);
+                if (insertOutputTuple(aggregateRow)) {
+                    pmp.countdownProgress();
+                }
                 // Recycle the aggs to start a new row.
                 aggregateRow->resetAggs();
                 break;
@@ -696,7 +707,9 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     }
     VOLT_TRACE("finalizing..");
     // There's one last group (or table) row in progress that needs to be output.
-    insertOutputTuple(aggregateRow);
+    if (insertOutputTuple(aggregateRow)) {
+        pmp.countdownProgress();
+    }
     return true;
 }
 

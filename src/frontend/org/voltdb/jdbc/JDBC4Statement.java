@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -460,16 +460,22 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         closeCurrentResult();
-        if (batch == null || batch.size() == 0)
+        if (batch == null || batch.size() == 0) {
             return new int[0];
+        }
+
         int[] updateCounts = new int[batch.size()];
-        for(int i=0;i<batch.size();i++)
+        // keep a running total of update counts
+        int runningUpdateCount = 0;
+
+        for(int i = 0; i < batch.size(); i++)
         {
             try
             {
                 setCurrentResult(null, (int) batch.get(i).execute(sourceConnection.NativeConnection,
                         this.m_timeout)[0].fetchRow(0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
+                runningUpdateCount += this.lastUpdateCount;
             }
             catch(SQLException x)
             {
@@ -477,6 +483,11 @@ public class JDBC4Statement implements java.sql.Statement
                 throw new BatchUpdateException(Arrays.copyOf(updateCounts, i+1), x);
             }
         }
+
+        // replace the update count from the last statement with the update count
+        // from the last batch.
+        this.lastUpdateCount = runningUpdateCount;
+
         return updateCounts;
     }
 
@@ -799,10 +810,12 @@ public class JDBC4Statement implements java.sql.Statement
         }
     }
 
+    @Override
     public void closeOnCompletion() throws SQLException {
         throw SQLError.noSupport();
     }
 
+    @Override
     public boolean isCloseOnCompletion() throws SQLException {
         throw SQLError.noSupport();
     }

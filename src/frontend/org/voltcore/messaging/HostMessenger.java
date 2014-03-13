@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,7 @@ import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
@@ -160,6 +161,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int SNAPSHOTSCAN_SITE_ID = -7;
     public static final int SNAPSHOTDELETE_SITE_ID = -8;
     public static final int REBALANCE_SITE_ID = -9;
+    public static final int SNAPSHOT_DAEMON_ID = -10;
+    public static final int SNAPSHOT_IO_AGENT_ID = -11;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
@@ -172,6 +175,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private volatile boolean m_localhostReady = false;
     // memoized InstanceId
     private InstanceId m_instanceId = null;
+    private boolean m_shuttingDown = false;
 
     /*
      * References to other hosts in the mesh.
@@ -217,6 +221,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_config.internalInterface,
                 m_config.internalPort,
                 this);
+
+        // Register a clean shutdown hook for the network threads.  This gets cranky
+        // when crashLocalVoltDB() is called because System.exit() can get called from
+        // a random network thread which is already shutting down and we'll get delicious
+        // deadlocks.  Take the coward's way out and just don't do this if we're already
+        // crashing (read as: I refuse to hunt for more shutdown deadlocks).
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, new Runnable() {
+            @Override
+            public void run()
+            {
+                for (ForeignHost host : m_foreignHosts.values())
+                {
+                    // null is OK. It means this host never saw this host id up
+                    if (host != null)
+                    {
+                        host.close();
+                    }
+                }
+            }
+        });
+
     }
 
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
@@ -226,11 +251,23 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (int hostId: failedHostIds) {
                     m_knownFailedHosts.add(hostId);
                     removeForeignHost(hostId);
-                    logger.warn(String.format("Host %d failed", hostId));
+                    if (!m_shuttingDown) {
+                        logger.warn(String.format("Host %d failed", hostId));
+                    }
                 }
             }
         }
     };
+
+    public synchronized void prepareForShutdown()
+    {
+        m_shuttingDown = true;
+    }
+
+    public synchronized boolean isShuttingDown()
+    {
+        return m_shuttingDown;
+    }
 
     /**
      * Synchronization protects m_knownFailedHosts and ensures that every failed host is only reported
@@ -240,13 +277,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void reportForeignHostFailed(int hostId) {
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         m_agreementSite.reportFault(initiatorSiteId);
-        logger.warn(String.format("Host %d failed", hostId));
+        if (!m_shuttingDown) {
+            logger.warn(String.format("Host %d failed", hostId));
+        }
     }
 
     @Override
     public synchronized void relayForeignHostFailed(FaultMessage fm) {
         m_agreementSite.reportFault(fm);
-        m_logger.warn("Someone else claims a host failed: " + fm);
+        if (!m_shuttingDown) {
+            m_logger.warn("Someone else claims a host failed: " + fm);
+        }
     }
 
     /**
@@ -756,13 +797,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (!fhost.isUp())
         {
-            //Throwable t = new Throwable();
-            //java.io.StringWriter sw = new java.io.StringWriter();
-            //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            //t.printStackTrace(pw);
-            //pw.flush();
-            m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
-            //m_logger.warn(sw.toString());
+            if (!m_shuttingDown) {
+                m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+            }
             return null;
         }
         return fhost;
@@ -890,7 +927,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized boolean isLocalHostReady() {
         return m_localhostReady;
     }
-
 
     public void shutdown() throws InterruptedException
     {

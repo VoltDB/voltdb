@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -78,6 +79,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     private final String m_name;
     public static volatile AtomicLong m_testConnectionIdGenerator;
     private final boolean m_leaveCallback;
+    private final SettableFuture<ClientResponseImpl> m_retFuture;
 
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
@@ -103,6 +105,21 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         }
         m_name = name;
         m_leaveCallback = leaveCallback;
+        m_retFuture = null;
+    }
+
+    //None of the values matter (other than the future) just using this as a shortcut to collect stats internally
+    public SimpleClientResponseAdapter(SettableFuture<ClientResponseImpl> fut) {
+        m_retFuture = fut;
+        m_leaveCallback = false;
+        m_name = "";
+        m_connectionId = 0;
+    }
+
+    public static
+        Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>>  getAsListenableFuture() {
+        final SettableFuture<ClientResponseImpl> fut = SettableFuture.create();
+        return Pair.of(new SimpleClientResponseAdapter(fut), (ListenableFuture<ClientResponseImpl>)fut);
     }
 
     public void registerCallback(long handle, Callback c) {
@@ -163,6 +180,13 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         try {
             b.position(4);
             resp.initFromBuffer(b);
+
+            //Go for a different behavior if we are using this adapter as a gussied up future for
+            //an internal request
+            if (m_retFuture != null) {
+                m_retFuture.set(resp);
+                return;
+            }
 
             Callback callback = null;
             if (m_leaveCallback) {

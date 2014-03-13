@@ -25,6 +25,15 @@ create table tunique (
   z bigint not null
 );
 
+create table tuniqcombo (
+  a bigint not null,
+  b bigint not null,
+  c bigint not null,
+  z bigint not null
+);
+
+create unique index cover3_UNIQCOMBO on tuniqcombo (a, c, b);
+
 create table tpk (
   a bigint not null primary key,
   b bigint not null,

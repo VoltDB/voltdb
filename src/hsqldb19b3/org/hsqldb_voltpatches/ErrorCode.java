@@ -120,7 +120,7 @@ public interface ErrorCode {
     int M_SERVER_SECURE_VERIFY_2         = 137;           // Server certificate has empty Common Name
     int M_SERVER_SECURE_VERIFY_3         = 139;           // Certificate Common Name[$$] does not match host name[$$]
 
-    //
+    //                                                       
     int INVALID_LIMIT = 153;                              // ; in LIMIT, OFFSET or FETCH
 
     //

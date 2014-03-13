@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -243,7 +243,9 @@ public class TestTheHashinator {
         int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                 valueToHash);
         if (eehash != javahash) {
-            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                    VoltType.typeFromObject(valueToHash).toSQLString(),
+                    valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
         assertNotSame(0, eehash);
@@ -274,7 +276,9 @@ public class TestTheHashinator {
         int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                 valueToHash);
         if (eehash != javahash) {
-            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                    VoltType.typeFromObject(valueToHash).toSQLString(),
+                    valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
         assertTrue(eehash < partitionCount);
@@ -285,7 +289,9 @@ public class TestTheHashinator {
         javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                 valueToHash);
         if (eehash != javahash) {
-            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                    VoltType.typeFromObject(valueToHash).toSQLString(),
+                    valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
         assertTrue(eehash < partitionCount);
@@ -296,7 +302,9 @@ public class TestTheHashinator {
         javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                 valueToHash);
         if (eehash != javahash) {
-            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                    VoltType.typeFromObject(valueToHash).toSQLString(),
+                    valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
         assertTrue(eehash < partitionCount);
@@ -307,7 +315,9 @@ public class TestTheHashinator {
         javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                 valueToHash);
         if (eehash != javahash) {
-            System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+            System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                    VoltType.typeFromObject(valueToHash).toSQLString(),
+                    valueToHash, partitionCount, eehash, javahash);
         }
         assertEquals(eehash, javahash);
         assertTrue(eehash < partitionCount);
@@ -337,7 +347,9 @@ public class TestTheHashinator {
                 int eehash = ee.hashinate(valueToHash, hashinatorConfig);
                 int javahash = TheHashinator.getPartitionForParameter(VoltType.BIGINT.getValue(), valueToHash);
                 if (eehash != javahash) {
-                    System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                    System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                            VoltType.typeFromObject(valueToHash).toSQLString(),
+                            valueToHash, partitionCount, eehash, javahash);
                 }
                 assertEquals(eehash, javahash);
                 assertTrue(eehash < partitionCount);
@@ -349,7 +361,9 @@ public class TestTheHashinator {
                 int eehash = ee.hashinate(valueToHash, hashinatorConfig);
                 int javahash = TheHashinator.getPartitionForParameter(VoltType.SMALLINT.getValue(), valueToHash);
                 if (eehash != javahash) {
-                    System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                    System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                            VoltType.typeFromObject(valueToHash).toSQLString(),
+                            valueToHash, partitionCount, eehash, javahash);
                 }
                 assertEquals(eehash, javahash);
                 assertTrue(eehash < partitionCount);
@@ -389,7 +403,9 @@ public class TestTheHashinator {
                 int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                         valueToHash);
                 if (eehash != javahash) {
-                    System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                    System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                            VoltType.typeFromObject(valueToHash).toSQLString(),
+                            valueToHash, partitionCount, eehash, javahash);
                 }
                 assertEquals(eehash, javahash);
                 assertTrue(eehash < partitionCount);
@@ -419,7 +435,9 @@ public class TestTheHashinator {
                                                                         valueToHash);
             final int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
             if (eehash != javahash) {
-                System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                        VoltType.typeFromObject(valueToHash).toSQLString(),
+                        valueToHash, partitionCount, eehash, javahash);
             }
             assertEquals(eehash, javahash);
             assertTrue(eehash < partitionCount);
@@ -452,7 +470,9 @@ public class TestTheHashinator {
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
                                                                   valueToHash);
             if (eehash != javahash) {
-                System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
+                System.out.printf("Mismatched hash of (%s) %d with %d partitions => EE: %d, Java: %d\n",
+                        VoltType.typeFromObject(valueToHash).toSQLString(),
+                        valueToHash, partitionCount, eehash, javahash);
                 partitionCount++;
             }
             assertEquals(eehash, javahash);
@@ -582,6 +602,9 @@ public class TestTheHashinator {
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromClass(byte[].class).getValue(),
                     valueToHash);
             if (eehash != javahash) {
+                System.out.printf("Mismatched hash of (%s) %d bytes %d partitions => EE: %d Java: %d\n",
+                        VoltType.typeFromObject(valueToHash).toSQLString(),
+                        valueToHash.length, partitionCount, eehash, javahash);
                 partitionCount++;
             }
             assertTrue(eehash < partitionCount);

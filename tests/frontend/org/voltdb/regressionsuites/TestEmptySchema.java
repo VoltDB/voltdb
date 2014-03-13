@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,13 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -47,15 +46,6 @@ public class TestEmptySchema extends RegressionSuite
         return builder;
     }
 
-    void validateSchema(VoltTable result, VoltTable expected)
-    {
-        assertEquals(expected.getColumnCount(), result.getColumnCount());
-        for (int i = 0; i < result.getColumnCount(); i++) {
-            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
-            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
-        }
-    }
-
     public void testEmptySchema() throws Exception {
         final Client client = getClient();
         // sleep a little so that we have time for the IPC backend to actually be running
@@ -64,7 +54,7 @@ public class TestEmptySchema extends RegressionSuite
 
         // Even running should be an improvement (ENG-4645), but do something just to be sure
         // Also, check to be sure we get a full schema for the table and index stats
-        ColumnInfo[] expectedSchema = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema = new ColumnInfo[12];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -76,12 +66,13 @@ public class TestEmptySchema extends RegressionSuite
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
         System.out.println("TABLE RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
-        assertEquals(11, results[0].getColumnCount());
+        assertEquals(expectedSchema.length, results[0].getColumnCount());
         validateSchema(results[0], expectedTable);
 
         expectedSchema = new ColumnInfo[12];
@@ -102,7 +93,7 @@ public class TestEmptySchema extends RegressionSuite
         results = client.callProcedure("@Statistics", "INDEX", 0).getResults();
         System.out.println("INDEX RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
-        assertEquals(12, results[0].getColumnCount());
+        assertEquals(expectedSchema.length, results[0].getColumnCount());
         validateSchema(results[0], expectedTable);
     }
 

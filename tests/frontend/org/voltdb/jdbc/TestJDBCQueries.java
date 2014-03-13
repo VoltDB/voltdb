@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
@@ -137,26 +139,6 @@ public class TestJDBCQueries {
 
         // Set up ServerThread and Connection
         startServer();
-
-        // Populate tables.
-        for (Data d : data) {
-            String q = String.format("insert into %s values(?, ?)", d.tablename);
-            for (String id : d.good) {
-                try {
-                    PreparedStatement sel = conn.prepareStatement(q);
-                        sel.setString(1, id);
-                        sel.setString(2, String.format("VALUE:%s:%s", d.tablename, id));
-                        sel.execute();
-                        int count = sel.getUpdateCount();
-                        assertTrue(count==1);
-                }
-                catch(SQLException e) {
-                    System.err.printf("ERROR(INSERT): %s value='%s': %s\n",
-                                      d.typename, d.good[0], e.getMessage());
-                    fail();
-                }
-            }
-        }
     }
 
     @AfterClass
@@ -164,6 +146,45 @@ public class TestJDBCQueries {
         stopServer();
         File f = new File(testjar);
         f.delete();
+    }
+
+    @Before
+    public void populateTables()
+    {
+        // Populate tables.
+        for (Data d : data) {
+            String q = String.format("insert into %s values(?, ?)", d.tablename);
+            for (String id : d.good) {
+                try {
+                    PreparedStatement sel = conn.prepareStatement(q);
+                    sel.setString(1, id);
+                    sel.setString(2, String.format("VALUE:%s:%s", d.tablename, id));
+                    sel.execute();
+                    int count = sel.getUpdateCount();
+                    assertTrue(count==1);
+                }
+                catch(SQLException e) {
+                    System.err.printf("ERROR(INSERT): %s value='%s': %s\n",
+                            d.typename, d.good[0], e.getMessage());
+                    fail();
+                }
+            }
+        }
+    }
+
+    @After
+    public void clearTables()
+    {
+        for (Data d : data) {
+            try {
+                PreparedStatement sel =
+                        conn.prepareStatement(String.format("delete from %s", d.tablename));
+                sel.execute();
+            } catch (SQLException e) {
+                System.err.printf("ERROR(DELETE): %s: %s\n", d.tablename, e.getMessage());
+                fail();
+            }
+        }
     }
 
     private static void startServer() throws ClassNotFoundException, SQLException {
@@ -215,6 +236,86 @@ public class TestJDBCQueries {
     }
 
     @Test
+    public void testFloatDoubleVarcharColumn() throws Exception {
+        for (Data d : data) {
+            try {
+                String q = String.format("insert into %s values(?, ?)", d.tablename);
+                PreparedStatement ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setFloat(2, (float) 1.0);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                Statement sel = conn.createStatement();
+                sel.execute(q);
+                ResultSet rs = sel.getResultSet();
+                int rowCount = 0;
+                boolean found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("1.0")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(4, rowCount);
+
+                //Do double
+                q = String.format("insert into %s values(?, ?)", d.tablename);
+                ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setDouble(2, 9.999999);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                sel = conn.createStatement();
+                sel.execute(q);
+                rs = sel.getResultSet();
+                rowCount = 0;
+                found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("9.999999")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(5, rowCount);
+
+                //Do int
+                q = String.format("insert into %s values(?, ?)", d.tablename);
+                ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setInt(2, 9);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                sel = conn.createStatement();
+                sel.execute(q);
+                rs = sel.getResultSet();
+                rowCount = 0;
+                found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("9")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(6, rowCount);
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                System.err.printf("ERROR(SELECT): %s: %s\n", d.typename, e.getMessage());
+                fail();
+            }
+        }
+    }
+
+    @Test
     public void testQueryBatch() throws Exception
     {
         Statement batch = conn.createStatement();
@@ -225,9 +326,13 @@ public class TestJDBCQueries {
         try {
             int[] resultCodes = batch.executeBatch();
             assertEquals(data.length, resultCodes.length);
+            int total_cnt = 0;
             for (int i = 0; i < data.length; ++i) {
                 assertEquals(data[i].good.length, resultCodes[i]);
+                total_cnt += data[i].good.length;
             }
+            //Test update count
+            assertEquals(total_cnt, batch.getUpdateCount());
         }
         catch(SQLException e) {
             System.err.printf("ERROR: %s\n", e.getMessage());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,7 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -43,6 +44,7 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectWithJoinOrder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
@@ -57,7 +59,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         FeaturesSelectAll.class, UpdateTests.class,
         SelfJoinTest.class, SelectOrderLineByDistInfo.class,
         BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
+        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class,
+        TruncateTable.class
     };
 
     /**
@@ -428,7 +431,157 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             caught = true;
         }
         assertTrue(caught);
-}
+    }
+
+
+    private void loadTableForTruncateTest(Client client, String[] procs) throws Exception {
+        for (String proc: procs) {
+            client.callProcedure(proc, 1,  1,  1.1, "Luke",  "WOBURN");
+            client.callProcedure(proc, 2,  2,  2.1, "Leia",  "Bedfor");
+            client.callProcedure(proc, 3,  30,  3.1, "Anakin","Concord");
+            client.callProcedure(proc, 4,  20,  4.1, "Padme", "Burlington");
+            client.callProcedure(proc, 5,  10,  2.1, "Obiwan","Lexington");
+            client.callProcedure(proc, 6,  30,  3.1, "Jedi",  "Winchester");
+        }
+    }
+
+    public void testTruncateTable() throws Exception {
+        System.out.println("STARTING TRUNCATE TABLE......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String[] procs = {"RTABLE.insert", "PTABLE.insert"};
+        String[] tbs = {"RTABLE", "PTABLE"};
+        // Insert data
+        loadTableForTruncateTest(client, procs);
+
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {6});
+        }
+
+        if (isHSQL()) {
+            return;
+        }
+
+        Exception e = null;
+        try {
+            client.callProcedure("TruncateTable");
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+        } finally {
+            assertNotNull(e);
+        }
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {6});
+
+            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
+
+            vt = client.callProcedure("@AdHoc", "select count(ID) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {7});
+
+
+            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
+
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {0});
+
+            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
+            vt = client.callProcedure("@AdHoc", "select ID from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {7});
+
+            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
+        }
+
+        // insert the data back
+        loadTableForTruncateTest(client, procs);
+        String nestedLoopIndexJoin = "select count(*) from rtable r join ptable p on r.age = p.age";
+
+        // Test nested loop index join
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {6});
+        }
+
+        vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
+        System.err.println(vt);
+        assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
+        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
+        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
+
+        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {8});
+
+        vt = client.callProcedure("@AdHoc", "Truncate table ptable").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select count(*) from ptable").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
+
+        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
+    }
+
+    public void testTableLimit() throws Exception {
+        System.out.println("STARTING TABLE LIMIT TEST......");
+        Client client = getClient();
+        VoltTable vt = null;
+        Exception e = null;
+        if(isHSQL()) {
+            return;
+        }
+
+        // When table limit feature is fully supported, there needs to be more test cases.
+        // generalize this test within a loop, maybe.
+        // Test max row 0
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
+
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
+        } finally {
+            assertNotNull(e);
+        }
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
+
+        // Test @Statistics TABLE
+        validStatisticsForTableLimit(client, "CAPPED0", 0);
+
+        // Test max row 2
+        vt = client.callProcedure("CAPPED2.insert", 0, 0, 0).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        vt = client.callProcedure("CAPPED2.insert", 1, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
+        } finally {
+            assertNotNull(e);
+        }
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED2").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {2});
+
+        // Test @Statistics TABLE
+        validStatisticsForTableLimit(client, "CAPPED2", 2);
+
+        // Test @Statistics TABLE for normal table
+        vt = client.callProcedure("NOCAPPED.insert", 0, 0, 0).getResults()[0];
+        // Test @Statistics TABLE
+        validStatisticsForTableLimit(client, "NOCAPPED", VoltType.NULL_INTEGER);
+    }
+
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
@@ -439,7 +592,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
 
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSQLFeaturesSuite.class);
@@ -464,6 +617,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config.setMaxHeap(3300);
 
         // build the jarfile
         success = config.compile(project);
@@ -477,6 +631,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config.setMaxHeap(3300);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
@@ -486,6 +641,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config.setMaxHeap(3800);
         // Commented out until ENG-3076, ENG-3434 are resolved.
         //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
         //                          LocalCluster.FailureState.ONE_FAILURE, false);

@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,5 +88,9 @@ def compile(runner):
     args.append(runner.opts.catalog)
     if runner.opts.ddl:
         args.extend(runner.opts.ddl)
-    kwargs = dict(classpath = runner.opts.classpath)
+    # Add procedures to classpath
+    cpath = 'procedures'
+    if runner.opts.classpath:
+       cpath = 'procedures:' + runner.opts.classpath
+    kwargs = dict(classpath = cpath)
     runner.java_execute(VoltCompiler, None, *args, **kwargs)

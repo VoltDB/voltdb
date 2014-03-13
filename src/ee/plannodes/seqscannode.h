@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -83,7 +83,8 @@ class SeqScanPlanNode : public AbstractScanPlanNode {
          * Couldn't invoke it from the Executor without making a circular dependency
          */
         bool needsOutputTableClear() {
-            return getPredicate() != NULL || getInlinePlanNodes().size() > 0;
+            return getPredicate() != NULL || getInlinePlanNodes().size() > 0 ||
+                isSubQuery();
         }
 
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }

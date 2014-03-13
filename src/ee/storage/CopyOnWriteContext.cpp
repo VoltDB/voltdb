@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -75,7 +75,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     }
 
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
             "COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
     }

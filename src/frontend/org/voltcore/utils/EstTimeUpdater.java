@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,10 +24,10 @@ public class EstTimeUpdater {
     public static final long maxTolerableUpdateDelta = 2000;
     public static long lastErrorReport = System.currentTimeMillis() - maxErrorReportInterval;
 
-    public static boolean update(final long now) {
+    public static Long update(final long now) {
         final long estNow = EstTime.m_now.get();
         if (estNow == now) {
-            return false;
+            return null;
         }
         EstTime.m_now.lazySet(now);
         /*
@@ -46,9 +46,9 @@ public class EstTimeUpdater {
             }
             if (now - lastErrorReport > maxErrorReportInterval) {
                 lastErrorReport = now;
-                return true;
+                return now - estNow;
             }
         }
-        return false;
+        return null;
     }
 }

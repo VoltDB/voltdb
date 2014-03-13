@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package txnIdSelfCheck;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -51,6 +52,10 @@ public class BigTableLoader extends Thread {
     final Random r = new Random(0);
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final Semaphore m_permits;
+    String truncateProcedure = "TruncateTable";
+    long insertsTried = 0;
+    long rowsLoaded = 0;
+    long nTruncates = 0;
 
     BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize, Semaphore permits) {
         setName("BigTableLoader");
@@ -62,9 +67,13 @@ public class BigTableLoader extends Thread {
         this.rowSize = rowSize;
         this.batchSize = batchSize;
         m_permits = permits;
+        if (tableName == "bigp")
+            this.truncateProcedure += r.nextInt(10) == 0 ? "MP" : "SP";
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
+
+        log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount);
     }
 
     long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
@@ -74,6 +83,7 @@ public class BigTableLoader extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class InsertCallback implements ProcedureCallback {
@@ -87,10 +97,12 @@ public class BigTableLoader extends Thread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE) {
+            if (status == ClientResponse.GRACEFUL_FAILURE ||
+                    status == ClientResponse.USER_ABORT) {
                 // log what happened
                 log.error("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                Benchmark.printJStack();
                 // stop the world
                 System.exit(-1);
             }
@@ -98,8 +110,9 @@ public class BigTableLoader extends Thread {
                 // log what happened
                 log.error("BigTableLoader ungracefully failed to insert into table " + tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the loader
-                m_shouldContinue.set(false);
+            }
+            else {
+                rowsLoaded++;
             }
             latch.countDown();
         }
@@ -108,34 +121,88 @@ public class BigTableLoader extends Thread {
     @Override
     public void run() {
         byte[] data = new byte[rowSize];
-        r.nextBytes(data);
+        byte shouldRollback = 0;
+        long currentRowCount;
+        while (m_shouldContinue.get()) {
+            r.nextBytes(data);
 
-        try {
-            long currentRowCount = getRowCount();
-            while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
-                CountDownLatch latch = new CountDownLatch(batchSize);
-                // try to insert batchSize random rows
-                for (int i = 0; i < batchSize; i++) {
-                    long p = Math.abs(r.nextLong());
-                    m_permits.acquire();
-                    client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+            try {
+                currentRowCount = getRowCount();
+                // insert some batches...
+                int tc = batchSize * r.nextInt(99);
+                while ((currentRowCount < tc) && (m_shouldContinue.get())) {
+                    CountDownLatch latch = new CountDownLatch(batchSize);
+                    // try to insert batchSize random rows
+                    for (int i = 0; i < batchSize; i++) {
+                        long p = Math.abs(r.nextLong());
+                        m_permits.acquire();
+                        insertsTried++;
+                        client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+                    }
+                    latch.await(10, TimeUnit.SECONDS);
+                    long nextRowCount = getRowCount();
+                    // if no progress, throttle a bit
+                    if (nextRowCount == currentRowCount) {
+                        try { Thread.sleep(1000); } catch (Exception e2) {}
+                    }
+                    currentRowCount = nextRowCount;
                 }
-                latch.await(10, TimeUnit.SECONDS);
-                long nextRowCount = getRowCount();
-                // if no progress, throttle a bit
-                if (nextRowCount == currentRowCount) {
-                    Thread.sleep(1000);
-                }
-                currentRowCount = nextRowCount;
+
             }
-
+            catch (Exception e) {
+                // on exception, log and end the thread, but don't kill the process
+                log.error("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                try { Thread.sleep(3000); } catch (Exception e2) {}
+            }
+            // truncate the table, check for zero rows
+            try {
+                currentRowCount = getRowCount();
+                log.info("BigTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
+                shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
+                long p = Math.abs(r.nextLong());
+                ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + this.truncateProcedure, p, shouldRollback);
+                byte status = clientResponse.getStatus();
+                if (status == ClientResponse.GRACEFUL_FAILURE ||
+                        (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
+                    log.error("BigTableLoader gracefully failed to truncate table " + tableName + " and this shoudn't happen. Exiting.");
+                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    Benchmark.printJStack();
+                    // stop the world
+                    System.exit(-1);
+                }
+                if (status != ClientResponse.SUCCESS) {
+                    // log what happened
+                    log.error("BigTableLoader ungracefully failed to truncate table " + tableName);
+                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                }
+                else {
+                    nTruncates++;
+                }
+                shouldRollback = 0;
+            }
+            catch (ProcCallException e) {
+                ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+                if (shouldRollback == 0) {
+                    // this implies bad data and is fatal
+                    if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
+                            (cri.getStatus() == ClientResponse.USER_ABORT)) {
+                        // on exception, log and end the thread, but don't kill the process
+                        log.error("BigTableLoader failed a TruncateTable ProcCallException call for table " + tableName, e);
+                        Benchmark.printJStack();
+                        System.exit(-1);
+                    }
+                }
+            }
+            catch (InterruptedIOException e) {
+                // just need to fall through and get out
+            }
+            catch (Exception e) {
+                // on exception, log and end the thread, but don't kill the process
+                log.error("BigTableLoader failed a non-proc call exception for table " + tableName, e);
+                try { Thread.sleep(3000); } catch (Exception e2) {}
+            }
         }
-        catch (Exception e) {
-            // on exception, log and end the thread, but don't kill the process
-            log.error("BigTableLoader failed a procedure call for table " + tableName +
-                    " and the thread will now stop.", e);
-            return;
-        }
+        log.info("BigTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);
     }
 
 }

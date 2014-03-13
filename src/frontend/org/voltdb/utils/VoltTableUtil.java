@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -74,35 +75,35 @@ public class VoltTableUtil {
                         || type == VoltType.TINYINT) {
                     final long value = vt.getLong(ii);
                     if (vt.wasNull()) {
-                        fields[ii] =VoltTable. CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = Long.toString(value);
                     }
                 } else if (type == VoltType.FLOAT) {
                     final double value = vt.getDouble(ii);
                     if (vt.wasNull()) {
-                        fields[ii] =VoltTable. CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = Double.toString(value);
                     }
                 } else if (type == VoltType.DECIMAL) {
                     final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = VoltTable.CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = bd.toString();
                     }
                 } else if (type == VoltType.STRING) {
                     final String str = vt.getString(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = VoltTable.CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = str;
                     }
                 } else if (type == VoltType.TIMESTAMP) {
                     final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = VoltTable.CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = sdf.format(timestamp.asApproximateJavaDate());
                         fields[ii] += String.format("%03d", timestamp.getUSec());
@@ -110,7 +111,7 @@ public class VoltTableUtil {
                 } else if (type == VoltType.VARBINARY) {
                    byte bytes[] = vt.getVarbinary(ii);
                    if (vt.wasNull()) {
-                       fields[ii] = VoltTable.CSV_NULL;
+                       fields[ii] = Constants.CSV_NULL;
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }
@@ -165,7 +166,7 @@ public class VoltTableUtil {
      * Utility to aggregate a list of tables sharing a schema. Common for
      * sysprocs to do this, to aggregate results.
      */
-    public static VoltTable unionTables(List<VoltTable> operands) {
+    public static VoltTable unionTables(Collection<VoltTable> operands) {
         VoltTable result = null;
 
         // Locate the first non-null table to get the schema
@@ -191,8 +192,25 @@ public class VoltTableUtil {
                     }
                 }
             }
+
+            result.resetRowPosition();
         }
 
         return result;
+    }
+
+    /**
+     * Extract a table's schema.
+     * @param vt  input table with source schema
+     * @return  schema as column info array
+     */
+    public static VoltTable.ColumnInfo[] extractTableSchema(VoltTable vt)
+    {
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+            columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                    vt.getColumnType(ii));
+        }
+        return columns;
     }
 }

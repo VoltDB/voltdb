@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
@@ -67,7 +68,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getTargetTable());
+    assert(node->isSubQuery() || node->getTargetTable());
+    assert((node->isSubQuery() && node->getChildren().size() == 1) ||
+        !node->isSubQuery());
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -89,7 +92,10 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     else
     {
         // Create output table based on output schema from the plan
-        setTempOutputTable(limits, node->getTargetTable()->name());
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
+        setTempOutputTable(limits, temp_name);
     }
     return true;
 }
@@ -108,16 +114,21 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
-    assert(target_table);
+
+    Table* input_table = (node->isSubQuery()) ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
+
+    assert(input_table);
+
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
-               target_table->debug().c_str());
+               input_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
                " allocated",
-               target_table->name().c_str(),
-               (int)target_table->activeTupleCount(),
-               (int)target_table->allocatedTupleCount());
+               input_table->name().c_str(),
+               (int)input_table->activeTupleCount(),
+               (int)input_table->allocatedTupleCount());
 
     //
     // OPTIMIZATION: NESTED PROJECTION
@@ -157,8 +168,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // the predicate to each tuple. For each tuple that satisfies
         // our expression, we'll insert them into the output table.
         //
-        TableTuple tuple(target_table->schema());
-        TableIterator iterator = target_table->iterator();
+        TableTuple tuple(input_table->schema());
+        TableIterator iterator = input_table->iterator();
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
@@ -178,13 +189,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        m_engine->setLastAccessedTable(target_table);
+        TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
+
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(target_table->name()).c_str(), tuple_ctr,
-                       (int)target_table->activeTupleCount());
-            m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                       (int)input_table->activeTupleCount());
+            pmp.countdownProgress();
             //
             // For each tuple we need to evaluate it against our predicate
             //
@@ -211,28 +224,16 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                           getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    if (!output_table->insertTuple(temp_tuple))
-                    {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   target_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
-                    }
+                    output_temp_table->insertTupleNonVirtual(temp_tuple);
                 }
                 else
                 {
                     //
                     // Insert the tuple into our output table
                     //
-                    if (!output_table->insertTuple(tuple)) {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   target_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
-                    }
+                    output_temp_table->insertTupleNonVirtual(tuple);
                 }
+                pmp.countdownProgress();
             }
         }
     }

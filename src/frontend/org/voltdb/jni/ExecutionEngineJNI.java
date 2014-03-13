@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,6 +52,22 @@ import com.google_voltpatches.common.base.Throwables;
  * guidelines to add/modify JNI methods.
  */
 public class ExecutionEngineJNI extends ExecutionEngine {
+
+    /*
+     * Threshold of fullness where the EE will start compacting a table's blocks together
+     * to free memory and return to the OS. Block will always be freed if they are emptied
+     * and since rows are fixed size for a table they are always available for reuse.
+     *
+     * Valid values are 0-99, where 0 disables compaction completely and 99 compacts the table
+     * if it is even 1% empty.
+     */
+    public static final int EE_COMPACTION_THRESHOLD;
+    static {
+        EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
+        if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
+            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
+        }
+    }
 
     /** java.util.logging logger. */
     private static final VoltLogger LOG = new VoltLogger("HOST");
@@ -120,7 +136,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
-                    tempTableMemory * 1024 * 1024);
+                    tempTableMemory * 1024 * 1024,
+                    EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
@@ -353,7 +370,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
         }
-        byte[] serialized_table = table.getTableDataReference().array();
+        byte[] serialized_table = PrivateVoltTableFactory.getTableDataReference(table).array();
         if (LOG.isTraceEnabled()) {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }
@@ -555,13 +572,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return nativeHashinate(pointer, config.configPtr, config.numTokens);
     }
 
-    //Store a reference to the config to prevent it from being GCed while the EE
-    //is retaining a reference to it the native hash data
-    private HashinatorConfig m_configRef;
     @Override
     public void updateHashinator(HashinatorConfig config)
     {
-        m_configRef = config;
         if (config.configPtr == 0) {
             ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
 

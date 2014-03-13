@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,9 +19,9 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
-//#include "indexes/tableindex.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
+#include "storage/persistenttable.h"
 
 namespace catalog {
 class Database;
@@ -50,13 +50,12 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
 
 class TableCatalogDelegate : public CatalogDelegate {
   public:
-    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature);
+    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature, int32_t compactionThreshold);
     virtual ~TableCatalogDelegate();
 
 
     // Delegate interface
     virtual void deleteCommand();
-
 
     // table specific
     int init(catalog::Database const &catalogDatabase,
@@ -89,6 +88,14 @@ class TableCatalogDelegate : public CatalogDelegate {
         return m_table;
     }
 
+    PersistentTable *getPersistentTable() {
+        return dynamic_cast<PersistentTable *> (m_table);
+    }
+
+    void setTable(Table * tb) {
+        m_table = tb;
+    }
+
     bool exportEnabled() {
         return m_exportEnabled;
     }
@@ -99,11 +106,13 @@ class TableCatalogDelegate : public CatalogDelegate {
 
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                            catalog::Table const &catalogTable);
+                                            catalog::Table const &catalogTable,
+                                            const int32_t compactionThreshold);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
     std::string m_signature;
+    const int32_t m_compactionThreshold;
 };
 
 }

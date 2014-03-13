@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -161,6 +161,8 @@ public class MpTransactionState extends TransactionState
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
                 task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+                // Set the involved partitions for command logging
+                task.setInvolvedPartitions(m_masterHSIds.keySet());
             }
 
             if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {

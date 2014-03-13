@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,7 +63,10 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -306,8 +309,9 @@ class VoltNetwork implements Runnable
                         }
 
                         if (m_networkId == 0) {
-                            if (EstTimeUpdater.update(System.currentTimeMillis())) {
-                                m_logger.warn("Network was more than two seconds late in updating the estimated time");
+                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                            if ( delta != null ) {
+                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
                             }
                         }
                     }
@@ -394,8 +398,12 @@ class VoltNetwork implements Runnable
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            if (e instanceof IOException) {
-                m_logger.trace( "VoltPort died, probably of natural causes", e);
+            final String trimmed = e.getMessage().trim();
+            if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
+                    e instanceof AsynchronousCloseException ||
+                    e instanceof ClosedChannelException ||
+                    e instanceof ClosedByInterruptException) {
+                m_logger.debug( "VoltPort died, probably of natural causes", e);
             } else {
                 e.printStackTrace();
                 networkLog.error( "VoltPort died due to an unexpected exception", e);

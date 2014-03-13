@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -104,8 +104,8 @@ public class LiveClientsStats extends StatsSource
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
         m_clientStats = new HashMap<Long, Pair<String,long[]>>();
-        for (ClientInterface ci : VoltDB.instance().getClientInterfaces())
-        {
+        ClientInterface ci = VoltDB.instance().getClientInterface();
+        if (ci != null) {
             m_clientStats.putAll(ci.getLiveClientStats());
         }
         return new DummyIterator(m_clientStats.keySet().iterator());

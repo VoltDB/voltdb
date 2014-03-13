@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /*
  * Log a message to the specified logger, but limit the rate at which the message is logged.
@@ -84,13 +85,14 @@ public class RateLimitedLogger {
     public static void tryLogForMessage(
             String message,
             long now,
-            final int maxLogIntervalMillis,
+            final long maxLogInterval,
+            final TimeUnit maxLogIntervalUnit,
             final VoltLogger logger,
             final Level level) {
         Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
             @Override
             public RateLimitedLogger call() throws Exception {
-                return new RateLimitedLogger(maxLogIntervalMillis, logger, level);
+                return new RateLimitedLogger((int)maxLogIntervalUnit.toMillis(maxLogInterval), logger, level);
             }
         };
 

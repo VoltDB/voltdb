@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -44,6 +45,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                 "testplansgroupby", false);
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
     @Override
@@ -89,15 +92,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
-    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments, boolean isHashAggregator, boolean isIndexScan) {
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-            while (apn.getChildCount() > 0) {
-                apn = apn.getChild(0);
-                System.out.println(apn.toExplainPlanString());
-            }
-        }
-
+    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments,
+                                      boolean isHashAggregator, boolean isIndexScan) {
         AbstractPlanNode apn = pns.get(0).getChild(0);
         if (twoFragments) {
             assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
@@ -108,6 +104,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByOnly() {
+        System.out.println("Starting testGroupByOnly");
         // Replicated Table
 
         // only GROUP BY cols in SELECT clause
@@ -158,9 +155,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkGroupByOnlyPlan(pns, true, true, true);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(1).toExplainPlanString());
         checkGroupByOnlyPlan(pns, true, true, true);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
@@ -175,15 +171,29 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
         checkGroupByOnlyPlan(pns, true, true, true);
 
-        // unoptimized case (only use second col of the index), but will be replaced in
-        // SeqScanToIndexScan optimization for deterministic reason
+        // unoptimized case (only uses second col of the index), will not be replaced in
+        // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(pns, true, true, true);
+        //* debug */ System.out.println("DEBUG 0: " + pns.get(0).getChild(0).toExplainPlanString());
+        //* debug */ System.out.println("DEBUG 1: " + pns.get(1).getChild(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, true, true, false);
+
+        // unoptimized case (only uses second col of the index), will be replaced in
+        // SeqScanToIndexScan for determinism.
+        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, false, true, true);
+
+        pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, false, false, true);
+        System.out.println("Finishing testGroupByOnly");
     }
 
     public void testEdgeComplexRelatedCases() {
-        // Make sure that this query will compile correctly
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
@@ -204,7 +214,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
 
-        // Make sure it compile correctly
         pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
         p = pns.get(0).getChild(0);
 
@@ -217,6 +226,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
+        p = pns.get(0).getChild(0);
+        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
+        p = pns.get(0).getChild(0);
+        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        assertTrue(p instanceof ProjectionPlanNode);
+        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
@@ -457,6 +481,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFix_TopAgg_ReAgg("SELECT SUM(V_SUM_C1) FROM V_P1 WHERE V_SUM_C1 > 3", 0, 1, 2, 1);
         checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_SUM_C1", 1, 1, 2, 2);
 
+        // ENG-5669 HAVING edge cases.
+        checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING MAX(V_SUM_D1) > 3", 0, 2, 2, 2);
+        checkMVNoFix_NoAgg("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING SUM(V_SUM_D1) > 3", 0, 2, false, true, true);
+
         // No disctinct will be pushed down.
         // ENG-5364.
         // In future,  a little efficient way is to push down distinct for part of group by columns only.
@@ -554,6 +582,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     scanFilter == null? null: new String[] {scanFilter});
     }
 
+    private void checkMVFixWithWhere(String sql, Object aggFilters[]) {
+        pns = compileToFragments(sql);
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkMVFixWithWhere(aggFilters, null);
+    }
+
     private void checkMVFixWithWhere(Object aggFilters, Object scanFilters) {
         AbstractPlanNode p = pns.get(0);
 
@@ -615,11 +651,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
         //      FROM P1  GROUP BY A1, B1;
         // Test
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_cnt = 1", "v_cnt = 1", null);
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9", null, "v_a1 = 9");
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9 AND v_cnt = 1", "v_cnt = 1", "v_a1 = 9");
-        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9 OR v_cnt = 1", "(v_a1 = 9) OR (v_cnt = 1)", null);
-        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = v_cnt + 1", "v_a1 = (v_cnt + 1)", null);
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9 OR v_cnt = 1", new String[] {"v_a1 = 9) OR ", "v_cnt = 1)"});
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = v_cnt + 1", new String[] {"v_a1 = (", "v_cnt + 1)"});
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     private void checkMVFixWithJoin_reAgg(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
@@ -661,9 +699,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testTry() {
         String sql = "";
 
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         // Test agg query on join.
         sql = "select v_a1 from v_p1 left join v_r1 on v_p1.v_a1 = v_r1.v_a1 AND v_p1.v_cnt = 2 ";
         checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt = 2", null);
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     /**
@@ -671,6 +711,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * Non-aggregation queries.
      */
     public void testMVBasedQuery_Join_NoAgg() {
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
         // Two tables joins.
@@ -684,7 +725,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select v_cnt from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin_reAgg(sql, 2, 2,
-                new String[] { "(v_sum_c1 < 3)", "(v_cnt > 1)" }, "v_a1 > 2");
+                new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 > 2");
 
         // join on different columns.
         sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
@@ -716,7 +757,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 and r1v.v_sum_c1 > 6";
         checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
                 new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
-
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     /**
@@ -724,6 +765,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * Aggregation queries.
      */
     public void testMVBasedQuery_Join_Agg() {
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
         // Two tables joins.
@@ -795,10 +837,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
                 "group by v_p1.v_cnt, v_p1.v_b1 ";
-        checkMVFixWithJoin(sql, 2, 1, 2, 3, new String[] { "(v_sum_c1 < 3)", "(v_cnt > 1)" }, "v_a1 > 2");
+        checkMVFixWithJoin(sql, 2, 1, 2, 3, new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 > 2");
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     public void testENG5385() {
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
         sql = "select v_a1 from v_p1 left join v_r1 on v_p1.v_a1 = v_r1.v_a1 AND v_p1.v_cnt = 2 ";
@@ -806,9 +850,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // When ENG-5385 is fixed, use the next line to check its plan.
 //        checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     public void testENG389_Having() {
+        boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
         //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
         //      FROM P1  GROUP BY A1, B1;
@@ -819,11 +865,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         failToCompile("select sum(V_A1) from v_r1 having 3 > 3", "does not support HAVING clause without aggregation");
 
         sql = "select V_A1, count(v_cnt) from v_r1 group by v_a1 having count(v_cnt) > 1; ";
-        checkHavingClause(sql, "count ((VOLT_TEMP_TABLE. > 1))");
+        checkHavingClause(sql, ".v_cnt) having (column#1 > 1)");
 //        checkHavingClause(sql, "count ((V_R1.V_CNT > 1))");
 
         sql = "select sum(V_A1) from v_r1 having avg(v_cnt) > 3; ";
-        checkHavingClause(sql, "avg (( > 3))");
+        checkHavingClause(sql, ".v_cnt) having (column#1 > 3)");
+
+        sql = "select avg(v_cnt) from v_r1 having avg(v_cnt) > 3; ";
+        checkHavingClause(sql, ".v_cnt) having (column#0 > 3)");
+        AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
     private void checkHavingClause(String sql, Object aggPostFilters) {

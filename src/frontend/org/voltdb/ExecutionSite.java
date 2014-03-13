@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,13 +30,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -54,7 +52,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -64,10 +61,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.SiteFailureFault;
-import org.voltdb.fault.VoltFault;
-import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.MockExecutionEngine;
@@ -103,8 +96,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
-    private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
-        new ExecutionSiteNodeFailureFaultHandler();
 
     final LoadedProcedureSet m_loadedProcedures;
     final Mailbox m_mailbox;
@@ -123,9 +114,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
     private boolean m_rejoining = false;
-    private boolean m_haveRecoveryPermit = false;
-    private long m_recoveryStartTime = 0;
-    private static AtomicLong m_recoveryBytesTransferred = new AtomicLong();
 
     // Catalog
     public CatalogContext m_context;
@@ -178,7 +166,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     private volatile long m_rejoinSnapshotTxnId = -1;
     // The snapshot completion handler will set this to true
     private volatile boolean m_rejoinSnapshotFinished = false;
-    private long m_rejoinSnapshotBytes = 0;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
     // Used to track if the site can keep up on rejoin, default is 10 seconds
@@ -188,7 +175,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     private long m_remainingTasks = 0;
     private long m_executedTaskCount = 0;
     private long m_loggedTaskCount = 0;
-    private long m_taskExeStartTime = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -257,59 +243,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
     }
 
-    // This message is used locally to schedule a node failure event's
-    // required  processing at an execution site.
-    class ExecutionSiteNodeFailureMessage extends VoltMessage
-    {
-        final HashSet<SiteFailureFault> m_failedSites;
-        ExecutionSiteNodeFailureMessage(HashSet<SiteFailureFault> failedSites)
-        {
-            m_failedSites = failedSites;
-            m_sourceHSId = m_siteId;
-        }
-
-        @Override
-        public byte getSubject() {
-            return Subject.FAILURE.getId();
-        }
-
-        @Override
-        protected void initFromBuffer(ByteBuffer buf)
-        {
-        }
-
-        @Override
-        public void flattenToBuffer(ByteBuffer buf)
-        {
-        }
-    }
-
-    /**
-     * Generated when a snapshot buffer is discarded. Reminds the EE thread
-     * that there is probably more snapshot work to do.
-     */
-    private class PotentialSnapshotWorkMessage extends VoltMessage
-    {
-        public PotentialSnapshotWorkMessage() {
-            m_sourceHSId = m_siteId;
-        }
-
-        @Override
-        public byte getSubject() {
-            return Subject.DEFAULT.getId();
-        }
-
-        @Override
-        protected void initFromBuffer(ByteBuffer buf)
-        {
-        }
-
-        @Override
-        public void flattenToBuffer(ByteBuffer buf)
-        {
-        }
-    }
-
     // This message is used locally to get the currently active TransactionState
     // to check whether or not its WorkUnit's dependencies have been satisfied.
     // Necessary after handling a node failure.
@@ -333,51 +266,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
     }
 
-    private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
-    {
-        /** Remember the complete set of all faulted sites */
-        protected Set<Long> m_failedHsids = new HashSet<Long>();
-
-        @Override
-        public void faultOccured(Set<VoltFault> faults)
-        {
-            if (m_shouldContinue == false) {
-                return;
-            }
-            HashSet<SiteFailureFault> failedSites = new HashSet<SiteFailureFault>();
-            for (VoltFault fault : faults) {
-                if (fault instanceof SiteFailureFault)
-                {
-                    SiteFailureFault site_fault = (SiteFailureFault)fault;
-                    failedSites.add(site_fault);
-                    // record the failed site ids for future queries on this object
-                    m_failedHsids.addAll(site_fault.getSiteIds());
-                }
-            }
-            if (!failedSites.isEmpty()) {
-                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedSites));
-            }
-        }
-
-        /**
-         * Was the given site id in the log of all witnessed faults?
-         */
-        public boolean isWitnessedFailedSite(long hsid) {
-            return m_failedHsids.contains(hsid);
-        }
-    }
-
     public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
         // if the host id is less than this one, then it existed when this site
         // was created (or it failed before this site existed)
         // This relies on the non-resuse and monotonically increasingness of host ids
         // this also assumes no garbage input
         if (CoreUtils.getHostIdFromHSId(hsid) <= CoreUtils.getHostIdFromHSId(m_siteId)) {
-            return true;
-        }
-
-        // check whether this site has witnessed a failure
-        if (m_faultHandler.isWitnessedFailedSite(hsid)) {
             return true;
         }
 
@@ -440,89 +334,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
     }
 
-    /**
-     * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
-     */
-    private final Runnable m_onRejoinCompletion = new Runnable() {
-        @Override
-        public void run() {
-            final long now = System.currentTimeMillis();
-            final boolean liveRejoin = true;
-            long transferred = 0;
-            final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
-            final long megabytes = transferred / (1024 * 1024);
-            final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
-            if (liveRejoin) {
-                /*
-                 * The logged txn count will be greater than the replayed txn count
-                 * because some logged ones were before the stream snapshot
-                 */
-                final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
-                final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
-                m_rejoinLog.info("Logged " + m_loggedTaskCount + " tasks");
-                m_rejoinLog.info("Executed " + m_executedTaskCount + " tasks in " +
-                        duration + " seconds at a rate of " +
-                        throughput + " tasks/second");
-            }
-            m_rejoinSnapshotProcessor = null;
-            m_rejoinSnapshotTxnId = -1;
-            m_rejoinSnapshotFinished = false;
-            m_rejoinTaskLog = null;
-            m_rejoining = false;
-            if (m_haveRecoveryPermit) {
-                m_haveRecoveryPermit = false;
-                /*
-                 * If it's not using pauseless rejoin, no need to release the
-                 * permit here because it was never set. Pauseless rejoin has
-                 * its own coordinator that makes sure only one site is doing
-                 * snapshot streaming at any point of time.
-                 */
-                if (!liveRejoin) {
-                    m_recoveryPermit.release();
-                }
-                m_rejoinLog.info(
-                        "Destination rejoin complete for site " +
-                        CoreUtils.hsIdToString(m_siteId) +
-                        " partition " + m_tracker.getPartitionForSite(m_siteId) +
-                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
-                        " with " + megabytes + " megabytes transferred " +
-                        " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
-                if (remaining == 0) {
-                    ee.toggleProfiler(0);
-
-                    /*
-                     * If it's the new rejoin code, the rejoin coordinator
-                     * handles this.
-                     */
-                    if (!liveRejoin) {
-                        VoltDB.instance().onExecutionSiteRejoinCompletion(bytesTransferredTotal);
-                    }
-                }
-
-                /*
-                 * New rejoin is site independent, so don't have to look at the
-                 * remaining count
-                 */
-                if (liveRejoin) {
-                    // Notify the rejoin coordinator that this site has finished
-                    if (m_rejoinCoordinatorHSId != -1) {
-                        RejoinMessage msg =
-                                new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
-                        m_mailbox.send(m_rejoinCoordinatorHSId, msg);
-                    }
-                    m_rejoinCoordinatorHSId = -1;
-                }
-            } else {
-                m_rejoinLog.info("Source recovery complete for site " + m_siteId +
-                        " partition " + m_tracker.getPartitionForSite(m_siteId) +
-                        " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
-                        " with " + megabytes + " megabytes transferred " +
-                        " at a rate of " + megabytesPerSecond + " megabytes/sec");
-            }
-        }
-    };
-
     @Override
     public void tick() {
         /*
@@ -570,8 +381,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
-        public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
-        @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
         public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
@@ -616,8 +425,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
         }
 
+
         @Override
-        public void updateHashinator(TheHashinator.HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
+        {
+            return null;
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
         {
         }
 
@@ -688,11 +504,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_rejoining = recovering;
         //lastCommittedTxnId = txnId;
 
-        VoltDB.instance().getFaultDistributor().
-        registerFaultHandler(SiteFailureFault.SITE_FAILURE_EXECUTION_SITE,
-                             m_faultHandler,
-                             FaultType.SITE_FAILURE);
-
         // initialize the DR gateway
         m_partitionDRGateway =
             PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
@@ -730,11 +541,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
-        int snapshotPriority = 6;
-        if (m_context.cluster.getDeployment().get("deployment") != null) {
-            snapshotPriority = m_context.cluster.getDeployment().get("deployment").
-                getSystemsettings().get("systemsettings").getSnapshotpriority();
-        }
         m_snapshotter = null;
     }
 
@@ -907,9 +713,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
-            m_rejoinSnapshotBytes = m_rejoinSnapshotProcessor.bytesTransferred();
             m_rejoinSnapshotProcessor = null;
-            m_taskExeStartTime = System.currentTimeMillis();
             /*
              * Don't notify the rejoin coordinator yet. The stream snapshot may
              * have not finished on all nodes, let the snapshot completion
@@ -935,10 +739,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     private void initiateRejoin(long rejoinCoordinatorHSId) {
         m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
-
-        // Set rejoin permit
-        m_haveRecoveryPermit = true;
-        m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
         m_rejoinSnapshotProcessor = new StreamSnapshotSink(VoltDB.instance().getHostMessenger().createMailbox());
@@ -1181,7 +981,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             }
 
             final long recoveringPartitionTxnId = rm.txnId();
-            m_recoveryStartTime = System.currentTimeMillis();
             m_rejoinLog.info(
                     "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
                     " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
@@ -1191,16 +990,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             RejoinMessage rm = (RejoinMessage) message;
             handleRejoinMessage(rm);
         }
-        else if (message instanceof ExecutionSiteNodeFailureMessage) {
-        }
         else if (message instanceof CheckTxnStateCompletionMessage) {
             long txn_id = ((CheckTxnStateCompletionMessage)message).m_txnId;
             TransactionState txnState = m_transactionsById.get(txn_id);
             if (txnState != null)
             {
             }
-        } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(m_systemProcedureContext, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
@@ -1689,7 +1484,13 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config) {
+    public TheHashinator getCurrentHashinator()
+    {
+        return null;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator) {
 
     }
 
@@ -1703,4 +1504,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public void setProcedureName(String procedureName) {}
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {}
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,7 @@
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 #include <vector>
 
@@ -59,9 +60,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                             TempTableLimits* limits)
 {
     assert (m_abstractNode);
-
-    // cache the name of the abstractNode for debugging/logging/progress reporting
-    m_planNodeName = planNodeToString(m_abstractNode->getPlanNodeType());
 
     //
     // Grab the input tables directly from this node's children
@@ -108,7 +106,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         // If the target_table is NULL, then we need to ask the engine
         // for a reference to what we need
         // Really, we can't enforce this when we load the plan? --izzy 7/3/2010
-        if (target_table == NULL) {
+        bool is_subquery = (scan_node != NULL && scan_node->isSubQuery());
+        if (target_table == NULL && !is_subquery) {
             target_table = engine->getTable(targetTableName);
             if (target_table == NULL) {
                 VOLT_ERROR("Failed to retrieve target table '%s' "
@@ -117,10 +116,12 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                            m_abstractNode->debug().c_str());
                 return false;
             }
+            TableCatalogDelegate * tcd = engine->getTableDelegate(targetTableName);
+            assert(tcd != NULL);
             if (scan_node) {
-                scan_node->setTargetTable(target_table);
+                scan_node->setTargetTableDelegate(tcd);
             } else if (oper_node) {
-                oper_node->setTargetTable(target_table);
+                oper_node->setTargetTableDelegate(tcd);
             }
         }
     }

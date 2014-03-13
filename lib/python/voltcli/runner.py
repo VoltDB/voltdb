@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -402,13 +402,13 @@ class VerbRunner(object):
             args2 = [verb_name] + list(args[1:])
             self._run_command(verbspace, *args2, **kwargs)
 
-    def call_proc(self, sysproc_name, types, args, check_status = True):
+    def call_proc(self, sysproc_name, types, args, check_status=True, timeout=None):
         if self.client is None:
             utility.abort('Command is not set up as a client.',
                           'Add an appropriate admin or client bundle to @VOLT.Command().')
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
-        response = proc.call(params = args)
+        response = proc.call(params=args, timeout=timeout)
         if check_status and response.status != 1:
             utility.abort('"%s" procedure call failed.' % sysproc_name, (response,))
         utility.verbose_info(response)

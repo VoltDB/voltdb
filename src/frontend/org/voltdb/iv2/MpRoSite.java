@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,12 +122,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
-        // Needed for adhoc queries
-        @Override
-        public long getCurrentTxnId() {
-            return m_currentTxnId;
-        }
-
         @Override
         public long getSiteId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
@@ -200,7 +194,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void updateHashinator(TheHashinator.HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -472,7 +472,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config) {
+    public TheHashinator getCurrentHashinator()
+    {
+        return null;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
@@ -493,5 +499,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setProcedureName(String procedureName) {
         // don't need to do anything here I think?
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {
+        // TODO Auto-generated method stub
+
     }
 }

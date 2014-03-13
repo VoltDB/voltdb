@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
     columnNames.push_back("TUPLE_DATA_MEMORY");
     columnNames.push_back("STRING_DATA_MEMORY");
+    columnNames.push_back("TUPLE_LIMIT");
     return columnNames;
 }
 
@@ -46,7 +47,8 @@ void TableStats::populateTableStatsSchema(
     StatsSource::populateBaseSchema(types, columnLengths, allowNull);
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT);  columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));  allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
@@ -122,6 +124,7 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
+    int tupleLimit = m_table->tupleLimit();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
@@ -161,14 +164,15 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
-    tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-                      ValueFactory::
-                      getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
+    tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
+            ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
+            tupleLimit == INT_MAX ?
+            ValueFactory::getNullValue() :
+            ValueFactory::getIntegerValue(tupleLimit));
 }
 
 /**

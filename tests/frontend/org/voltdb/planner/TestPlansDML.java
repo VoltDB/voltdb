@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -30,14 +31,15 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class TestPlansDML extends PlannerTestCase {
 
+    List<AbstractPlanNode> pns;
     public void testBasicUpdateAndDelete() {
         // select * with ON clause should return all columns from all tables
-        List<AbstractPlanNode> pns;
-        AbstractPlanNode pn;
         AbstractPlanNode n;
+        AbstractPlanNode pn;
 
         pns = compileToFragments("UPDATE R1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
@@ -102,6 +104,26 @@ public class TestPlansDML extends PlannerTestCase {
         //n = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof InsertPlanNode);
 
+    }
+
+    public void testTruncateTable() {
+        String tbs[] = {"R1", "P1"};
+        for (String tb: tbs) {
+            pns = compileToFragments("Truncate table " + tb);
+            checkTruncateFlag();
+
+            pns = compileToFragments("DELETE FROM " + tb);
+            checkTruncateFlag();
+        }
+    }
+
+    private void checkTruncateFlag() {
+        assertTrue(pns.size() == 2);
+
+        ArrayList<AbstractPlanNode> deletes = pns.get(1).findAllNodesOfType(PlanNodeType.DELETE);
+
+        assertTrue(deletes.size() == 1);
+        assertTrue(((DeletePlanNode) deletes.get(0) ).isTruncate());
     }
 
 

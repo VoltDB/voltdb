@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -44,9 +45,16 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -88,7 +96,20 @@ import org.voltdb.utils.MiscUtils;
 public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
-    private StatsAgent m_statsAgent;
+    private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<DeferredSerialization>();
+    private int drStatsInvoked = 0;
+    private StatsAgent m_statsAgent = new StatsAgent() {
+        @Override
+        public void performOpsAction(final Connection c, final long clientHandle, final OpsSelector selector,
+                                     final ParameterSet params) throws Exception {
+            final String stat = (String)params.toArray()[0];
+            if (stat.equals("TOPO") && !statsAnswers.isEmpty()) {
+                c.writeStream().enqueue(statsAnswers.poll());
+            } else if (stat.equals("DR")) {
+                drStatsInvoked++;
+            }
+        }
+    };
     private SystemInformationAgent m_sysinfoAgent;
     private HostMessenger m_messenger;
     private ClientInputHandler m_handler;
@@ -112,17 +133,33 @@ public class TestClientInterface {
 
     }
 
+    BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<ByteBuffer>();
+    BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+    private static final ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+
     @Before
     public void setUp() throws Exception {
         // Set up CI with the mock objects.
         m_volt = mock(VoltDBInterface.class);
-        m_statsAgent = mock(StatsAgent.class);
         m_sysinfoAgent = mock(SystemInformationAgent.class);
         m_messenger = mock(HostMessenger.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
         m_zk = mock(ZooKeeper.class);
-        m_cxn = mock(SimpleClientResponseAdapter.class);
+        responses = new LinkedTransferQueue<ByteBuffer>();
+        responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+        //m_cxn = mock(SimpleClientResponseAdapter.class);
+        drStatsInvoked = 0;
+        m_cxn = new SimpleClientResponseAdapter(0, "foo") {
+            @Override
+            public void enqueue(ByteBuffer buf) {responses.offer(buf);}
+            @Override
+            public void enqueue(ByteBuffer bufs[]) {responses.offer(bufs[0]);}
+            @Override
+            public void enqueue(DeferredSerialization ds) {responsesDS.offer(ds);}
+            @Override
+            public void queueTask(Runnable r) {}
+        };
 
 
         /*
@@ -143,13 +180,14 @@ public class TestClientInterface {
             @Override
             public Object answer(InvocationOnMock invocation)
             {
-                return null;
+                Object args[] = invocation.getArguments();
+                return ses.scheduleAtFixedRate((Runnable) args[0], (long) args[1], (long) args[2], (TimeUnit) args[3]);
             }
-        }).when(m_cxn).queueTask(any(Runnable.class));
-        doReturn(m_cxn).when(m_cxn).writeStream();
-        m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, m_messenger, ReplicationRole.NONE,
-                                       m_cartographer, m_allPartitions));
+        }).when(m_volt).scheduleWork(any(Runnable.class), anyLong(), anyLong(), (TimeUnit)anyObject());
+
+        m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
+                m_context, m_messenger, ReplicationRole.NONE,
+                m_cartographer, m_allPartitions));
         m_ci.bindAdapter(m_cxn);
 
         //m_mb = m_ci.m_mailbox;
@@ -454,6 +492,16 @@ public class TestClientInterface {
     }
 
     @Test
+    public void testGC() throws Exception {
+        ByteBuffer msg = createMsg("@GC");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        //System.gc() should take at least a little time
+        assertTrue(Long.valueOf(resp.getStatusString()) > 10000);
+    }
+
+    @Test
     public void testSystemInformation() throws Exception {
         ByteBuffer msg = createMsg("@SystemInformation");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
@@ -471,8 +519,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.STATISTICS),
-                any(ParameterSet.class));
+        assertEquals(drStatsInvoked, 1);
     }
 
     @Test
@@ -600,9 +647,7 @@ public class TestClientInterface {
         m_ci.m_mailbox.deliver(respMsg);
 
         // Make sure that the txn is NOT restarted
-        ArgumentCaptor<DeferredSerialization> respCaptor = ArgumentCaptor.forClass(DeferredSerialization.class);
-        verify(m_cxn).enqueue(respCaptor.capture());
-        DeferredSerialization resp = respCaptor.getValue();
+        DeferredSerialization resp = responsesDS.take();
 
         if (shouldRestart) {
             assertEquals(0, resp.serialize().length);
@@ -669,5 +714,54 @@ public class TestClientInterface {
             assertTrue(partitions.remove(partition));
         }
         assertTrue(partitions.isEmpty());
+    }
+
+    @Test
+    public void testSubscribe() throws Exception {
+        RateLimitedClientNotifier.WARMUP_MS = 0;
+        ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 1;
+        try {
+            m_ci.startAcceptingConnections();
+            ByteBuffer msg = createMsg("@Subscribe", "TOPOLOGY");
+            ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+            assertNotNull(resp);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            statsAnswers.offer(dsOf(getClientResponse("foo")));
+            m_ci.schedulePeriodicWorks();
+
+            //Shouldn't get anything
+            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
+
+            //Change the bytes of the topology results and expect a topology update
+            //to make its way to the client
+            ByteBuffer expectedBuf = getClientResponse("bar");
+            statsAnswers.offer(dsOf(expectedBuf));
+            assertEquals(expectedBuf, responsesDS.take().serialize()[0]);
+        } finally {
+            RateLimitedClientNotifier.WARMUP_MS = 1000;
+            ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 5000;
+            m_ci.shutdown();
+        }
+    }
+
+    private DeferredSerialization dsOf(final ByteBuffer buf) {
+        return new DeferredSerialization() {
+            @Override
+            public ByteBuffer[] serialize() throws IOException {
+                return new ByteBuffer[] {buf.duplicate()};
+            }
+            @Override
+            public void cancel() {}
+        };
+    }
+
+    public ByteBuffer getClientResponse(String str) {
+        ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS,
+                new VoltTable[0], str, ClientInterface.ASYNC_TOPO_HANDLE);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
     }
 }

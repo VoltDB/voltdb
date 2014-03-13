@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,7 +27,6 @@ import java.io.File;
 import java.net.URL;
 
 import org.voltcore.utils.InstanceId;
-
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -45,7 +44,6 @@ public class ServerThread extends Thread {
         }
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
@@ -61,6 +59,8 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
+
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
@@ -75,12 +75,13 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
+
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
@@ -110,12 +111,12 @@ public class ServerThread extends Thread {
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
@@ -148,6 +149,9 @@ public class ServerThread extends Thread {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
         this.join();
+        while (VoltDB.instance().isRunning()) {
+            Thread.sleep(1);
+        }
     }
 
     /**

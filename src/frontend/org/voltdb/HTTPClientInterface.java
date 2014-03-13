@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,6 @@ import org.voltdb.utils.Encoder;
 public class HTTPClientInterface {
 
     AuthenticatedConnectionCache m_connections = null;
-    MessageDigest m_md = null;
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
@@ -66,15 +65,23 @@ public class HTTPClientInterface {
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
-            if (m_jsonp != null)
+            if (m_jsonp != null) {
                 msg = String.format("%s( %s )", m_jsonp, msg);
+            }
 
             // send the response back through jetty
             HttpServletResponse response = (HttpServletResponse) m_continuation.getServletResponse();
             response.setStatus(HttpServletResponse.SC_OK);
             m_request.setHandled(true);
             response.getWriter().print(msg);
-            m_continuation.complete();
+            try{
+                m_continuation.complete();
+             } catch (IllegalStateException e){
+                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                // Essentially we're closing everything down from underneath the HTTP request.
+                 VoltLogger log = new VoltLogger("HOST");
+                 log.warn("JSON request completion exception: ", e);
+             }
             m_latch.countDown();
         }
 
@@ -84,16 +91,9 @@ public class HTTPClientInterface {
     }
 
     public HTTPClientInterface() {
-        try {
-            m_md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("JVM doesn't support SHA-1 hashing. Please use a supported JVM", e);
-        }
     }
 
     public void process(Request request, HttpServletResponse response) {
-        String msg;
-
         Client client = null;
         boolean adminMode = false;
 
@@ -115,10 +115,20 @@ public class HTTPClientInterface {
                 int port = VoltDB.instance().getConfig().m_port;
                 int adminPort = VoltDB.instance().getConfig().m_adminPort;
                 String externalInterface = VoltDB.instance().getConfig().m_externalInterface;
-                if (externalInterface == null || externalInterface.isEmpty()) {
-                    externalInterface = "localhost";
+                String adminInterface = "localhost";
+                String clientInterface = "localhost";
+                if (externalInterface != null && !externalInterface.isEmpty()) {
+                    clientInterface = externalInterface;
+                    adminInterface = externalInterface;
                 }
-                m_connections = new AuthenticatedConnectionCache(10, externalInterface, port, adminPort);
+                //If individual override is available use them.
+                if (VoltDB.instance().getConfig().m_clientInterface.length() > 0) {
+                    clientInterface = VoltDB.instance().getConfig().m_clientInterface;
+                }
+                if (VoltDB.instance().getConfig().m_adminInterface.length() > 0) {
+                    adminInterface = VoltDB.instance().getConfig().m_adminInterface;
+                }
+                m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
             String username = request.getParameter("User");
@@ -131,8 +141,9 @@ public class HTTPClientInterface {
 
             // check for admin mode
             if (admin != null) {
-                if (admin.compareToIgnoreCase("true") == 0)
+                if (admin.compareToIgnoreCase("true") == 0) {
                     adminMode = true;
+                }
             }
 
             // null procs are bad news
@@ -147,7 +158,11 @@ public class HTTPClientInterface {
 
             if (password != null) {
                 try {
-                    hashedPasswordBytes = m_md.digest(password.getBytes("UTF-8"));
+                    // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
+                    MessageDigest md = MessageDigest.getInstance("SHA-1");
+                    hashedPasswordBytes = md.digest(password.getBytes("UTF-8"));
+                } catch (NoSuchAlgorithmException e) {
+                    throw new RuntimeException("JVM doesn't support SHA-1 hashing. Please use a supported JVM", e);
                 } catch (UnsupportedEncodingException e) {
                     throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
                 }
@@ -169,7 +184,7 @@ public class HTTPClientInterface {
             assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
 
             // get a connection to localhost from the pool
-            client = m_connections.getClient(username, hashedPasswordBytes, adminMode);
+            client = m_connections.getClient(username, password, hashedPasswordBytes, adminMode);
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
@@ -204,9 +219,10 @@ public class HTTPClientInterface {
             }
         }
         catch (Exception e) {
-            msg = e.getMessage();
+            e.printStackTrace();  // for debugging, remove later
+            String msg = e.getMessage();
             VoltLogger log = new VoltLogger("HOST");
-            log.warn("JSON interface: " + msg);
+            log.warn("JSON interface exception: " + msg, e);
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             msg = rimpl.toJSONString();
             response.setStatus(HttpServletResponse.SC_OK);

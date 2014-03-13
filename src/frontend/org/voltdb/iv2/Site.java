@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,8 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -80,13 +82,18 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 
+import org.voltdb.utils.MinimumRatioMaintainer;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    private static final double m_taskLogReplayRatio =
+            Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
@@ -204,6 +211,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
+    /*
+     * The version of the hashinator currently in use at the site will be consistent
+     * across the node because balance partitions runs everywhere and all sites update.
+     *
+     * There is a corner case with live rejoin where sites replay their log and some sites
+     * can pull ahead and update the global hashinator to ones further ahead causing transactions
+     * to not be applied correctly during replay at the other sites. To avoid this each site
+     * maintains a reference to it's own hashinator (which will be shared if possible).
+     *
+     * When two partition transactions come online they will diverge for pretty much the entire rebalance,
+     * but will converge at the end when the final hash function update is issued everywhere
+     */
+    TheHashinator m_hashinator;
+
     SiteProcedureConnection getSiteProcedureConnection()
     {
         return this;
@@ -228,11 +249,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public long getSpHandleForSnapshotDigest() {
             return m_spHandleForSnapshotDigest;
-        }
-
-        @Override
-        public long getCurrentTxnId() {
-            return m_currentTxnId;
         }
 
         @Override
@@ -318,9 +334,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void updateHashinator(HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
         {
-            Site.this.updateHashinator(config);
+            return m_hashinator;
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
+        {
+            Site.this.updateHashinator(hashinator);
         }
 
         @Override
@@ -372,6 +394,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
         m_drGateway = drGateway;
+        m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -480,7 +503,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
-
+        //Maintain a minimum ratio of task log (unrestricted) to live (restricted) transactions
+        final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
                 if (m_rejoinState == kStateRunning) {
@@ -491,15 +515,34 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
                     task.run(getSiteProcedureConnection());
-                }
-                else {
+                } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
                     SiteTasker task = m_scheduler.poll();
+                    boolean didWork = false;
                     if (task != null) {
-                        task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                        didWork = true;
+                        //If the task log is empty, free to execute the task
+                        //If the mrm says we can do a restricted task, go do it
+                        //Otherwise spin doing unrestricted tasks until we can bail out
+                        //and do the restricted task that was polled
+                        while (!m_rejoinTaskLog.isEmpty() && !mrm.canDoRestricted()) {
+                            replayFromTaskLog(mrm);
+                        }
+                        mrm.didRestricted();
+                        if (m_rejoinState == kStateRunning) {
+                            task.run(getSiteProcedureConnection());
+                        } else {
+                            task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                        }
+                    } else {
+                        //If there are no tasks, do task log work
+                        didWork |= replayFromTaskLog(mrm);
                     }
-                    replayFromTaskLog();
+                    if (!didWork) Thread.yield();
+                } else {
+                    SiteTasker task = m_scheduler.take();
+                    task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 }
             }
         }
@@ -522,30 +565,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;
-    void replayFromTaskLog() throws IOException
+    boolean replayFromTaskLog(MinimumRatioMaintainer mrm) throws IOException
     {
         // not yet time to catch-up.
         if (m_rejoinState != kStateReplayingRejoin) {
-            return;
+            return false;
         }
 
-        // replay 10:1 in favor of replay
-        for (int i=0; i < 10; ++i) {
-            if (m_rejoinTaskLog.isEmpty()) {
-                break;
-            }
-
-            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
-            if (tibm == null) {
-                break;
-            }
-
+        TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+        if (tibm != null) {
+            mrm.didUnrestricted();
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, m_drGateway);
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
@@ -567,6 +604,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
 
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
@@ -599,6 +638,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
         }
+        return tibm != null;
     }
 
     static boolean filter(TransactionInfoBaseMessage tibm)
@@ -608,20 +648,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
+        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
                 return true;
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
-            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                return false;
-            }
-            else {
-                return true;
-            }
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
+            //All durable sysprocs and non-sysprocs should not get filtered.
+            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
         }
         return false;
     }
@@ -1111,9 +1147,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config)
+    public TheHashinator getCurrentHashinator() {
+        return m_hashinator;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator)
     {
-        m_ee.updateHashinator(config);
+        Preconditions.checkNotNull(hashinator);
+        m_hashinator = hashinator;
+        m_ee.updateHashinator(hashinator.pGetCurrentConfig());
     }
 
     /**
@@ -1146,5 +1189,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setProcedureName(String procedureName) {
         m_ee.setProcedureName(procedureName);
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {
+        m_initiatorMailbox.notifyOfSnapshotNonce(nonce);
     }
 }

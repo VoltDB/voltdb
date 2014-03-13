@@ -424,16 +424,20 @@ if not ascommithook:
 
         elif arg != "${voltpro}":
             print "Checking additional repository: " + arg;
-            proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
-            proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
+            if arg.startswith(".") or arg.startswith("/"):
+                pathprefix = arg
+            else:
+                pathprefix = os.path.join("..", arg)
+            proLicenses = [pathprefix + '/tools/approved_licenses/license.txt']
+            proLicensesPy = [pathprefix + '/tools/approved_licenses/license_python.txt']
             (fixcount, errcount) = (0, 0)
-            (fixinc, errinc) = processAllFiles("../" + arg + "/src/", fix,
+            (fixinc, errinc) = processAllFiles(pathprefix + "/src/", fix,
                 tuple([readFile(f) for f in proLicenses]),
                 tuple([readFile(f) for f in proLicensesPy]))
             fixcount += fixinc
             errcount += errinc
 
-            (fixinc, errinc) = processAllFiles("../" + arg + "/tests/", fix,
+            (fixinc, errinc) = processAllFiles(pathprefix + "/tests/", fix,
                 tuple([readFile(f) for f in proLicenses]),
                 tuple([readFile(f) for f in proLicensesPy]))
             fixcount += fixinc

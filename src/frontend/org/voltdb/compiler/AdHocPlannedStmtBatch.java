@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -129,7 +129,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 partitionParamIndex == -1 ? new byte[20] : null,
                 new byte[20],
                 partitionParamIndex == -1 ? new byte[20] : null,
-                false,
                 false,
                 true,
                 paramTypes,

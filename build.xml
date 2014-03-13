@@ -113,7 +113,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://download.oracle.com/javase/6/docs/api/"/>
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
@@ -234,7 +234,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="distcheck" />
@@ -252,7 +252,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_noclustering" />
         <arg value="distcheck" />
@@ -270,7 +270,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="licensecheck" />
         <arg value="junit_quick" />
         <arg value="distcheck" />
@@ -288,7 +288,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_sql" />
         <arg value="distcheck" />
@@ -307,7 +307,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="junit_quarantine" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
@@ -398,13 +398,15 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
+    <echo message="Building Stored Procedure JavaDoc"/>
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
         destdir="doc/javadoc/procedure-api"
         Public="true"
         version="true"
         use="true"
-        nodeprecated="true"
+        failonerror="true"
+        additionalparam="-quiet"
         Overview='${src.gpl.dir}/overview-public.html'
         Windowtitle='VoltDB Server APIs'>
         <link href="${j2se_api}"/>
@@ -480,6 +482,7 @@ DISTRIBUTION
         <fileset dir="tools" defaultexcludes="yes">
             <include name="toolrunner.py" />
             <include name="voltify" />
+            <include name="voltify-README.md" />
             <include name="voltify.d/**" />
             <include name="lib/**" />
         </fileset>
@@ -793,9 +796,11 @@ JAR BUILDING
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/cliffc_voltpatches/**" />
-	        <include name="org/supercsv_voltpatches/tokenizer/*" />
+            <include name="groovy_voltpatches/**"/>
+	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/spearce_voltpatches/**" />
         </fileset>
@@ -881,6 +886,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/**" />
             <include name="vanilla/**" />
@@ -1018,12 +1024,14 @@ JAVA COMPILATION
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
                   javax/annotation_voltpatches/**/*.java
                   com/google_voltpatches/**/*.java
                   org/cliffc_voltpatches/**
-		          org/supercsv_voltpatches/tokenizer/*.java"/>
+                  groovy_voltpatches/**
+		  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
@@ -1208,8 +1216,8 @@ LICENSING
 -->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
-    <exec dir='tools' executable='python' failonerror='true'>
-        <arg line="licensescheck.py" />
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="tools/licensescheck.py" />
         <arg line="${voltpro}"/>
     </exec>
 </target>
@@ -1291,7 +1299,7 @@ TEST CASES
             failureproperty="junit.failures"
             printsummary="false"
             timeout="${junit.timeout}"
-            maxmemory='1024M'
+            maxmemory='2048M'
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
@@ -1377,25 +1385,28 @@ TEST CASES
                 <!-- Standard junit fileset -->
                 <patternset refid="junit.all.path" />
                 <!-- Exclude many tests not directly related to sql functionality -->
-                <exclude name="**/*$*.class"/>
+                <exclude name='**/*$*.class'/>
+                <exclude name='org/voltcore/**/*.class'/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
+                <exclude name='org/voltdb/client/TestDistributer.class'/>
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
                 <exclude name='org/voltdb/iv2/Test*.class'/>
                 <exclude name='org/voltdb/jdbc/Test*.class'/>
                 <exclude name='org/voltdb/jni/Test*.class'/>
                 <exclude name='org/voltdb/messaging/Test*.class'/>
                 <exclude name='org/voltdb/regressionsuites/TestAdminMode.class'/>
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestCommandLog*.class" />
-                <exclude name="**/TestExport*.class"/>
-                <exclude name="**/TestJoin.class"/>
-                <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/Test*Rejoin*.class" />
-                <exclude name="**/Test*Replication*.class" />
-                <exclude name="**/Test*Restore*.class" />
-                <exclude name="**/Test*Snapshot*.class" />
-                <exclude name="**/TestMultipleOuterJoinPlans.class" />
+                <exclude name='org/voltdb/regressionsuites/TestClientPort*.class'/>
+                <exclude name='org/voltdb/quarantine/**/*.class'/>
+                <exclude name='**/TestCommandLog*.class'/>
+                <exclude name='**/TestExport*.class'/>
+                <exclude name='**/TestJoin.class'/>
+                <exclude name='**/TestLogReader.class'/>
+                <exclude name='**/TestMaliciousClientSuite.class'/>
+                <exclude name='**/Test*Rejoin*.class'/>
+                <exclude name='**/Test*Replication*.class'/>
+                <exclude name='**/Test*Restore*.class'/>
+                <exclude name='**/Test*Snapshot*.class'/>
+                <exclude name='**/TestMultipleOuterJoinPlans.class'/>
             </fileset>
         </tests>
     </run_junit>
@@ -1509,13 +1520,13 @@ TEST CASES
 </target>
 
 <target name="junit_lite_sql" description="lightweight junit tests for sql">
-	<run_junit>
-		<tests>
-			<fileset dir='${build.test.dir}'>
-		    	<include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
-			</fileset>
-		</tests>
-	</run_junit>
+  <run_junit>
+    <tests>
+      <fileset dir='${build.test.dir}'>
+          <include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
+      </fileset>
+    </tests>
+  </run_junit>
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
@@ -1859,7 +1870,7 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />
@@ -2105,7 +2116,7 @@ UTILITIES
 </target>
 
 <target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
-        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dversion=4.1.1">
+        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dnewversion=4.1.1">
     <echo message='Be sure to commit both repositories'/>
 </target>
 
@@ -2185,7 +2196,7 @@ DEBIAN PACKAGE CREATION
 -->
 
 <target name="debian_package"
-	    depends="buildinfo"
+      depends="buildinfo"
         description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
     <exec executable="sudo" failonerror="true">
         <arg value="python" />
@@ -2197,7 +2208,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- This debian package cleaning target is safe. It doesn't run as root. -->
 <target name="clean_debian_package"
-	    depends=""
+      depends=""
         description="Remove all Debian/Ubuntu package build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${debian.package.dir}'" />
@@ -2206,7 +2217,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- Use this if permissions are messed up by interrupted package building as root. -->
 <target name="force_clean_debian_package"
-	    depends=""
+      depends=""
         description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
     <exec dir="." executable="sudo" failonerror="false">
         <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
@@ -2231,7 +2242,7 @@ RPM PACKAGE CREATION
 
 <!-- This cleaning target is safe. It doesn't run as root. -->
 <target name="clean_rpm_package"
-	    depends=""
+      depends=""
         description="Remove all RPM build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />

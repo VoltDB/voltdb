@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -149,14 +149,6 @@ AbstractExpression *
 ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
-    /*printf("left: %s\n", left_optimized->debug("").c_str());
-    fflush(stdout);
-    printf("right: %s\n", right_optimized->debug("").c_str());
-    fflush(stdout);*/
-
-    //printf("%s\n", right_optimized->debug().c_str());
-    //fflush(stdout);
-
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);

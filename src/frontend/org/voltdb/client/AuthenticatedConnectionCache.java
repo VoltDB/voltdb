@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ import org.voltdb.common.Constants;
 public class AuthenticatedConnectionCache {
 
     final String m_hostname;
+    final String m_adminHostName;
     final int m_port;
     final int m_adminPort;
     final int m_targetSize; // goal size of the client cache
@@ -55,6 +56,38 @@ public class AuthenticatedConnectionCache {
         byte[] hashedPassword;
         int passHash;
     }
+
+    /**
+     * Provides a callback to be notified on node failure. Close
+     * the connection if this callback is invoked.
+     */
+    class StatusListener extends ClientStatusListenerExt {
+        Connection m_conn = null;
+
+        StatusListener(Connection conn)
+        {
+            m_conn = conn;
+        }
+
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            // Close the connection. The cause can be CONNECTION_CLOSED or TIMEOUT, we don't care which.
+
+            // debug printstacktrace, to be remove later.  In theory we shouldn't hit this code
+            // because the JSON/HTTP client is within the server.  Speculation that this
+            // can be called if the connection is closed by the server, which is odd because
+            // this client is running *within* the server!
+            new Exception("Client Disconnect").printStackTrace();
+            System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
+            try {
+                if (null != m_conn.client) {
+                    m_conn.client.close();
+                }
+            } catch (InterruptedException ex) {
+            }
+        }
+    }
+
 
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
@@ -90,24 +123,25 @@ public class AuthenticatedConnectionCache {
     }
 
     public AuthenticatedConnectionCache(int targetSize) {
-        this(targetSize, "localhost");
+        this(targetSize, "localhost", "localhost");
     }
 
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname) {
-        this(targetSize, serverHostname, Constants.DEFAULT_PORT, 0);
+    public AuthenticatedConnectionCache(int targetSize, String serverHostname, String adminHostName) {
+        this(targetSize, serverHostname, Constants.DEFAULT_PORT, adminHostName, 0);
     }
 
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, int adminPort) {
+    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, String adminHostName, int adminPort) {
         assert(serverHostname != null);
         assert(serverPort > 0);
 
         m_hostname = serverHostname;
+        m_adminHostName = adminHostName;
         m_port = serverPort;
         m_adminPort = adminPort;
         m_targetSize = targetSize;
     }
 
-    public synchronized Client getClient(String userName, byte[] hashedPassword, boolean admin) throws IOException {
+    public synchronized Client getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
         // ADMIN MODE
         if (admin) {
             ClientImpl adminClient = null;
@@ -123,10 +157,10 @@ public class AuthenticatedConnectionCache {
                     if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                         throw new IOException("Username was null but password was not.");
                     }
-                    adminClient.createConnection(m_hostname, m_adminPort);
+                    adminClient.createConnection(m_adminHostName, m_adminPort);
                 }
                 else {
-                    adminClient.createConnectionWithHashedCredentials(m_hostname, m_adminPort, userName, hashedPassword);
+                    adminClient.createConnectionWithHashedCredentials(m_adminHostName, m_adminPort, userName, hashedPassword);
                 }
             }
             catch (IOException ioe)
@@ -178,8 +212,9 @@ public class AuthenticatedConnectionCache {
 
         // AUTHENTICATED
         int passHash = 0;
-        if (hashedPassword != null)
+        if (hashedPassword != null) {
             passHash = Arrays.hashCode(hashedPassword);
+        }
 
         Connection conn = m_connections.get(userName);
         if (conn != null) {
@@ -206,8 +241,14 @@ public class AuthenticatedConnectionCache {
             {
                 conn.hashedPassword = null;
             }
+
+            // Add a callback listener for this client, to detect if
+            // a connection gets closed/disconnected.  If this happens,
+            // we need to remove it from the m_conections cache.
+            ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn));
+
             conn.user = userName;
-            conn.client = (ClientImpl) ClientFactory.createClient();
+            conn.client = (ClientImpl) ClientFactory.createClient(config);
             try
             {
                 conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
@@ -237,12 +278,14 @@ public class AuthenticatedConnectionCache {
         ClientImpl ci = (ClientImpl) client;
 
         // if no username, this is the unauth client
-        if (ci.getUsername().length() == 0)
+        if (ci.getUsername().length() == 0) {
             return;
+        }
 
         Connection conn = m_connections.get(ci.getUsername());
-        if (conn == null)
+        if (conn == null) {
             throw new RuntimeException("Released client not in pool.");
+        }
         conn.refCount--;
         attemptToShrinkPoolIfNeeded();
     }

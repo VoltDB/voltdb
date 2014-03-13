@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,7 @@ import org.voltdb.planner.CompiledPlan;
 public abstract class MicroOptimization {
     protected AbstractParsedStmt m_parsedStmt;
 
-    boolean shouldRun(DeterminismMode detMode) {
-        return true;
-    }
+    boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement) { return true; }
 
     public abstract List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) ;
 }

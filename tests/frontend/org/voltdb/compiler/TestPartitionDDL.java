@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -169,7 +169,7 @@ public class TestPartitionDDL extends TestCase {
             ByteArrayOutputStream ss = new ByteArrayOutputStream();
             PrintStream ps = new PrintStream(ss);
             if (success) {
-                compiler.summarizeSuccess(null, ps);
+                compiler.summarizeSuccess(null, ps, testout_jar);
             }
             else {
                 compiler.summarizeErrors(null, ps);

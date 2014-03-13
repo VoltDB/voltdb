@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,8 +29,9 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -55,6 +56,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
+
+    // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
+    // using EXPLAIN output to validate plans.
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
+    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    public static boolean disableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = false;
+        return was;
+    }
+    public static void restoreVerboseExplainForDebugging(boolean was) { m_verboseExplainForDebugging = was; }
 
     public AbstractExpression(ExpressionType type) {
         m_type = type;
@@ -683,26 +696,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return this;
     }
 
-    public String baseTableAlias() {
-        String tableAlias = null;
-        if (m_left != null) {
-            tableAlias = m_left.baseTableAlias();
-            if (tableAlias != null) return tableAlias;
-        }
-        if (m_right != null) {
-            tableAlias = m_right.baseTableAlias();
-            if (tableAlias != null) return tableAlias;
-        }
-        if (m_args != null) {
-            for (AbstractExpression expr: m_args) {
-                tableAlias = expr.baseTableAlias();
-                if (tableAlias != null) return tableAlias;
-            }
-        }
-        return null;
-    }
-
-
     public ArrayList<AbstractExpression> findBaseTVEs() {
         return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
     }
@@ -948,26 +941,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
-            }
-        }
-    }
-
-    /** Associate underlying TupleValueExpressions with columns in the schema
-     * and propagate the type implications to parent expressions.
-     */
-    public void resolveForDB(Database db) {
-        resolveChildrenForDB(db);
-    }
-
-    /** Do the recursive part of resolveForDB as required for tree-structured expession types. */
-    protected final void resolveChildrenForDB(Database db) {
-        if (m_left != null)
-            m_left.resolveForDB(db);
-        if (m_right != null)
-            m_right.resolveForDB(db);
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                argument.resolveForDB(db);
             }
         }
     }

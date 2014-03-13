@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,7 +53,9 @@ class G:
     script = os.path.realpath(sys.argv[0])
     script_dir, script_name = os.path.split(script)
     base_dir = os.path.dirname(script_dir)
-    log_path = os.path.join(script_dir, '%s.log' % script_name)
+    # Use ~/.<script> as the output directory for logging and virtual environments.
+    user_dir = os.path.expanduser(os.path.join('~', '.voltdb'))
+    log_path = os.path.join(user_dir, 'logs', '%s.log' % script_name)
     module_path = os.path.realpath(__file__)
     # Opened by main() and vmain()
     log_file = None
@@ -61,6 +63,17 @@ class G:
     # Full path glob of virtualenv packages. The latest is chosen based on the parsed version number.
     virtualenv_package_glob = os.path.join(base_dir, 'third_party', 'python', 'packages', 'virtualenv-*.tar.gz')
     virtualenv_parse_re = re.compile('^.*/(virtualenv-([0-9.]+))[.]tar[.]gz$')
+
+
+def get_version(base_dir, error_abort=True):
+    try:
+        # noinspection PyUnresolvedReferences
+        return open(os.path.join(base_dir, 'version.txt')).read().strip()
+    except (IOError, OSError), e:
+        if error_abort:
+            abort('Unable to read version.txt.', e)
+        return None
+
 
 def go(cmd_name,
        cmd_dir,
@@ -92,12 +105,7 @@ def go(cmd_name,
         sys.path.extend(libpath.split(':'))
     start_logging()
     try:
-        version = None
-        try:
-            # noinspection PyUnresolvedReferences
-            version = open(os.path.join(base_dir, 'version.txt')).read().strip()
-        except (IOError, OSError), e:
-            abort('Unable to read version.txt.', e)
+        version = get_version(base_dir)
         if os.path.isdir('/opt/lib/voltdb/python'):
             sys.path.insert(0, '/opt/lib/voltdb/python')
         if os.path.isdir('/usr/share/lib/voltdb/python'):
@@ -124,7 +132,8 @@ def main(description='(no description)',
          standalone=False,
          directory=None,
          verbose=False,
-         libpath=''):
+         libpath='',
+         command_name=None):
     """
     Main entry point for commands not running in a virtual environment.
     :param description:
@@ -135,6 +144,8 @@ def main(description='(no description)',
     """
     cmd_path = sys.argv[0]
     cmd_dir, cmd_name = os.path.split(os.path.realpath(cmd_path))
+    if not command_name is None:
+        cmd_name = command_name
     base_dir = os.path.dirname(cmd_dir)
     go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, libpath, *sys.argv[1:])
 
@@ -180,6 +191,56 @@ def get_virtualenv():
     return ['python', os.path.join(os.getcwd(), latest_package_name, 'virtualenv.py')]
 
 
+# Internal function to build/rebuild the virtual environment
+def _build_virtual_environment(venv_dir, version, packages):
+    # Wipe any existing virtual environment directory.
+    if os.path.exists(venv_dir):
+        try:
+            shutil.rmtree(venv_dir)
+        except (IOError, OSError), e:
+            abort('Failed to remove existing virtual environment.', (venv_dir, e))
+    # Create the directory as needed.
+    if not os.path.isdir(venv_dir):
+        os.makedirs(venv_dir)
+    # Save version.txt in the venv root directory.
+    try:
+        version_path = os.path.join(venv_dir, 'version.txt')
+        f = open(version_path, 'w')
+        try:
+            try:
+                f.write(version)
+            except (IOError, OSError), e:
+                abort('Failed to write version file.', (version_path, e))
+        finally:
+            f.close()
+    except (IOError, OSError), e:
+        abort('Failed to open version file for writing.', (version_path, e))
+    # Prefer to use the system virtualenv, but fall back to the third_party copy.
+    save_dir = os.getcwd()
+    save_lc_all = os.environ.get('LC_ALL', None)
+    # Makes sure a pip failure provides clean output instead of a Unicode error.
+    os.environ['LC_ALL'] = 'C'
+    try:
+        os.chdir(os.path.dirname(venv_dir))
+        args = get_virtualenv()
+        pip = os.path.join(venv_dir, 'bin', 'pip')
+        info('Preparing the %s Python virtual environment:' % G.script_name, [
+                    '(an Internet connection is required)',
+                    'Folder: %s' % venv_dir])
+        args += ['--clear', '--system-site-packages', sys.platform]
+        run_cmd(*args)
+        if packages:
+            for package in packages:
+                info('Installing virtual environment package: %s' % package)
+                run_cmd(pip, 'install', package)
+    finally:
+        os.chdir(save_dir)
+        if save_lc_all is None:
+            del os.environ['LC_ALL']
+        else:
+            os.environ['LC_ALL'] = save_lc_all
+
+
 def vmain(description='(no description)',
           standalone=False,
           directory='',
@@ -196,39 +257,40 @@ def vmain(description='(no description)',
     """
     G.verbose = verbose
     start_logging()
-    vname = '%s.venv' % G.script_name
-    venv_base = os.path.join(G.script_dir, vname)
+    # Set up virtual environment under home since it should be write-able.
+    output_dir = os.path.join(G.user_dir, G.script_name)
+    # Make sure the output directory is available.
+    if not os.path.isdir(output_dir):
+        if os.path.exists(output_dir):
+            abort('Output path "%s" exists, but is not a directory.' % output_dir,
+                  'Please move or delete it before running this command again.')
+        try:
+            os.makedirs(output_dir)
+        except (IOError, OSError), e:
+            abort('Output path "%s" exists, but is not a directory.' % output_dir,
+                  'Please move or delete it before running this command again.', e)
+    venv_base = os.path.join(output_dir, 'venv')
     venv_dir = os.path.join(venv_base, sys.platform)
     venv_complete = False
+    version = get_version(os.path.dirname(G.script_dir))
     try:
-        if not os.path.isdir(venv_base):
-            os.makedirs(venv_base)
-        if not os.path.isdir(venv_dir):
-            # Prefer to use the system virtualenv, but fall back to the third_party copy.
-            save_dir = os.getcwd()
-            save_lc_all = os.environ.get('LC_ALL', None)
-            # Makes sure a pip failure provides clean output instead of a Unicode error.
-            os.environ['LC_ALL'] = 'C'
-            try:
-                os.chdir(venv_base)
-                args = get_virtualenv()
-                pip = os.path.join(venv_dir, 'bin', 'pip')
-                info('Preparing the %s Python virtual environment:' % G.script_name, [
-                            '(an Internet connection is required)',
-                            'Folder: %s' % venv_dir])
-                args += ['--clear', '--system-site-packages', sys.platform]
-                run_cmd(*args)
-                if packages:
-                    for package in packages:
-                        info('Installing virtual environment package: %s' % package)
-                        run_cmd(pip, 'install', package)
-            finally:
-                os.chdir(save_dir)
-                if save_lc_all is None:
-                    del os.environ['LC_ALL']
-                else:
-                    os.environ['LC_ALL'] = save_lc_all
-
+        build_venv = not os.path.isdir(venv_dir)
+        if not build_venv:
+            # If the virtual environment is present check that it's current.
+            # If version.txt is not present leave it alone so that we don't
+            # get in the situation where the virtual environment gets
+            # recreated every time.
+            venv_version = get_version(venv_dir, error_abort=False)
+            if venv_version is None:
+                warning('Unable to read the version file:',
+                        [os.path.join(venv_dir, 'version.txt')],
+                        'Assuming that the virtual environment is current.',
+                        'To force a rebuild delete the virtual environment base directory:',
+                        [venv_base])
+            else:
+                build_venv = venv_version != version
+        if build_venv:
+            _build_virtual_environment(venv_dir, version, packages)
         venv_complete = True
         # Exec the toolrunner.py script inside the virtual environment by using
         # the virtual environment's Python.
@@ -274,6 +336,12 @@ def start_logging():
     """
     Open log file.
     """
+    base_dir = os.path.dirname(G.log_path)
+    if not os.path.exists(base_dir):
+        try:
+            os.makedirs(base_dir)
+        except (IOError, OSError), e:
+            abort('Failed to create log directory.', (base_dir, e))
     try:
         G.log_file = open(G.log_path, 'w')
     except (IOError, OSError), e:

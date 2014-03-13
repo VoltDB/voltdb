@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,6 +150,9 @@ public class TestUnion extends PlannerTestCase {
         // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
         failToCompile("select DESC from T1 UNION select TEXT from T5");
         failToCompile("select A from T1 UNION select D from T4");
+
+        // Query hangs from SQL coverage
+        failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2");
 
         // If ONE side is single-partitioned, it would theoretically be possible to satisfy
         // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
