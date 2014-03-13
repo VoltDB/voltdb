@@ -544,12 +544,18 @@ public class TableSaveFile
                         if (retval != 0) {
                             log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
                         }
-                        long length = position - Bits.pageSize() - positionAtLastFAdvise;
+
+                        //Get aligned start and end position
+                        final long fadviseStart = positionAtLastFAdvise;
+                        //-1 because we don't want to drop the last page because
+                        //We will be reading it soon
+                        positionAtLastFAdvise = ((position / Bits.pageSize()) - 1) * Bits.pageSize();
+                        final long length = positionAtLastFAdvise - fadviseStart;
                         if (length > 0) {
                             retval = PosixAdvise.fadvise(
                                     m_fd,
-                                    positionAtLastFAdvise,
-                                    position - Bits.pageSize() - positionAtLastFAdvise,
+                                    fadviseStart,
+                                    length,
                                     PosixAdvise.POSIX_FADV_DONTNEED);
                         }
                         if (retval != 0) {
