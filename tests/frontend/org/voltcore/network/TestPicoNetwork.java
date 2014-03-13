@@ -176,7 +176,7 @@ public class TestPicoNetwork extends TestCase {
 
     @Test
     public void testLargeMessages() throws Exception {
-        ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 30);
+        ByteBuffer buf = ByteBuffer.allocate(1024 * 1024 * 30);
         buf.putInt(buf.capacity() - 4);
         buf.position(0);
         while (buf.hasRemaining()) {
