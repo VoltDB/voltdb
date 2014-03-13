@@ -30,7 +30,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Checksum;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -62,15 +61,12 @@ public class TableSaveFile
         CRC32, CRC32C
     }
 
-//    private AtomicInteger necessaryDiscards = new AtomicInteger();
     public class Container extends BBContainer {
         public final int partitionId;
         private final BBContainer m_origin;
         private boolean discarded = false;
         Container(ByteBuffer b, BBContainer origin, int partitionId) {
             super(b);
-//            System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " creating container " + Integer.toHexString(this.hashCode()) + " origin " + Integer.toHexString(this.hashCode()));
-//            necessaryDiscards.incrementAndGet();
             m_origin = origin;
             this.partitionId = partitionId;
         }
@@ -79,7 +75,6 @@ public class TableSaveFile
         public void discard() {
             checkDoubleFree();
             discarded = true;
-//            necessaryDiscards.decrementAndGet();
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
@@ -87,13 +82,6 @@ public class TableSaveFile
             }
         }
 
-//        @Override
-//        public void finalize() {
-//            if (!discarded) {
-//                System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " failed to discard " + Integer.toHexString(this.hashCode()));
-//                System.exit(-1);
-//            }
-//        }
     }
 
     /**
@@ -117,8 +105,6 @@ public class TableSaveFile
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
             {
-//                System.err.println("Constructing TSF " + Integer.toHexString(this.hashCode()));
-//                new Throwable().printStackTrace();
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
@@ -400,15 +386,6 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
-//        System.err.println("Starting close " + Integer.toHexString(this.hashCode()) + " with necessary discards " + necessaryDiscards.get());
-//        System.gc();
-//        System.runFinalization();
-//        try {
-//            Thread.sleep(200);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-//        }
-//        System.err.println("Finishing close " + Integer.toHexString(this.hashCode()));
         if (m_chunkReaderThread != null) {
             m_chunkReaderThread.interrupt();
             try {
@@ -450,7 +427,6 @@ public class TableSaveFile
         }
         if (!m_hasMoreChunks) {
             final Container c = m_availableChunks.poll();
-//            System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
             return c;
         }
 
@@ -478,7 +454,6 @@ public class TableSaveFile
                 throw m_chunkReaderException;
             }
         }
-//        System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
         return c;
     }
 
@@ -1061,7 +1036,6 @@ public class TableSaveFile
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                 final ByteBuffer b = originContainer.b();
                 final Container retcont = new Container(b, originContainer, nextChunkPartitionId);
-//                System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(originContainer.hashCode()));
                 return retcont;
             }
             /*
@@ -1070,7 +1044,6 @@ public class TableSaveFile
              * container remain the same.
              */
             final Container retcont = new Container(c.b(), c, nextChunkPartitionId);
-//            System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(c.hashCode()));
             return retcont;
         }
 
@@ -1094,12 +1067,5 @@ public class TableSaveFile
             }
         }
 
-//        @Override
-//        public void finalize() {
-//            if (necessaryDiscards.get() > 0) {
-//                System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " finalized with necessary discards " + necessaryDiscards.get());
-//                System.exit(-1);
-//            }
-//        }
     }
 }
