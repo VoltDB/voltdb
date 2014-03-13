@@ -208,23 +208,51 @@ std::string TupleSchema::debug() const {
     return ret;
 }
 
-bool TupleSchema::equals(const TupleSchema *other) const {
+bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
+{
+    if (this == other) {
+        return true;
+    }
     if (other->m_columnCount != m_columnCount ||
         other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
-        other->m_allowInlinedObjects != m_allowInlinedObjects) {
+        other->m_allowInlinedObjects != m_allowInlinedObjects ||
+        other->tupleLength() != tupleLength()) {
         return false;
     }
 
     for (int ii = 0; ii < m_columnCount; ii++) {
         const ColumnInfo *columnInfo = getColumnInfo(ii);
         const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
-        if (columnInfo->allowNull != ocolumnInfo->allowNull ||
-                columnInfo->offset != ocolumnInfo->offset ||
-                columnInfo->type != ocolumnInfo->type) {
+        if (columnInfo->offset != ocolumnInfo->offset ||
+                columnInfo->type != ocolumnInfo->type ||
+                columnInfo->inlined != ocolumnInfo->inlined) {
             return false;
         }
     }
 
+    return true;
+}
+
+bool TupleSchema::equals(const TupleSchema *other) const
+{
+    // First check for structural equality.
+    if ( ! isCompatibleForCopy(other)) {
+        return false;
+    }
+    // Finally, rule out behavior differences.
+    for (int ii = 0; ii < m_columnCount; ii++) {
+        const ColumnInfo *columnInfo = getColumnInfo(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+        if (columnInfo->allowNull != ocolumnInfo->allowNull) {
+            return false;
+        }
+        // The declared column length for an out-of-line object is a behavior difference
+        // that has no effect on tuple format.
+        if (( ! columnInfo->inlined) &&
+                (columnInfo->length != ocolumnInfo->length)) {
+            return false;
+        }
+    }
     return true;
 }
 

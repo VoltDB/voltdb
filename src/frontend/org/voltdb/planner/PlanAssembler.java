@@ -880,6 +880,28 @@ public class PlanAssembler {
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
 
+            // The current insertexecutor implementation requires its input tuple from the
+            // materializeexecutor to be formatted exactly like the target persistent tuple.
+            // This requires the intervening outputschema to describe result columns of the
+            // exactly right type and size (at least for inlined sizes) as their target columns.
+            if (expr.getValueType().getValue() != column.getType() ||
+                    expr.getValueSize() != column.getSize()) {
+                // Patch over any mismatched expressions with an explicit cast.
+                // Most impossible-to-cast type combinations should have already been caught by the
+                // parser, but there are also runtime checks in the casting code
+                // -- such as for out of range values.
+                expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
+                expr.setValueType(VoltType.get((byte) column.getType()));
+                // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
+                // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
+                // the tuple that gets the result of the cast can be properly formatted as inline.
+                // A too-wide value survives the cast (to generic VARCHAR of any length) but the
+                // attempt to cache the result in the inline temp tuple storage will throw an early
+                // runtime error on bahalf of the target table column.
+                // The important thing here is to leave the formatting hint in the output schema that
+                // drives the temp tuple layout.
+                expr.setValueSize(column.getSize());
+            }
             // add column to the materialize node.
             // This table name is magic.
             mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",

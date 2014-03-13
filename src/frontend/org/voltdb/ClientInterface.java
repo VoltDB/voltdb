@@ -47,14 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.base.Predicate;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Throwables;
-
 import org.HdrHistogram_voltpatches.AbstractHistogram;
-import org.HdrHistogram_voltpatches.Histogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -110,6 +104,9 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
@@ -1273,8 +1270,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon(ZooKeeper zk, GlobalServiceElector gse) {
-        m_snapshotDaemon.init(this, zk, new Runnable() {
+    public void initializeSnapshotDaemon(HostMessenger messenger, GlobalServiceElector gse) {
+        m_snapshotDaemon.init(this, messenger, new Runnable() {
             @Override
             public void run() {
                 bindAdapter(m_snapshotDaemonAdapter);
@@ -1678,6 +1675,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
+        // Deserialize the client's request and map to a catalog stored procedure
+        final CatalogContext catalogContext = m_catalogContext.get();
+        final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
+
         // ping just responds as fast as possible to show the connection is alive
         // nb: ping is not a real procedure, so this is checked before other "sysprocs"
         if (task.procName.startsWith("@")) {
@@ -1690,11 +1691,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@Subscribe")) {
                 return dispatchSubscribe( handler, task);
             }
+            if (task.procName.equals("@GC")) {
+                return dispatchSystemGC(handler, task, user);
+            }
         }
 
-        // Deserialize the client's request and map to a catalog stored procedure
-        final CatalogContext catalogContext = m_catalogContext.get();
-        final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
         Procedure catProc = catalogContext.procedures.get(task.procName);
 
         if (catProc == null) {
@@ -1884,6 +1885,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    /*
+     * Allow System.gc() to be invoked remotely even when JMX isn't enabled.
+     * Can be used to perform old gen GCs on a schedule during non-peak times
+     */
+    private ClientResponseImpl dispatchSystemGC(ClientInputHandler handler,
+            StoredProcedureInvocation task, AuthSystem.AuthUser user) {
+        if (user.hasSystemProcPermission()) {
+            final long start = System.nanoTime();
+            System.gc();
+            final long duration = System.nanoTime() - start;
+            return new ClientResponseImpl(
+                    ClientResponseImpl.SUCCESS,
+                    new VoltTable[] {},
+                    Long.toString(duration),
+                    task.clientHandle);
+        } else {
+            return new ClientResponseImpl(
+                    ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[] {},
+                    "User " + handler.m_username + " doesn't have sysproc permission needed to invoke @GC",
+                    task.clientHandle);
+        }
     }
 
     private ClientResponseImpl dispatchSubscribe(ClientInputHandler c, StoredProcedureInvocation task) {

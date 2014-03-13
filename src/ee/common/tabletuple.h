@@ -288,8 +288,6 @@ public:
     std::string debugNoHeader() const;
 
     /** Copy values from one tuple into another (uses memcpy) */
-    // verify assumptions for copy. do not use at runtime (expensive)
-    bool compatibleForCopy(const TableTuple &source);
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
@@ -533,7 +531,7 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
 
 #ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
+    if( ! m_schema->isCompatibleForCopy(source.m_schema)) {
         std::ostringstream message;
         message << "src  tuple: " << source.debug("") << std::endl;
         message << "src schema: " << source.m_schema->debug() << std::endl;
@@ -662,7 +660,7 @@ inline void TableTuple::copy(const TableTuple &source) {
     const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
 
 #ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
+    if( ! m_schema->isCompatibleForCopy(source.m_schema)) {
         std::ostringstream message;
         message << "src  tuple: " << source.debug("") << std::endl;
         message << "src schema: " << source.m_schema->debug() << std::endl;

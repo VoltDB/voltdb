@@ -57,6 +57,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
@@ -169,6 +170,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int SNAPSHOTSCAN_SITE_ID = -7;
     public static final int SNAPSHOTDELETE_SITE_ID = -8;
     public static final int REBALANCE_SITE_ID = -9;
+    public static final int SNAPSHOT_DAEMON_ID = -10;
+    public static final int SNAPSHOT_IO_AGENT_ID = -11;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
@@ -229,6 +232,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_config.internalInterface,
                 m_config.internalPort,
                 this);
+
+        // Register a clean shutdown hook for the network threads.  This gets cranky
+        // when crashLocalVoltDB() is called because System.exit() can get called from
+        // a random network thread which is already shutting down and we'll get delicious
+        // deadlocks.  Take the coward's way out and just don't do this if we're already
+        // crashing (read as: I refuse to hunt for more shutdown deadlocks).
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, new Runnable() {
+            @Override
+            public void run()
+            {
+                for (ForeignHost host : m_foreignHosts.values())
+                {
+                    // null is OK. It means this host never saw this host id up
+                    if (host != null)
+                    {
+                        host.close();
+                    }
+                }
+            }
+        });
+
     }
 
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
@@ -992,7 +1016,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized boolean isLocalHostReady() {
         return m_localhostReady;
     }
-
 
     public void shutdown() throws InterruptedException
     {
