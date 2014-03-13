@@ -78,6 +78,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
@@ -94,6 +95,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
     private final String m_coreBindId;
 
@@ -190,6 +192,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                     return port;
                 } finally {
                     m_ports.add(port);
+                    m_numPorts.incrementAndGet();
                 }
             }
         };
@@ -225,6 +228,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                             selectionKey.cancel();
                         } finally {
                             m_ports.remove(port);
+                            m_numPorts.decrementAndGet();
                         }
                     }
                 } finally {
@@ -385,6 +389,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             key.interestOps (port.interestOps());
         } else {
             m_ports.remove(port);
+            m_numPorts.decrementAndGet();
         }
     }
 
@@ -466,6 +471,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             return retval;
     }
 
+    @Override
     public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
@@ -492,6 +498,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     }
 
     int numPorts() {
-        return m_ports.size();
+        return m_numPorts.get();
     }
 }
