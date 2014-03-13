@@ -2036,7 +2036,7 @@ TEST_F(NValueTest, TestLike)
             const char *testDatum = testData[jj];
             NValue testString = voltdb::ValueFactory::getStringValue(testDatum);
 
-            if (testString.like(pattern).isTrue()) {
+            if (testString.like_withoutNull(pattern).isTrue()) {
                 foundMatches++;
             }
             testString.free();
@@ -2055,8 +2055,8 @@ TEST_F(NValueTest, TestLike)
     NValue value = voltdb::ValueFactory::getStringValue("XY");
     NValue pattern1 = voltdb::ValueFactory::getStringValue("X%_");
     NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
-    EXPECT_TRUE(value.like(pattern1).isTrue());
-    EXPECT_TRUE(value.like(pattern2).isTrue());
+    EXPECT_TRUE(value.like_withoutNull(pattern1).isTrue());
+    EXPECT_TRUE(value.like_withoutNull(pattern2).isTrue());
     pattern2.free();
     pattern1.free();
     value.free();

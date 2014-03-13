@@ -314,7 +314,9 @@ class NValue {
        exact types to allow disparate type comparison. See also the
        op_ functions which return boolean NValues.
      */
+    int compareNull(const NValue rhs) const;
     int compare(const NValue rhs) const;
+    int compareWithoutNull(const NValue rhs) const;
 
     /* Return a boolean NValue with the comparison result */
     NValue op_equals(const NValue rhs) const;
@@ -323,6 +325,14 @@ class NValue {
     NValue op_lessThanOrEqual(const NValue rhs) const;
     NValue op_greaterThan(const NValue rhs) const;
     NValue op_greaterThanOrEqual(const NValue rhs) const;
+
+    NValue op_equals_withoutNull(const NValue rhs) const;
+    NValue op_notEquals_withoutNull(const NValue rhs) const;
+    NValue op_lessThan_withoutNull(const NValue rhs) const;
+    NValue op_lessThanOrEqual_withoutNull(const NValue rhs) const;
+    NValue op_greaterThan_withoutNull(const NValue rhs) const;
+    NValue op_greaterThanOrEqual_withoutNull(const NValue rhs) const;
+
 
     /* Return a copy of MAX(this, rhs) */
     NValue op_max(const NValue rhs) const;
@@ -341,7 +351,7 @@ class NValue {
      * This NValue must be VARCHAR and the rhs must be VARCHAR.
      * This NValue is the value and the rhs is the pattern
      */
-    NValue like(const NValue rhs) const;
+    NValue like_withoutNull(const NValue rhs) const;
 
     //TODO: passing NValue arguments by const reference SHOULD be standard practice
     // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
@@ -677,6 +687,17 @@ class NValue {
         return *reinterpret_cast<const int32_t *>(&m_data[8]);
     }
 
+    /**
+     * Used by varchar or varbinary.
+     */
+    int32_t getObjectLengthForVarsWithoutNull() const {
+        assert(isNull() == false);
+        assert(getValueType() == VALUE_TYPE_VARCHAR || getValueType() == VALUE_TYPE_VARBINARY);
+        // now safe to read and return the length preceding value.
+        return *reinterpret_cast<const int32_t *>(&m_data[8]);
+    }
+
+
     int8_t setObjectLength(int32_t length) {
         *reinterpret_cast<int32_t *>(&m_data[8]) = length;
         int8_t lengthLength = getAppropriateObjectLengthLength(length);
@@ -750,6 +771,18 @@ class NValue {
         if (isNull()) {
             return NULL;
         }
+        void* value;
+        if (m_sourceInlined) {
+            value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+        }
+        else {
+            StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+            value = sref->get() + getObjectLengthLength();
+        }
+        return value;
+    }
+
+    void* getObjectValueWithoutNull() const {
         void* value;
         if (m_sourceInlined) {
             value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
@@ -896,6 +929,27 @@ class NValue {
             return 0; // NOT REACHED
         }
     }
+
+    int64_t castAsBigIntAndGetValueWithoutNull() const {
+            const ValueType type = getValueType();
+            switch (type) {
+            case VALUE_TYPE_BIGINT:
+                return getBigInt();
+            case VALUE_TYPE_INTEGER:
+                return static_cast<int64_t>(getInteger());
+            case VALUE_TYPE_TINYINT:
+                return static_cast<int64_t>(getTinyInt());
+            case VALUE_TYPE_SMALLINT:
+                return static_cast<int64_t>(getSmallInt());
+            case VALUE_TYPE_ADDRESS:
+                return getBigInt();
+            case VALUE_TYPE_TIMESTAMP:
+                return getTimestamp();
+            default:
+                throwCastSQLException(type, VALUE_TYPE_BIGINT);
+                return 0; // NOT REACHED
+            }
+        }
 
     int64_t castAsRawInt64AndGetValue() const {
         const ValueType type = getValueType();
@@ -1493,29 +1547,11 @@ class NValue {
 
     }
 
-    int compareAnyIntegerValue (const NValue rhs) const {
+    int compareAnyIntegerValueWithoutNull (const NValue rhs) const {
         int64_t lhsValue, rhsValue;
-
         // get the right hand side as a bigint
-        if (rhs.getValueType() != VALUE_TYPE_BIGINT) rhsValue = rhs.castAsBigIntAndGetValue();
-        else rhsValue = rhs.getBigInt();
-
-        // convert the left hand side
-        switch(getValueType()) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_TIMESTAMP:
-            lhsValue = castAsBigIntAndGetValue(); break;
-        case VALUE_TYPE_BIGINT:
-            lhsValue = getBigInt(); break;
-        default: {
-            throwDynamicSQLException(
-                    "non comparable types lhs '%s' rhs '%s'",
-                    getValueTypeString().c_str(),
-                    rhs.getValueTypeString().c_str());
-        }
-        }
+        lhsValue = castAsBigIntAndGetValueWithoutNull();
+        rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
 
         // do the comparison
         if (lhsValue == rhsValue) {
@@ -1527,47 +1563,21 @@ class NValue {
         }
     }
 
-    int compareDoubleValue (const NValue rhs) const {
-        const double lhsValue = getDouble();
-        double rhsValue;
-
-        switch (rhs.getValueType()) {
-            case VALUE_TYPE_DOUBLE:
-                rhsValue = rhs.getDouble();
-                break;
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
-            case VALUE_TYPE_TIMESTAMP:
-                rhsValue = rhs.castAsDouble().getDouble();
-                break;
-            case VALUE_TYPE_DECIMAL:
-                rhsValue = rhs.castAsDoubleAndGetValue();
-                break;
-            default:
-                char message[128];
-                snprintf(message, 128,
-                         "Type %s cannot be cast for comparison to type %s",
-                         valueToString(rhs.getValueType()).c_str(),
-                         valueToString(getValueType()).c_str());
-                throw SQLException(SQLException::
-                                   data_exception_most_specific_type_mismatch,
-                                   message);
-                // Not reached
-                return 0;
-        }
-
-        // Add null type comparison
-        if (isNull()) {
-            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
-        }
-        else if (rhs.isNull()) {
+    template<typename T>
+    int compareValueWithoutNull (const T lhsValue, const T rhsValue) const {
+        if (lhsValue == rhsValue) {
+            return VALUE_COMPARE_EQUAL;
+        } else if (lhsValue > rhsValue) {
             return VALUE_COMPARE_GREATERTHAN;
+        } else {
+            return VALUE_COMPARE_LESSTHAN;
         }
+    }
+
+    int compareDoubleValueWithoutNull (const double lhsValue, const double rhsValue) const {
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        else if (std::isnan(lhsValue)) {
+        if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (std::isnan(rhsValue)) {
@@ -1584,30 +1594,169 @@ class NValue {
         }
     }
 
-    int compareStringValue (const NValue rhs) const {
-        if ((rhs.getValueType() != VALUE_TYPE_VARCHAR) && (rhs.getValueType() != VALUE_TYPE_VARBINARY)) {
+    int compareTinyIntWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_TINYINT);
+
+        // get the right hand side as a bigint
+        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+            return compareDoubleValueWithoutNull(static_cast<double>(getTinyInt()), rhs.getDouble());
+        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+            const TTInt rhsValue = rhs.getDecimal();
+            TTInt lhsValue(static_cast<int64_t>(getTinyInt()));
+            lhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+        } else {
+            int64_t lhsValue, rhsValue;
+            lhsValue = static_cast<int64_t>(getTinyInt());
+            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+        }
+    }
+
+    int compareSmallIntWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_SMALLINT);
+
+        // get the right hand side as a bigint
+        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+            return compareDoubleValueWithoutNull(static_cast<double>(getSmallInt()), rhs.getDouble());
+        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+            const TTInt rhsValue = rhs.getDecimal();
+            TTInt lhsValue(static_cast<int64_t>(getSmallInt()));
+            lhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+        } else {
+            int64_t lhsValue, rhsValue;
+            lhsValue = static_cast<int64_t>(getSmallInt());
+            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+        }
+    }
+
+    int compareIntegerWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_INTEGER);
+
+        // get the right hand side as a bigint
+        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+            return compareDoubleValueWithoutNull(static_cast<double>(getInteger()), rhs.getDouble());
+        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+            const TTInt rhsValue = rhs.getDecimal();
+            TTInt lhsValue(static_cast<int64_t>(getInteger()));
+            lhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+        } else {
+            int64_t lhsValue, rhsValue;
+            lhsValue = static_cast<int64_t>(getInteger());
+            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+        }
+    }
+
+    int compareBigIntWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_BIGINT);
+
+        // get the right hand side as a bigint
+        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+            return compareDoubleValueWithoutNull(static_cast<double>(getBigInt()), rhs.getDouble());
+        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+            const TTInt rhsValue = rhs.getDecimal();
+            TTInt lhsValue(getBigInt());
+            lhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+        } else {
+            int64_t lhsValue, rhsValue;
+            lhsValue = getBigInt();
+            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+        }
+    }
+
+
+    int compareTimestampWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_TIMESTAMP);
+
+        // get the right hand side as a bigint
+        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
+            return compareDoubleValueWithoutNull(static_cast<double>(getTimestamp()), rhs.getDouble());
+        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+            const TTInt rhsValue = rhs.getDecimal();
+            TTInt lhsValue(getTimestamp());
+            lhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+        } else {
+            int64_t lhsValue, rhsValue;
+            lhsValue = getTimestamp();
+            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+        }
+    }
+
+    int compareDoubleValueWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_DOUBLE);
+
+        const double lhsValue = getDouble();
+        double rhsValue;
+
+        switch (rhs.getValueType()) {
+        case VALUE_TYPE_DOUBLE:
+            rhsValue = rhs.getDouble(); break;
+        case VALUE_TYPE_TINYINT:
+            rhsValue = static_cast<double>(rhs.getTinyInt()); break;
+        case VALUE_TYPE_SMALLINT:
+            rhsValue = static_cast<double>(rhs.getSmallInt()); break;
+        case VALUE_TYPE_INTEGER:
+            rhsValue = static_cast<double>(rhs.getInteger()); break;
+        case VALUE_TYPE_BIGINT:
+            rhsValue = static_cast<double>(rhs.getBigInt()); break;
+        case VALUE_TYPE_TIMESTAMP:
+            rhsValue = static_cast<double>(rhs.getTimestamp()); break;
+        case VALUE_TYPE_DECIMAL:
+        {
+            TTInt scaledValue = rhs.getDecimal();
+            TTInt whole(scaledValue);
+            TTInt fractional(scaledValue);
+            whole /= kMaxScaleFactor;
+            fractional %= kMaxScaleFactor;
+            rhsValue = static_cast<double>(whole.ToInt()) +
+                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
+            break;
+        }
+        default:
             char message[128];
             snprintf(message, 128,
-                     "Type %s cannot be cast for comparison to type %s",
-                     valueToString(rhs.getValueType()).c_str(),
-                     valueToString(getValueType()).c_str());
+                    "Type %s cannot be cast for comparison to type %s",
+                    valueToString(rhs.getValueType()).c_str(),
+                    valueToString(getValueType()).c_str());
             throw SQLException(SQLException::
-                               data_exception_most_specific_type_mismatch,
-                               message);
+                    data_exception_most_specific_type_mismatch,
+                    message);
+            // Not reached
         }
-        const char* left = reinterpret_cast<const char*>(getObjectValue());
-        const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
-        if (isNull()) {
-            if (rhs.isNull()) {
-                return VALUE_COMPARE_EQUAL;
-            } else {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-        } else if (rhs.isNull()) {
-            return VALUE_COMPARE_GREATERTHAN;
+
+        return compareDoubleValueWithoutNull(lhsValue, rhsValue);
+    }
+
+    int compareStringValueWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_VARCHAR);
+
+        ValueType rhsType = rhs.getValueType();
+        if ((rhsType != VALUE_TYPE_VARCHAR) && (rhsType != VALUE_TYPE_VARBINARY)) {
+            char message[128];
+            snprintf(message, 128,
+                    "Type %s cannot be cast for comparison to type %s",
+                    valueToString(rhsType).c_str(),
+                    valueToString(m_valueType).c_str());
+            throw SQLException(SQLException::
+                    data_exception_most_specific_type_mismatch,
+                    message);
         }
-        const int32_t leftLength = getObjectLength();
-        const int32_t rightLength = rhs.getObjectLength();
+
+        assert(m_valueType == VALUE_TYPE_VARCHAR);
+
+        const int32_t leftLength = getObjectLengthForVarsWithoutNull();
+        const int32_t rightLength = rhs.getObjectLengthForVarsWithoutNull();
+        const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
+        const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
+
         const int result = ::strncmp(left, right, std::min(leftLength, rightLength));
         if (result == 0 && leftLength != rightLength) {
             if (leftLength > rightLength) {
@@ -1626,30 +1775,25 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareBinaryValue (const NValue rhs) const {
+    int compareBinaryValueWithoutNull (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_VARBINARY);
+
         if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
             char message[128];
             snprintf(message, 128,
                      "Type %s cannot be cast for comparison to type %s",
                      valueToString(rhs.getValueType()).c_str(),
-                     valueToString(getValueType()).c_str());
+                     valueToString(m_valueType).c_str());
             throw SQLException(SQLException::
                                data_exception_most_specific_type_mismatch,
                                message);
         }
-        const char* left = reinterpret_cast<const char*>(getObjectValue());
-        const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
-        if (isNull()) {
-            if (rhs.isNull()) {
-                return VALUE_COMPARE_EQUAL;
-            } else {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-        } else if (rhs.isNull()) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
-        const int32_t leftLength = getObjectLength();
-        const int32_t rightLength = rhs.getObjectLength();
+        const int32_t leftLength = getObjectLengthForVarsWithoutNull();
+        const int32_t rightLength = rhs.getObjectLengthForVarsWithoutNull();
+
+        const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
+        const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
+
         const int result = ::memcmp(left, right, std::min(leftLength, rightLength));
         if (result == 0 && leftLength != rightLength) {
             if (leftLength > rightLength) {
@@ -1668,65 +1812,71 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareDecimalValue(const NValue rhs) const {
+    int compareDecimalValueWithoutNull(const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_DECIMAL);
         switch (rhs.getValueType()) {
-          // create the equivalent decimal value
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          {
-              const TTInt lhsValue = getDecimal();
-              const TTInt rhsValue = rhs.castAsDecimalAndGetValue();
+        case VALUE_TYPE_DECIMAL:
+        {
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhs.getDecimal());
+        }
+        case VALUE_TYPE_DOUBLE:
+        {
+            const double rhsValue = rhs.getDouble();
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            TTInt fractional(scaledValue);
+            whole /= kMaxScaleFactor;
+            fractional %= kMaxScaleFactor;
+            const double lhsValue = static_cast<double>(whole.ToInt()) +
+                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
 
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_DECIMAL:
-          {
-              const TTInt lhsValue = getDecimal();
-              const TTInt rhsValue = rhs.getDecimal();
-
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_DOUBLE:
-          {
-              const double lhsValue = castAsDoubleAndGetValue();
-              const double rhsValue = rhs.getDouble();
-
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          default:
-          {
-              char message[128];
-              snprintf(message, 128,
-                       "Type %s cannot be cast for comparison to type %s",
-                       valueToString(rhs.getValueType()).c_str(),
-                       valueToString(getValueType()).c_str());
-              throw SQLException(SQLException::
-                                 data_exception_most_specific_type_mismatch,
-                                 message);
-              // Not reached
-              return 0;
-          }
-       }
+            return compareValueWithoutNull<double>(lhsValue, rhsValue);
+        }
+        // create the equivalent decimal value
+        case VALUE_TYPE_TINYINT:
+        {
+            TTInt rhsValue(static_cast<int64_t>(rhs.getTinyInt()));
+            rhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+        }
+        case VALUE_TYPE_SMALLINT:
+        {
+            TTInt rhsValue(static_cast<int64_t>(rhs.getSmallInt()));
+            rhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+        }
+        case VALUE_TYPE_INTEGER:
+        {
+            TTInt rhsValue(static_cast<int64_t>(rhs.getInteger()));
+            rhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+        }
+        case VALUE_TYPE_BIGINT:
+        {
+            TTInt rhsValue(rhs.getBigInt());
+            rhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+        }
+        case VALUE_TYPE_TIMESTAMP:
+        {
+            TTInt rhsValue(rhs.getTimestamp());
+            rhsValue *= NValue::kMaxScaleFactor;
+            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+        }
+        default:
+        {
+            char message[128];
+            snprintf(message, 128,
+                    "Type %s cannot be cast for comparison to type %s",
+                    valueToString(rhs.getValueType()).c_str(),
+                    valueToString(getValueType()).c_str());
+            throw SQLException(SQLException::
+                    data_exception_most_specific_type_mismatch,
+                    message);
+            // Not reached
+            return 0;
+        }
+        }
     }
 
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
@@ -2166,44 +2316,76 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
 }
 
 /**
+ * This null compare function works for GROUP BY, ORDER BY, INDEX KEY, etc,
+ * except for comparison expression.
+ * comparison expression has different logic for null.
+ */
+inline int NValue::compareNull(const NValue rhs) const {
+    bool lnull = isNull();
+    bool rnull = rhs.isNull();
+
+    if (lnull) {
+        if (rnull) {
+            return VALUE_COMPARE_EQUAL;
+        } else {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+    } else if (rnull) {
+        return VALUE_COMPARE_GREATERTHAN;
+    }
+    return VALUE_COMPARE_INVALID;
+}
+
+/**
+ * Assuming no nulls are in comparison.
  * Compare any two NValues. Comparison is not guaranteed to
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.
  */
-inline int NValue::compare(const NValue rhs) const {
-    switch (getValueType()) {
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return castAsDouble().compareDoubleValue(rhs);
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
-            return -1 * rhs.compareDecimalValue(*this);
-        } else {
-            return compareAnyIntegerValue(rhs);
-        }
-    case VALUE_TYPE_TIMESTAMP:
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return castAsDouble().compareDoubleValue(rhs);
-        } else {
-            return compareAnyIntegerValue(rhs);
-        }
-    case VALUE_TYPE_DOUBLE:
-        return compareDoubleValue(rhs);
+inline int NValue::compareWithoutNull(const NValue rhs) const {
+    assert(isNull() == false && rhs.isNull() == false);
+
+    switch (m_valueType) {
     case VALUE_TYPE_VARCHAR:
-        return compareStringValue(rhs);
+        return compareStringValueWithoutNull(rhs);
+    case VALUE_TYPE_BIGINT:
+        return compareBigIntWithoutNull(rhs);
+    case VALUE_TYPE_INTEGER:
+        return compareIntegerWithoutNull(rhs);
+    case VALUE_TYPE_SMALLINT:
+        return compareSmallIntWithoutNull(rhs);
+    case VALUE_TYPE_TINYINT:
+        return compareTinyIntWithoutNull(rhs);
+    case VALUE_TYPE_TIMESTAMP:
+        return compareTimestampWithoutNull(rhs);
+    case VALUE_TYPE_DOUBLE:
+        return compareDoubleValueWithoutNull(rhs);
     case VALUE_TYPE_VARBINARY:
-        return compareBinaryValue(rhs);
+        return compareBinaryValueWithoutNull(rhs);
     case VALUE_TYPE_DECIMAL:
-        return compareDecimalValue(rhs);
+        return compareDecimalValueWithoutNull(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
                 getValueTypeString().c_str(),
                 rhs.getValueTypeString().c_str());
     }
+    /* no break */
     }
+}
+
+/**
+ * Compare any two NValues. Comparison is not guaranteed to
+ * succeed if the values are incompatible.  Avoid use of
+ * comparison in favor of op_*.
+ */
+inline int NValue::compare(const NValue rhs) const {
+    int hasNullCompare = compareNull(rhs);
+    if (hasNullCompare != VALUE_COMPARE_INVALID) {
+        return hasNullCompare;
+    }
+
+    return compareWithoutNull(rhs);
 }
 
 /**
@@ -2261,47 +2443,21 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     NValue retval(type);
     switch (type)
     {
-    case VALUE_TYPE_TIMESTAMP:
-        retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage);
-        if (retval.getTimestamp() == INT64_NULL) {
-            retval.tagAsNull();
-        }
-        break;
-    case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage);
-        if (retval.getTinyInt() == INT8_NULL) {
-            retval.tagAsNull();
-        }
-        break;
-    case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage);
-        if (retval.getSmallInt() == INT16_NULL) {
-            retval.tagAsNull();
-        }
-        break;
     case VALUE_TYPE_INTEGER:
-        retval.getInteger() = *reinterpret_cast<const int32_t*>(storage);
-        if (retval.getInteger() == INT32_NULL) {
+        if ((retval.getInteger() = *reinterpret_cast<const int32_t*>(storage)) == INT32_NULL) {
             retval.tagAsNull();
         }
         break;
     case VALUE_TYPE_BIGINT:
-        retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage);
-        if (retval.getBigInt() == INT64_NULL) {
+        if ((retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
             retval.tagAsNull();
         }
         break;
     case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = *reinterpret_cast<const double*>(storage);
-        if (retval.getDouble() <= DOUBLE_NULL) {
+        if ((retval.getDouble() = *reinterpret_cast<const double*>(storage)) <= DOUBLE_NULL) {
             retval.tagAsNull();
         }
         break;
-    case VALUE_TYPE_DECIMAL:
-    {
-        ::memcpy(retval.m_data, storage, sizeof(TTInt));
-        break;
-    }
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     {
@@ -2309,8 +2465,8 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         if (isInlined) {
             //If it is inlined the storage area contains the actual data so copy a reference
             //to the storage area
-            char* inline_data = reinterpret_cast<char*>(const_cast<void*>(storage));
-            *reinterpret_cast<char**>(retval.m_data) = inline_data;
+            const char* inline_data = reinterpret_cast<const char*>(storage);
+            *reinterpret_cast<const char**>(retval.m_data) = inline_data;
             retval.setSourceInlined(true);
             /**
              * If a string is inlined in its storage location there will be no pointer to
@@ -2373,9 +2529,30 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         retval.setObjectLength(length); // this unsets the null tag.
         break;
     }
+    case VALUE_TYPE_TIMESTAMP:
+        if ((retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage)) == INT64_NULL) {
+            retval.tagAsNull();
+        }
+        break;
+    case VALUE_TYPE_TINYINT:
+        if ((retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage)) == INT8_NULL) {
+            retval.tagAsNull();
+        }
+        break;
+    case VALUE_TYPE_SMALLINT:
+        if ((retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage)) == INT16_NULL) {
+            retval.tagAsNull();
+        }
+        break;
+    case VALUE_TYPE_DECIMAL:
+    {
+        ::memcpy(retval.m_data, storage, sizeof(TTInt));
+        break;
+    }
     default:
         throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                                  getTypeName(type).c_str());
+                                 /* no break */
     }
     return retval;
 }
@@ -2845,6 +3022,7 @@ inline bool NValue::isNaN() const {
     return false;
 }
 
+// general full comparison
 inline NValue NValue::op_equals(const NValue rhs) const {
     return compare(rhs) == 0 ? getTrue() : getFalse();
 }
@@ -2869,22 +3047,45 @@ inline NValue NValue::op_greaterThanOrEqual(const NValue rhs) const {
     return compare(rhs) >= 0 ? getTrue() : getFalse();
 }
 
+// without null comparison
+inline NValue NValue::op_equals_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) == 0 ? getTrue() : getFalse();
+}
+
+inline NValue NValue::op_notEquals_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) != 0 ? getTrue() : getFalse();
+}
+
+inline NValue NValue::op_lessThan_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) < 0 ? getTrue() : getFalse();
+}
+
+inline NValue NValue::op_lessThanOrEqual_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) <= 0 ? getTrue() : getFalse();
+}
+
+inline NValue NValue::op_greaterThan_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) > 0 ? getTrue() : getFalse();
+}
+
+inline NValue NValue::op_greaterThanOrEqual_withoutNull(const NValue rhs) const {
+    return compareWithoutNull(rhs) >= 0 ? getTrue() : getFalse();
+}
+
 inline NValue NValue::op_max(const NValue rhs) const {
-    const int value = compare(rhs);
-    if (value > 0) {
+    if (compare(rhs) > 0) {
         return *this;
     } else {
         return rhs;
-        }
+    }
 }
 
 inline NValue NValue::op_min(const NValue rhs) const {
-    const int value = compare(rhs);
-    if (value < 0) {
+    if (compare(rhs) < 0) {
         return *this;
     } else {
         return rhs;
-        }
+    }
 }
 
 inline NValue NValue::getNullValue(ValueType type) {
@@ -3233,13 +3434,7 @@ inline int32_t NValue::murmurHash3() const {
  * and the RHS should always be the LIKE expression. The planner or EE
  * needs to enforce this.
  */
-inline NValue NValue::like(const NValue rhs) const {
-    const bool lhsIsNull = isNull();
-    const bool rhsIsNull = rhs.isNull();
-    if (lhsIsNull || rhsIsNull) {
-        return getFalse();
-    }
-
+inline NValue NValue::like_withoutNull(const NValue rhs) const {
     /*
      * Validate that all params are VARCHAR
      */
