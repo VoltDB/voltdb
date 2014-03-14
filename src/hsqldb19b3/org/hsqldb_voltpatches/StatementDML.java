@@ -1334,7 +1334,7 @@ public class StatementDML extends StatementDMQL {
                 "VoltDB does not support DML statements of type " + type);
         }
 
-        voltAppendParameters(session, xml);
+        voltAppendParameters(session, xml, parameters);
         xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }

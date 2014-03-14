@@ -104,6 +104,8 @@ class TableLoader {
             case ClientResponse.GRACEFUL_FAILURE:
                 // all graceful failures but this one fall through to death
                 if (clientResponse.getStatusString().contains("CONSTRAINT VIOLATION")) {
+                    log.info("CONSTRAINT VIOLATION: for pkey: " + pkey
+                            + " Details: " + ((ClientResponseImpl) clientResponse).toJSONString());
                     break;
                 }
             case ClientResponse.UNEXPECTED_FAILURE:

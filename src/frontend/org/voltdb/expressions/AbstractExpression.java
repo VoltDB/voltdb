@@ -29,8 +29,9 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -940,26 +941,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
-            }
-        }
-    }
-
-    /** Associate underlying TupleValueExpressions with columns in the schema
-     * and propagate the type implications to parent expressions.
-     */
-    public void resolveForDB(Database db) {
-        resolveChildrenForDB(db);
-    }
-
-    /** Do the recursive part of resolveForDB as required for tree-structured expession types. */
-    protected final void resolveChildrenForDB(Database db) {
-        if (m_left != null)
-            m_left.resolveForDB(db);
-        if (m_right != null)
-            m_right.resolveForDB(db);
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                argument.resolveForDB(db);
             }
         }
     }

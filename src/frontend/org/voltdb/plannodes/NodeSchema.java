@@ -147,6 +147,23 @@ public class NodeSchema
         return copy;
     }
 
+    public NodeSchema replaceTableClone(String tableAlias) {
+        NodeSchema copy = new NodeSchema();
+        for (int i = 0; i < m_columns.size(); ++i)
+        {
+            SchemaColumn col = m_columns.get(i);
+            String colAlias = col.getColumnAlias();
+
+            TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
+            tve.setValueType(col.getType());
+            tve.setValueSize(col.getSize());
+            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve);
+            copy.addColumn(sc);
+        }
+
+        return copy;
+    }
+
     @Override
     public boolean equals (Object obj) {
         if (obj == null) return false;

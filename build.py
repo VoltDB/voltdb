@@ -53,7 +53,7 @@ if compiler_name == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
 
-if compiler_name == 'clang':
+if (compiler_name == 'clang') and (compiler_major == 3 and compiler_minor >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
 if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):

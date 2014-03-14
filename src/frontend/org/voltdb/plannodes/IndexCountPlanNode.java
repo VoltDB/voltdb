@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -40,6 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -88,10 +90,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public IndexCountPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     private IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn,
                                IndexLookupType endType, List<AbstractExpression> endKeys)
     {
-        super();
+        super(isp.m_targetTableName, isp.m_targetTableAlias);
 
         m_catalogIndex = isp.m_catalogIndex;
 
@@ -99,8 +106,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_tableSchema = isp.m_tableSchema;
         m_tableScanSchema = isp.m_tableScanSchema.clone();
 
-        m_targetTableAlias = isp.m_targetTableAlias;
-        m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
         m_tableScan = isp.getTableScan();
@@ -320,10 +325,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
             indexes.add(m_targetIndexName);

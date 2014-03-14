@@ -48,10 +48,6 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestPlansJoin extends PlannerTestCase {
 
-    public void testJoin() {
-        compile("select R1.a, r1.c, R2.a, r2.c, R3.a, r3.c FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R1.C = R3.c");
-    }
-
     public void testBasicInnerJoin() {
         // select * with ON clause should return all columns from all tables
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C");

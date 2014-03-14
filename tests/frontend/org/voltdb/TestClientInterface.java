@@ -99,6 +99,7 @@ public class TestClientInterface {
     private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<DeferredSerialization>();
     private int drStatsInvoked = 0;
     private StatsAgent m_statsAgent = new StatsAgent() {
+        @Override
         public void performOpsAction(final Connection c, final long clientHandle, final OpsSelector selector,
                                      final ParameterSet params) throws Exception {
             final String stat = (String)params.toArray()[0];
@@ -488,6 +489,16 @@ public class TestClientInterface {
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, true, true).getStoredProcedureInvocation();
         assertEquals(1, invocation.getParameterAtIndex(0));
+    }
+
+    @Test
+    public void testGC() throws Exception {
+        ByteBuffer msg = createMsg("@GC");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        //System.gc() should take at least a little time
+        assertTrue(Long.valueOf(resp.getStatusString()) > 10000);
     }
 
     @Test

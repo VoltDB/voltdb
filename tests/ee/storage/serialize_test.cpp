@@ -198,8 +198,10 @@ TEST_F(TableSerializeTest, NullStrings) {
     TableTuple t(deserialized->schema());
     int count = 0;
     while (iter.next(t)) {
-        EXPECT_EQ(VALUE_TYPE_VARCHAR, tuple.getType(0));
-        EXPECT_EQ(VALUE_TYPE_VARCHAR, t.getType(0));
+        const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, columnInfo->getVoltType());
+        const TupleSchema::ColumnInfo *tcolumnInfo = t.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, tcolumnInfo->getVoltType());
         EXPECT_TRUE(tuple.getNValue(0).isNull());
         EXPECT_TRUE(t.getNValue(0).isNull());
         EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(tuple.getNValue(0)).isTrue());
