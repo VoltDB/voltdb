@@ -86,7 +86,7 @@ public class TestCatalogVersionUpgrade extends TestCase {
         InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
         CatalogUpgradeTools.dorkVersion(memCatalog);
         // Squizzle creation is no longer supported.
-        CatalogUpgradeTools.dorkCatalogDDL(memCatalog, "CREATE SQUIZZLE");
+        CatalogUpgradeTools.dorkDDL(memCatalog, "CREATE SQUIZZLE");
 
         // Check the (hopefully) upgraded catalog version against the server version.
         try {
@@ -116,7 +116,7 @@ public class TestCatalogVersionUpgrade extends TestCase {
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
         CatalogUpgradeTools.dorkVersion(memCatalog);
-        CatalogUpgradeTools.dorkCatalogDDL(memCatalog,
+        CatalogUpgradeTools.dorkDDL(memCatalog,
             "CREATE PROCEDURE groovy.procedures.SelectItem AS ### \n" +
             "  selectItem = new SQLStmt('SELECT I_ID, I_NAME FROM ITEM WHERE I_ID = ?') \n" +
             "  transactOn = { id -> \n" +
