@@ -666,8 +666,7 @@ public class ExportGeneration {
         }
     }
 
-    public void pushExportBuffer(int partitionId, String signature, long uso,
-            long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
@@ -679,7 +678,7 @@ public class ExportGeneration {
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
                     + partitionId + " generation " + m_timestamp + " the export data is being discarded");
-            DBBPool.deleteCharArrayMemory(bufferPtr);
+            DBBPool.wrapBB(buffer).discard();
             return;
         }
 
@@ -688,11 +687,11 @@ public class ExportGeneration {
             exportLog.error("Could not find export data source for partition " + partitionId +
                     " signature " + signature + " generation " +
                     m_timestamp + " the export data is being discarded");
-            DBBPool.deleteCharArrayMemory(bufferPtr);
+            DBBPool.wrapBB(buffer).discard();
             return;
         }
 
-        source.pushExportBuffer(uso, bufferPtr, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync, endOfStream);
     }
 
     public void closeAndDelete() throws IOException {

@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +27,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 
 /**
@@ -109,14 +107,16 @@ public abstract class NIOWriteStreamBase {
             final int serializedSize = ds.getSerializedSize();
             if (serializedSize == -1) continue;
             BBContainer outCont = m_queuedBuffers.peekLast();
-            if (outCont == null || !outCont.b.hasRemaining()) {
+            ByteBuffer outbuf = null;
+            if (outCont == null || !outCont.b().hasRemaining()) {
                 outCont = pool.acquire();
-                outCont.b.clear();
+                outbuf = outCont.b();
+                outbuf.clear();
                 m_queuedBuffers.offer(outCont);
             }
+
             //Fastpath, serialize to direct buffer creating no garbage
-            if (outCont.b.remaining() >= serializedSize) {
-                final ByteBuffer outbuf = outCont.b;
+            if (outbuf.remaining() >= serializedSize) {
                 final int oldLimit = outbuf.limit();
                 outbuf.limit(outbuf.position() + serializedSize);
                 final ByteBuffer slice = outbuf.slice();
@@ -134,17 +134,18 @@ public abstract class NIOWriteStreamBase {
                 buf.position(0);
                 bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
-                    if (!outCont.b.hasRemaining()) {
+                    if (outbuf.hasRemaining()) {
                         outCont = pool.acquire();
-                        outCont.b.clear();
+                        outbuf = outCont.b();
+                        outbuf.clear();
                         m_queuedBuffers.offer(outCont);
                     }
-                    if (outCont.b.remaining() >= buf.remaining()) {
-                        outCont.b.put(buf);
+                    if (outbuf.remaining() >= buf.remaining()) {
+                        outbuf.put(buf);
                     } else {
                         final int oldLimit = buf.limit();
-                        buf.limit(buf.position() + outCont.b.remaining());
-                        outCont.b.put(buf);
+                        buf.limit(buf.position() + outbuf.remaining());
+                        outbuf.put(buf);
                         buf.limit(oldLimit);
                     }
                 }
@@ -189,13 +190,13 @@ public abstract class NIOWriteStreamBase {
         m_isShutdown = true;
         BBContainer c = null;
         if (m_currentWriteBuffer != null) {
-            bytesReleased += m_currentWriteBuffer.b.remaining();
+            bytesReleased += m_currentWriteBuffer.b().remaining();
             m_currentWriteBuffer.discard();
         }
         while ((c = m_queuedBuffers.poll()) != null) {
             //Buffer is not flipped after being written to in swap and serialize, need to do it here
-            c.b.flip();
-            bytesReleased += c.b.remaining();
+            c.b().flip();
+            bytesReleased += c.b().remaining();
             c.discard();
         }
         updateQueued(-bytesReleased, false);

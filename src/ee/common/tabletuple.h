@@ -146,7 +146,9 @@ public:
         size_t bytes = 0;
         int cols = sizeInValues();
         for (int i = 0; i < cols; ++i) {
-            switch (getType(i)) {
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            switch (columnType) {
               case VALUE_TYPE_TINYINT:
               case VALUE_TYPE_SMALLINT:
               case VALUE_TYPE_INTEGER:
@@ -176,7 +178,7 @@ public:
                 // let caller handle this error
                 throwDynamicSQLException(
                         "Unknown ValueType %s found during Export serialization.",
-                        valueToString(getType(i)).c_str() );
+                        valueToString(columnType).c_str() );
                 return (size_t)0;
             }
         }
@@ -194,8 +196,10 @@ public:
             for (int i = 0; i < cols; ++i)
             {
                 // peekObjectLength is unhappy with non-varchar
-                if (((getType(i) == VALUE_TYPE_VARCHAR) || (getType(i) == VALUE_TYPE_VARBINARY)) &&
-                    !m_schema->columnIsInlined(i))
+                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+                voltdb::ValueType columnType = columnInfo->getVoltType();
+                if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
+                    !columnInfo->inlined)
                 {
                     if (!getNValue(i).isNull())
                     {
@@ -259,11 +263,6 @@ public:
         return m_data == NULL;
     }
 
-    /** Get the type of a particular column in the tuple */
-    inline ValueType getType(int idx) const {
-        return m_schema->columnType(idx);
-    }
-
     /** Get the value of a specified column (const) */
     //not performant because it has to check the schema to see how to
     //return the SlimValue.
@@ -272,10 +271,11 @@ public:
         assert(m_data);
         assert(idx < m_schema->columnCount());
 
-        //assert(isActive());
-        const voltdb::ValueType columnType = m_schema->columnType(idx);
-        const char* dataPtr = getDataPtr(idx);
-        const bool isInlined = m_schema->columnIsInlined(idx);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        const voltdb::ValueType columnType = columnInfo->getVoltType();
+        const char* dataPtr = getDataPtr(columnInfo);
+        const bool isInlined = columnInfo->inlined;
+
         return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
@@ -357,16 +357,16 @@ private:
      */
     char *m_data;
 
-    inline char* getDataPtr(const int idx) {
+    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
         assert(m_schema);
         assert(m_data);
-        return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
+        return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline const char* getDataPtr(const int idx) const {
+    inline const char* getDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
         assert(m_schema);
         assert(m_data);
-        return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
+        return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 };
 
@@ -480,11 +480,12 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     assert(m_schema);
     assert(m_data);
-    const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    value = value.castAs(columnInfo->getVoltType());
+    const bool isInlined = columnInfo->inlined;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 
@@ -494,7 +495,6 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
     assert(lhs.getSchema());
     assert(beginIdx + end - begin <= sizeInValues());
     while (begin != end) {
-        assert(m_schema->columnType(beginIdx) == lhs.getSchema()->columnType(begin));
         setNValue(beginIdx++, lhs.getNValue(begin++));
     }
 }
@@ -506,12 +506,13 @@ inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
 {
     assert(m_schema);
     assert(m_data);
-    //assert(isActive())
-    const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    voltdb::ValueType columnType = columnInfo->getVoltType();
+    value = value.castAs(columnType);
+    bool isInlined = columnInfo->inlined;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
+
     value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
                                                     columnLength, dataPool);
 }
@@ -604,8 +605,10 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
          */
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             if (ii == nextUninlineableObjectColumnInfoIndex) {
-                char *       *mPtr = reinterpret_cast<char**>(getDataPtr(ii));
-                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(ii));
+                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
+                char *       *mPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
+                const TupleSchema::ColumnInfo *sourceColumnInfo = source.getSchema()->getColumnInfo(ii);
+                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(sourceColumnInfo));
                 if (*mPtr != *oPtr) {
                     // Make a copy of the input string. Don't want to delete the old string
                     // because it's either from the temp pool or persistently referenced elsewhere.
@@ -689,7 +692,9 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
 
     tupleIn.readInt();
     for (int j = 0; j < m_schema->columnCount(); ++j) {
-        const ValueType type = m_schema->columnType(j);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
+        const voltdb::ValueType type = columnInfo->getVoltType();
+
         /**
          * Hack hack. deserializeFrom is only called when we serialize
          * and deserialize tables. The serialization format for
@@ -702,10 +707,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
          * TableTuple. The memory allocation will be performed when
          * serializing to tuple storage.
          */
-        const bool isInlined = m_schema->columnIsInlined(j);
-        char *dataPtr = getDataPtr(j);
-        const int32_t columnLength = m_schema->columnLength(j);
-        NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, columnLength, dataPool);
+        char *dataPtr = getWritableDataPtr(columnInfo);
+        NValue::deserializeFrom(tupleIn, type, dataPtr, columnInfo->inlined, columnInfo->length, dataPool);
     }
 }
 
@@ -767,7 +770,8 @@ inline void TableTuple::setAllNulls() {
     assert(m_data);
 
     for (int ii = 0; ii < m_schema->columnCount(); ++ii) {
-        NValue value = NValue::getNullValue(m_schema->columnType(ii));
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
+        NValue value = NValue::getNullValue(columnInfo->getVoltType());
         setNValue(ii, value);
     }
 }
@@ -807,7 +811,9 @@ inline void TableTuple::freeObjectColumns() {
     const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
     std::vector<char*> oldObjects;
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {
-        char** dataPtr = reinterpret_cast<char**>(getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
+        int idx = m_schema->getUninlinedObjectColumnInfoIndex(ii);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        char** dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
         oldObjects.push_back(*dataPtr);
     }
     NValue::freeObjectsFromTupleStorage(oldObjects);

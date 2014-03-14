@@ -60,6 +60,7 @@
 #include <sys/types.h>
 #include <sys/sysinfo.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include <unistd.h>
 #ifndef __USE_GNU
 #define  __USE_GNU
@@ -94,6 +95,7 @@
 
 #include "org_voltdb_jni_ExecutionEngine.h" // the header file output by javah
 #include "org_voltcore_utils_DBBPool.h" //Utility method for DBBContainer
+#include "org_voltdb_utils_PosixAdvise.h" //Utility method for invoking madvise/fadvise
 
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_array.hpp"
@@ -629,29 +631,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-}
-
-/*
- * Class:     org_voltcore_utils_DBBPool
- * Method:    getBufferAddress
- * Signature: (Ljava/nio/ByteBuffer;)J
- *
- * Returns the native address of the provided DirectByteBuffer as a long
- * @param env Pointer to the JNIEnv for this thread
- * @param obj Pointer to the object on which this method was called
- * @param buffer DirectByteBuffer
- * @return Native address of the DirectByteBuffer as a long
- */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress
-  (JNIEnv *env, jclass clazz, jobject buffer)
-{
-    void *address = env->GetDirectBufferAddress(buffer);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        return (jlong)address;
-    }
-    assert(address);
-    return reinterpret_cast<jlong>(address);
 }
 
 /*
@@ -1289,13 +1268,72 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
 
 /*
  * Class:     org_voltcore_utils_DBBPool
- * Method:    deleteCharArrayMemory
+ * Method:    nativeDeleteCharArrayMemory
  * Signature: (J)V
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_nativeDeleteCharArrayMemory
   (JNIEnv *env, jclass clazz, jlong ptr) {
     delete[] reinterpret_cast<char*>(ptr);
 }
+
+/*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    nativeAllocateUnsafeByteBuffer
+ * Signature: (J)Ljava/nio/ByteBuffer;
+ */
+SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_nativeAllocateUnsafeByteBuffer
+  (JNIEnv *jniEnv, jclass, jlong size) {
+    char *memory = new char[size];
+    jobject buffer = jniEnv->NewDirectByteBuffer( memory, size);
+    if (buffer == NULL) {
+        jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+    return buffer;
+}
+
+/*
+ * Class:     org_voltdb_utils_PosixAdvise
+ * Method:    madvise
+ * Signature: (JJI)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_madvise
+  (JNIEnv *, jclass, jlong addr, jlong length, jint advice) {
+#ifdef LINUX
+    return posix_madvise(reinterpret_cast<void*>(addr), static_cast<size_t>(length), advice);
+#else
+    return 0;
+#endif
+}
+
+/*
+ * Class:     org_voltdb_utils_PosixAdvise
+ * Method:    fadvise
+ * Signature: (JJJI)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
+  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+#ifdef LINUX
+    return posix_fadvise(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+#else
+    return 0;
+#endif
+}
+
+/*
+ * Class:     org_voltdb_utils_PosixAdvise
+ * Method:    fallocate
+ * Signature: (JJJ)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
+  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+#ifdef MACOSX
+    return -1;
+#else
+    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+#endif
+}
+
 
 JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
   (JNIEnv *env, jobject obj, jlong engine_ptr) {

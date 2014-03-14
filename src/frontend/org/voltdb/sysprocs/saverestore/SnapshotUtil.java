@@ -808,7 +808,7 @@ public class SnapshotUtil {
                     }
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
-                    TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
+                    TableSaveFile saveFile = new TableSaveFile(fis, 1, null, true);
                     try {
                         for (Integer partitionId : saveFile.getPartitionIds()) {
                             partitionIds.add(partitionId);
@@ -1419,9 +1419,9 @@ public class SnapshotUtil {
 
         buf.putInt(outputContainers.size());
         for (DBBPool.BBContainer container : outputContainers) {
-            buf.putLong(container.address);
-            buf.putInt(container.b.position());
-            buf.putInt(container.b.remaining());
+            buf.putLong(container.address());
+            buf.putInt(container.b().position());
+            buf.putInt(container.b().remaining());
         }
 
         return buf.array();

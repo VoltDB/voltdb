@@ -80,7 +80,9 @@ bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *t
     assert(table);
     assert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
-        voltdb::NValue value = voltdb::getRandomValue(table->schema()->columnType(col_ctr));
+        const TupleSchema::ColumnInfo *columnInfo = table->schema()->getColumnInfo(col_ctr);
+        voltdb::NValue value = voltdb::getRandomValue(columnInfo->getVoltType());
+
         tuple->setNValue(col_ctr, value);
 
         /*
@@ -88,9 +90,10 @@ bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *t
          * if the pointer wasn't transferred into the tuple.
          * The pointer won't be transferred into the tuple if the schema has that column inlined.
          */
-        voltdb::ValueType t = tuple->getSchema()->columnType(col_ctr);
-        if (((t == voltdb::VALUE_TYPE_VARCHAR) || (t == voltdb::VALUE_TYPE_VARBINARY)) &&
-                tuple->getSchema()->columnIsInlined(col_ctr)) {
+        const TupleSchema::ColumnInfo *tupleColumnInfo = tuple->getSchema()->getColumnInfo(col_ctr);
+
+        const voltdb::ValueType t = tupleColumnInfo->getVoltType();
+        if (((t == voltdb::VALUE_TYPE_VARCHAR) || (t == voltdb::VALUE_TYPE_VARBINARY)) && tupleColumnInfo->inlined) {
             value.free();
         }
     }

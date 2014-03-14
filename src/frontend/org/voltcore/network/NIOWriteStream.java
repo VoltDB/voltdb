@@ -22,14 +22,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
-import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
 *
@@ -120,6 +116,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return m_hadBackPressure;
     }
 
+    @Override
     protected synchronized ArrayDeque<DeferredSerialization> getQueuedWrites() {
         ArrayDeque<DeferredSerialization> oldlist;
         if (m_queuedWrites.isEmpty()) return m_queuedWrites;
@@ -202,6 +199,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * related on the network thread, so the entire thing can just
      * go in the queue directly without acquiring any additional locks
      */
+    @Override
     public void fastEnqueue(final DeferredSerialization ds) {
         m_port.queueTask(new Runnable() {
             @Override
@@ -273,8 +271,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * Free the pool resources that are held by this WriteStream. The pool itself is thread local
      * and will be freed when the thread terminates.
      */
+    @Override
     synchronized void shutdown() {
-        super.shutdown();
         DeferredSerialization ds = null;
         while ((ds = m_queuedWrites.poll()) != null) {
             ds.cancel();
@@ -298,6 +296,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
     }
 
+    @Override
     protected void updateQueued(int queued, boolean noBackpressureSignal) {
         if (m_monitor != null) {
             boolean shouldSignalBackpressure = m_monitor.queue(queued);
@@ -318,6 +317,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * @return
      * @throws IOException
      */
+    @Override
     int drainTo (final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
         long rc = 0;
@@ -338,10 +338,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             ByteBuffer buffer = null;
             if (m_currentWriteBuffer == null) {
                 m_currentWriteBuffer = m_queuedBuffers.poll();
-                buffer = m_currentWriteBuffer.b;
+                buffer = m_currentWriteBuffer.b();
                 buffer.flip();
             } else {
-                buffer = m_currentWriteBuffer.b;
+                buffer = m_currentWriteBuffer.b();
             }
 
             rc = channel.write(buffer);

@@ -231,6 +231,7 @@ JAVA COMPILATION
                   org/voltcore/utils/InstanceId.java
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
+                  org/voltcore/utils/Bits.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java

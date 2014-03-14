@@ -132,8 +132,8 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     }
                     try {
                         int totalWritten = 0;
-                        while (data.b.hasRemaining()) {
-                            int written = m_fc.write(data.b);
+                        while (data.b().hasRemaining()) {
+                            int written = m_fc.write(data.b());
                             if (written > 0) {
                                 m_bytesWritten += written;
                                 totalWritten += written;

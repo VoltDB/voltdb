@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -32,7 +33,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
@@ -40,6 +40,8 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
@@ -87,9 +89,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     private AbstractExpression m_skip_null_predicate;
 
-    // ???
-    protected Boolean m_keyIterate = false;
-
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
 
@@ -112,12 +111,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
-    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
+    public IndexScanPlanNode(StmtTableScan tableScan, Index index) {
         super();
+        setTableScan(tableScan);
+        setCatalogIndex(index);
+    }
+
+    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
+        super(srcNode.m_targetTableName, srcNode.m_targetTableAlias);
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
-        m_targetTableAlias = srcNode.m_targetTableAlias;
-        m_targetTableName = srcNode.m_targetTableName;
         m_tableScanSchema = srcNode.m_tableScanSchema.clone();
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
@@ -193,10 +196,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
@@ -247,30 +250,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return false;
     }
 
-    public void setCatalogIndex(Index index)
+    private void setCatalogIndex(Index index)
     {
         m_catalogIndex = index;
+        m_targetIndexName = index.getTypeName();
     }
 
     public Index getCatalogIndex()
     {
         return m_catalogIndex;
-    }
-
-    /**
-     *
-     * @param keyIterate
-     */
-    public void setKeyIterate(Boolean keyIterate) {
-        m_keyIterate = keyIterate;
-    }
-
-    /**
-     *
-     * @return Does this scan iterate over values in the index.
-     */
-    public Boolean getKeyIterate() {
-        return m_keyIterate;
     }
 
     /**
@@ -309,13 +297,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public String getTargetIndexName() {
         return m_targetIndexName;
-    }
-
-    /**
-     * @param targetIndexName the target_index_name to set
-     */
-    public void setTargetIndexName(String targetIndexName) {
-        m_targetIndexName = targetIndexName;
     }
 
     /**
@@ -449,9 +430,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
+        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
         // get the width of the index and number of columns used
         // need doubles for math
@@ -559,7 +538,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
@@ -591,7 +569,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_purpose = jobj.has(Members.PURPOSE.name()) ?

@@ -126,7 +126,7 @@ public class SchemaColumn
     @Override
     public int hashCode () {
         // based on implementation of equals
-        int result = m_tableName.hashCode();
+        int result = m_tableAlias != null ? m_tableAlias.hashCode() : m_tableName.hashCode();
         if (m_columnName != null && !m_columnName.equals("")) {
             result += m_columnName.hashCode();
         } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
