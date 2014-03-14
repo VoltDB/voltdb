@@ -1422,6 +1422,39 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
+    public void testENG5637() throws IOException, ProcCallException {
+        System.out.println("STARTING testing error message......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String var1LongString = "Voltdb will be successful";
+
+        try {
+            client.callProcedure("VARLENGTH.insert", 1, var1LongString, null);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("Object "+var1LongString+" exceeds specified size."));
+            assertTrue(ex.getMessage().contains("Size is "+var1LongString.length()+" and max is 10"));
+        }
+
+        String var2LongString = "Voltdb will be successful | Voltdb will be successful " +
+                "| Voltdb will be successful | Voltdb will be successful| Voltdb will be successful | Voltdb will be successful" +
+                "| Voltdb will be successful | Voltdb will be successful| Voltdb will be successful | Voltdb will be successful" +
+                "| Voltdb will be successful | Voltdb will be successful| Voltdb will be successful | Voltdb will be successful" +
+                "| Voltdb will be successful | Voltdb will be successful| Voltdb will be successful | Voltdb will be successful";
+        try {
+            client.callProcedure("VARLENGTH.insert", 2, null, var2LongString);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("Object "+var2LongString+" exceeds specified size."));
+            assertTrue(ex.getMessage().contains("Size is "+var2LongString.length()+" and max is 10"));
+        }
+
+    }
+
+
     //
     // JUnit / RegressionSuite boilerplate
     //

@@ -143,3 +143,10 @@ CREATE VIEW V_P3 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
 SELECT wage, dept, count(*), sum(age), sum(rent) FROM P3
 GROUP BY wage, dept;
 
+
+CREATE TABLE VarLength (
+  ID INTEGER DEFAULT '0' NOT NULL,
+  var1 VARCHAR(10),
+  var2 VARCHAR(100),
+  PRIMARY KEY (ID)
+);
