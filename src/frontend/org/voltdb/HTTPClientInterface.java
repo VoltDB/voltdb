@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -35,6 +36,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.CharStreams;
 
 public class HTTPClientInterface {
 
@@ -131,11 +135,26 @@ public class HTTPClientInterface {
                 m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
+            String params;
+            if (request.getMethod().equalsIgnoreCase("POST")) {
+                int queryParamSize = request.getContentLength();
+                if (queryParamSize > 150000) {
+                    // We don't want to be building huge strings
+                    throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
+                }
+                if (queryParamSize == 0) {
+                    throw new Exception("Received POST with no parameters in the body.");
+                }
+//                params = IO.toString(request.getInputStream(), "UTF-8");
+                params = CharStreams.toString(new InputStreamReader(request.getInputStream(), Charsets.UTF_8));
+            }
+            else
+                params = request.getParameter("Parameters");
+
             String username = request.getParameter("User");
             String password = request.getParameter("Password");
             String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
-            String params = request.getParameter("Parameters");
             String jsonp = request.getParameter("jsonp");
             String admin = request.getParameter("admin");
 
@@ -188,7 +207,6 @@ public class HTTPClientInterface {
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
-
             if (params != null) {
                 ParameterSet paramSet = null;
                 try {
