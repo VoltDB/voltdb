@@ -30,8 +30,8 @@ if [ "$(uname)" == "Darwin" ];
 echo $SED
 showchange() {
     echo ""
-    echo "Changed $file:"
-    grep $version $file
+    echo "Changes in " $file
+    git diff $file
 }
 
 #Change version.txt
@@ -41,8 +41,12 @@ showchange
 
 # Change RealVoltDB.java
 file="src/frontend/org/voltdb/RealVoltDB.java"
-$SED "s/m_defaultVersionString = \".*\"/m_defaultVersionString = \"${version}\"/" $file
+$SED "s/static final String m_defaultVersionString = \".*\"/static final String m_defaultVersionString = \"${version}\"/" $file
+#8 backslashes allows bash, then sed to do their thing,
+#leaving double-backslash in the actual file
+$SED "s/static final String m_defaultHotfixableRegexPattern = \".*\"/static final String m_defaultHotfixableRegexPattern = \"^\\\\\\\\Q${version}\\\\\\\\E\\\\\\\\z\"/" $file
 showchange
+
 
 # Change verify_kits.py
 file="tools/kit_tools/verify_kits.py"
