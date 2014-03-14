@@ -316,7 +316,7 @@ class NValue {
      */
     int compareNull(const NValue rhs) const;
     int compare(const NValue rhs) const;
-    int compareWithoutNull(const NValue rhs) const;
+    int compare_withoutNull(const NValue rhs) const;
 
     /* Return a boolean NValue with the comparison result */
     NValue op_equals(const NValue rhs) const;
@@ -351,7 +351,7 @@ class NValue {
      * This NValue must be VARCHAR and the rhs must be VARCHAR.
      * This NValue is the value and the rhs is the pattern
      */
-    NValue like_withoutNull(const NValue rhs) const;
+    NValue like(const NValue rhs) const;
 
     //TODO: passing NValue arguments by const reference SHOULD be standard practice
     // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
@@ -684,13 +684,13 @@ class NValue {
         }
 
         // now safe to read and return the length preceding value.
-        return *reinterpret_cast<const int32_t *>(&m_data[8]);
+        return getObjectLength_withoutNull();
     }
 
     /**
      * Used by varchar or varbinary.
      */
-    int32_t getObjectLengthWithoutNull() const {
+    int32_t getObjectLength_withoutNull() const {
         assert(isNull() == false);
         assert(getValueType() == VALUE_TYPE_VARCHAR || getValueType() == VALUE_TYPE_VARBINARY);
         // now safe to read and return the length preceding value.
@@ -764,7 +764,7 @@ class NValue {
         *reinterpret_cast<void**>(m_data) = object;
     }
 
-    void* getObjectValueWithoutNull() const {
+    void* getObjectValue_withoutNull() const {
         void* value;
         if (m_sourceInlined) {
             value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
@@ -783,7 +783,7 @@ class NValue {
         if (isNull()) {
             return NULL;
         }
-        return getObjectValueWithoutNull();
+        return getObjectValue_withoutNull();
     }
 
     // getters
@@ -922,7 +922,7 @@ class NValue {
         }
     }
 
-    int64_t castAsBigIntAndGetValueWithoutNull() const {
+    int64_t castAsBigIntAndGetValue_withoutNull() const {
             const ValueType type = getValueType();
             switch (type) {
             case VALUE_TYPE_BIGINT:
@@ -1539,11 +1539,11 @@ class NValue {
 
     }
 
-    int compareAnyIntegerValueWithoutNull (const NValue rhs) const {
+    int compareAnyIntegerValue_withoutNull (const NValue rhs) const {
         int64_t lhsValue, rhsValue;
         // get the right hand side as a bigint
-        lhsValue = castAsBigIntAndGetValueWithoutNull();
-        rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
+        lhsValue = castAsBigIntAndGetValue_withoutNull();
+        rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
 
         // do the comparison
         if (lhsValue == rhsValue) {
@@ -1556,7 +1556,7 @@ class NValue {
     }
 
     template<typename T>
-    int compareValueWithoutNull (const T lhsValue, const T rhsValue) const {
+    int compareValue_withoutNull (const T lhsValue, const T rhsValue) const {
         if (lhsValue == rhsValue) {
             return VALUE_COMPARE_EQUAL;
         } else if (lhsValue > rhsValue) {
@@ -1566,7 +1566,7 @@ class NValue {
         }
     }
 
-    int compareDoubleValueWithoutNull (const double lhsValue, const double rhsValue) const {
+    int compareDoubleValue_withoutNull (const double lhsValue, const double rhsValue) const {
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
         if (std::isnan(lhsValue)) {
@@ -1586,103 +1586,103 @@ class NValue {
         }
     }
 
-    int compareTinyIntWithoutNull (const NValue rhs) const {
+    int compareTinyInt_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_TINYINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return compareDoubleValueWithoutNull(static_cast<double>(getTinyInt()), rhs.getDouble());
+            return compareDoubleValue_withoutNull(static_cast<double>(getTinyInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getTinyInt()));
             lhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+            return compareValue_withoutNull<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
             lhsValue = static_cast<int64_t>(getTinyInt());
-            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
-            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+            rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
+            return compareValue_withoutNull<int64_t>(lhsValue, rhsValue);
         }
     }
 
-    int compareSmallIntWithoutNull (const NValue rhs) const {
+    int compareSmallInt_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_SMALLINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return compareDoubleValueWithoutNull(static_cast<double>(getSmallInt()), rhs.getDouble());
+            return compareDoubleValue_withoutNull(static_cast<double>(getSmallInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getSmallInt()));
             lhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+            return compareValue_withoutNull<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
             lhsValue = static_cast<int64_t>(getSmallInt());
-            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
-            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+            rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
+            return compareValue_withoutNull<int64_t>(lhsValue, rhsValue);
         }
     }
 
-    int compareIntegerWithoutNull (const NValue rhs) const {
+    int compareInteger_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_INTEGER);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return compareDoubleValueWithoutNull(static_cast<double>(getInteger()), rhs.getDouble());
+            return compareDoubleValue_withoutNull(static_cast<double>(getInteger()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getInteger()));
             lhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+            return compareValue_withoutNull<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
             lhsValue = static_cast<int64_t>(getInteger());
-            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
-            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+            rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
+            return compareValue_withoutNull<int64_t>(lhsValue, rhsValue);
         }
     }
 
-    int compareBigIntWithoutNull (const NValue rhs) const {
+    int compareBigInt_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_BIGINT);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return compareDoubleValueWithoutNull(static_cast<double>(getBigInt()), rhs.getDouble());
+            return compareDoubleValue_withoutNull(static_cast<double>(getBigInt()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getBigInt());
             lhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+            return compareValue_withoutNull<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
             lhsValue = getBigInt();
-            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
-            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+            rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
+            return compareValue_withoutNull<int64_t>(lhsValue, rhsValue);
         }
     }
 
 
-    int compareTimestampWithoutNull (const NValue rhs) const {
+    int compareTimestamp_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_TIMESTAMP);
 
         // get the right hand side as a bigint
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return compareDoubleValueWithoutNull(static_cast<double>(getTimestamp()), rhs.getDouble());
+            return compareDoubleValue_withoutNull(static_cast<double>(getTimestamp()), rhs.getDouble());
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getTimestamp());
             lhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(lhsValue, rhsValue);
+            return compareValue_withoutNull<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
             lhsValue = getTimestamp();
-            rhsValue = rhs.castAsBigIntAndGetValueWithoutNull();
-            return compareValueWithoutNull<int64_t>(lhsValue, rhsValue);
+            rhsValue = rhs.castAsBigIntAndGetValue_withoutNull();
+            return compareValue_withoutNull<int64_t>(lhsValue, rhsValue);
         }
     }
 
-    int compareDoubleValueWithoutNull (const NValue rhs) const {
+    int compareDoubleValue_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_DOUBLE);
 
         const double lhsValue = getDouble();
@@ -1724,10 +1724,10 @@ class NValue {
             // Not reached
         }
 
-        return compareDoubleValueWithoutNull(lhsValue, rhsValue);
+        return compareDoubleValue_withoutNull(lhsValue, rhsValue);
     }
 
-    int compareStringValueWithoutNull (const NValue rhs) const {
+    int compareStringValue_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_VARCHAR);
 
         ValueType rhsType = rhs.getValueType();
@@ -1744,10 +1744,10 @@ class NValue {
 
         assert(m_valueType == VALUE_TYPE_VARCHAR);
 
-        const int32_t leftLength = getObjectLengthWithoutNull();
-        const int32_t rightLength = rhs.getObjectLengthWithoutNull();
-        const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
-        const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
+        const int32_t leftLength = getObjectLength_withoutNull();
+        const int32_t rightLength = rhs.getObjectLength_withoutNull();
+        const char* left = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+        const char* right = reinterpret_cast<const char*>(rhs.getObjectValue_withoutNull());
 
         const int result = ::strncmp(left, right, std::min(leftLength, rightLength));
         if (result == 0 && leftLength != rightLength) {
@@ -1767,7 +1767,7 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareBinaryValueWithoutNull (const NValue rhs) const {
+    int compareBinaryValue_withoutNull (const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_VARBINARY);
 
         if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
@@ -1780,11 +1780,11 @@ class NValue {
                                data_exception_most_specific_type_mismatch,
                                message);
         }
-        const int32_t leftLength = getObjectLengthWithoutNull();
-        const int32_t rightLength = rhs.getObjectLengthWithoutNull();
+        const int32_t leftLength = getObjectLength_withoutNull();
+        const int32_t rightLength = rhs.getObjectLength_withoutNull();
 
-        const char* left = reinterpret_cast<const char*>(getObjectValueWithoutNull());
-        const char* right = reinterpret_cast<const char*>(rhs.getObjectValueWithoutNull());
+        const char* left = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+        const char* right = reinterpret_cast<const char*>(rhs.getObjectValue_withoutNull());
 
         const int result = ::memcmp(left, right, std::min(leftLength, rightLength));
         if (result == 0 && leftLength != rightLength) {
@@ -1804,12 +1804,12 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareDecimalValueWithoutNull(const NValue rhs) const {
+    int compareDecimalValue_withoutNull(const NValue rhs) const {
         assert(m_valueType == VALUE_TYPE_DECIMAL);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_DECIMAL:
         {
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhs.getDecimal());
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhs.getDecimal());
         }
         case VALUE_TYPE_DOUBLE:
         {
@@ -1822,38 +1822,38 @@ class NValue {
             const double lhsValue = static_cast<double>(whole.ToInt()) +
                     (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
 
-            return compareValueWithoutNull<double>(lhsValue, rhsValue);
+            return compareValue_withoutNull<double>(lhsValue, rhsValue);
         }
         // create the equivalent decimal value
         case VALUE_TYPE_TINYINT:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getTinyInt()));
             rhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_SMALLINT:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getSmallInt()));
             rhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_INTEGER:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getInteger()));
             rhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_BIGINT:
         {
             TTInt rhsValue(rhs.getBigInt());
             rhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_TIMESTAMP:
         {
             TTInt rhsValue(rhs.getTimestamp());
             rhsValue *= NValue::kMaxScaleFactor;
-            return compareValueWithoutNull<TTInt>(getDecimal(), rhsValue);
+            return compareValue_withoutNull<TTInt>(getDecimal(), rhsValue);
         }
         default:
         {
@@ -2334,28 +2334,28 @@ inline int NValue::compareNull(const NValue rhs) const {
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.
  */
-inline int NValue::compareWithoutNull(const NValue rhs) const {
+inline int NValue::compare_withoutNull(const NValue rhs) const {
     assert(isNull() == false && rhs.isNull() == false);
 
     switch (m_valueType) {
     case VALUE_TYPE_VARCHAR:
-        return compareStringValueWithoutNull(rhs);
+        return compareStringValue_withoutNull(rhs);
     case VALUE_TYPE_BIGINT:
-        return compareBigIntWithoutNull(rhs);
+        return compareBigInt_withoutNull(rhs);
     case VALUE_TYPE_INTEGER:
-        return compareIntegerWithoutNull(rhs);
+        return compareInteger_withoutNull(rhs);
     case VALUE_TYPE_SMALLINT:
-        return compareSmallIntWithoutNull(rhs);
+        return compareSmallInt_withoutNull(rhs);
     case VALUE_TYPE_TINYINT:
-        return compareTinyIntWithoutNull(rhs);
+        return compareTinyInt_withoutNull(rhs);
     case VALUE_TYPE_TIMESTAMP:
-        return compareTimestampWithoutNull(rhs);
+        return compareTimestamp_withoutNull(rhs);
     case VALUE_TYPE_DOUBLE:
-        return compareDoubleValueWithoutNull(rhs);
+        return compareDoubleValue_withoutNull(rhs);
     case VALUE_TYPE_VARBINARY:
-        return compareBinaryValueWithoutNull(rhs);
+        return compareBinaryValue_withoutNull(rhs);
     case VALUE_TYPE_DECIMAL:
-        return compareDecimalValueWithoutNull(rhs);
+        return compareDecimalValue_withoutNull(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
@@ -2377,7 +2377,7 @@ inline int NValue::compare(const NValue rhs) const {
         return hasNullCompare;
     }
 
-    return compareWithoutNull(rhs);
+    return compare_withoutNull(rhs);
 }
 
 /**
@@ -3041,27 +3041,27 @@ inline NValue NValue::op_greaterThanOrEqual(const NValue rhs) const {
 
 // without null comparison
 inline NValue NValue::op_equals_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) == 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) == 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_notEquals_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) != 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) != 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_lessThan_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) < 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) < 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_lessThanOrEqual_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) <= 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) <= 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_greaterThan_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) > 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) > 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_greaterThanOrEqual_withoutNull(const NValue rhs) const {
-    return compareWithoutNull(rhs) >= 0 ? getTrue() : getFalse();
+    return compare_withoutNull(rhs) >= 0 ? getTrue() : getFalse();
 }
 
 inline NValue NValue::op_max(const NValue rhs) const {
@@ -3423,10 +3423,12 @@ inline int32_t NValue::murmurHash3() const {
 
 /*
  * The LHS (this) should always be the string being compared
- * and the RHS should always be the LIKE expression. The planner or EE
- * needs to enforce this.
+ * and the RHS should always be the LIKE expression.
+ * The planner or EE needs to enforce this.
+ *
+ * Null check should have been handled already.
  */
-inline NValue NValue::like_withoutNull(const NValue rhs) const {
+inline NValue NValue::like(const NValue rhs) const {
     /*
      * Validate that all params are VARCHAR
      */
@@ -3446,8 +3448,8 @@ inline NValue NValue::like_withoutNull(const NValue rhs) const {
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
-    const int32_t valueUTF8Length = getObjectLengthWithoutNull();
-    const int32_t patternUTF8Length = rhs.getObjectLengthWithoutNull();
+    const int32_t valueUTF8Length = getObjectLength_withoutNull();
+    const int32_t patternUTF8Length = rhs.getObjectLength_withoutNull();
 
     if (0 == patternUTF8Length) {
         if (0 == valueUTF8Length) {
@@ -3457,8 +3459,8 @@ inline NValue NValue::like_withoutNull(const NValue rhs) const {
         }
     }
 
-    char *valueChars = reinterpret_cast<char*>(getObjectValueWithoutNull());
-    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValueWithoutNull());
+    char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
+    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValue_withoutNull());
     assert(valueChars);
     assert(patternChars);
 

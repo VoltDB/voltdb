@@ -72,8 +72,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLengthWithoutNull();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValueWithoutNull());
+        const int32_t valueLength = strValue.getObjectLength_withoutNull();
+        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
