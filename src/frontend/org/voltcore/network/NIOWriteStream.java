@@ -273,6 +273,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     synchronized void shutdown() {
+        super.shutdown();
         DeferredSerialization ds = null;
         while ((ds = m_queuedWrites.poll()) != null) {
             ds.cancel();

@@ -110,10 +110,11 @@ public abstract class NIOWriteStreamBase {
             ByteBuffer outbuf = null;
             if (outCont == null || !outCont.b().hasRemaining()) {
                 outCont = pool.acquire();
-                outbuf = outCont.b();
-                outbuf.clear();
+                outCont.b().clear();
                 m_queuedBuffers.offer(outCont);
             }
+
+            outbuf = outCont.b();
 
             //Fastpath, serialize to direct buffer creating no garbage
             if (outbuf.remaining() >= serializedSize) {
@@ -134,7 +135,7 @@ public abstract class NIOWriteStreamBase {
                 buf.position(0);
                 bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
-                    if (outbuf.hasRemaining()) {
+                    if (!outbuf.hasRemaining()) {
                         outCont = pool.acquire();
                         outbuf = outCont.b();
                         outbuf.clear();
