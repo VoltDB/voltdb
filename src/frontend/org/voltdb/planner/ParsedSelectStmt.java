@@ -683,7 +683,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             Table tb = getTableFromDB(groupbyCol.tableName);
             if (tb != null) {
                 org.voltdb.catalog.Column catalogColumn =
-                        tb.getColumns().getIgnoreCase(groupbyCol.columnName);
+                        tb.getColumns().get(groupbyCol.columnName);
                 groupbyCol.index = catalogColumn.getIndex();
             }
         }
