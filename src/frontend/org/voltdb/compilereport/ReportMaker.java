@@ -48,10 +48,12 @@ import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
+import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeList;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeRollup;
+import org.voltdb.utils.CatalogSizing.DatabaseSizes;
+import org.voltdb.utils.CatalogSizing.TableSize;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogItemSizeList;
-import org.voltdb.utils.CatalogUtil.CatalogItemSizeRollup;
-import org.voltdb.utils.CatalogUtil.TableSize;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
@@ -562,13 +564,13 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSizeTable(CatalogUtil.DatabaseSizes sizes) {
+    static String generateSizeTable(DatabaseSizes sizes) {
         StringBuilder sb = new StringBuilder();
         int nrow = 0;
-        for (CatalogUtil.TableSize tsize: sizes.tableSizes) {
+        for (TableSize tsize: sizes.tableSizes) {
             sb.append(generateSizeRow(tsize, ++nrow));
         }
-        for (CatalogUtil.TableSize vsize: sizes.viewSizes) {
+        for (TableSize vsize: sizes.viewSizes) {
             sb.append(generateSizeRow(vsize, ++nrow));
         }
         return sb.toString();
@@ -670,19 +672,39 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSizeSummary(CatalogUtil.DatabaseSizes dbSizes) {
+    static String generateSizeSummary(DatabaseSizes dbSizes) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<table class='table table-condensed size-summary-table'>\n");
+
         CatalogItemSizeList<CatalogItemSizeRollup> rollups =
                 new CatalogItemSizeList<CatalogItemSizeRollup>();
         rollups.add(dbSizes.tableRollup());
         rollups.add(dbSizes.viewRollup());
         rollups.add(dbSizes.indexRollup());
         CatalogItemSizeRollup rollupRollup = rollups.rollup(1);
-        generateSizeRollupSummary("Table", "table", sb, rollups.get(0));
-        generateSizeRollupSummary("Materialized View", "view", sb, rollups.get(1));
-        generateSizeRollupSummary("Index", "index", sb, rollups.get(2));
-        generateSizeRollupSummary("Total", "total", sb, rollupRollup);
+
+        sb.append("<table class='table size-summary-table'>\n");
+        generateSizeRollupSummary("tables whose row data ", "table", sb, rollups.get(0));
+        generateSizeRollupSummary("materialized views whose row data ", "view", sb, rollups.get(1));
+        generateSizeRollupSummary("indexes whose key data and overhead ", "index", sb, rollups.get(2));
+
+        sb.append("<tr><td colspan='6'>&nbsp;</td></tr>\n"); // blank row
+
+        // write the totals
+        sb.append("<tr>");
+        if (rollupRollup.widthMin == rollupRollup.widthMax) {
+            sb.append("<td colspan='2'><b>Total user data is expected to use about</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td colspan='3'>&nbsp;of memory.</td>");
+        }
+        else {
+            sb.append("<td colspan='2'><b>Total user data is expected to use between</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td>&nbsp;<b>and</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-max' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMax));
+            sb.append("<td>&nbsp<b>of memory.</b></td>");
+        }
+        sb.append("</tr>\n");
+
         sb.append("</table>\n");
         return sb.toString();
     }
@@ -694,19 +716,24 @@ public class ReportMaker {
             CatalogItemSizeRollup rollup)
     {
         String prefix = String.format("s-size-summary-%s", label);
-        sb.append(
-            "<tr>").append(String.format(
-                "<td>%s (count):</td>", name)).append(String.format(
-                "<td id='%s-count' class='right-cell'>%d</td>", prefix, rollup.itemCount)).append(
-            "</tr>\n").append(
-            "<tr>").append(String.format(
-                "<td>%s (minimum size):</td>", name)).append(String.format(
-                "<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin)).append(
-            "</tr>\n").append(
-            "<tr>").append(String.format(
-                "<td>%s (maximum size):</td>", name)).append(String.format(
-                "<td id='%s-max' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMax)).append(
-            "</tr>\n");
+        sb.append("<tr>");
+        sb.append(String.format("<td id='%s-count' class='right-cell'>%d</td>", prefix, rollup.itemCount));
+        sb.append(String.format("<td>%s is expected to use", name));
+        // different output if the range is 0
+        if (rollup.widthMin == rollup.widthMax) {
+            sb.append(" about&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td colspan='3'>");
+        }
+        else {
+            sb.append(" between&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td>&nbsp;and&nbsp;</td>");
+            sb.append(String.format("<td id='%s-max' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMax));
+            sb.append("<td>");
+        }
+        sb.append("&nbsp; of memory.&nbsp;</td>");
+        sb.append("</tr>\n");
     }
 
 
@@ -851,7 +878,7 @@ public class ReportMaker {
         String procData = generateProceduresTable(db.getProcedures());
         contents = contents.replace("##PROCS##", procData);
 
-        CatalogUtil.DatabaseSizes sizes = CatalogUtil.getCatalogSizes(db);
+        DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db);
 
         String sizeData = generateSizeTable(sizes);
         contents = contents.replace("##SIZES##", sizeData);
