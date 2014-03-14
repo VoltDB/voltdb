@@ -1306,4 +1306,15 @@ public class LocalCluster implements VoltServerConfig {
     public void setExpectedToInitialize(boolean expectedToInitialize) {
         this.m_expectedToInitialize = expectedToInitialize;
     }
+
+    /**
+     * @param watcher watcher to attach to active output pipes
+     */
+    public void setOutputWatcher(OutputWatcher watcher) {
+        for (PipeToFile pipe : m_pipes) {
+            if (pipe != null) {
+                pipe.setWatcher(watcher);
+            }
+        }
+    }
 }
