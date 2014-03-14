@@ -77,6 +77,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -134,6 +135,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
+
+    private static final boolean DISABLE_JMX;
+    static {
+        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    }
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -226,6 +233,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private JoinCoordinator m_joinCoordinator = null;
     private ElasticJoinService m_elasticJoinService = null;
 
+    // Snapshot IO agent
+    private SnapshotIOAgent m_snapshotIOAgent = null;
+
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
     String m_pathToStartupCatalog;
@@ -294,7 +304,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
-
+        ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {
@@ -399,6 +409,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+
+            Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", false);
+            if (snapshotIOAgentClass != null) {
+                try {
+                    m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
+                            .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+                    m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
+                }
+            }
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
@@ -691,7 +712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 final Class<?> statsManagerClass =
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
-                if (statsManagerClass != null) {
+                if (statsManagerClass != null && !DISABLE_JMX) {
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
                     m_statsManager.initialize();
                 }
@@ -778,7 +799,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             assert (m_clientInterface != null);
-            m_clientInterface.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
 
             // Start elastic join service
             try {
@@ -1757,6 +1778,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                }
+
+                if (m_snapshotIOAgent != null) {
+                    m_snapshotIOAgent.shutdown();
                 }
 
                 // shut down the network/messaging stuff

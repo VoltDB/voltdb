@@ -89,7 +89,7 @@ TableTuple keyTuple;
 
 PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this, m_data.begin()),
+    m_iter(this),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
@@ -98,6 +98,9 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this)
 {
+    // this happens here because m_data might not be initialized above
+    m_iter.reset(m_data.begin());
+
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -958,7 +961,8 @@ std::string PersistentTable::debug() {
 void PersistentTable::onSetColumns() {
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        m_allowNulls[i] = m_schema->columnAllowNull(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
     }
 
     // Also clear some used block state. this structure doesn't have
@@ -1068,6 +1072,10 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
+        char errMsg[1024];
+        snprintf(errMsg, 1024, "No table streamer for table %s.", name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);

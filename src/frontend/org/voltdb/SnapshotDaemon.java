@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -34,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -48,6 +50,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteMailbox;
+import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
@@ -55,12 +61,15 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.messaging.SnapshotCheckRequestMessage;
+import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -200,15 +209,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit, GlobalServiceElector gse) {
+    public void init(DaemonInitiator initiator, HostMessenger messenger, Runnable threadLocalInit, GlobalServiceElector gse) {
         m_initiator = initiator;
-        m_zk = zk;
+        m_zk = messenger.getZK();
+        m_mb = new SiteMailbox(messenger, messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_DAEMON_ID));
+        messenger.createMailbox(m_mb.getHSId(), m_mb);
 
         try {
-            zk.create(VoltZK.nodes_currently_snapshotting, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.create(VoltZK.nodes_currently_snapshotting, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
         try {
-            zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
 
         if (threadLocalInit != null) {
@@ -251,6 +262,83 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
             });
         }
+    }
+
+    private Mailbox m_mb;
+    private void initiateSnapshotSave(final String requestId,
+                                      final long handle,
+                                      final Object params[])
+    {
+        Callable<Object> work = new Callable<Object>() {
+            @Override
+            public Object call() throws Exception
+            {
+                final JSONObject jsObj = new JSONObject((String) params[0]);
+                final String format = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
+                boolean initiateSnapshot;
+                VoltTable checkResult = null;
+
+                // Only do file check if this snapshot actually writes to files, stream snapshots don't
+                if (SnapshotFormat.getEnumIgnoreCase(format).isFileBased()) {
+                    // Do scan work on all known live hosts
+                    VoltMessage msg = new SnapshotCheckRequestMessage((String) params[0]);
+                    List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                    for (int hostId : liveHosts) {
+                        m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
+                    }
+
+                    // Wait for responses from all hosts for a certain amount of time
+                    Map<Integer, VoltTable> responses = Maps.newHashMap();
+                    final long timeoutMs = 10 * 1000; // 10s timeout
+                    final long endTime = System.currentTimeMillis() + timeoutMs;
+                    SnapshotCheckResponseMessage response;
+                    while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
+                        // ignore responses to previous requests
+                        if (jsObj.getString("path").equals(response.getPath()) &&
+                            jsObj.getString("nonce").equals(response.getNonce())) {
+                            responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
+                        }
+
+                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
+                            break;
+                        }
+                    }
+
+                    // Retry if timed out
+                    if (responses.size() != liveHosts.size()) {
+                        throw new CoreUtils.RetryException();
+                    }
+
+                    // Call @SnapshotSave if check passed, return the failure otherwise
+                    checkResult = VoltTableUtil.unionTables(responses.values());
+                    initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[] {checkResult});
+                } else {
+                    initiateSnapshot = true;
+                }
+
+                if (initiateSnapshot) {
+                    m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+                } else if (requestId != null) {
+                    final ClientResponseImpl failureResponse =
+                            new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{checkResult}, null);
+                    saveResponseToZKAndReset(requestId, failureResponse);
+                }
+
+                return null;
+            }
+        };
+
+        CoreUtils.retryHelper(VoltDB.instance().getSES(true), m_es, work, 3, 10, TimeUnit.SECONDS, 1, TimeUnit.HOURS);
+    }
+
+    private void saveResponseToZKAndReset(String requestId, ClientResponseImpl response) throws Exception
+    {
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        m_zk.create(VoltZK.user_snapshot_response + requestId,
+                response.flattenToBuffer(buf).array(),
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT);
+        userSnapshotRequestExistenceCheck(true);
     }
 
     /*
@@ -685,7 +773,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         });
         try {
             loggingLog.info("Initiating @SnapshotSave for log truncation");
-            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
+            initiateSnapshotSave(truncReqId, handle, new Object[]{jsObj.toString(4)});
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -767,14 +855,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                          */
                         if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                             ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                            m_zk.create(
-                                    VoltZK.user_snapshot_response + requestId,
-                                    rimpl.flattenToBuffer(buf).array(),
-                                    Ids.OPEN_ACL_UNSAFE,
-                                    CreateMode.PERSISTENT);
-                            //Reset the watch
-                            userSnapshotRequestExistenceCheck(true);
+                            saveResponseToZKAndReset(requestId, rimpl);
                             return;
                         }
 
@@ -785,17 +866,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                          * failure/success to the client.
                          */
                         if (isSnapshotInProgressResponse(clientResponse)) {
-                            scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
+                            scheduleSnapshotForLater(jsObj.toString(4), requestId, true);
                         } else {
                             ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                            m_zk.create(
-                                    VoltZK.user_snapshot_response + requestId,
-                                    rimpl.flattenToBuffer(buf).array(),
-                                    Ids.OPEN_ACL_UNSAFE,
-                                    CreateMode.PERSISTENT);
-                            //Reset the watch
-                            userSnapshotRequestExistenceCheck(true);
+                            saveResponseToZKAndReset(requestId, rimpl);
                             return;
                         }
                     } catch (Exception e) {
@@ -808,10 +882,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
-            m_initiator.initiateSnapshotDaemonWork(
-                    "@SnapshotSave",
-                    handle,
-                    new Object[] { jsObj.toString(4) });
+            initiateSnapshotSave(requestId, handle, new Object[]{jsObj.toString(4)});
             return;
         }
     }
@@ -928,20 +999,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                     SNAP_LOG.info("Queued user snapshot was attempted, but there was a failure.");
                                     try {
                                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                        m_zk.create(
-                                                VoltZK.user_snapshot_response + requestId,
-                                                rimpl.flattenToBuffer(buf).array(),
-                                                Ids.OPEN_ACL_UNSAFE,
-                                                CreateMode.PERSISTENT);
+                                        saveResponseToZKAndReset(requestId, rimpl);
                                     }
                                     catch (NodeExistsException e) {
                                         // used to pass null as request ID to avoid this check if the request ID
                                         // already existed, this gives us the same behavior with a pre-existing
                                         // request ID
                                     }
-                                    //Reset the watch, in case this is recoverable
-                                    userSnapshotRequestExistenceCheck(true);
                                     //Log the details of the failure, after resetting the watch in case of some odd NPE
                                     result.resetRowPosition();
                                     SNAP_LOG.info(result);
@@ -953,19 +1017,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                          * Snapshot was started no problem, reset the watch for new requests
                                          */
                                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                        m_zk.create(
-                                                VoltZK.user_snapshot_response + requestId,
-                                                rimpl.flattenToBuffer(buf).array(),
-                                                Ids.OPEN_ACL_UNSAFE,
-                                                CreateMode.PERSISTENT);
+                                        saveResponseToZKAndReset(requestId, rimpl);
                                     }
                                     catch (NodeExistsException e) {
                                         // used to pass null as request ID to avoid this check if the request ID
                                         // already existed, this gives us the same behavior with a pre-existing
                                         // request ID
                                     }
-                                    userSnapshotRequestExistenceCheck(true);
                                     return;
                                 }
                             } catch (Exception e) {
@@ -980,8 +1038,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         }
                     });
 
-                    m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
-                            new Object[] { requestObj });
+                    JSONObject jsonObj = new JSONObject(requestObj);
+                    initiateSnapshotSave(requestId, handle, new Object[]{requestObj});
                 } catch (Exception e) {
                     try {
                         userSnapshotRequestExistenceCheck(true);
@@ -1241,12 +1299,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 @Override
                 public void clientCallback(final ClientResponse clientResponse)
-                        throws Exception {
+                        throws Exception
+                {
                     processClientResponsePrivate(clientResponse);
                 }
 
             });
-            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
+            initiateSnapshotSave(null, handle, new Object[]{jsObj.toString(4)});
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast

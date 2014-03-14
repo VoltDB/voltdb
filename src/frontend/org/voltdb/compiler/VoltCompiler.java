@@ -56,6 +56,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -453,12 +454,10 @@ public class VoltCompiler {
         // do all the work to get the catalog
         DatabaseType database = getProjectDatabase(projectReader);
         if (database == null) {
-            compilerLog.error("Failed to create catalog database object.");
             return false;
         }
         final Catalog catalog = compileCatalogInternal(database, ddlReaderList, jarOutput);
         if (catalog == null) {
-            compilerLog.error("Catalog compilation failed.");
             return false;
         }
 
@@ -2012,7 +2011,7 @@ public class VoltCompiler {
     public void summarizeErrors(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
             outputStream.println("------------------------------------------");
-            outputStream.println("Project compilation failed. See log for errors.");
+            outputStream.println("Catalog compilation failed.");
             outputStream.println("------------------------------------------");
         }
         if (feedbackStream != null) {
@@ -2343,7 +2342,7 @@ public class VoltCompiler {
                 PrintStream outputStream = new PrintStream(outputTextPath);
                 try {
                     if (success) {
-                        summarizeSuccess(outputStream, null, outputJarPath);
+                        summarizeSuccess(outputStream, outputStream, outputJarPath);
                         consoleLog.info(String.format(
                                 "The catalog was automatically upgraded from " +
                                 "version %s to %s and saved to \"%s\". " +
@@ -2352,7 +2351,7 @@ public class VoltCompiler {
                                 outputJarPath, outputTextPath));
                     }
                     else {
-                        summarizeErrors(outputStream, null);
+                        summarizeErrors(outputStream, outputStream);
                         outputStream.close();
                         compilerLog.error("Catalog upgrade failed.");
                         compilerLog.info(String.format(

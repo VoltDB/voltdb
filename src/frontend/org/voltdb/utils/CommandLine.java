@@ -460,6 +460,20 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:+UseTLAB");
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        /*
+         * Have RMI not invoke System.gc constantly
+         */
+        cmdline.add("-Dsun.rmi.dgc.server.gcInterval=" + Long.MAX_VALUE);
+        cmdline.add("-Dsun.rmi.dgc.client.gcInterval=" + Long.MAX_VALUE);
+        /*
+         * To ensure that CMS is low pause on a consistent basis, have it wait a looong time
+         * for young gen GCs to occur when load is low. Scavenge before remark
+         * so when remarks occur they are a consistent duration.
+         */
+        cmdline.add("-XX:CMSWaitDuration=120000");
+        cmdline.add("-XX:CMSMaxAbortablePrecleanTime=120000");
+        cmdline.add("-XX:+ExplicitGCInvokesConcurrent");
+        cmdline.add("-XX:+CMSScavengeBeforeRemark");
         //If a Volt root is provided such as local cluster or VEM, put the error file in it
         if ( !volt_root.isEmpty() ) {
             cmdline.add("-XX:ErrorFile=" + volt_root + "/hs_err_pid%p.log");

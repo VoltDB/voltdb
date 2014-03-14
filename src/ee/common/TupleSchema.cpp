@@ -113,14 +113,16 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     std::vector<bool> columnAllowNull(combinedColumnCount, true);
     std::vector<uint16_t>::const_iterator iter;
     for (iter = firstSet.begin(); iter != firstSet.end(); iter++) {
-        columnTypes.push_back(first->columnType(*iter));
-        columnLengths.push_back(first->columnLength(*iter));
-        columnAllowNull[*iter] = first->columnAllowNull(*iter);
+        const TupleSchema::ColumnInfo *columnInfo = first->getColumnInfo(*iter);
+        columnTypes.push_back(columnInfo->getVoltType());
+        columnLengths.push_back(columnInfo->length);
+        columnAllowNull[*iter] = columnInfo->allowNull;
     }
     for (iter = secondSet.begin(); second && iter != secondSet.end(); iter++) {
-        columnTypes.push_back(second->columnType(*iter));
-        columnLengths.push_back(second->columnLength(*iter));
-        columnAllowNull[offset + *iter] = second->columnAllowNull(*iter);
+        const TupleSchema::ColumnInfo *columnInfo = second->getColumnInfo(*iter);
+        columnTypes.push_back(columnInfo->getVoltType());
+        columnLengths.push_back(columnInfo->length);
+        columnAllowNull[offset + *iter] = columnInfo->allowNull;
     }
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
@@ -131,11 +133,11 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     // Remember to set the inlineability of each column correctly.
     for (iter = firstSet.begin(); iter != firstSet.end(); iter++) {
         ColumnInfo *info = schema->getColumnInfo(*iter);
-        info->inlined = first->columnIsInlined(*iter);
+        info->inlined = first->getColumnInfo(*iter)->inlined;
     }
     for (iter = secondSet.begin(); second && iter != secondSet.end(); iter++) {
         ColumnInfo *info = schema->getColumnInfo((int)offset + *iter);
-        info->inlined = second->columnIsInlined(*iter);
+        info->inlined = second->getColumnInfo(*iter)->inlined;
     }
 
     return schema;
@@ -199,32 +201,62 @@ std::string TupleSchema::debug() const {
            << std::endl;
 
     for (uint16_t i = 0; i < columnCount(); i++) {
-        buffer << " column " << i << ": type = " << getTypeName(columnType(i));
-        buffer << ", length = " << columnLength(i) << ", nullable = ";
-        buffer << (columnAllowNull(i) ? "true" : "false") << ", isInlined = " << columnIsInlined(i) <<  std::endl;
+        const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(i);
+
+        buffer << " column " << i << ": type = " << getTypeName(columnInfo->getVoltType());
+        buffer << ", length = " << columnInfo->length << ", nullable = ";
+        buffer << (columnInfo->allowNull ? "true" : "false") << ", isInlined = " << columnInfo->inlined <<  std::endl;
     }
 
     std::string ret(buffer.str());
     return ret;
 }
 
-bool TupleSchema::equals(const TupleSchema *other) const {
+bool TupleSchema::isCompatibleForCopy(const TupleSchema *other) const
+{
+    if (this == other) {
+        return true;
+    }
     if (other->m_columnCount != m_columnCount ||
         other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
-        other->m_allowInlinedObjects != m_allowInlinedObjects) {
+        other->m_allowInlinedObjects != m_allowInlinedObjects ||
+        other->tupleLength() != tupleLength()) {
         return false;
     }
 
     for (int ii = 0; ii < m_columnCount; ii++) {
         const ColumnInfo *columnInfo = getColumnInfo(ii);
         const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
-        if (columnInfo->allowNull != ocolumnInfo->allowNull ||
-                columnInfo->offset != ocolumnInfo->offset ||
-                columnInfo->type != ocolumnInfo->type) {
+        if (columnInfo->offset != ocolumnInfo->offset ||
+                columnInfo->type != ocolumnInfo->type ||
+                columnInfo->inlined != ocolumnInfo->inlined) {
             return false;
         }
     }
 
+    return true;
+}
+
+bool TupleSchema::equals(const TupleSchema *other) const
+{
+    // First check for structural equality.
+    if ( ! isCompatibleForCopy(other)) {
+        return false;
+    }
+    // Finally, rule out behavior differences.
+    for (int ii = 0; ii < m_columnCount; ii++) {
+        const ColumnInfo *columnInfo = getColumnInfo(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+        if (columnInfo->allowNull != ocolumnInfo->allowNull) {
+            return false;
+        }
+        // The declared column length for an out-of-line object is a behavior difference
+        // that has no effect on tuple format.
+        if (( ! columnInfo->inlined) &&
+                (columnInfo->length != ocolumnInfo->length)) {
+            return false;
+        }
+    }
     return true;
 }
 

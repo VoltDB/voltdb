@@ -70,6 +70,7 @@ public class StatementQuery extends StatementDMQL {
         checkAccessRights(session);
     }
 
+    @Override
     Result getResult(Session session) {
 
         Result result = queryExpression.getResult(session,
@@ -80,6 +81,7 @@ public class StatementQuery extends StatementDMQL {
         return result;
     }
 
+    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -97,6 +99,7 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
+    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         queryExpression.getBaseTableNames(set);
@@ -108,6 +111,7 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
+    @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 
     /************************* Volt DB Extensions *************************/
@@ -147,7 +151,7 @@ public class StatementQuery extends StatementDMQL {
      * Returns true if the specified exprColumn index is in the list of column indices specified by groupIndex
      * @return true/false
      */
-    boolean isGroupByColumn(QuerySpecification select, int index) {
+    static boolean isGroupByColumn(QuerySpecification select, int index) {
         if (!select.isGrouped) {
             return false;
         }
@@ -171,10 +175,11 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltGetStatementXML(Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        return voltGetXMLExpression(queryExpression, session);
+        return voltGetXMLExpression(queryExpression, parameters, session);
     }
 
-    VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
+
+    static VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, ExpressionColumn parameters[], Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
@@ -188,7 +193,7 @@ public class StatementQuery extends StatementDMQL {
                         queryExpr.operatorName() + " is not supported.");
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
-            return voltGetXMLSpecification(select, session);
+            return voltGetXMLSpecification(select, parameters, session);
         } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
                    exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
@@ -196,9 +201,9 @@ public class StatementQuery extends StatementDMQL {
             unionExpr.attributes.put("uniontype", queryExpr.operatorName());
 
             VoltXMLElement leftExpr = voltGetXMLExpression(
-                    queryExpr.getLeftQueryExpression(), session);
+                    queryExpr.getLeftQueryExpression(), parameters, session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
-                    queryExpr.getRightQueryExpression(), session);
+                    queryExpr.getRightQueryExpression(), parameters, session);
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
@@ -224,9 +229,9 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
-    VoltXMLElement voltGetXMLSpecification(QuerySpecification select, Session session)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
-
+    static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    {
         // select
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
@@ -435,7 +440,7 @@ public class StatementQuery extends StatementDMQL {
         }
 
         // parameters
-        voltAppendParameters(session, query);
+        voltAppendParameters(session, query, parameters);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
@@ -484,7 +489,8 @@ public class StatementQuery extends StatementDMQL {
      * @param element
      * @param cols - output collection containing the column references
      */
-    protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
+
+    static protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
         if ("columnref".equalsIgnoreCase(element.name)) {
             cols.add(element);
         } else {
@@ -501,8 +507,9 @@ public class StatementQuery extends StatementDMQL {
      * @param columns list of columns to resolve
      * @return rvs list of range variables
      */
-    protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
+    static protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+
         // Only one OUTER join for a whole select is supported so far
         for (VoltXMLElement columnElmt : columns) {
             String table = null;

@@ -516,8 +516,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        const ValueType columnType = tmptup.getType(columnIndex);
-        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(columnType));
+        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(tmptup.getSchema()->columnType(columnIndex)));
     }
     VOLT_TRACE("Setting passthrough columns");
     // A second pass to set the output columns from the input columns that are being passed through.

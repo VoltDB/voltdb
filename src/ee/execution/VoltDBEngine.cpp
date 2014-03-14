@@ -108,8 +108,6 @@
 using namespace std;
 namespace voltdb {
 
-const int64_t AD_HOC_FRAG_ID = -1;
-
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(0),
       m_allTuplesScanned(0),
@@ -662,17 +660,19 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
             return false;
         }
 
-        if (t2->schema()->columnAllowNull(index) != nullable) {
+        const TupleSchema::ColumnInfo *columnInfo = t2->schema()->getColumnInfo(index);
+
+        if (columnInfo->allowNull != nullable) {
             return false;
         }
 
-        if (t2->schema()->columnType(index) != type) {
+        if (columnInfo->getVoltType() != type) {
             return false;
         }
 
         // check the size of types where size matters
         if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+            if (columnInfo->length != size) {
                 return false;
             }
         }
