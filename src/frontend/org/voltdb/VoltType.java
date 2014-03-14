@@ -503,6 +503,10 @@ public enum VoltType {
         return m_lengthInBytes;
     }
 
+    public int getLengthInBytesForFixedTypesWithoutCheck() {
+        return m_lengthInBytes;
+    }
+
     /**
      * Get the maximum number of bytes required to store the type
      * @return An integer value representing a number of bytes.

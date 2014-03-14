@@ -1147,7 +1147,7 @@ public class PlanAssembler {
 
         // Build the output schema for the projection based on the display columns
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
-        projectionNode.setOutputSchema(proj_schema);
+        projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // if the projection can be done inline...
         if (rootNode instanceof AbstractScanPlanNode) {

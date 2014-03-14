@@ -3446,7 +3446,7 @@ inline NValue NValue::like_withoutNull(const NValue rhs) const {
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
-    const int32_t valueUTF8Length = getObjectLengthWithoutNull()();
+    const int32_t valueUTF8Length = getObjectLengthWithoutNull();
     const int32_t patternUTF8Length = rhs.getObjectLengthWithoutNull();
 
     if (0 == patternUTF8Length) {
