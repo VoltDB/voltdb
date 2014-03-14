@@ -55,7 +55,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T get(String name) {
-        return m_items.get(name.toLowerCase());
+        return m_items.get(name);
     }
 
     /**
@@ -64,7 +64,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T getIgnoreCase(String name) {
-        return m_items.get(name.toLowerCase());
+        return m_items.get(name.toUpperCase());
     }
 
     /**
@@ -100,7 +100,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public T add(String name) {
         try {
-            String mapKey = name.toLowerCase();
+            String mapKey = name.toUpperCase();
             if (m_items.containsKey(mapKey))
                 throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
 
@@ -129,7 +129,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public void delete(String name) {
         try {
-            String mapKey = name.toLowerCase();
+            String mapKey = name.toUpperCase();
             if (m_items.containsKey(mapKey) == false)
                 throw new CatalogException("Catalog item '" + mapKey + "' doesn't exists in " + m_parent);
 

@@ -112,8 +112,8 @@ class AE {
     /* this is how java serializes.. note derived class data follows
        the serialization of children */
     virtual void serialize(Json::Value &json) {
-        json["TYPE"] = expressionToString(m_type);
-        json["VALUE_TYPE"] = valueToString(m_valueType);
+        json["TYPE"] = static_cast<int>(m_type);
+        json["VALUE_TYPE"] = static_cast<int>(m_valueType);
         json["VALUE_SIZE"] = m_valueSize;
 
         if (left)

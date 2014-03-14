@@ -183,7 +183,7 @@ public abstract class AbstractParsedStmt {
 
             String name = child.attributes.get("name");
             assert(name != null);
-            Column col = table.getColumns().getIgnoreCase(name.trim());
+            Column col = table.getColumns().get(name);
 
             assert(child.children.size() == 1);
             VoltXMLElement subChild = child.children.get(0);
@@ -694,7 +694,7 @@ public abstract class AbstractParsedStmt {
     }
 
     protected Table getTableFromDB(String tableName) {
-        Table table = m_db.getTables().getIgnoreCase(tableName);
+        Table table = m_db.getTables().get(tableName);
         return table;
     }
 
