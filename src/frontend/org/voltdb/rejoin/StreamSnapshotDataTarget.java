@@ -172,8 +172,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * subsystem.
          */
         protected int send(Mailbox mb, MessageFactory msgFactory, BBContainer message) throws IOException {
-            if (message.b.isDirect()) {
-                byte[] data = CompressionService.compressBuffer(message.b);
+            final ByteBuffer messageBuffer = message.b();
+            if (messageBuffer.isDirect()) {
+                byte[] data = CompressionService.compressBuffer(messageBuffer);
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, data));
 
                 if (rejoinLog.isTraceEnabled()) {
@@ -184,8 +185,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             } else {
                 byte compressedBytes[] =
                     CompressionService.compressBytes(
-                        message.b.array(), message.b.position(),
-                        message.b.remaining());
+                            messageBuffer.array(), messageBuffer.position(),
+                            messageBuffer.remaining());
 
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, compressedBytes));
 
@@ -367,7 +368,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     rejoinLog.error("Error sending a recovery stream message", e);
                 }
             }
-
+            CompressionService.releaseThreadLocal();
             rejoinLog.trace("Stream sender thread exiting");
         }
     }
@@ -382,18 +383,20 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         rejoinLog.trace("Starting write");
 
         try {
-            BBContainer chunk;
+            BBContainer chunkC;
+            ByteBuffer chunk;
             try {
-                chunk = tupleData.call();
+                chunkC = tupleData.call();
+                chunk = chunkC.b();
             } catch (Exception e) {
                 return Futures.immediateFailedFuture(e);
             }
 
             // cleanup and exit immediately if in failure mode
             // or on null imput
-            if (m_writeFailed.get() != null || (chunk == null)) {
-                if (chunk != null) {
-                    chunk.discard();
+            if (m_writeFailed.get() != null || (chunkC == null)) {
+                if (chunkC != null) {
+                    chunkC.discard();
                 }
                 return null;
             }
@@ -401,7 +404,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // cleanup and exit immediately if in failure mode
             // but here, throw an exception because this isn't supposed to happen
             if (m_closed.get()) {
-                chunk.discard();
+                chunkC.discard();
 
                 IOException e = new IOException("Trying to write snapshot data " +
                         "after the stream is closed");
@@ -419,13 +422,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 send(StreamSnapshotMessageType.SCHEMA, tableId, schema);
             }
 
-            chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(m_blockIndex); // put chunk index
-            chunk.b.putInt(tableId); // put table ID
+            chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
+            chunk.putInt(m_blockIndex); // put chunk index
+            chunk.putInt(tableId); // put table ID
 
-            chunk.b.position(0);
+            chunk.position(0);
 
-            return send(m_blockIndex++, chunk);
+            return send(m_blockIndex++, chunkC);
         } finally {
             rejoinLog.trace("Finished call to write");
         }
@@ -577,7 +580,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     public int getInContainerRowCount(BBContainer tupleData) {
         // according to TableOutputStream.cpp:TupleOutputStream::endRows() the row count is
         // at offset 4 (second integer)
-        ByteBuffer bb = tupleData.b.duplicate();
+        ByteBuffer bb = tupleData.b().duplicate();
         bb.position(getHeaderSize());
         bb.getInt(); // skip first four (partition id)
 

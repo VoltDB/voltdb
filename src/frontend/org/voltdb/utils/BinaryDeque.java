@@ -28,6 +28,14 @@ import org.voltcore.utils.DBBPool.BBContainer;
  *
  */
 public interface BinaryDeque {
+    /*
+     * Allocator for storage coming out of the BinaryDeque. Only
+     * used if copying is necessary, otherwise a slice is returned
+     */
+    public static interface OutputContainerFactory {
+        public BBContainer getContainer(int minimumSize);
+    }
+
     /**
      * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
@@ -35,7 +43,7 @@ public interface BinaryDeque {
      * @param objects
      * @throws IOException
      */
-    public void offer(BBContainer object[]) throws IOException;
+    public void offer(BBContainer object) throws IOException;
 
     /**
      * A push creates a new file each time to be "the head" so it is more efficient to pass
@@ -43,16 +51,16 @@ public interface BinaryDeque {
      * as few files as possible. IOException may be thrown if the object
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
-     * @param objects Array of buffer chains representing the objects to be pushed to the head of the queue
+     * @param objects Array of buffers representing the objects to be pushed to the head of the queue
      */
-    public void push(BBContainer objects[][]) throws IOException;
+    public void push(BBContainer objects[]) throws IOException;
 
     /**
      * Remove and return the object at the head of the queue
      * @return
      * @throws IOException
      */
-    public BBContainer poll() throws IOException;
+    public BBContainer poll(OutputContainerFactory ocf) throws IOException;
 
     /**
      * Persist all objects in the queue to the backing store
@@ -70,6 +78,7 @@ public interface BinaryDeque {
     public boolean isEmpty() throws IOException;
 
     public long sizeInBytes();
+    public int getNumObjects();
 
     public void closeAndDelete() throws IOException;
 
