@@ -204,8 +204,9 @@ public class JDBC4ClientConnection implements Closeable {
         this.users--;
         if (this.users == 0) {
             try {
-                if (this.client.get() != null) {
-                    this.client.get().close();
+                Client currentClient = this.client.get();
+                if (currentClient != null) {
+                    currentClient.close();
                 }
             } catch (Exception x) {
                 // ignore
@@ -222,7 +223,7 @@ public class JDBC4ClientConnection implements Closeable {
         Client currentClient = this.client.get();
         if (currentClient != null && currentClient == clientToDrop) {
             try {
-                this.client.get().close();
+                currentClient.close();
                 this.client.set(null);
             }
             catch (Exception x) {
@@ -477,13 +478,7 @@ public class JDBC4ClientConnection implements Closeable {
         if (currentClient == null) {
             throw new IOException("Client is unavailable for drain().");
         }
-        try {
-            this.client.get().drain();
-        }
-        catch (NoConnectionsException e) {
-            this.dropClient(currentClient);
-            throw e;
-        }
+        currentClient.drain();
     }
 
     /**
@@ -494,10 +489,11 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws IOException
      */
     public void backpressureBarrier() throws InterruptedException, IOException {
-        if (this.client.get() == null) {
+        ClientImpl currentClient = this.getClient();
+        if (currentClient == null) {
             throw new IOException("Client is unavailable for backpressureBarrier().");
         }
-        this.client.get().backpressureBarrier();
+        currentClient.backpressureBarrier();
     }
 
     /**
