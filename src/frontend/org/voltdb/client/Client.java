@@ -204,6 +204,7 @@ public interface Client {
      * to the database</p>
      *
      * @throws InterruptedException if this blocking call is interrupted.
+     * @deprecated Doesn't work right, hasn't for years
      */
     public void backpressureBarrier() throws InterruptedException;
 
@@ -240,6 +241,7 @@ public interface Client {
      * immediately if it is not possible to queue the procedure invocation due to backpressure.</p>
      *
      * @param blocking Whether you want procedure calls to block on backpressure.
+     * @deprecated The non-blocking feature set is untested and not very useful
      */
     public void configureBlocking(boolean blocking);
 
@@ -249,6 +251,7 @@ public interface Client {
      *
      * @return true if {@link #callProcedure(ProcedureCallback, String, Object...)} will
      * block until backpressure ceases and false otherwise.
+     * @deprecated The non-blocking feature set is untested and not very useful
      */
     public boolean blocking();
 
