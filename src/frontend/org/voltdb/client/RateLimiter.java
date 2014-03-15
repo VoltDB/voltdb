@@ -20,6 +20,7 @@ package org.voltdb.client;
 import java.util.ArrayDeque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -38,6 +39,8 @@ class RateLimiter {
     final int RECENT_HISTORY_SIZE = 5;
     final int MINIMUM_MOVEMENT = 5;
 
+    //Boolean indicating whether the only thing being tracked is max outstanding
+    protected boolean m_doesAnyTuning = false;
     protected boolean m_autoTune = false;
     protected int m_targetTxnsPerSecond = Integer.MAX_VALUE;
     //protected int m_targetTxnsPerBlock = Integer.MAX_VALUE;
@@ -125,6 +128,7 @@ class RateLimiter {
      */
     synchronized void enableAutoTuning(int latencyTarget) {
         m_autoTune = true;
+        m_doesAnyTuning = true;
         m_targetTxnsPerSecond = Integer.MAX_VALUE;
         m_maxOutstandingTxns = 20;
         m_latencyTarget = latencyTarget;
@@ -135,6 +139,13 @@ class RateLimiter {
      */
     synchronized void setLimits(int txnsPerSec, int maxOutstanding) {
         m_autoTune = false;
+        /*
+         * If the rate limit is some reasonably low value then go through the effort
+         * of rate limiting
+         */
+        if (txnsPerSec < Integer.MAX_VALUE / 2) {
+            m_doesAnyTuning = true;
+        }
         m_targetTxnsPerSecond = txnsPerSec;
         m_maxOutstandingTxns = maxOutstanding;
         m_outstandingTxnsSemaphore.drainPermits();
@@ -154,7 +165,7 @@ class RateLimiter {
     }
 
     void transactionResponseReceived(long timestampNanos, int internalLatency) {
-        if (m_autoTune) {
+        if (m_doesAnyTuning) {
             synchronized (this) {
                 ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
                 //Wake someone up if they are blocked
@@ -180,8 +191,8 @@ class RateLimiter {
      * @param ignoreBackpressure If true, never block.
      * @return The time as measured when the call returns.
      */
-    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestampNanos, boolean ignoreBackpressure) {
-        if (m_autoTune) {
+    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestampNanos, long timeoutNanos, boolean ignoreBackpressure) throws TimeoutException {
+        if (m_doesAnyTuning) {
             long timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
             while (true) {
                 synchronized(this) {
@@ -229,7 +240,9 @@ class RateLimiter {
 
             if (!acquired) {
                 try {
-                    m_outstandingTxnsSemaphore.acquire();
+                    if (!m_outstandingTxnsSemaphore.tryAcquire(timeoutNanos, TimeUnit.NANOSECONDS)) {
+                        throw new TimeoutException();
+                    }
                 } catch (InterruptedException e) {
                     Throwables.propagate(e);
                 }

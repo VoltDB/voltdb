@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
@@ -282,7 +283,7 @@ class Distributer {
                         // if the timeout is expired, call the callback and remove the
                         // bookeeping data
                         final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
-                        if (deltaNanos > cb.m_procedureTimeoutNanos) {
+                        if (deltaNanos > cb.procedureTimeoutNanos) {
 
                             // make the minimum timeoutMS for certain long running system procedures
                             //  higher than the default 2m.
@@ -304,15 +305,18 @@ class Distributer {
                                     "",
                                     new VoltTable[0],
                                     String.format("No response received in the allotted time (set to %d ms).",
-                                            TimeUnit.NANOSECONDS.toMillis(cb.m_procedureTimeoutNanos)));
+                                            TimeUnit.NANOSECONDS.toMillis(cb.procedureTimeoutNanos)));
                             r.setClientHandle(handle);
                             r.setClientRoundtrip(deltaNanos);
+                            r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
                             try {
                                 cb.callback.clientCallback(r);
                             } catch (Exception e1) {
                                 uncaughtException(cb.callback, r, e1);
                             }
-                            m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                            if (!cb.ignoreBackpressure) {
+                                m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                            }
                         }
                     }
                 }
@@ -323,18 +327,20 @@ class Distributer {
     }
 
     class CallbackBookeeping {
-        public CallbackBookeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos) {
+        public CallbackBookeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
             assert(callback != null);
             this.timestampNanos = timestampNanos;
             this.callback = callback;
             this.name = name;
-            this.m_procedureTimeoutNanos = timeoutNanos;
+            this.procedureTimeoutNanos = timeoutNanos;
+            this.ignoreBackpressure = ignoreBackpressure;
         }
         long timestampNanos;
         //Timeout in ms 0 means use conenction specified procedure timeoutMS.
-        final long m_procedureTimeoutNanos;
+        final long procedureTimeoutNanos;
         ProcedureCallback callback;
         String name;
+        boolean ignoreBackpressure;
     }
 
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
@@ -352,14 +358,47 @@ class Distributer {
         public void createWork(long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
-            long nowNanos = System.nanoTime();
-            nowNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                    nowNanos, ignoreBackpressure);
             timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
+            long nowNanos = System.nanoTime();
+
+            /*
+             * Do rate limiting or check for max outstanding related backpressure in
+             * the rate limiter which can block. If it blocks we can still get a timeout
+             * exception to give prompt timeouts
+             */
+            if (!ignoreBackpressure) {
+                try {
+                    nowNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                            nowNanos, timeoutNanos, ignoreBackpressure);
+                } catch (TimeoutException e) {
+                    /*
+                     * It's possible we need to timeout because it took too long to get
+                     * the transaction out on the wire due to max outstanding
+                     */
+                    final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
+                    ClientResponseImpl r = new ClientResponseImpl(
+                            ClientResponse.CONNECTION_TIMEOUT,
+                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                            "",
+                            new VoltTable[0],
+                            String.format("Timed out acquiring outstanding transaction permit (set to %d ms).",
+                                    TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+                    r.setClientHandle(handle);
+                    r.setClientRoundtrip(deltaNanos);
+                    r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
+                    try {
+                        callback.clientCallback(r);
+                    } catch (Exception e3) {
+                        uncaughtException(callback, r, e);
+                    }
+                    return;
+                }
+            }
+
             assert(m_callbacks.containsKey(handle) == false);
 
             //Optimistically submit the task
-            m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos));
+            m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
 
             //Schedule an individual timeout if necessary
             if (timeoutNanos < TimeUnit.SECONDS.toNanos(1)) {
@@ -379,8 +418,10 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(callback, r, e);
                 }
-                // for bookkeeping, but it feels dishonest to call this here
-                m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                if (!ignoreBackpressure) {
+                    //for bookkeeping, but it feels dishonest to call this here
+                    m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                }
                 return;
             } else {
                 m_connection.writeStream().enqueue(c);
@@ -402,16 +443,18 @@ class Distributer {
                             "",
                             new VoltTable[0],
                             String.format("No response received in the allotted time (set to %d ms).",
-                                    TimeUnit.NANOSECONDS.toMillis(cb.m_procedureTimeoutNanos)));
+                                    TimeUnit.NANOSECONDS.toMillis(cb.procedureTimeoutNanos)));
                     r.setClientHandle(handle);
                     r.setClientRoundtrip(deltaNanos);
-
+                    r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
                     try {
                         cb.callback.clientCallback(r);
                     } catch (Throwable e1) {
                         e1.printStackTrace();
                     }
-                    m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                    if (!cb.ignoreBackpressure) {
+                        m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                    }
                 }
             }, timeoutNanos, TimeUnit.NANOSECONDS);
         }
@@ -524,7 +567,9 @@ class Distributer {
                 }
 
                 int clusterRoundTrip = response.getClusterRoundtrip();
-                m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip);
+                if (!stuff.ignoreBackpressure) {
+                    m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip);
+                }
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error);
                 response.setClientRoundtrip(deltaNanos);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
@@ -641,7 +686,9 @@ class Distributer {
                 catch (Exception ex) {
                     uncaughtException(callBk.callback, r, ex);
                 }
-                m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
+                if (!callBk.ignoreBackpressure) {
+                    m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1);
+                }
             }
             m_callbacks.clear();
         }
