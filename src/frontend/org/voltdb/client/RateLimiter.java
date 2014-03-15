@@ -18,6 +18,10 @@
 package org.voltdb.client;
 
 import java.util.ArrayDeque;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Provide the {@link Client} with a way to throttle throughput in one
@@ -42,6 +46,7 @@ class RateLimiter {
     protected int m_currentBlockSendCount = 0;
     protected int m_currentBlockRecvSuccessCount = 0;
     protected int m_outstandingTxns = 0;
+    protected Semaphore m_outstandingTxnsSemaphore = new Semaphore(10);
 
     protected int m_maxOutstandingTxns = 10;
 
@@ -132,6 +137,8 @@ class RateLimiter {
         m_autoTune = false;
         m_targetTxnsPerSecond = txnsPerSec;
         m_maxOutstandingTxns = maxOutstanding;
+        m_outstandingTxnsSemaphore.drainPermits();
+        m_outstandingTxnsSemaphore.release(maxOutstanding);
     }
 
     /**
@@ -146,13 +153,23 @@ class RateLimiter {
         return limits;
     }
 
-    synchronized void transactionResponseReceived(long timestamp, int internalLatency) {
-        ensureCurrentBlockIsKosher(timestamp);
-        --m_outstandingTxns;
-        assert(m_outstandingTxns >= 0);
-        if (internalLatency != -1) {
-            ++m_currentBlockRecvSuccessCount;
-            m_currentBlockTotalInternalLatency += internalLatency;
+    void transactionResponseReceived(long timestampNanos, int internalLatency) {
+        if (m_autoTune) {
+            synchronized (this) {
+                ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
+                //Wake someone up if they are blocked
+                if (m_outstandingTxns > m_maxOutstandingTxns && m_outstandingTxns - 1 == m_maxOutstandingTxns) {
+                    this.notify();
+                }
+                --m_outstandingTxns;
+                assert(m_outstandingTxns >= 0);
+                if (internalLatency != -1) {
+                    ++m_currentBlockRecvSuccessCount;
+                    m_currentBlockTotalInternalLatency += internalLatency;
+                }
+            }
+        } else {
+            m_outstandingTxnsSemaphore.release();
         }
     }
 
@@ -163,50 +180,65 @@ class RateLimiter {
      * @param ignoreBackpressure If true, never block.
      * @return The time as measured when the call returns.
      */
-    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestamp, boolean ignoreBackpressure) {
-        while (true) {
-            synchronized(this) {
-                // switch to a new block if 100ms has passed
-                // possibly compute a new target rate
-                ensureCurrentBlockIsKosher(timestamp);
+    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestampNanos, boolean ignoreBackpressure) {
+        if (m_autoTune) {
+            long timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
+            while (true) {
+                synchronized(this) {
+                    // switch to a new block if 100ms has passed
+                    // possibly compute a new target rate
+                    ensureCurrentBlockIsKosher(timestamp);
 
-                assert((timestamp - m_currentBlockTimestamp) <= BLOCK_SIZE);
+                    assert((timestamp - m_currentBlockTimestamp) <= BLOCK_SIZE);
 
-                // don't let the time be before the start of the current block
-                // also ensure faketime - m_currentBlockTimestamp is positive
-                long faketime = timestamp < m_currentBlockTimestamp ? m_currentBlockTimestamp : timestamp;
+                    // don't let the time be before the start of the current block
+                    // also ensure faketime - m_currentBlockTimestamp is positive
+                    long faketime = timestamp < m_currentBlockTimestamp ? m_currentBlockTimestamp : timestamp;
 
-                long targetTxnsPerBlock = m_targetTxnsPerSecond / (1000 / BLOCK_SIZE);
+                    long targetTxnsPerBlock = m_targetTxnsPerSecond / (1000 / BLOCK_SIZE);
 
-                // compute the percentage of the current 100ms block that has passed
-                double expectedTxnsSent =
-                        targetTxnsPerBlock * (faketime - m_currentBlockTimestamp + 1.0) / BLOCK_SIZE;
-                expectedTxnsSent = Math.ceil(expectedTxnsSent);
+                    // compute the percentage of the current 100ms block that has passed
+                    double expectedTxnsSent =
+                            targetTxnsPerBlock * (faketime - m_currentBlockTimestamp + 1.0) / BLOCK_SIZE;
+                    expectedTxnsSent = Math.ceil(expectedTxnsSent);
 
-                assert(expectedTxnsSent <= targetTxnsPerBlock); // stupid fp math
-                assert((expectedTxnsSent >= 1.0) || (targetTxnsPerBlock == 0));
+                    assert(expectedTxnsSent <= targetTxnsPerBlock); // stupid fp math
+                    assert((expectedTxnsSent >= 1.0) || (targetTxnsPerBlock == 0));
 
-                // if the rate is under target, no problems
-                if (((m_currentBlockSendCount < expectedTxnsSent) &&
-                     (m_outstandingTxns < m_maxOutstandingTxns)) ||
-                    (ignoreBackpressure == true)) {
+                    // if the rate is under target, no problems
+                    if (((m_currentBlockSendCount < expectedTxnsSent) &&
+                         (m_outstandingTxns < m_maxOutstandingTxns)) ||
+                        (ignoreBackpressure == true)) {
 
-                    // bookkeeping
-                    ++m_currentBlockSendCount;
-                    ++m_outstandingTxns;
+                        // bookkeeping
+                        ++m_currentBlockSendCount;
+                        ++m_outstandingTxns;
 
-                    // exit the while loop
-                    break;
+                        // exit the while loop
+                        break;
+                    }
                 }
-            }
 
-            // if the rate is above target, pause for the smallest time possible
-            try { Thread.sleep(1); } catch (InterruptedException e) {}
-            timestamp = System.currentTimeMillis();
+                // if the rate is above target, pause for the smallest time possible
+                try { Thread.sleep(1); } catch (InterruptedException e) {}
+                timestampNanos = System.nanoTime();
+                timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
+            }
+        } else {
+            boolean acquired = m_outstandingTxnsSemaphore.tryAcquire();
+
+            if (!acquired) {
+                try {
+                    m_outstandingTxnsSemaphore.acquire();
+                } catch (InterruptedException e) {
+                    Throwables.propagate(e);
+                }
+                return System.nanoTime();
+            }
         }
 
         // this time may have changed if this call blocked during a sleep
-        return timestamp;
+        return timestampNanos;
     }
 
     public synchronized void debug() {

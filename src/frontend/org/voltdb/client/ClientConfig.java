@@ -17,12 +17,14 @@
 
 package org.voltdb.client;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
 
-    static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
     final String m_username;
@@ -34,7 +36,7 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
+    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
 
@@ -130,8 +132,33 @@ public class ClientConfig {
         if (ms < 0) ms = 0;
         // 0 implies infinite, but use LONG_MAX to reduce branches to test
         if (ms == 0) ms = Long.MAX_VALUE;
-        m_procedureCallTimeoutMS = ms;
+        m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(ms);
     }
+
+    /**
+     * <p>Set the timeout for procedure call. If the timeout expires before the call returns,
+     * the procedure callback will be called with status {@link ClientResponse#CONNECTION_TIMEOUT}.
+     * Synchronous procedures will throw an exception. If a response comes back after the
+     * expiration has triggered, then a callback method
+     * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
+     * will be called.</p>
+     *
+     * Default value is 2 minutes if not set. Value of 0 means forever.</p>
+     *
+     * For small timeouts a best effort will be made to schedule the timeout accurately</p>
+     *
+     * @param timeout Timeout value in milliseconds.
+     * @param unit Unit of timeout value
+     */
+    public void setProcedureCallTimeout(long timeout, TimeUnit unit) {
+        assert(timeout >= 0);
+        if (timeout < 0) timeout = 0;
+        // 0 implies infinite, but use LONG_MAX to reduce branches to test
+        if (timeout == 0) timeout = Long.MAX_VALUE;
+        m_procedureCallTimeoutNanos = unit.toNanos(timeout);
+    }
+
+
 
     /**
      * <p>Set the timeout for reading from a connection. If a connection receives no responses,

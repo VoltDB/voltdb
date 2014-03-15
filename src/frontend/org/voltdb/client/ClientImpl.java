@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -89,7 +90,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     ClientImpl(ClientConfig config) {
         m_distributer = new Distributer(
                 config.m_heavyweight,
-                config.m_procedureCallTimeoutMS,
+                config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity);
         m_distributer.addClientStatusListener(new CSL());
@@ -265,7 +266,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
-        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        //Time unit doesn't matter in this case since the timeout isn't being specified
+        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
     }
 
     /**
@@ -278,7 +280,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @return True if the procedure was queued and false otherwise
      */
     public boolean callProcedureWithTimeout(ProcedureCallback callback, String procName,
-            long timeout, Object... parameters) throws IOException, NoConnectionsException {
+            long timeout, TimeUnit unit, Object... parameters) throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
@@ -287,7 +289,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, 0, invocation, timeout);
+        return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
     }
 
     /**
@@ -342,13 +344,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, 0);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_TIMEOUT);
     }
 
     private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
-            ProcedureInvocation invocation, long timeout)
+            ProcedureInvocation invocation, long timeoutNanos)
             throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -364,7 +366,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout)) {
+                    isBlessed, timeoutNanos)) {
                 try {
                     backpressureBarrier();
                 } catch (InterruptedException e) {
@@ -376,7 +378,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout);
+                    isBlessed, timeoutNanos);
         }
     }
 
