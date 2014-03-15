@@ -202,7 +202,7 @@ public class TestClientFeatures extends TestCase {
         boolean exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, 6000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
             exceptionCalled = true;
@@ -213,7 +213,7 @@ public class TestClientFeatures extends TestCase {
         exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, 6000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -222,7 +222,7 @@ public class TestClientFeatures extends TestCase {
         //no timeout of 0
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, 2000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }

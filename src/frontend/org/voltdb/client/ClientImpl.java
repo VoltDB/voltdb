@@ -185,26 +185,27 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
      * Synchronously invoke a procedure call blocking until a result is available.
      *
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public ClientResponse callProcedureWithTimeout(String procName, long timeout, Object... parameters)
+    public ClientResponse callProcedureWithTimeout(String procName, long timeout, TimeUnit unit, Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, timeout, invocation);
+        return callProcedure(cb, unit.toNanos(timeout), invocation);
     }
 
     /**
@@ -275,7 +276,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
