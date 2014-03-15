@@ -253,10 +253,10 @@ class Distributer {
                     connections.addAll(m_connections);
                 }
 
-                long nowNanos = System.nanoTime();
+                final long nowNanos = System.nanoTime();
 
                 // for each connection
-                for (NodeConnection c : connections) {
+                for (final NodeConnection c : connections) {
                     synchronized(c) {
                         // check for connection age
                         long sinceLastResponse = Math.max(1, nowNanos - c.m_lastResponseTimeNanos);
@@ -278,7 +278,7 @@ class Distributer {
                         Iterator<Entry<Long, CallbackBookeeping>> iter = c.m_callbacks.entrySet().iterator();
                         while (iter.hasNext()) {
                             Entry<Long, CallbackBookeeping> e = iter.next();
-                            long handle = e.getKey();
+                            final long handle = e.getKey();
                             final CallbackBookeeping cb = e.getValue();
 
                             // if the timeout is expired, call the callback and remove the
@@ -297,30 +297,29 @@ class Distributer {
                                     continue;
                                 }
 
-                                final ClientResponseImpl r = new ClientResponseImpl(
-                                        ClientResponse.CONNECTION_TIMEOUT,
-                                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                        "",
-                                        new VoltTable[0],
-                                        String.format("No response received in the allotted time (set to %d ms).",
-                                                TimeUnit.NANOSECONDS.toMillis(cb.m_procedureTimeoutNanos)));
-                                r.setClientHandle(handle);
-                                r.setClientRoundtrip(deltaNanos);
-
                                 callbacksToDeliver.add(new Runnable() {
                                     @Override
                                     public void run() {
+                                        final ClientResponseImpl r = new ClientResponseImpl(
+                                                ClientResponse.CONNECTION_TIMEOUT,
+                                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                "",
+                                                new VoltTable[0],
+                                                String.format("No response received in the allotted time (set to %d ms).",
+                                                        TimeUnit.NANOSECONDS.toMillis(cb.m_procedureTimeoutNanos)));
+                                        r.setClientHandle(handle);
+                                        r.setClientRoundtrip(deltaNanos);
                                         try {
                                             cb.callback.clientCallback(r);
                                         } catch (Exception e1) {
                                             e1.printStackTrace();
                                         }
+                                        m_rateLimiter.transactionResponseReceived(nowNanos, -1);
+                                        int callbacksToInvoke = c.m_callbacksToInvoke.decrementAndGet();
+                                        assert(callbacksToInvoke >= 0);
                                     }
                                 });
                                 iter.remove();
-                                m_rateLimiter.transactionResponseReceived(nowNanos, -1);
-                                int callbacksToInvoke = c.m_callbacksToInvoke.decrementAndGet();
-                                assert(callbacksToInvoke >= 0);
                             }
                         }
                     }
@@ -371,6 +370,7 @@ class Distributer {
             long nowNanos = System.nanoTime();
             nowNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
                     nowNanos, ignoreBackpressure);
+            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
             synchronized (this) {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
@@ -388,7 +388,6 @@ class Distributer {
                 }
 
                 assert(m_callbacks.containsKey(handle) == false);
-                timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
                 ScheduledFuture<?> timeoutFuture = null;
                 if (timeoutNanos < TimeUnit.SECONDS.toNanos(1)) {
                     timeoutFuture = submitTimeoutTask(handle, timeoutNanos);
@@ -485,11 +484,24 @@ class Distributer {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
-            ProcedureCallback cb = null;
-            long callTimeNanos = 0;
-            long deltaNanos = 0;
-            long handle = response.getClientHandle();
-            ScheduledFuture<?> toCancel = null;
+
+            if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
+                /*
+                 * Really didn't want to add this block because it is not DRY
+                 * for the exception handling, but trying to set + reset the async topo callback
+                 * turned out to be pretty challenging
+                 */
+                ProcedureCallback cb = new TopoUpdateCallback();
+                try {
+                    cb.clientCallback(response);
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
+                }
+                return;
+            }
+
+            final long handle = response.getClientHandle();
+            CallbackBookeeping stuff = null;
             synchronized (this) {
                 // track the timestamp of the most recent read on this connection
                 m_lastResponseTimeNanos = nowNanos;
@@ -498,60 +510,43 @@ class Distributer {
                 if (response.getClientHandle() == PING_HANDLE) {
                     m_outstandingPing = false;
                     return;
-                } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
-                    /*
-                     * Really didn't want to add this block because it is not DRY
-                     * for the exception handling, but trying to set + reset the async topo callback
-                     * turned out to be pretty challenging
-                     */
-                    cb = new TopoUpdateCallback();
-                    try {
-                        cb.clientCallback(response);
-                    } catch (Exception e) {
-                        uncaughtException(cb, response, e);
-                    }
-                    return;
                 }
 
-                CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
-                // presumably (hopefully) this is a response for a timed-out message
-                if (stuff == null) {
-                    // also ignore internal (topology and procedure) calls
-                    if (handle >= 0) {
-                        // notify any listeners of the late response
-                        for (ClientStatusListenerExt listener : m_listeners) {
-                            listener.lateProcedureResponse(
-                                    response,
-                                    m_connection.getHostnameOrIP(),
-                                    m_connection.getRemotePort());
-                        }
-                    }
-                }
-                // handle a proper callback
-                else {
-                    toCancel = stuff.timeoutFuture;
-                    callTimeNanos = stuff.timestampNanos;
-                    deltaNanos = Math.max(1, nowNanos - callTimeNanos);
-                    cb = stuff.callback;
-                    assert(cb != null);
-                    final byte status = response.getStatus();
-                    boolean abort = false;
-                    boolean error = false;
-                    if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
-                        abort = true;
-                    } else if (status != ClientResponse.SUCCESS) {
-                        error = true;
-                    }
-                    int clusterRoundTrip = response.getClusterRoundtrip();
-                    m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip);
-                    updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error);
-                }
+                stuff = m_callbacks.remove(response.getClientHandle());
             }
 
-            if (toCancel != null) toCancel.cancel(false);
+            // presumably (hopefully) this is a response for a timed-out message
+            if (stuff == null) {
+                // also ignore internal (topology and procedure) calls
+                if (handle >= 0) {
+                    // notify any listeners of the late response
+                    for (ClientStatusListenerExt listener : m_listeners) {
+                        listener.lateProcedureResponse(
+                                response,
+                                m_connection.getHostnameOrIP(),
+                                m_connection.getRemotePort());
+                    }
+                }
+            }
+            // handle a proper callback
+            else {
+                if (stuff.timeoutFuture != null) stuff.timeoutFuture.cancel(false);
+                final long callTimeNanos = stuff.timestampNanos;
+                final long deltaNanos = Math.max(1, nowNanos - callTimeNanos);
+                final ProcedureCallback cb = stuff.callback;
+                assert(cb != null);
+                final byte status = response.getStatus();
+                boolean abort = false;
+                boolean error = false;
+                if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                    abort = true;
+                } else if (status != ClientResponse.SUCCESS) {
+                    error = true;
+                }
 
-            // cb might be null on late response
-            if (cb != null) {
+                int clusterRoundTrip = response.getClusterRoundtrip();
+                m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip);
+                updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error);
                 response.setClientRoundtrip(deltaNanos);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {
