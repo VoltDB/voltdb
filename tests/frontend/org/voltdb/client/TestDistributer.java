@@ -611,7 +611,7 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            config.setMaxOutstandingTxns(8);
+            config.setMaxOutstandingTxns(5);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);

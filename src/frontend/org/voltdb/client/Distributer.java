@@ -39,6 +39,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
@@ -314,6 +315,11 @@ class Distributer {
                             } catch (Exception e1) {
                                 uncaughtException(cb.callback, r, e1);
                             }
+
+                            //Drain needs to know when all callbacks have been invoked
+                            final int remainingToInvoke = c.m_callbacksToInvoke.decrementAndGet();
+                            assert(remainingToInvoke >= 0);
+
                             if (!cb.ignoreBackpressure) {
                                 m_rateLimiter.transactionResponseReceived(nowNanos, -1);
                             }
@@ -344,6 +350,7 @@ class Distributer {
     }
 
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
+        private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<Long, CallbackBookeeping>();
         private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
         private Connection m_connection;
@@ -397,6 +404,10 @@ class Distributer {
 
             assert(m_callbacks.containsKey(handle) == false);
 
+            //Drain needs to know when all callbacks have been invoked
+            final int callbacksToInvoke = m_callbacksToInvoke.incrementAndGet();
+            assert(callbacksToInvoke >= 0);
+
             //Optimistically submit the task
             m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
 
@@ -418,12 +429,18 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(callback, r, e);
                 }
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
+
                 if (!ignoreBackpressure) {
                     //for bookkeeping, but it feels dishonest to call this here
                     m_rateLimiter.transactionResponseReceived(nowNanos, -1);
                 }
                 return;
             } else {
+
                 m_connection.writeStream().enqueue(c);
             }
         }
@@ -452,6 +469,11 @@ class Distributer {
                     } catch (Throwable e1) {
                         e1.printStackTrace();
                     }
+
+                    //Drain needs to know when all callbacks have been invoked
+                    final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                    assert(remainingToInvoke >= 0);
+
                     if (!cb.ignoreBackpressure) {
                         m_rateLimiter.transactionResponseReceived(nowNanos, -1);
                     }
@@ -530,6 +552,11 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(cb, response, e);
                 }
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
+
                 return;
             }
 
@@ -578,6 +605,10 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(cb, response, e);
                 }
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
             }
         }
 
@@ -686,6 +717,11 @@ class Distributer {
                 catch (Exception ex) {
                     uncaughtException(callBk.callback, r, ex);
                 }
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
+
                 if (!callBk.ignoreBackpressure) {
                     m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1);
                 }
@@ -745,7 +781,7 @@ class Distributer {
         do {
             more = false;
             for (NodeConnection cxn : m_connections) {
-                more = more || !cxn.m_callbacks.isEmpty();
+                more = more || cxn.m_callbacksToInvoke.get() > 0;
             }
             /*
              * Back off to spinning at five millis. Try and get drain to be a little
