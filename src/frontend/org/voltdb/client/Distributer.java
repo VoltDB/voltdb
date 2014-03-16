@@ -520,7 +520,7 @@ class Distributer {
                 stats.m_endTS = Long.MIN_VALUE;
                 m_stats.put(procName, stats);
             }
-            stats.update((int)TimeUnit.NANOSECONDS.toMillis(roundTripNanos), clusterRoundTrip, abort, failure);
+            stats.update(roundTripNanos, clusterRoundTrip, abort, failure);
         }
 
         @Override

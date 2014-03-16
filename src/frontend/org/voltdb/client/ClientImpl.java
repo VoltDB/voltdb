@@ -619,6 +619,24 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         fw.close();
     }
 
+    public void writeSummaryCSVWithDoubles(ClientStats stats, String path) throws IOException {
+        // don't do anything (be silent) if empty path
+        if ((path == null) || (path.length() == 0)) {
+            return;
+        }
+
+        FileWriter fw = new FileWriter(path);
+        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f\n",
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
+                stats.kPercentileLatencyAsDouble(0.0),
+                stats.kPercentileLatencyAsDouble(1.0),
+                stats.kPercentileLatencyAsDouble(0.95),
+                stats.kPercentileLatencyAsDouble(0.99)));
+        fw.close();
+    }
+
     //Hidden method to check if Hashinator is initialized.
     public boolean isHashinatorInitialized() {
         return m_distributer.isHashinatorInitialized();
