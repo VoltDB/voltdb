@@ -293,8 +293,8 @@ public class TestClientFeatures extends TestCase {
 
             @Override
             public void clientCallback(ClientResponse clientResponse) throws Exception {
-                assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
-                latch3.countDown();
+                assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
+                latch4.countDown();
             }
 
         }
@@ -305,7 +305,7 @@ public class TestClientFeatures extends TestCase {
         ((ClientImpl) client).callProcedureWithTimeout(new MyCallback4(), "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
         final long start = System.nanoTime();
         try {
-            latch3.await();
+            latch4.await();
         } catch (InterruptedException ex) {
             ex.printStackTrace();
             fail();
