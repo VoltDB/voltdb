@@ -553,10 +553,6 @@ class Distributer {
                     uncaughtException(cb, response, e);
                 }
 
-                //Drain needs to know when all callbacks have been invoked
-                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
-                assert(remainingToInvoke >= 0);
-
                 return;
             }
 
