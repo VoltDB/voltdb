@@ -137,9 +137,9 @@ public class LoadTableLoader extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE) {
+            if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
+                log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 System.exit(-1);
