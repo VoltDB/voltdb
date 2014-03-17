@@ -158,8 +158,6 @@ public class ClientConfig {
         m_procedureCallTimeoutNanos = unit.toNanos(timeout);
     }
 
-
-
     /**
      * <p>Set the timeout for reading from a connection. If a connection receives no responses,
      * either from procedure calls or &amp;Pings, for the timeout time in milliseconds,
