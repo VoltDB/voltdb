@@ -145,12 +145,6 @@ public class LoadTableLoader extends Thread {
                 System.exit(-1);
             }
             if (status != ClientResponse.SUCCESS) {
-                //Remove from cp or del queue
-                if (shouldCopy != 0) {
-                    cpDelQueue.remove(p);
-                } else {
-                    onlyDelQueue.remove(p);
-                }
                 // log what happened
                 log.error("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
