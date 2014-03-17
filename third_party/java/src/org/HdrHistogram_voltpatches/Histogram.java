@@ -143,7 +143,6 @@ public class Histogram extends AbstractHistogram {
     public Histogram(final long lowestTrackableValue, final long highestTrackableValue, final int numberOfSignificantValueDigits) {
         super(lowestTrackableValue, highestTrackableValue, numberOfSignificantValueDigits);
         counts = new long[countsArrayLength];
-        System.out.println("Histogram size is " + (counts.length * 8));
     }
 
     private void readObject(final ObjectInputStream o)
