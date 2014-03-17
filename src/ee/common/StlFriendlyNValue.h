@@ -38,7 +38,7 @@ struct StlFriendlyNValue : public NValue {
 
     bool operator==(const StlFriendlyNValue& other) const
     {
-        return compare(other) == 0;
+        return compare(other) == VALUE_COMPARE_EQUAL;
     }
 
     const StlFriendlyNValue& operator=(const NValue& other)
@@ -50,7 +50,7 @@ struct StlFriendlyNValue : public NValue {
 
     bool operator<(const StlFriendlyNValue& other) const
     {
-        return compare(other) < 0;
+        return compare(other) < VALUE_COMPARE_EQUAL;
     }
 
 };

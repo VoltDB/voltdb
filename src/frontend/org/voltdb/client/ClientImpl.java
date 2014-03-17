@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -89,7 +90,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     ClientImpl(ClientConfig config) {
         m_distributer = new Distributer(
                 config.m_heavyweight,
-                config.m_procedureCallTimeoutMS,
+                config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_subject);
@@ -189,26 +190,27 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
      * Synchronously invoke a procedure call blocking until a result is available.
      *
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public ClientResponse callProcedureWithTimeout(String procName, long timeout, Object... parameters)
+    public ClientResponse callProcedureWithTimeout(String procName, long timeout, TimeUnit unit, Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, timeout, invocation);
+        return callProcedure(cb, unit.toNanos(timeout), invocation);
     }
 
     /**
@@ -270,7 +272,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
-        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        //Time unit doesn't matter in this case since the timeout isn't being specified
+        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
     }
 
     /**
@@ -278,12 +281,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
     public boolean callProcedureWithTimeout(ProcedureCallback callback, String procName,
-            long timeout, Object... parameters) throws IOException, NoConnectionsException {
+            long timeout, TimeUnit unit, Object... parameters) throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
@@ -292,7 +296,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, 0, invocation, timeout);
+        return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
     }
 
     /**
@@ -347,13 +351,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, 0);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_TIMEOUT);
     }
 
     private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
-            ProcedureInvocation invocation, long timeout)
+            ProcedureInvocation invocation, long timeoutNanos)
             throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -369,7 +373,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout)) {
+                    isBlessed, timeoutNanos)) {
                 try {
                     backpressureBarrier();
                 } catch (InterruptedException e) {
@@ -381,7 +385,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout);
+                    isBlessed, timeoutNanos);
         }
     }
 
@@ -617,6 +621,24 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 stats.kPercentileLatency(1.0),
                 stats.kPercentileLatency(0.95),
                 stats.kPercentileLatency(0.99)));
+        fw.close();
+    }
+
+    public void writeSummaryCSVWithDoubles(ClientStats stats, String path) throws IOException {
+        // don't do anything (be silent) if empty path
+        if ((path == null) || (path.length() == 0)) {
+            return;
+        }
+
+        FileWriter fw = new FileWriter(path);
+        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f\n",
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
+                stats.kPercentileLatencyAsDouble(0.0),
+                stats.kPercentileLatencyAsDouble(1.0),
+                stats.kPercentileLatencyAsDouble(0.95),
+                stats.kPercentileLatencyAsDouble(0.99)));
         fw.close();
     }
 

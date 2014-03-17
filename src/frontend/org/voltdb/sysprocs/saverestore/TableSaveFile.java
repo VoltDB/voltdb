@@ -386,16 +386,22 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
-        if (m_chunkReaderThread != null) {
-            m_chunkReaderThread.interrupt();
+        Thread chunkReader;
+        synchronized (this) {
+            m_hasMoreChunks = false;
+            chunkReader = m_chunkReaderThread;
+        }
+
+        if (chunkReader != null) {
+            chunkReader.interrupt();
             try {
-                m_chunkReaderThread.join();
+                chunkReader.join();
             } catch (InterruptedException e) {
                 throw new IOException(e);
             }
         }
+
         synchronized (this) {
-            m_hasMoreChunks = false;
             while (!m_availableChunks.isEmpty()) {
                 m_availableChunks.poll().discard();
             }

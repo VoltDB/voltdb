@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.client.Client;
@@ -263,7 +264,7 @@ public class JDBC4ClientConnection implements Closeable {
         ClientImpl currentClient = this.getClient();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, parameters);
+            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, TimeUnit.SECONDS, parameters);
             this.statistics.update(procedure, response);
             return response;
         }
