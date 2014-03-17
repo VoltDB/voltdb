@@ -60,7 +60,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.NIOWriteStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
@@ -868,14 +867,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 clientData = cihm.findHandle(response.getClientInterfaceHandle());
             }
             if (clientData == null) {
-                return -1;
+                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
             // Reuse the creation time of the original invocation to have accurate internal latency
             if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
-                return -1;
+                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
             final long now = System.nanoTime();

@@ -105,7 +105,7 @@ public abstract class NIOWriteStreamBase {
         while ((ds = oldlist.poll()) != null) {
             processedWrites++;
             final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == -1) continue;
+            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
             BBContainer outCont = m_queuedBuffers.peekLast();
             ByteBuffer outbuf = null;
             if (outCont == null || !outCont.b().hasRemaining()) {

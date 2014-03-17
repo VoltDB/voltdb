@@ -27,6 +27,11 @@ import java.nio.ByteBuffer;
  */
 public interface DeferredSerialization {
     /**
+     * Value to return for an empty message
+     */
+    public static final int EMPTY_MESSAGE_LENGTH = -1;
+
+    /**
      * Serialize the Object contained in this DeferredSerialization
      * @return Serialized representation of the object stored
      * @throws IOException Thrown here because FastSerialzier throws IOException
