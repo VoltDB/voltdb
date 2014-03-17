@@ -365,8 +365,19 @@ class Distributer {
         public void createWork(long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
+
+            //How long from the starting point in time to wait to get this stuff done
             timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
-            long nowNanos = System.nanoTime();
+
+            //The time when the transaction was submitted and the timeout and latency should be relative to
+            final long nowNanos = System.nanoTime();
+
+            //Trigger the timeout at this point in time no matter what
+            final long timeoutTime = nowNanos + timeoutNanos;
+
+            //What was the time after the rate limiter returned
+            //Will be the same as timeoutNanos if it didn't block
+            long afterRateLimitNanos = 0;
 
             /*
              * Do rate limiting or check for max outstanding related backpressure in
@@ -375,7 +386,7 @@ class Distributer {
              */
             if (!ignoreBackpressure) {
                 try {
-                    nowNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                    afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
                             nowNanos, timeoutNanos, ignoreBackpressure);
                 } catch (TimeoutException e) {
                     /*
@@ -411,9 +422,14 @@ class Distributer {
             //Optimistically submit the task
             m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
 
+            //Schedule the timeout to fire relative to the amount of time
+            //spent getting to this point. Might fire immediately
+            //some of the time, but that is fine
+            final long timeoutRemaining = timeoutTime - afterRateLimitNanos;
+
             //Schedule an individual timeout if necessary
             if (timeoutNanos < TimeUnit.SECONDS.toNanos(1)) {
-                submitTimeoutTask(handle, timeoutNanos);
+                submitTimeoutTask(handle, Math.max(0, timeoutRemaining));
             }
 
             //Check for disconnect
@@ -440,7 +456,6 @@ class Distributer {
                 }
                 return;
             } else {
-
                 m_connection.writeStream().enqueue(c);
             }
         }
