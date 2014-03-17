@@ -230,7 +230,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
             } else {
                 m_tableSchema = new NodeSchema();
-                CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+                CatalogMap<Column> cols = db.getTables().getExact(m_targetTableName).getColumns();
                 // you don't strictly need to sort this, but it makes diff-ing easier
                 for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
                 {

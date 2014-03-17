@@ -787,7 +787,7 @@ inline int TableTuple::compare(const TableTuple &other) const {
             return diff;
         }
     }
-    return 0;
+    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {
