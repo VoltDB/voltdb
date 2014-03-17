@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -46,6 +47,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
+    private long clientRoundTripTimeNanos = 0;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_STATUS_KEY = "status";
@@ -258,8 +260,14 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return clientRoundTripTime;
     }
 
-    public void setClientRoundtrip(int time) {
-        clientRoundTripTime = time;
+    @Override
+    public long getClientRoundtripNanos() {
+        return clientRoundTripTimeNanos;
+    }
+
+    public void setClientRoundtrip(long timeNanos) {
+        clientRoundTripTimeNanos = timeNanos;
+        clientRoundTripTime = (int)TimeUnit.NANOSECONDS.toMillis(timeNanos);
     }
 
     @Override

@@ -211,6 +211,7 @@ JAVA COMPILATION
                   org/apache/jute_voltpatches/**/*.java
                   org/apache/zookeeper_voltpatches/KeeperException.java
                   org/cliffc_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   jsr166y/**/*.java
 

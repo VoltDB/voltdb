@@ -357,7 +357,7 @@ private:
      */
     char *m_data;
 
-    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
+    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) {
         assert(m_schema);
         assert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
@@ -787,7 +787,7 @@ inline int TableTuple::compare(const TableTuple &other) const {
             return diff;
         }
     }
-    return 0;
+    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {

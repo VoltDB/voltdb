@@ -17,12 +17,14 @@
 
 package org.voltdb.client;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
 
-    static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
     final String m_username;
@@ -34,7 +36,7 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
+    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
 
@@ -130,7 +132,7 @@ public class ClientConfig {
         if (ms < 0) ms = 0;
         // 0 implies infinite, but use LONG_MAX to reduce branches to test
         if (ms == 0) ms = Long.MAX_VALUE;
-        m_procedureCallTimeoutMS = ms;
+        m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(ms);
     }
 
     /**

@@ -556,8 +556,8 @@ public:
 
    static Json::Value expr_value_base(const std::string& type) {
         Json::Value value;
-        value["TYPE"] = "VALUE_CONSTANT";
-        value["VALUE_TYPE"] = type;
+        value["TYPE"] = EXPRESSION_TYPE_VALUE_CONSTANT;
+        value["VALUE_TYPE"] = stringToValue(type);
         value["VALUE_SIZE"] = 0;
         value["ISNULL"] = false;
         return value;
@@ -580,8 +580,8 @@ public:
                                         const std::string& colname)
     {
         Json::Value value;
-        value["TYPE"] = "VALUE_TUPLE";
-        value["VALUE_TYPE"] = type;
+        value["TYPE"] = EXPRESSION_TYPE_VALUE_TUPLE;
+        value["VALUE_TYPE"] = stringToValue(type);
         value["VALUE_SIZE"] = 0;
         value["TABLE_NAME"] = tblname;
         value["COLUMN_IDX"] = colidx;
@@ -596,8 +596,8 @@ public:
                                       const Json::Value& right)
     {
         Json::Value value;
-        value["TYPE"] = op;
-        value["VALUE_TYPE"] = type;
+        value["TYPE"] = stringToExpression(op);
+        value["VALUE_TYPE"] = stringToValue(type);
         value["VALUE_SIZE"] = 0;
         value["LEFT"] = left;
         value["RIGHT"] = right;
@@ -878,9 +878,8 @@ public:
     std::string generateHashRangePredicate(const T_HashRangeVector& ranges) {
         int colidx = m_table->partitionColumn();
         Json::Value json;
-        std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
-        json["TYPE"] = op;
-        json["VALUE_TYPE"] = valueToString(VALUE_TYPE_BIGINT);
+        json["TYPE"] = EXPRESSION_TYPE_HASH_RANGE;
+        json["VALUE_TYPE"] = VALUE_TYPE_BIGINT;
         json["VALUE_SIZE"] = 8;
         json["HASH_COLUMN"] = colidx;
         Json::Value array;
