@@ -86,7 +86,7 @@ public:
 };
 class CmpLike {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.like_withoutNull(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.like(r);}
 };
 class CmpIn {
 public:

@@ -52,3 +52,6 @@ doc/tutorials/auction/csvloader_*.csv
 /tools/voltify.venv
 /tests/ee/.cproject
 /tests/ee/.project
+/src/ee/org_voltdb_utils_PosixAdvise.h
+/src/frontend/org/voltcore/utils/DBBPool.java
+/src/frontend/org/voltcore/utils/.flagfile

@@ -23,6 +23,26 @@
       td.invert>p>a {
         color: #eeeeee;
       }
+      .table th.right-cell, .table td.right-cell {
+		text-align: right;
+      }
+      .table th.calculated-cell, .table td.calculated-cell {
+        font-weight: bold;
+        background-color: #e6ebf0;
+      }
+      .table th.min-max-header {
+        font-size: smaller;
+      }
+      td.table-view-name {
+        font-weight: bold;
+      }
+      table.size-summary-table {
+        width: auto;
+      }
+      input.count-input {
+        width: 100px;
+        text-align: right;
+      }
     </style>
     <link href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" rel="stylesheet">
     <link href="http://assets.voltdb.com/t/css/theme.bootstrap.css" rel="stylesheet">
@@ -56,6 +76,7 @@
               <li id='s-nav'> <a href="#s">Schema</a></li>
               <li id='p-nav'> <a href="#p">Procedures &amp; SQL</a></li>
               <li id='r-nav'> <a href="#r">System Report</a></li>
+              <li id='z-nav'> <a href="#z">Size Worksheet</a></li>
             <!--##RESOURCES
               <li id='m-nav'> <a href='/memory/'>Memory Report</a></li>
             ##RESOURCES-->
@@ -130,6 +151,57 @@
             <!--##PLATFORM2##-->
             <h4>VoltDB Compiler Platform:</h4>
             <p>##PLATFORM##</p>
+        </div>
+
+        <div id='z' class='reportpage' style='display: none;'>
+            <a name='z'></a><h1>Estimate Memory Used by User Data</h1><br/>
+
+            <table><tr>
+
+            <td width='60%'>
+                This sizing worksheet is designed to help VoltDB application developers
+                estimate the amount of memory the user data will require in an application.
+                These estimates include user data and most of the per-row data structure
+                overhead for that data. Memory use that is not proportional to the amount
+                of data (e.g., the Java heap and any temporary buffers
+                and caches) is not included.
+            </td>
+
+            <td width='*'>
+            <small><ul>
+                <li>Sizes without units are in bytes.</li>
+                <li>For more useful results replace row counts with better estimates.</li>
+                <li>All calculated fields update after leaving any input field.</li>
+                <li>Warning: Page refresh resets all input fields.</li>
+            </ul></small>
+            </td>
+
+            </tr></table>
+            <br/>
+
+            <table class="table tableL3 tablesorter" id='sizetable'>
+                <thead>
+	                <tr>
+	                    <th>Name</th>
+	                    <th>Type</th>
+                        <th>Count</th>
+	                    <th class='min-max-header'>Row Min</th>
+	                    <th class='min-max-header'>Row Max</th>
+	                    <th class='min-max-header'>Index Min</th>
+	                    <th class='min-max-header'>Index Max</th>
+	                    <th class='min-max-header'>Table Min</th>
+	                    <th class='min-max-header'>Table Max</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ##SIZES##
+                </tbody>
+            </table>
+            <br/>
+
+            <h4>Size Analysis Summary</h4>
+            ##SIZESUMMARY##
+
         </div>
 
       <hr>
@@ -250,6 +322,7 @@
                 navigate(hash);
                 return false;
             });
+
             $('.tableL2').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
 
@@ -267,6 +340,32 @@
                 }
                 else {
                     console.log("not visible");
+                }
+                history.replaceState(null, null, hash);
+                navigate(hash);
+                return false;
+            });
+
+            $(".tableL3").tablesorter({
+                theme : 'bootstrap',
+                widthFixed: true,
+                headerTemplate : '{content} {icon}',
+                widgets : [ "uitheme", "filter", "stickyHeaders" ],
+                widgetOptions : {
+                    filter_reset : ".reset",
+                    filter_hideFilters : true
+                },
+                cssChildRow: "tablesorter-childRow"
+            });
+
+            $('.tableL3').delegate('.togglex', 'click' ,function(){
+                var id = $(this).attr('id');
+                var toppage = id.split('-')[0];
+                var dropdownid = "#" + id + "--dropdown";
+
+                var hash = "#" + id;
+                if ($(dropdownid).is(":visible")) {
+                    hash = "#" + toppage;
                 }
                 history.replaceState(null, null, hash);
                 navigate(hash);
@@ -311,7 +410,123 @@
                 'This statement or procedure could potentially use SQL that outputs non-deterministic ' +
                 'results which then may be used to modify state. If this happens, the cluster will ' +
                 'halt. Consider adding an ORDER BY clause to make a SELECT statement deterministic.'});
+
+            sizes_update_all();
         });
+
+        function numberWithCommas(n) {
+            n = Math.round(n / 1000.0);
+            var parts=n.toString().split(".");
+            return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "") + " K";
+        }
+
+        function size_table_element(name, nrow) {
+        	var id = "s-size-".concat(nrow, '-', name);
+            var e = document.getElementById(id);
+            return e;
+        }
+
+        function size_table_value(name, nrow) {
+        	var elem = size_table_element(name, nrow);
+        	var value = Math.floor(name == "count" ? elem.value : elem.innerHTML);
+        	return value;
+        }
+
+        function size_table_update(name, nrow, value) {
+            var elem = size_table_element(name, nrow);
+            if (elem != null) {
+                elem.innerHTML = numberWithCommas(value);
+            }
+        }
+
+        function size_summary_element(type, name) {
+            var id = "s-size-summary-".concat(type, '-', name);
+            var e = document.getElementById(id);
+            return e;
+        }
+
+        function size_summary_value(type, name) {
+            var elem = size_summary_element(type, name);
+            var value = Math.floor(elem.innerHTML);
+            return value;
+        }
+
+        function size_summary_update(type, name, value) {
+            var elem = size_summary_element(type, name);
+            if (elem != null) {
+                elem.innerHTML = numberWithCommas(value);
+            }
+        }
+
+        function sizes_get_row(nrow) {
+            return {
+                "count": size_table_value("count", nrow),
+                "rmin": size_table_value("rmin", nrow),
+                "rmax": size_table_value("rmax", nrow),
+                "imin": size_table_value("imin", nrow),
+                "imax": size_table_value("imax", nrow),
+                "tmin": size_table_value("tmin", nrow),
+                "tmax": size_table_value("tmax", nrow)
+            };
+        }
+
+        // Do the size worksheet calculations for a single row.
+        function sizes_update_row(nrow) {
+        	var v = sizes_get_row(nrow);
+            size_table_update("tmin", nrow, (v["rmin"] + v["imin"]) * v["count"]);
+            size_table_update("tmax", nrow, (v["rmax"] + v["imax"]) * v["count"]);
+        }
+
+        /*
+         * Update the size worksheet summary.
+         */
+        function sizes_update_summary() {
+        	var ntables = size_summary_value("table", "count");
+            var nviews = size_summary_value("view", "count");
+            var nrow = 0;
+            var tmin = 0;
+            var tmax = 0;
+            var vmin = 0;
+            var vmax = 0;
+            var imin = 0;
+            var imax = 0;
+        	for (var ntable = 0; ntable < ntables; ++ntable) {
+                var v = sizes_get_row(++nrow);
+                tmin += (v["rmin"] * v["count"]);
+                tmax += (v["rmax"] * v["count"]);
+                imin += (v["imin"] * v["count"]);
+                imax += (v["imax"] * v["count"]);
+        	}
+            for (var nview = 0; nview < nviews; ++nview) {
+                var v = sizes_get_row(++nrow);
+                vmin += (v["rmin"] * v["count"]);
+                vmax += (v["rmax"] * v["count"]);
+                imin += (v["imin"] * v["count"]);
+                imax += (v["imax"] * v["count"]);
+            }
+            size_summary_update("table", "min", tmin);
+            size_summary_update("table", "max", tmax);
+            size_summary_update("view", "min", vmin);
+            size_summary_update("view", "max", vmax);
+            size_summary_update("index", "min", imin);
+            size_summary_update("index", "max", imax);
+            size_summary_update("total", "min", tmin + vmin + imin);
+            size_summary_update("total", "max", tmax + vmax + imax);
+        }
+
+        /*
+         * Do all the size worksheet calculations at once.
+         * Call sizes_update_row() when a single row is changed.
+         */
+        function sizes_update_all() {
+            // Use the summary counts to determine the number of table rows.
+            var ntables = size_summary_value("table", "count");
+            var nviews = size_summary_value("view", "count");
+            for (var nrow = 1; nrow <= ntables + nviews; ++nrow) {
+                sizes_update_row(nrow);
+            }
+            sizes_update_summary();
+        }
 
     </script>
 

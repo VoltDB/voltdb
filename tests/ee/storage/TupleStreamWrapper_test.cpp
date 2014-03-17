@@ -266,7 +266,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
-    EXPECT_EQ( 1786, m_wrapper->allocatedByteCount());
+    EXPECT_EQ( 1802, m_wrapper->allocatedByteCount());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);

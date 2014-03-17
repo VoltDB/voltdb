@@ -686,6 +686,10 @@ public class VoltDB {
         }
     }
 
+    public static void crashLocalVoltDB(String errMsg) {
+        crashLocalVoltDB(errMsg, false, null);
+    }
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
