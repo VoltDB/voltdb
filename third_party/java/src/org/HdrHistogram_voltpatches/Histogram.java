@@ -146,10 +146,6 @@ public class Histogram extends AbstractHistogram {
         System.out.println("Histogram size is " + (counts.length * 8));
     }
 
-    public static void main(String args[]) {
-        new Histogram(50, 10L * 1000L * 1000L, 2);
-    }
-
     private void readObject(final ObjectInputStream o)
             throws IOException, ClassNotFoundException {
         o.defaultReadObject();

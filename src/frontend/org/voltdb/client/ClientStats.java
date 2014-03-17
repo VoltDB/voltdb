@@ -458,8 +458,10 @@ public class ClientStats {
      * @return An estimate of k-percentile latency in whole milliseconds.
      */
     public int kPercentileLatency(double percentile) {
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        if (data.getTotalCount() == 0) return 0;
         percentile = Math.max(0.0, percentile);
-        return (int) (Math.round(m_latencyHistogram.getHistogramData().getValueAtPercentile(percentile * 100.0)) / 1000.0);
+        return (int) (Math.round(data.getValueAtPercentile(percentile * 100.0)) / 1000.0);
     }
 
     /**
@@ -477,8 +479,10 @@ public class ClientStats {
      * @return An estimate of k-percentile latency in whole milliseconds.
      */
     public double kPercentileLatencyAsDouble(double percentile) {
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        if (data.getTotalCount() == 0) return 0.0;
         percentile = Math.max(0.0, percentile);
-        return m_latencyHistogram.getHistogramData().getValueAtPercentile(percentile * 100.0) / 1000.0;
+        return data.getValueAtPercentile(percentile * 100.0) / 1000.0;
     }
 
     /**
