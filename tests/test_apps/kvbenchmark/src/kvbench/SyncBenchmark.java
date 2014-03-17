@@ -229,7 +229,7 @@ public class SyncBenchmark {
             m_writer.printf("volt.kv.aborts %d %.3f\n", stats.getInvocationAborts(), now);
             m_writer.printf("volt.kv.errors %d %.3f\n", stats.getInvocationErrors(), now);
             m_writer.printf("volt.kv.latency.average %f %.3f\n", stats.getAverageLatency(), now);
-            m_writer.printf("volt.kv.latency.five9s %d %.3f\n", stats.kPercentileLatency(0.99999), now);
+            m_writer.printf("volt.kv.latency.five9s %.2f %.3f\n", stats.kPercentileLatencyAsDouble(0.99999), now);
             m_writer.printf("volt.kv.completed %d %.3f\n", stats.getInvocationsCompleted(), now);
             m_writer.printf("volt.kv.throughput %d %.3f\n", stats.getTxnThroughput(), now);
         }
@@ -263,11 +263,11 @@ public class SyncBenchmark {
 
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%f,%d\n",
+            m_writer.printf("%s,%d,%d,%d,%d,%d,%f,%.2f\n",
                     ts, stats.getEndTimestamp(), stats.getInvocationsCompleted(),
                     stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getTxnThroughput(), stats.getAverageLatency(),
-                    stats.kPercentileLatency(0.99999)
+                    stats.kPercentileLatencyAsDouble(0.99999)
                     );
         }
     }
@@ -423,8 +423,8 @@ public class SyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/99.999%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.99999));
+        System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.99999));
 
         logMetric(stats);
     }
@@ -482,16 +482,16 @@ public class SyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
-        System.out.printf("99.999th percentile latency:   %,9d ms\n", stats.kPercentileLatency(.99999));
+        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
+        System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");

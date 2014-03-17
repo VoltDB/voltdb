@@ -91,16 +91,14 @@ public final class DBBPool {
         }
 
         final public ByteBuffer bD() {
-            checkUseAfterFree();
-            return b.duplicate();
+            return b().duplicate();
         }
 
         final public ByteBuffer bDR() {
-            checkUseAfterFree();
-            return b.asReadOnlyBuffer();
+            return b().asReadOnlyBuffer();
         }
 
-        protected void checkUseAfterFree() {
+        final protected void checkUseAfterFree() {
 #ifndef NO_MEMCHECK
             if (m_freeThrowable != null) {
                 System.err.println("Use after free in DBBPool");
@@ -117,7 +115,7 @@ public final class DBBPool {
 #endif
         }
 
-        protected ByteBuffer checkDoubleFree() {
+        final protected ByteBuffer checkDoubleFree() {
 #ifndef NO_MEMCHECK
             synchronized (this) {
                 if (m_freeThrowable != null) {

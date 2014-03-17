@@ -34,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.Test;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -204,7 +206,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         long invocations = 0;
         results[0].resetRowPosition();
         while (results[0].advanceRow()) {
-            invocations += AbstractHistogram.fromCompressedBytes(results[0].getVarbinary("HISTOGRAM")).getHistogramData().getTotalCount();
+            byte histogramBytes[] = results[0].getVarbinary("HISTOGRAM");
+            Histogram h = AbstractHistogram.fromCompressedBytes(histogramBytes, CompressionStrategySnappy.INSTANCE);
+            invocations += h.getHistogramData().getTotalCount();
         }
         assertTrue(invocations > 0);
     }
