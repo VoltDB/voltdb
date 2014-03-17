@@ -222,10 +222,10 @@ public class NIOWriteStream implements WriteStream {
             ByteBuffer buffer = null;
             if (m_currentWriteBuffer == null) {
                 m_currentWriteBuffer = m_queuedBuffers.poll();
-                buffer = m_currentWriteBuffer.b;
+                buffer = m_currentWriteBuffer.b();
                 buffer.flip();
             } else {
-                buffer = m_currentWriteBuffer.b;
+                buffer = m_currentWriteBuffer.b();
             }
 
             rc = 0;
@@ -377,17 +377,18 @@ public class NIOWriteStream implements WriteStream {
                 bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
                     BBContainer outCont = m_queuedBuffers.peekLast();
-                    if (outCont == null || !outCont.b.hasRemaining()) {
+                    if (outCont == null || !outCont.b().hasRemaining()) {
                         outCont = pool.acquire();
-                        outCont.b.clear();
+                        outCont.b().clear();
                         m_queuedBuffers.offer(outCont);
                     }
-                    if (outCont.b.remaining() >= buf.remaining()) {
-                        outCont.b.put(buf);
+                    ByteBuffer outBuf = outCont.b();
+                    if (outBuf.remaining() >= buf.remaining()) {
+                        outBuf.put(buf);
                     } else {
                         final int oldLimit = buf.limit();
-                        buf.limit(buf.position() + outCont.b.remaining());
-                        outCont.b.put(buf);
+                        buf.limit(buf.position() + outBuf.remaining());
+                        outBuf.put(buf);
                         buf.limit(oldLimit);
                     }
                 }
@@ -405,13 +406,13 @@ public class NIOWriteStream implements WriteStream {
         m_isShutdown = true;
         BBContainer c = null;
         if (m_currentWriteBuffer != null) {
-            bytesReleased += m_currentWriteBuffer.b.remaining();
+            bytesReleased += m_currentWriteBuffer.b().remaining();
             m_currentWriteBuffer.discard();
         }
         while ((c = m_queuedBuffers.poll()) != null) {
             //Buffer is not flipped after being written to in swap and serialize, need to do it here
-            c.b.flip();
-            bytesReleased += c.b.remaining();
+            c.b().flip();
+            bytesReleased += c.b().remaining();
             c.discard();
         }
         updateQueued(-bytesReleased, false);

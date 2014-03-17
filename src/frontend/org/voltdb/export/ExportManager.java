@@ -44,10 +44,10 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -548,11 +548,13 @@ public class ExportManager
             ByteBuffer buffer,
             boolean sync,
             boolean endOfStream) {
+        //For validating that the memory is released
+        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
             ExportGeneration generation = instance.m_generations.get(exportGeneration);
             if (generation == null) {
-                DBBPool.deleteCharArrayMemory(bufferPtr);
+                DBBPool.wrapBB(buffer).discard();
                 /*
                  * If the generation was already drained it is fine for a buffer to come late and miss it
                  */
@@ -566,21 +568,7 @@ public class ExportManager
                 return;
             }
 
-            /*
-             * Due to issues double freeing and using after free,
-             * copy the buffer onto the heap and rely on GC.
-             *
-             * This should buy enough time to diagnose the root cause.
-             */
-            if (buffer != null) {
-                ByteBuffer buf = ByteBuffer.allocate(buffer.remaining());
-                buf.put(buffer);
-                buf.flip();
-                DBBPool.deleteCharArrayMemory(bufferPtr);
-                buffer = buf;
-                bufferPtr = 0;
-            }
-            generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
+            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
