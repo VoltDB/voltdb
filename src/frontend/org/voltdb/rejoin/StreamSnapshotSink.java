@@ -227,7 +227,7 @@ public class StreamSnapshotSink {
         long targetId = msg.getSecond().getFirst();
         BBContainer container = msg.getSecond().getSecond();
         try {
-            ByteBuffer block = container.b;
+            ByteBuffer block = container.b();
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
             final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];

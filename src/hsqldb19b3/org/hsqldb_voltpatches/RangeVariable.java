@@ -1174,11 +1174,11 @@ final class RangeVariable {
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY && tableAlias == null) {
             scan.attributes.put("table", rangeTable.getName().name + rangeTable.getName().hashCode());
         } else {
-            scan.attributes.put("table", rangeTable.getName().name);
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
         }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("tablealias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
         }
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {

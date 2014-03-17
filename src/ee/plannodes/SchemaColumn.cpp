@@ -20,7 +20,7 @@
 using namespace std;
 using namespace voltdb;
 
-SchemaColumn::SchemaColumn(PlannerDomValue colObject)
+SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
 {
     if (colObject.hasKey("TABLE_NAME")) {
         m_tableName = colObject.valueForKey("TABLE_NAME").asStr();
@@ -30,7 +30,10 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject)
         m_columnName = colObject.valueForKey("COLUMN_NAME").asStr();
     }
     else {
-        throw runtime_error("SchemaColumn::constructor missing column name.");
+//        throw runtime_error("SchemaColumn::constructor missing column name.");
+        char tmpName[6]; // 1024
+        std::snprintf(tmpName, sizeof(tmpName), "C%d", idx);
+        m_columnName = std::string(tmpName);
     }
 
     if (colObject.hasKey("COLUMN_ALIAS")) {
@@ -48,11 +51,12 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject)
 
     m_expression = NULL;
     // lazy vector search
+    if (colObject.hasKey("EXPRESSION")) {
+        PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
 
-    PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
-
-    m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
-    assert(m_expression);
+        m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
+        assert(m_expression);
+    }
 }
 
 SchemaColumn::~SchemaColumn()

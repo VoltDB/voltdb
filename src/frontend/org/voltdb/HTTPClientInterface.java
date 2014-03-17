@@ -218,8 +218,21 @@ public class HTTPClientInterface {
                 cb.waitForResponse();
             }
         }
+        catch (java.net.ConnectException c_ex)
+        {
+            // Clients may attempt to connect to VoltDB before the server
+            // is completely initialized (our tests do this, for example).
+            // Don't print a stack trace, and return a server unavailable reason.
+            ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.SERVER_UNAVAILABLE, new VoltTable[0], c_ex.getMessage());
+            String msg = rimpl.toJSONString();
+            response.setStatus(HttpServletResponse.SC_OK);
+            request.setHandled(true);
+            try {
+                response.getWriter().print(msg);
+                continuation.complete();
+            } catch (IOException e1) {}
+        }
         catch (Exception e) {
-            e.printStackTrace();  // for debugging, remove later
             String msg = e.getMessage();
             VoltLogger log = new VoltLogger("HOST");
             log.warn("JSON interface exception: " + msg, e);

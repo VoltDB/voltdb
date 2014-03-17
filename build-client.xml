@@ -211,6 +211,7 @@ JAVA COMPILATION
                   org/apache/jute_voltpatches/**/*.java
                   org/apache/zookeeper_voltpatches/KeeperException.java
                   org/cliffc_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   jsr166y/**/*.java
 
@@ -231,6 +232,7 @@ JAVA COMPILATION
                   org/voltcore/utils/InstanceId.java
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
+                  org/voltcore/utils/Bits.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java

@@ -149,9 +149,11 @@ public class PlanNodeTree implements JSONString {
             for( int i = 0; i < size; i++ ) {
                 JSONObject jobj;
                 jobj = jArray.getJSONObject(i);
-                JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
-                for( int j = 0; j < children.length(); j++ ) {
-                    m_planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j) ) );
+                if (jobj.has("CHILDREN_IDS")) {
+                    JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
+                    for( int j = 0; j < children.length(); j++ ) {
+                        m_planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j) ) );
+                    }
                 }
             }
         }
