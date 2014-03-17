@@ -45,6 +45,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import jsr166y.ThreadLocalRandom;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
@@ -352,7 +353,7 @@ class Distributer {
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<Long, CallbackBookeeping>();
-        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
+        private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<String, ClientStats>();
         private Connection m_connection;
         private volatile boolean m_isConnected = true;
 
@@ -1153,13 +1154,11 @@ class Distributer {
                 new TreeMap<Long, Map<String, ClientStats>>();
 
             for (NodeConnection conn : m_connections) {
-                synchronized (conn) {
-                    Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
-                    for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
-                        connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
-                    }
-                    retval.put(conn.connectionId(), connMap);
+                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
+                    connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
                 }
+                retval.put(conn.connectionId(), connMap);
             }
 
 
