@@ -118,6 +118,7 @@ public class ClientStats {
         m_roundTripTimeNanos = other.m_roundTripTimeNanos;
         m_clusterRoundTripTime = other.m_clusterRoundTripTime;
         m_latencyHistogram = other.m_latencyHistogram.copy();
+        m_latencyHistogram.reestablishTotalCount();
         m_bytesSent = other.m_bytesSent;
         m_bytesReceived = other.m_bytesReceived;
     }
@@ -200,21 +201,20 @@ public class ClientStats {
     }
 
     void update(long roundTripTimeNanos, int clusterRoundTripTime, boolean abort, boolean error) {
-        //I do solemnly swear that no txn will roundtrip Volt in less than LOWEST_TRACKABLE microseconds
-        //And if it does, maybe I don't care much
-        roundTripTimeNanos = Math.max(LOWEST_TRACKABLE, roundTripTimeNanos);
         m_invocationsCompleted++;
         if (abort) m_invocationAborts++;
         if (error) m_invocationErrors++;
         m_roundTripTimeNanos += roundTripTimeNanos;
         m_clusterRoundTripTime += clusterRoundTripTime;
 
-        final long roundTripMicros = Math.max(1, TimeUnit.NANOSECONDS.toMicros(roundTripTimeNanos));
-        if (roundTripMicros > m_latencyHistogram.getHighestTrackableValue()) {
-            m_latencyHistogram.recordValue(roundTripMicros % m_latencyHistogram.getHighestTrackableValue());
-            int count = (int)(roundTripMicros / m_latencyHistogram.getHighestTrackableValue());
+        //Round up to 50 microseconds. Average is still accurate and it doesn't change the percentile distribution
+        //above 50 micros
+        final long roundTripMicros = Math.max(LOWEST_TRACKABLE, TimeUnit.NANOSECONDS.toMicros(roundTripTimeNanos));
+        if (roundTripMicros > HIGHEST_TRACKABLE) {
+            m_latencyHistogram.recordValue(roundTripMicros % HIGHEST_TRACKABLE);
+            int count = (int)(roundTripMicros / HIGHEST_TRACKABLE);
             for (int ii = 0; ii < count; ii++) {
-                m_latencyHistogram.recordValue(m_latencyHistogram.getHighestTrackableValue());
+                m_latencyHistogram.recordValue(HIGHEST_TRACKABLE);
             }
         } else {
             m_latencyHistogram.recordValue(roundTripMicros);
@@ -461,6 +461,7 @@ public class ClientStats {
         final HistogramData data = m_latencyHistogram.getHistogramData();
         if (data.getTotalCount() == 0) return 0;
         percentile = Math.max(0.0, percentile);
+        //Convert from micros to millis for return value, round to nearest integer
         return (int) (Math.round(data.getValueAtPercentile(percentile * 100.0)) / 1000.0);
     }
 
@@ -482,6 +483,7 @@ public class ClientStats {
         final HistogramData data = m_latencyHistogram.getHistogramData();
         if (data.getTotalCount() == 0) return 0.0;
         percentile = Math.max(0.0, percentile);
+        //Convert from micros to millis for return value, enjoy having precision
         return data.getValueAtPercentile(percentile * 100.0) / 1000.0;
     }
 
@@ -500,6 +502,7 @@ public class ClientStats {
             Throwables.propagate(e);
         }
 
+        //Get a latency report in milliseconds
         m_latencyHistogram.getHistogramData().outputPercentileDistributionVolt(pw, 1, 1000.0);
 
         return new String(baos.toByteArray(), Charsets.UTF_8);
