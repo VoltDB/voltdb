@@ -462,7 +462,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
         } else {
             stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.getValue());
-            if (m_valueType.getLengthInBytesForFixedTypes() == -1) {
+            if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
                 stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
             }
         }
@@ -549,7 +549,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (obj.has(Members.VALUE_SIZE.name())) {
             expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
         } else {
-            expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypesWithoutCheck();
+            expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
         }
 
         expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
