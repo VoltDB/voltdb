@@ -105,7 +105,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested cache from shutdown LeaderCache.");
         }
-        return m_publicCache.get();
+        return m_publicCache;
     }
 
     /**
@@ -113,7 +113,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     @Override
     public Long get(int partitionId) {
-        return m_publicCache.get().get(partitionId);
+        return m_publicCache.get(partitionId);
     }
 
     /**
@@ -154,10 +154,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private Set<String> m_lastChildren = new HashSet<String>();
 
     // the cache exposed to the public. Start empty. Love it.
-    private AtomicReference<ImmutableMap<Integer, Long>> m_publicCache =
-        new AtomicReference<ImmutableMap<Integer, Long>>(
-                ImmutableMap.copyOf(new HashMap<Integer, Long>())
-                );
+    private volatile ImmutableMap<Integer, Long> m_publicCache = ImmutableMap.of();
 
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
@@ -278,9 +275,9 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             }
         }
 
-        m_publicCache.set(ImmutableMap.copyOf(cache));
+        m_publicCache = ImmutableMap.copyOf(cache);
         if (m_cb != null) {
-            m_cb.run(m_publicCache.get());
+            m_cb.run(m_publicCache);
         }
     }
 
@@ -289,7 +286,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      * a deleted child or a child with modified data.
      */
     private void processChildEvent(WatchedEvent event) throws Exception {
-        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_publicCache.get());
+        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_publicCache);
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
@@ -301,9 +298,9 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             // rtb: I think result's path is the same as cb.getPath()?
             cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
         }
-        m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
+        m_publicCache = ImmutableMap.copyOf(cacheCopy);
         if (m_cb != null) {
-            m_cb.run(m_publicCache.get());
+            m_cb.run(m_publicCache);
         }
     }
 }

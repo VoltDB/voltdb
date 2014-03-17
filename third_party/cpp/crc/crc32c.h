@@ -33,9 +33,7 @@ static inline uint32_t crc32cFinish(uint32_t crc) {
 }
 
 uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
-#ifdef __SSE4_2__
 uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length);
-#endif
 
 }  // namespace vdbcrc
 #endif

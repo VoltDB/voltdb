@@ -383,7 +383,7 @@ public class Inits {
                         catalogStuff.uniqueId,
                         catalog, catalogStuff.bytes, m_rvdb.m_depCRC, catalogStuff.version, -1);
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
+                VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }
         }
     }

@@ -62,15 +62,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * if it is even 1% empty.
      */
     public static final int EE_COMPACTION_THRESHOLD;
+
+    /** java.util.logging logger. */
+    private static final VoltLogger LOG = new VoltLogger("HOST");
+
+    private static final boolean HOST_TRACE_ENABLED;
+
     static {
         EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
         if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
             VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
         }
+        HOST_TRACE_ENABLED = LOG.isTraceEnabled();
     }
 
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     /** The HStoreEngine pointer. */
     private long pointer;
@@ -261,7 +266,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;
-        if (LOG.isTraceEnabled()) {
+        if (HOST_TRACE_ENABLED) {
             for (int i = 0; i < batchSize; ++i) {
                 LOG.trace("Batch Executing planfragment:" + planFragmentIds[i] + ", params=" + parameterSets[i].toString());
             }
@@ -355,7 +360,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public VoltTable serializeTable(final int tableId) throws EEException {
-        if (LOG.isTraceEnabled()) {
+        if (HOST_TRACE_ENABLED) {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
         //Clear is destructive, do it before the native call
@@ -372,11 +377,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations,
         long undoToken) throws EEException
     {
-        if (LOG.isTraceEnabled()) {
+        if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
         }
         byte[] serialized_table = PrivateVoltTableFactory.getTableDataReference(table).array();
-        if (LOG.isTraceEnabled()) {
+        if (HOST_TRACE_ENABLED) {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }
 
