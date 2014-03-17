@@ -297,7 +297,6 @@ public class TestDistributer extends TestCase {
         }
     }
 
-
     @Test
     public void testCreateConnection() throws Exception {
         MockVolt volt0 = null;
@@ -350,7 +349,7 @@ public class TestDistributer extends TestCase {
             CSL csl = new CSL();
 
             Distributer dist = new Distributer(false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
                     false);
             dist.addClientStatusListener(csl);
@@ -435,7 +434,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -489,7 +488,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
                 false);
         dist.createConnection("localhost", "", "", 20000);
@@ -542,7 +541,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -612,7 +611,7 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            config.setMaxOutstandingTxns(8);
+            config.setMaxOutstandingTxns(5);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);

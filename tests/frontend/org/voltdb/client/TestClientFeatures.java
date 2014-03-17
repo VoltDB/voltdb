@@ -29,6 +29,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
@@ -201,7 +202,7 @@ public class TestClientFeatures extends TestCase {
         boolean exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, 6000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
             exceptionCalled = true;
@@ -212,7 +213,7 @@ public class TestClientFeatures extends TestCase {
         exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, 6000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -221,7 +222,7 @@ public class TestClientFeatures extends TestCase {
         //no timeout of 0
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, 2000);
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -239,7 +240,7 @@ public class TestClientFeatures extends TestCase {
         }
         // Query timeout is in seconds third arg.
         //Async versions
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, 6000);
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         try {
             latch.await();
         } catch (InterruptedException ex) {
@@ -259,7 +260,7 @@ public class TestClientFeatures extends TestCase {
 
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, 6000);
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         try {
             latch2.await();
         } catch (InterruptedException ex) {
@@ -279,7 +280,7 @@ public class TestClientFeatures extends TestCase {
 
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, 6000);
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
         try {
             latch3.await();
         } catch (InterruptedException ex) {
@@ -287,6 +288,30 @@ public class TestClientFeatures extends TestCase {
             fail();
         }
 
+        final CountDownLatch latch4 = new CountDownLatch(1);
+        class MyCallback4 implements ProcedureCallback {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
+                latch4.countDown();
+            }
+
+        }
+
+        /*
+         * Check that a super tiny timeout triggers fast
+         */
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback4(), "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
+        final long start = System.nanoTime();
+        try {
+            latch4.await();
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+            fail();
+        }
+        final long delta = System.nanoTime() - start;
+        assertTrue(TimeUnit.NANOSECONDS.toSeconds(delta) < 1);
     }
 
     /**

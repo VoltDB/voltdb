@@ -128,6 +128,12 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
                 return null;
             }
 
+            @Override
+            public long getClientRoundtripNanos() {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
         };
     }
 

@@ -60,6 +60,8 @@ namespace voltdb {
 #define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
 #define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
 
+#define FULL_STRING_IN_MESSAGE_THRESHOLD 100
+
 //The int used for storage and return values
 typedef ttmath::Int<2> TTInt;
 //Long integer with space for multiplication and division without carry/overflow
@@ -1518,9 +1520,18 @@ class NValue {
                     throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
                 }
                 char msg[1024];
-                snprintf(msg, 1024,
-                         "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
-                                    objectLength, maxLength);
+                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                if (m_valueType == VALUE_TYPE_VARCHAR) {
+                    std::string inputValue = std::string(ptr, std::min(objectLength, FULL_STRING_IN_MESSAGE_THRESHOLD));
+                    snprintf(msg, 1024,
+                             "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                             objectLength, inputValue.c_str(), maxLength);
+                } else if (m_valueType == VALUE_TYPE_VARBINARY) {
+                    snprintf(msg, 1024,
+                             "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                             objectLength, maxLength);
+                }
+
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
@@ -2578,22 +2589,29 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 *reinterpret_cast<void**>(storage) = NULL;
             }
             else {
-                length = getObjectLength();
+                length = getObjectLength_withoutNull();
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + length;
                 if (length > maxLength) {
                     char msg[1024];
-                    snprintf(msg, 1024, "In NValue::serializeToTupleStorageAllocateForObjects, Object exceeds specified size. Size is %d"
-                            " and max is %d", length, maxLength);
-                    throw SQLException(
-                        SQLException::data_exception_string_data_length_mismatch,
-                        msg);
+                    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                    if (m_valueType == VALUE_TYPE_VARCHAR) {
+                        std::string inputValue = std::string(ptr, std::min(length, FULL_STRING_IN_MESSAGE_THRESHOLD));
+                        snprintf(msg, 1024,
+                                "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                                length, inputValue.c_str(), maxLength);
+                    } else if (m_valueType == VALUE_TYPE_VARBINARY) {
+                        snprintf(msg, 1024,
+                                "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                                length, maxLength);
+                    }
+                    throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
 
                 }
                 StringRef* sref = StringRef::create(minlength, dataPool);
                 char *copy = sref->get();
                 setObjectLengthToLocation(length, copy);
-                ::memcpy(copy + lengthLength, getObjectValue(), length);
+                ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), length);
                 *reinterpret_cast<StringRef**>(storage) = sref;
             }
         }
@@ -2645,7 +2663,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             inlineCopyObject(storage, maxLength);
         }
         else {
-            if (isNull() || getObjectLength() <= maxLength) {
+            if (isNull() || getObjectLength_withoutNull() <= maxLength) {
                 if (m_sourceInlined && !isInlined)
                 {
                     throwDynamicSQLException(
@@ -2656,9 +2674,20 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
                   *reinterpret_cast<StringRef* const*>(m_data);
             }
             else {
-                const int32_t length = getObjectLength();
-                throwDynamicSQLException(
-                        "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+                const int32_t objectLength = getObjectLength_withoutNull();
+                char msg[1024];
+                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                if (m_valueType == VALUE_TYPE_VARCHAR) {
+                    std::string inputValue = std::string(ptr, std::min(objectLength, FULL_STRING_IN_MESSAGE_THRESHOLD));
+                    snprintf(msg, 1024,
+                             "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                             objectLength, inputValue.c_str(), maxLength);
+                } else if (m_valueType == VALUE_TYPE_VARBINARY) {
+                    snprintf(msg, 1024,
+                             "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                             objectLength, maxLength);
+                }
+                throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
             }
         }
         break;

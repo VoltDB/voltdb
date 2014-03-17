@@ -23,6 +23,7 @@
 #include <cstring>
 #include <stdint.h>
 
+#define MAGIC_HEADER_SPACE_FOR_JAVA 8
 namespace voltdb
 {
     /**
@@ -31,7 +32,7 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(0),
+            : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
               m_uso(uso)
         {
         }
@@ -50,11 +51,11 @@ namespace voltdb
          * Returns a pointer to the underlying raw memory allocation
          */
         char* rawPtr() {
-            return m_data;
+            return m_data - MAGIC_HEADER_SPACE_FOR_JAVA;
         }
 
         int32_t rawLength() const {
-            return  static_cast<int32_t>(m_offset);
+            return  static_cast<int32_t>(m_offset) + MAGIC_HEADER_SPACE_FOR_JAVA;
         }
 
         /**

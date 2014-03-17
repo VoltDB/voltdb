@@ -262,9 +262,10 @@ public class SnapshotSiteProcessor {
 
     private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
-        return new BBContainer(origin.b, origin.address) {
+        return new BBContainer(origin.b()) {
             @Override
             public void discard() {
+                checkDoubleFree();
                 origin.discard();
                 m_availableSnapshotBuffers.incrementAndGet();
 
