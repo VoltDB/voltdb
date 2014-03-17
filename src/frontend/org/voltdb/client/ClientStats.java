@@ -19,19 +19,13 @@ package org.voltdb.client;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.HdrHistogram_voltpatches.HistogramData;
-import org.HdrHistogram_voltpatches.HistogramData.LinearBucketValues;
-import org.HdrHistogram_voltpatches.HistogramIterationValue;
-import org.HdrHistogram_voltpatches.LinearIterator;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -62,6 +56,7 @@ public class ClientStats {
     long m_invocationsCompleted;
     long m_invocationAborts;
     long m_invocationErrors;
+    long m_invocationTimeouts;
 
     // cumulative latency measured by client, used to calculate avg. lat.
     long m_roundTripTimeNanos;
@@ -115,6 +110,7 @@ public class ClientStats {
         m_invocationsCompleted = other.m_invocationsCompleted;
         m_invocationAborts = other.m_invocationAborts;
         m_invocationErrors = other.m_invocationErrors;
+        m_invocationTimeouts = other.m_invocationTimeouts;
         m_roundTripTimeNanos = other.m_roundTripTimeNanos;
         m_clusterRoundTripTime = other.m_clusterRoundTripTime;
         m_latencyHistogram = other.m_latencyHistogram.copy();
@@ -142,6 +138,7 @@ public class ClientStats {
         retval.m_invocationsCompleted = newer.m_invocationsCompleted - older.m_invocationsCompleted;
         retval.m_invocationAborts = newer.m_invocationAborts - older.m_invocationAborts;
         retval.m_invocationErrors = newer.m_invocationErrors - older.m_invocationErrors;
+        retval.m_invocationTimeouts = newer.m_invocationTimeouts - older.m_invocationTimeouts;
 
         retval.m_roundTripTimeNanos = newer.m_roundTripTimeNanos - older.m_roundTripTimeNanos;
         retval.m_clusterRoundTripTime = newer.m_clusterRoundTripTime - older.m_clusterRoundTripTime;
@@ -189,6 +186,7 @@ public class ClientStats {
         m_invocationsCompleted += other.m_invocationsCompleted;
         m_invocationAborts += other.m_invocationAborts;
         m_invocationErrors += other.m_invocationErrors;
+        m_invocationTimeouts += other.m_invocationTimeouts;
 
         m_roundTripTimeNanos += other.m_roundTripTimeNanos;
         m_clusterRoundTripTime += other.m_clusterRoundTripTime;
@@ -200,10 +198,11 @@ public class ClientStats {
         m_bytesReceived += other.m_bytesReceived;
     }
 
-    void update(long roundTripTimeNanos, int clusterRoundTripTime, boolean abort, boolean error) {
+    void update(long roundTripTimeNanos, int clusterRoundTripTime, boolean abort, boolean error, boolean timeout) {
         m_invocationsCompleted++;
         if (abort) m_invocationAborts++;
         if (error) m_invocationErrors++;
+        if (timeout) m_invocationTimeouts++;
         m_roundTripTimeNanos += roundTripTimeNanos;
         m_clusterRoundTripTime += clusterRoundTripTime;
 
@@ -323,6 +322,16 @@ public class ClientStats {
      */
     public long getInvocationErrors() {
         return m_invocationErrors;
+    }
+
+    /**
+     * Get the number of transactions timed out before being sent to or responded by VoltDB server(s)
+     * during the time period covered by this stats instance.
+     *
+     * @return The number of transactions that failed.
+     */
+    public long getInvocationTimeouts() {
+        return m_invocationTimeouts;
     }
 
     /**
@@ -586,8 +595,8 @@ public class ClientStats {
                 new Date(m_startTS).toString(), new Date(m_endTS).toString(), m_procName, m_connectionId));
         sb.append(String.format("    hostname: %s:%d\n",
                 m_hostname, m_port));
-        sb.append(String.format("    invocations completed/aborted/errors: %d/%d/%d\n",
-                m_invocationsCompleted, m_invocationAborts, m_invocationErrors));
+        sb.append(String.format("    invocations completed/aborted/errors/timeouts: %d/%d/%d/%d\n",
+                m_invocationsCompleted, m_invocationAborts, m_invocationErrors, m_invocationTimeouts));
         if (m_invocationsCompleted > 0) {
             sb.append(String.format("    avg latency client/internal: %.2f/%d\n",
                     (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0, m_clusterRoundTripTime / m_invocationsCompleted));

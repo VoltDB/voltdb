@@ -61,6 +61,7 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -373,7 +374,7 @@ class Distributer {
                      * the transaction out on the wire due to max outstanding
                      */
                     final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
-                    invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
+                    invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
                     return;
                 }
             }
@@ -457,13 +458,14 @@ class Distributer {
 
             final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
 
-            invokeCallbackWithTimeout(cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
+            invokeCallbackWithTimeout(cb.name, cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
         }
 
         /*
          * Factor out the boilerplate involved in invoking a callback with a timeout response
          */
-        void invokeCallbackWithTimeout(ProcedureCallback callback,
+        void invokeCallbackWithTimeout(String procName,
+                                       ProcedureCallback callback,
                                        long deltaNanos,
                                        long nowNanos,
                                        long timeoutNanos,
@@ -490,6 +492,7 @@ class Distributer {
             assert(remainingToInvoke >= 0);
 
             m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
+            updateStatsForTimeout(procName, r.getClientRoundtripNanos(), r.getClusterRoundtrip());
         }
 
         void sendPing() {
@@ -506,6 +509,18 @@ class Distributer {
             m_outstandingPing = true;
         }
 
+        private void updateStatsForTimeout(
+                final String procName,
+                final long roundTripNanos,
+                final int clusterRoundTrip) {
+            m_connection.queueTask(new Runnable() {
+                @Override
+                public void run() {
+                    updateStats(procName, roundTripNanos, clusterRoundTrip, false, false, true);
+                }
+            });
+        }
+
         /**
          * Update the procedures statistics
          * @param procName Name of procedure being updated
@@ -519,7 +534,8 @@ class Distributer {
                 long roundTripNanos,
                 int clusterRoundTrip,
                 boolean abort,
-                boolean failure) {
+                boolean failure,
+                boolean timeout) {
             ClientStats stats = m_stats.get(procName);
             if (stats == null) {
                 stats = new ClientStats();
@@ -531,7 +547,7 @@ class Distributer {
                 stats.m_endTS = Long.MIN_VALUE;
                 m_stats.put(procName, stats);
             }
-            stats.update(roundTripNanos, clusterRoundTrip, abort, failure);
+            stats.update(roundTripNanos, clusterRoundTrip, abort, failure, timeout);
         }
 
         @Override
@@ -604,7 +620,7 @@ class Distributer {
 
                 int clusterRoundTrip = response.getClusterRoundtrip();
                 m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
-                updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error);
+                updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
                 response.setClientRoundtrip(deltaNanos);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {

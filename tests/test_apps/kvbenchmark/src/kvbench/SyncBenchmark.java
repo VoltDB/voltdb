@@ -253,7 +253,7 @@ public class SyncBenchmark {
                 Throwables.propagate(ioex);
             }
             m_writer = pw;
-            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,THROUGHPUT,AVERAGE_LATENCY,FIVE9S_LATENCY");
+            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,TIMEOUTS,THROUGHPUT,AVERAGE_LATENCY,TWO9S_LATENCY,THREE9S_LATENCY,FOUR9S_LATENCY,FIVE9S_LATENCY");
         }
 
         @Override
@@ -263,10 +263,14 @@ public class SyncBenchmark {
 
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%f,%.2f\n",
+            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%f,%.2f\n",
                     ts, stats.getEndTimestamp(), stats.getInvocationsCompleted(),
                     stats.getInvocationAborts(), stats.getInvocationErrors(),
+                    stats.getInvocationTimeouts(),
                     stats.getTxnThroughput(), stats.getAverageLatency(),
+                    stats.kPercentileLatencyAsDouble(0.99),
+                    stats.kPercentileLatencyAsDouble(0.999),
+                    stats.kPercentileLatencyAsDouble(0.9999),
                     stats.kPercentileLatencyAsDouble(0.99999)
                     );
         }
