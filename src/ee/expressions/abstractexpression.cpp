@@ -206,22 +206,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         valueSize = obj.valueForKey("VALUE_SIZE").asInt();
     } else {
         // This value size should be consistent with VoltType.java
-        switch (value_type) {
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_DOUBLE:
-        case VALUE_TYPE_TIMESTAMP:
-            valueSize = 8; break;
-        case VALUE_TYPE_INTEGER:
-            valueSize = 4; break;
-        case VALUE_TYPE_SMALLINT:
-            valueSize = 2; break;
-        case VALUE_TYPE_TINYINT:
-            valueSize = 1; break;
-        case VALUE_TYPE_DECIMAL:
-            valueSize = 16; break;
-        default:
-            break;
-        }
+        valueSize = NValue::getTupleStorageSize(value_type);
     }
 
     // recurse to children

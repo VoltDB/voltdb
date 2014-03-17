@@ -462,7 +462,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
         } else {
             stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.getValue());
-            if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
+            if (m_valueType.getLengthInBytesForFixedTypes() == -1) {
                 stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
             }
         }
