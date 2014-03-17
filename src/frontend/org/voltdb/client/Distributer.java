@@ -362,15 +362,12 @@ class Distributer {
 
         public NodeConnection(long ids[]) {}
 
-        public void createWork(long handle, String name, ByteBuffer c,
+        public void createWork(final long nowNanos, long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
 
             //How long from the starting point in time to wait to get this stuff done
             timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
-
-            //The time when the transaction was submitted and the timeout and latency should be relative to
-            final long nowNanos = System.nanoTime();
 
             //Trigger the timeout at this point in time no matter what
             final long timeoutTime = nowNanos + timeoutNanos;
@@ -919,7 +916,8 @@ class Distributer {
             //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
             final ByteBuffer buf = serializeSPI(spi);
-            cxn.createWork(spi.getHandle(),
+            cxn.createWork(System.nanoTime(),
+                    spi.getHandle(),
                     spi.getProcName(),
                     serializeSPI(spi),
                     new SubscribeCallback(),
@@ -928,7 +926,8 @@ class Distributer {
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            cxn.createWork(spi.getHandle(),
+            cxn.createWork(System.nanoTime(),
+                    spi.getHandle(),
                     spi.getProcName(),
                     serializeSPI(spi),
                     new TopoUpdateCallback(),
@@ -940,7 +939,8 @@ class Distributer {
             if (!m_fetchedCatalog) {
                 spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
-                cxn.createWork(spi.getHandle(),
+                cxn.createWork(System.nanoTime(),
+                        spi.getHandle(),
                         spi.getProcName(),
                         serializeSPI(spi),
                         new ProcUpdateCallback(),
@@ -968,6 +968,9 @@ class Distributer {
             throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
+
+        //The time when the transaction was submitted and the timeout and latency should be relative to
+        final long nowNanos = System.nanoTime();
 
         NodeConnection cxn = null;
         boolean backpressure = true;
@@ -1092,7 +1095,7 @@ class Distributer {
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
+            cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
         }
 
         return !backpressure;
