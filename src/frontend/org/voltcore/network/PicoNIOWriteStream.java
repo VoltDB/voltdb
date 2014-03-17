@@ -90,8 +90,7 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
              * Nothing to write
              */
             if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                m_bytesWritten += bytesWritten;
-                return bytesWritten;
+                break;
             }
 
             ByteBuffer buffer = null;
