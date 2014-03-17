@@ -298,32 +298,7 @@ class Distributer {
                                 continue;
                             }
 
-                            //It was handled during the race
-                            if (c.m_callbacks.remove(handle) == null) continue;
-
-                            final ClientResponseImpl r = new ClientResponseImpl(
-                                    ClientResponse.CONNECTION_TIMEOUT,
-                                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                    "",
-                                    new VoltTable[0],
-                                    String.format("No response received in the allotted time (set to %d ms).",
-                                            TimeUnit.NANOSECONDS.toMillis(cb.procedureTimeoutNanos)));
-                            r.setClientHandle(handle);
-                            r.setClientRoundtrip(deltaNanos);
-                            r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
-                            try {
-                                cb.callback.clientCallback(r);
-                            } catch (Exception e1) {
-                                uncaughtException(cb.callback, r, e1);
-                            }
-
-                            //Drain needs to know when all callbacks have been invoked
-                            final int remainingToInvoke = c.m_callbacksToInvoke.decrementAndGet();
-                            assert(remainingToInvoke >= 0);
-
-                            if (!cb.ignoreBackpressure) {
-                                m_rateLimiter.transactionResponseReceived(nowNanos, -1);
-                            }
+                            c.handleTimedoutCallback(handle, nowNanos);
                         }
                     }
                 }
@@ -363,6 +338,12 @@ class Distributer {
 
         public NodeConnection(long ids[]) {}
 
+        /*
+         * NodeConnection uses ignoreBackpressure to get rate limiter to not
+         * apply any permit tracking or rate limits to transactions that should
+         * never be rejected such as those submitted from within a callback thread or
+         * generated internally
+         */
         public void createWork(final long nowNanos, long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
@@ -392,21 +373,7 @@ class Distributer {
                      * the transaction out on the wire due to max outstanding
                      */
                     final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
-                    ClientResponseImpl r = new ClientResponseImpl(
-                            ClientResponse.CONNECTION_TIMEOUT,
-                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                            "",
-                            new VoltTable[0],
-                            String.format("Timed out acquiring outstanding transaction permit (set to %d ms).",
-                                    TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
-                    r.setClientHandle(handle);
-                    r.setClientRoundtrip(deltaNanos);
-                    r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
-                    try {
-                        callback.clientCallback(r);
-                    } catch (Exception e3) {
-                        uncaughtException(callback, r, e);
-                    }
+                    invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
                     return;
                 }
             }
@@ -427,7 +394,7 @@ class Distributer {
 
             //Schedule an individual timeout if necessary
             if (timeoutNanos < TimeUnit.SECONDS.toNanos(1)) {
-                submitTimeoutTask(handle, Math.max(0, timeoutRemaining));
+                submitDiscreteTimeoutTask(handle, Math.max(0, timeoutRemaining));
             }
 
             //Check for disconnect
@@ -448,50 +415,81 @@ class Distributer {
                 final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
                 assert(remainingToInvoke >= 0);
 
-                if (!ignoreBackpressure) {
-                    //for bookkeeping, but it feels dishonest to call this here
-                    m_rateLimiter.transactionResponseReceived(nowNanos, -1);
-                }
+                //for bookkeeping, but it feels dishonest to call this here
+                m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
                 return;
             } else {
                 m_connection.writeStream().enqueue(c);
             }
         }
 
-        void submitTimeoutTask(final long handle, long timeoutNanos) {
+        /*
+         * For high precision timeouts, submit a discrete task to a scheduled
+         * executor service to time out the transaction. The timeout task
+         * when run checks if the task is still present in the concurrent map
+         * of tasks and removes it. If it wins the race to remove the map
+         * then the transaction will be timed out even if a response is received
+         * at the same time.
+         *
+         * This will race with the periodic task that checks lower resolution timeouts
+         * and it is fine, the concurrent map makes sure each callback is handled exactly once
+         */
+        void submitDiscreteTimeoutTask(final long handle, long timeoutNanos) {
             m_ex.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    final CallbackBookeeping cb = m_callbacks.remove(handle);
-                    if (cb == null) return;
-                    final long nowNanos = System.nanoTime();
-                    final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
-
-                    ClientResponseImpl r = new ClientResponseImpl(
-                            ClientResponse.CONNECTION_TIMEOUT,
-                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                            "",
-                            new VoltTable[0],
-                            String.format("No response received in the allotted time (set to %d ms).",
-                                    TimeUnit.NANOSECONDS.toMillis(cb.procedureTimeoutNanos)));
-                    r.setClientHandle(handle);
-                    r.setClientRoundtrip(deltaNanos);
-                    r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
-                    try {
-                        cb.callback.clientCallback(r);
-                    } catch (Throwable e1) {
-                        e1.printStackTrace();
-                    }
-
-                    //Drain needs to know when all callbacks have been invoked
-                    final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
-                    assert(remainingToInvoke >= 0);
-
-                    if (!cb.ignoreBackpressure) {
-                        m_rateLimiter.transactionResponseReceived(nowNanos, -1);
-                    }
+                    handleTimedoutCallback(handle, System.nanoTime());
                 }
             }, timeoutNanos, TimeUnit.NANOSECONDS);
+        }
+
+        /*
+         * Factor out the boilerplate involved in checking whether a timed out callback
+         * still exists and needs to be invoked, or has already been handled by another thread
+         */
+        void handleTimedoutCallback(long handle, long nowNanos) {
+            //Callback doesn't have to be there, it may have already
+            //received a response or been expired by the periodic expiration task, or a discrete expiration task
+            final CallbackBookeeping cb = m_callbacks.remove(handle);
+
+            //It was handled during the race
+            if (cb == null) return;
+
+            final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
+
+            invokeCallbackWithTimeout(cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
+        }
+
+        /*
+         * Factor out the boilerplate involved in invoking a callback with a timeout response
+         */
+        void invokeCallbackWithTimeout(ProcedureCallback callback,
+                                       long deltaNanos,
+                                       long nowNanos,
+                                       long timeoutNanos,
+                                       long handle,
+                                       boolean ignoreBackpressure) {
+            ClientResponseImpl r = new ClientResponseImpl(
+                    ClientResponse.CONNECTION_TIMEOUT,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                    "",
+                    new VoltTable[0],
+                    String.format("No response received in the allotted time (set to %d ms).",
+                            TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+            r.setClientHandle(handle);
+            r.setClientRoundtrip(deltaNanos);
+            r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
+            try {
+                callback.clientCallback(r);
+            } catch (Throwable e1) {
+                e1.printStackTrace();
+            }
+
+            //Drain needs to know when all callbacks have been invoked
+            final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+            assert(remainingToInvoke >= 0);
+
+            m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
         }
 
         void sendPing() {
@@ -572,6 +570,8 @@ class Distributer {
             // track the timestamp of the most recent read on this connection
             m_lastResponseTimeNanos = nowNanos;
 
+            //Race with expiration thread to be the first to remove the callback
+            //from the map and process it
             final CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
 
             // presumably (hopefully) this is a response for a timed-out message
@@ -603,9 +603,7 @@ class Distributer {
                 }
 
                 int clusterRoundTrip = response.getClusterRoundtrip();
-                if (!stuff.ignoreBackpressure) {
-                    m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip);
-                }
+                m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error);
                 response.setClientRoundtrip(deltaNanos);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
@@ -731,9 +729,7 @@ class Distributer {
                 final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
                 assert(remainingToInvoke >= 0);
 
-                if (!callBk.ignoreBackpressure) {
-                    m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1);
-                }
+                m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1, callBk.ignoreBackpressure);
             }
             m_callbacks.clear();
         }

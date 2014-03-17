@@ -164,7 +164,13 @@ class RateLimiter {
         return limits;
     }
 
-    void transactionResponseReceived(long timestampNanos, int internalLatency) {
+    /**
+     *
+     * @param timestampNanos The time as measured when the call is made.
+     * @param internalLatency Latency measurement of this transaction in millis
+     * @param ignoreBackpressure Don't return a permit for backpressure purposes since none was ever taken
+     */
+    void transactionResponseReceived(long timestampNanos, int internalLatency, boolean ignoreBackpressure) {
         if (m_doesAnyTuning) {
             synchronized (this) {
                 ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
@@ -180,6 +186,7 @@ class RateLimiter {
                 }
             }
         } else {
+            if (ignoreBackpressure) return;
             m_outstandingTxnsSemaphore.release();
         }
     }
@@ -236,6 +243,7 @@ class RateLimiter {
                 timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
             }
         } else {
+            if (ignoreBackpressure) return timestampNanos;
             boolean acquired = m_outstandingTxnsSemaphore.tryAcquire();
 
             if (!acquired) {
