@@ -138,12 +138,13 @@ public class LoadTableLoader extends Thread {
             latch.countDown();
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
-                // log what happened
+                // log what happened status will be logged in json error log.
                 log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 System.exit(-1);
             }
+            //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
                 log.error("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
@@ -316,7 +317,7 @@ public class LoadTableLoader extends Thread {
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                if (onlyDelQueue.size() > 100) {
+                if (onlyDelQueue.size() > 100 && m_shouldContinue.get()) {
                     List<Long> workList = new ArrayList<Long>();
                     onlyDelQueue.drainTo(workList, 100);
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
