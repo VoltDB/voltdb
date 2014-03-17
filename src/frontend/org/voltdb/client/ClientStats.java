@@ -75,7 +75,7 @@ public class ClientStats {
     /** The number of buckets tracking latency with 100ms granularity. */
     final public static int HUNDRED_MS_BUCKET_COUNT = 10;
 
-    AtomicHistogram m_latencyHistogram;
+    Histogram m_latencyHistogram;
 
     long m_bytesSent;
     long m_bytesReceived;
@@ -88,8 +88,8 @@ public class ClientStats {
      * Get a that tracks from 1 microsecond to 10 seconds with
      * 2 significant value digits
      */
-    public static AtomicHistogram constructHistogram() {
-        return new AtomicHistogram( LOWEST_TRACKABLE, HIGHEST_TRACKABLE, SIGNIFICANT_VALUE_DIGITS);
+    public static Histogram constructHistogram() {
+        return new Histogram( LOWEST_TRACKABLE, HIGHEST_TRACKABLE, SIGNIFICANT_VALUE_DIGITS);
     }
 
     ClientStats() {
@@ -146,7 +146,7 @@ public class ClientStats {
         retval.m_roundTripTimeNanos = newer.m_roundTripTimeNanos - older.m_roundTripTimeNanos;
         retval.m_clusterRoundTripTime = newer.m_clusterRoundTripTime - older.m_clusterRoundTripTime;
 
-        retval.m_latencyHistogram = AtomicHistogram.diff(newer.m_latencyHistogram, older.m_latencyHistogram);
+        retval.m_latencyHistogram = Histogram.diff(newer.m_latencyHistogram, older.m_latencyHistogram);
 
         retval.m_bytesSent = newer.m_bytesSent - older.m_bytesSent;
         retval.m_bytesReceived = newer.m_bytesReceived - older.m_bytesReceived;
