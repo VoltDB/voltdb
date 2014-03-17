@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -37,6 +38,16 @@ import org.voltdb.utils.VoltFile;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    public static final class ProcedurePartitionInfo {
+        VoltType type;
+        int index;
+        public ProcedurePartitionInfo(VoltType type, int index) {
+            this.type = type;
+            this.index = index;
+        }
+    }
+
 
     // THE CATALOG!
     public final Catalog catalog;
@@ -106,6 +117,15 @@ public class CatalogContext {
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
+
+        if (procedures != null) {
+            for (Procedure proc : procedures) {
+                if (proc.getSinglepartition()) {
+                    ProcedurePartitionInfo ppi = new ProcedurePartitionInfo(VoltType.get((byte)proc.getPartitioncolumn().getType()), proc.getPartitionparameter());
+                    proc.setAttachment(ppi);
+                }
+            }
+        }
     }
 
     public CatalogContext update(
