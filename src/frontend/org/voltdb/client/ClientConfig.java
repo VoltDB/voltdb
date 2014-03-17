@@ -136,29 +136,6 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the timeout for procedure call. If the timeout expires before the call returns,
-     * the procedure callback will be called with status {@link ClientResponse#CONNECTION_TIMEOUT}.
-     * Synchronous procedures will throw an exception. If a response comes back after the
-     * expiration has triggered, then a callback method
-     * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
-     * will be called.</p>
-     *
-     * Default value is 2 minutes if not set. Value of 0 means forever.</p>
-     *
-     * For small timeouts a best effort will be made to schedule the timeout accurately</p>
-     *
-     * @param timeout Timeout value in milliseconds.
-     * @param unit Unit of timeout value
-     */
-    public void setProcedureCallTimeout(long timeout, TimeUnit unit) {
-        assert(timeout >= 0);
-        if (timeout < 0) timeout = 0;
-        // 0 implies infinite, but use LONG_MAX to reduce branches to test
-        if (timeout == 0) timeout = Long.MAX_VALUE;
-        m_procedureCallTimeoutNanos = unit.toNanos(timeout);
-    }
-
-    /**
      * <p>Set the timeout for reading from a connection. If a connection receives no responses,
      * either from procedure calls or &amp;Pings, for the timeout time in milliseconds,
      * then the connection will be assumed dead and the closed connection callback will
