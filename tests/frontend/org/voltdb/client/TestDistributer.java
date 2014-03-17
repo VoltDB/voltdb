@@ -352,7 +352,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false);
+                    false, null /* subject */);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
@@ -437,7 +437,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 1000 /* One second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000);
 
@@ -491,7 +491,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 30000 /* thirty second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.createConnection("localhost", "", "", 20000);
 
         // make sure it connected
@@ -544,7 +544,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000);
@@ -653,7 +653,7 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32);
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null);
         } catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));

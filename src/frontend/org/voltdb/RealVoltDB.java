@@ -90,6 +90,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
@@ -1282,9 +1283,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // enable security if set on the deployment file
             SecurityType security = m_deployment.getSecurity();
+
+            boolean enabled = false;
             if (security != null) {
-                cluster.setSecurityenabled(security.isEnabled());
+                enabled = security.isEnabled();
             }
+            cluster.setSecurityenabled(enabled);
+
+            SecurityProviderString provider = SecurityProviderString.HASH;
+            if (enabled && security != null) {
+                if (security.getProvider() != null) {
+                    provider = security.getProvider();
+                }
+            }
+            db.setSecurityprovider(provider.value());
 
 
             // create groups as needed for users

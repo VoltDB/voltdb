@@ -96,6 +96,7 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -790,6 +791,13 @@ public abstract class CatalogUtil {
             sb.append(st.isEnabled());
         }
 
+        sb.append(" SECURITYPROVIDER ");
+        if (st == null || !st.isEnabled() || st.getProvider() == null) {
+            sb.append(SecurityProviderString.HASH.value());
+        } else {
+            sb.append(st.getProvider());
+        }
+
         sb.append(" ADMINMODE ");
         AdminModeType amt = deployment.getAdminMode();
         if (amt != null)
@@ -1230,15 +1238,25 @@ public abstract class CatalogUtil {
     /**
      * Set the security setting in the catalog from the deployment file
      * @param catalog the catalog to be updated
-     * @param securityEnabled security element of the deployment xml
+     * @param security security element of the deployment xml
      */
-    private static void setSecurityEnabled( Catalog catalog, SecurityType securityEnabled) {
+    private static void setSecurityEnabled( Catalog catalog, SecurityType security) {
         Cluster cluster = catalog.getClusters().get("cluster");
+        Database database = cluster.getDatabases().get("database");
+
         boolean enabled = false;
-        if (securityEnabled != null) {
-            enabled = securityEnabled.isEnabled();
+        if (security != null) {
+            enabled = security.isEnabled();
         }
         cluster.setSecurityenabled(enabled);
+
+        SecurityProviderString provider = SecurityProviderString.HASH;
+        if (enabled && security != null) {
+            if (security.getProvider() != null) {
+                provider = security.getProvider();
+            }
+        }
+        database.setSecurityprovider(provider.value());
     }
 
     /**
