@@ -51,7 +51,11 @@ import org.voltdb.messaging.RejoinMessage;
  */
 public class InitiatorMailbox implements Mailbox
 {
-    static boolean LOG_TX = false;
+    static final boolean LOG_TX = false;
+    private static final boolean SCHEDULE_IN_SITE_THREAD;
+    static {
+        SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
+    }
 
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
@@ -245,9 +249,22 @@ public class InitiatorMailbox implements Mailbox
     }
 
     @Override
-    public synchronized void deliver(VoltMessage message)
+    public void deliver(final VoltMessage message)
     {
-        deliverInternal(message);
+        if (SCHEDULE_IN_SITE_THREAD) {
+            this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+                @Override
+                void run() {
+                    synchronized (InitiatorMailbox.this) {
+                        deliverInternal(message);
+                    }
+                }
+            });
+        } else {
+            synchronized (this) {
+                deliverInternal(message);
+            }
+        }
     }
 
     protected void deliverInternal(VoltMessage message) {

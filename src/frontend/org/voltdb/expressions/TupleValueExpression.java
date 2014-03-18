@@ -270,7 +270,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         // table name is not specified (and not missed?).
         // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
         // -- not bothering for now.
-        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        Column column = table.getColumns().getExact(m_columnName);
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();

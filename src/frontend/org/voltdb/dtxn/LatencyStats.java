@@ -25,6 +25,7 @@ import java.util.List;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
+import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.StatsSelector;
@@ -107,7 +108,7 @@ public class LatencyStats extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes();
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes(CompressionStrategySnappy.INSTANCE);
         super.updateStatsRow(rowKey, rowValues);
     }
 }

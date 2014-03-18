@@ -78,13 +78,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable, IOStatsIntf
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -93,6 +95,7 @@ class VoltNetwork implements Runnable
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
     private final String m_coreBindId;
 
@@ -189,6 +192,7 @@ class VoltNetwork implements Runnable
                     return port;
                 } finally {
                     m_ports.add(port);
+                    m_numPorts.incrementAndGet();
                 }
             }
         };
@@ -224,6 +228,7 @@ class VoltNetwork implements Runnable
                             selectionKey.cancel();
                         } finally {
                             m_ports.remove(port);
+                            m_numPorts.decrementAndGet();
                         }
                     }
                 } finally {
@@ -326,6 +331,7 @@ class VoltNetwork implements Runnable
             try {
                 p_shutdown();
             } catch (Throwable t) {
+                m_logger.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
@@ -339,8 +345,8 @@ class VoltNetwork implements Runnable
             if (port != null) {
                 try {
                     getUnregisterRunnable(port).run();
-                } catch (Exception e) {
-                    networkLog.error("Exception unregisering port " + port, e);
+                } catch (Throwable e) {
+                    networkLog.error("Exception unregistering port " + port, e);
                 }
             }
         }
@@ -383,6 +389,7 @@ class VoltNetwork implements Runnable
             key.interestOps (port.interestOps());
         } else {
             m_ports.remove(port);
+            m_numPorts.decrementAndGet();
         }
     }
 
@@ -398,7 +405,7 @@ class VoltNetwork implements Runnable
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            final String trimmed = e.getMessage().trim();
+            final String trimmed = e.getMessage() == null ? "" : e.getMessage().trim();
             if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
@@ -464,7 +471,8 @@ class VoltNetwork implements Runnable
             return retval;
     }
 
-    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+    @Override
+    public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {
@@ -487,5 +495,9 @@ class VoltNetwork implements Runnable
     void queueTask(Runnable r) {
         m_tasks.offer(r);
         m_selector.wakeup();
+    }
+
+    int numPorts() {
+        return m_numPorts.get();
     }
 }

@@ -156,19 +156,25 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public void fastEnqueue(DeferredSerialization ds) {
+        enqueue(ds);
+    }
+
+    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
-            ByteBuffer[] serialized;
             // serialize() touches not-threadsafe state around Initiator
             // stats.  In the normal code path, this is protected by a lock
             // in NIOWriteStream.enqueue().
+            ByteBuffer buf = null;
             synchronized(this) {
-                serialized = ds.serialize();
+                buf = ByteBuffer.allocate(ds.getSerializedSize());
+                ds.serialize(buf);
             }
-            if (serialized.length != 1) {
+            if (buf == null) {
                 throw new UnsupportedOperationException();
             }
-            enqueue(serialized[0]);
+            enqueue(buf);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in SimpleClientResponseAdapter throw an exception", true, e);
         }

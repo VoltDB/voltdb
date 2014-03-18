@@ -28,17 +28,24 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 public class VoltNetworkPool {
+
+    public interface IOStatsIntf {
+        Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval);
+    }
+
     private static final VoltLogger m_logger = new VoltLogger(VoltNetworkPool.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final VoltNetwork m_networks[];
-    private final AtomicLong m_nextWorkerSelection = new AtomicLong();
+    private final AtomicLong m_nextNetwork = new AtomicLong();
 
     public VoltNetworkPool() {
         this(1, null);
@@ -85,7 +92,15 @@ public class VoltNetworkPool {
             final InputHandler handler,
             final int interestOps,
             final ReverseDNSPolicy dns) throws IOException {
-        VoltNetwork vn = m_networks[(int)(m_nextWorkerSelection.incrementAndGet() % m_networks.length)];
+        //Start with a round robin base policy
+        VoltNetwork vn = m_networks[(int)(m_nextNetwork.getAndIncrement() % m_networks.length)];
+        //Then do a load based policy which is a little racy
+        for (int ii = 0; ii < m_networks.length; ii++) {
+            if (m_networks[ii] == vn) continue;
+            if (vn.numPorts() > m_networks[ii].numPorts()) {
+                vn = m_networks[ii];
+            }
+        }
         return vn.registerChannel(channel, handler, interestOps, dns);
     }
 
@@ -98,7 +113,7 @@ public class VoltNetworkPool {
     }
 
     public Map<Long, Pair<String, long[]>>
-        getIOStats(final boolean interval)
+        getIOStats(final boolean interval, List<IOStatsIntf> picoNetworks)
                 throws ExecutionException, InterruptedException {
         HashMap<Long, Pair<String, long[]>> retval = new HashMap<Long, Pair<String, long[]>>();
 
@@ -107,19 +122,26 @@ public class VoltNetworkPool {
         for (VoltNetwork vn : m_networks) {
             statTasks.add(vn.getIOStats(interval));
         }
+        for (IOStatsIntf pn : picoNetworks) {
+            statTasks.add(pn.getIOStats(interval));
+        }
 
         long globalStats[] = null;
         for (Future<Map<Long, Pair<String, long[]>>> statsFuture : statTasks) {
-            Map<Long, Pair<String, long[]>> stats = statsFuture.get();
-            if (globalStats == null) {
-                globalStats = stats.get(-1L).getSecond();
-            } else {
-                final long localStats[] = stats.get(-1L).getSecond();
-                for (int ii = 0; ii < localStats.length; ii++) {
-                    globalStats[ii] += localStats[ii];
+            try {
+                Map<Long, Pair<String, long[]>> stats = statsFuture.get(500, TimeUnit.MILLISECONDS);
+                if (globalStats == null) {
+                    globalStats = stats.get(-1L).getSecond();
+                } else {
+                    final long localStats[] = stats.get(-1L).getSecond();
+                    for (int ii = 0; ii < localStats.length; ii++) {
+                        globalStats[ii] += localStats[ii];
+                    }
                 }
+                retval.putAll(stats);
+            } catch (TimeoutException e) {
+                m_logger.warn("Timed out retrieving stats from network thread, probably harmless", e);
             }
-            retval.putAll(stats);
         }
         retval.put(-1L, Pair.of("GLOBAL", globalStats));
 
