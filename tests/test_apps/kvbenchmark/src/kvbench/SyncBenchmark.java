@@ -509,7 +509,7 @@ public class SyncBenchmark {
         System.out.println(stats.latencyHistoReport());
 
         // 3. Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        client.writeSummaryCSVWithDoubles(stats, config.statsfile);
     }
 
     /**

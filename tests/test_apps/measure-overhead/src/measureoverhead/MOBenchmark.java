@@ -320,7 +320,7 @@ public class MOBenchmark {
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        client.writeSummaryCSVWithDoubles(stats, config.statsfile);
     }
 
     /**

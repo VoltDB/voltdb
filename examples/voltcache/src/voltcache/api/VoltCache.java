@@ -701,7 +701,7 @@ public class VoltCache implements IVoltCache
      */
     public void saveStatistics(ClientStats stats, String file) throws IOException
     {
-        client.writeSummaryCSV(stats, file);
+        client.writeSummaryCSVWithDoubles(stats, file);
     }
 
 }
