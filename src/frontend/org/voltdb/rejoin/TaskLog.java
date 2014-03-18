@@ -54,6 +54,8 @@ public interface TaskLog {
 
     /**
      * Default policy at startup is to drop invocations until recording is necessary
+     * When used for live rejoin the first SnapshotSave plan fragment triggers the start
+     * of recording of transactions for the live rejoin
      */
     public void enableRecording();
 }
