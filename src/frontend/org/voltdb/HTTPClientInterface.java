@@ -145,16 +145,13 @@ public class HTTPClientInterface {
                 if (queryParamSize == 0) {
                     throw new Exception("Received POST with no parameters in the body.");
                 }
-//                params = IO.toString(request.getInputStream(), "UTF-8");
-                params = CharStreams.toString(new InputStreamReader(request.getInputStream(), Charsets.UTF_8));
             }
-            else
-                params = request.getParameter("Parameters");
 
             String username = request.getParameter("User");
             String password = request.getParameter("Password");
             String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
+            params = request.getParameter("Parameters");
             String jsonp = request.getParameter("jsonp");
             String admin = request.getParameter("admin");
 

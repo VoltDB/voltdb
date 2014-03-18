@@ -30,8 +30,13 @@ var IVoltDB = (function(){
         this.Key = (this.Server + '_' + this.Port + '_' + (user == ''?'':user) + '_' + (this.Admin == true?'Admin':'')).replace(/[^_a-zA-Z0-9]/g,"_");
         this.Display = this.Server + ':' + this.Port + (user == ''?'':' (' + user + ')') + (this.Admin == true?' - Admin':'');
 
-        this.BuildParameters = function(procedure, parameters)
+        this.BuildParamSet = function(procedure, parameters)
         {
+            var s = [];
+            if (!this.Procedures.hasOwnProperty(procedure)) {
+                return ['Procedure "' + procedure + '" is undefined.'];
+            }
+
             var signatures = this.Procedures[procedure];
             var localParameters = [];
             localParameters = localParameters.concat(parameters);
@@ -44,10 +49,11 @@ var IVoltDB = (function(){
                 return [ retval + ')' ];
             }
             var signature = signatures['' + localParameters.length];
-            var params = '';
+
+            s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
             if (localParameters != null)
             {
-                params = '[';
+                var params = '[';
                 var i = 0;
                 for(i = 0; i < localParameters.length; i++) {
                     if (i > 0) {
@@ -87,17 +93,8 @@ var IVoltDB = (function(){
                     }
                 }
                 params += ']';
+                s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
             }
-            return params;
-        }
-        this.BuildURI = function(procedure, parameters)
-        {
-            var s = [];
-            if (!this.Procedures.hasOwnProperty(procedure)) {
-                return ['Procedure "' + procedure + '" is undefined.'];
-            }
-
-            s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
             if (this.User != null)
                 s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.User);
             if (this.Password != null)
@@ -106,18 +103,15 @@ var IVoltDB = (function(){
                 s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
             if (this.Admin)
                 s[s.length] = 'admin=true';
-            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/?' + s.join('&') + '&jsonp=?';
-            return uri;
+            var paramSet = s.join('&') + '&jsonp=?';
+            return paramSet;
         }
         this.CallExecute = function(procedure, parameters, callback)
         {
-            var uri = this.BuildURI(procedure, parameters);
-            var params = this.BuildParameters(procedure, parameters);
+            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/' 
+            var params = this.BuildParamSet(procedure, parameters);
             if (typeof(uri) == 'string' && typeof(uri) == 'string')
-                if (params == '')
-                    jQuery.getJSON(uri, callback);
-                else
-                    jQuery.postJSON(uri, params, callback);
+                jQuery.postJSON(uri, params, callback);
             else
                 if (callback != null)
                     callback({"status":-1,"statusstring":"PrepareStatement error: " + uri[0],"results":[]});
