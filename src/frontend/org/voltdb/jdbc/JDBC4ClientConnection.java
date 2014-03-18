@@ -463,7 +463,7 @@ public class JDBC4ClientConnection implements Closeable {
         if (this.client.get() == null) {
             throw new IOException("Client is unavailable for writing summary CSV.");
         }
-        this.client.get().writeSummaryCSVWithDoubles(stats, path);
+        ((ClientImpl)this.client.get()).writeSummaryCSVWithDoubles(stats, path);
     }
 
     /**
