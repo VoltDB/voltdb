@@ -262,12 +262,13 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     } else {
         valueCount = scheme.columnIndices.size();
         for (size_t ii = 0; ii < valueCount; ++ii) {
-            ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
+            const TupleSchema::ColumnInfo *columnInfo = tupleSchema->getColumnInfo(scheme.columnIndices[ii]);
+            ValueType exprType = columnInfo->getVoltType();
             if ( ! isIntegralType(exprType)) {
                 isIntsOnly = false;
             }
             keyColumnTypes.push_back(exprType);
-            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+            keyColumnLengths.push_back(columnInfo->length);
         }
     }
     std::vector<bool> keyColumnAllowNull(valueCount, true);

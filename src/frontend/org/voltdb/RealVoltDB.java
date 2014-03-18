@@ -77,6 +77,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -163,9 +164,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.1";
-    // by default, 4.1 is only compatible with 4.1
-    static final String m_defaultHotfixableRegexPattern = "^4\\.1\\z";
+    static final String m_defaultVersionString = "4.2";
+    // by default set the version to only be compatible with itself
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -303,7 +304,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
-
+        ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {

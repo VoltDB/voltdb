@@ -56,7 +56,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -1777,9 +1776,6 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
-        // Ugh, need to keep the ShutdownHooks from printing the shutdown message
-        // because using VoltLogger causes it to get pulled in
-        ShutdownHooks.useOnlyCrashHooks();
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
@@ -1985,9 +1981,11 @@ public class VoltCompiler {
                         "\tfor best performance. For information on VoltDB partitioning, see:\n"+
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
-            outputStream.println("------------------------------------------\n");
-            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            if (m_reportPath != null) {
+                outputStream.println("------------------------------------------\n");
+                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            }
             outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {

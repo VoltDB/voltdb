@@ -17,17 +17,38 @@
 
 package org.voltdb.plannodes;
 
+import java.util.List;
+
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     public SeqScanPlanNode() {
         super();
+    }
+
+    public SeqScanPlanNode(StmtTableScan tableScan) {
+        setTableScan(tableScan);
+    }
+
+    public SeqScanPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
+    public static SeqScanPlanNode createDummyForTest(String tableName,
+            List<SchemaColumn> scanColumns) {
+        SeqScanPlanNode result = new SeqScanPlanNode(tableName, tableName);
+        result.setScanColumns(scanColumns);
+        return result;
     }
 
     @Override
@@ -45,11 +66,21 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         return false; // TODO: enhance to return true for any supportable cases of in-order storage
     }
 
+    private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
+        if (m_isSubQuery) {
+            // Get estimates from the sub-query
+            assert(m_children.size() == 1);
+            // @TODO For the sub-query the cost estimates will be calculated separately
+            // At the moment its contribution to the parent's cost plan is irrelevant because
+            // all parent plans have the same best cost plan for the sub-query
+            m_estimatedProcessedTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
+            m_estimatedOutputTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
+            return;
+        }
+        Table target = ((StmtTargetTableScan)m_tableScan).getTargetTable();
+        TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         // This maxTuples value estimates the number of tuples fetched from the sequential scan.
         // It's a vague measure of the cost of the scan.
         // Its accuracy depends a lot on what kind of post-filtering or projection needs to happen, if any.
@@ -67,7 +98,18 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    protected String explainPlanForNode(String indent) {
-        return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    public void resolveColumnIndexes() {
+        if (m_isSubQuery) {
+            assert(m_children.size() == 1);
+            m_children.get(0).resolveColumnIndexes();
+        }
+        super.resolveColumnIndexes();
     }
+
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    }
+
 }

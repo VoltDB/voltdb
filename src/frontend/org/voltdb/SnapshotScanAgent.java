@@ -224,7 +224,7 @@ public class SnapshotScanAgent extends OpsAgent
                         try {
                             TableSaveFile savefile =
                                 new TableSaveFile(
-                                        savefile_input.getChannel(),
+                                        savefile_input,
                                         1,
                                         null);
                             String partitions = "";

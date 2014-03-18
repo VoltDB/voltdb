@@ -83,7 +83,8 @@ class SeqScanPlanNode : public AbstractScanPlanNode {
          * Couldn't invoke it from the Executor without making a circular dependency
          */
         bool needsOutputTableClear() {
-            return getPredicate() != NULL || getInlinePlanNodes().size() > 0;
+            return getPredicate() != NULL || getInlinePlanNodes().size() > 0 ||
+                isSubQuery();
         }
 
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }

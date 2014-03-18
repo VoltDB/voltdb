@@ -48,6 +48,11 @@ import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
+import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeList;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeRollup;
+import org.voltdb.utils.CatalogSizing.DatabaseSizes;
+import org.voltdb.utils.CatalogSizing.TableSize;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
@@ -559,6 +564,179 @@ public class ReportMaker {
         return sb.toString();
     }
 
+    static String generateSizeTable(DatabaseSizes sizes) {
+        StringBuilder sb = new StringBuilder();
+        int nrow = 0;
+        for (TableSize tsize: sizes.tableSizes) {
+            sb.append(generateSizeRow(tsize, ++nrow));
+        }
+        for (TableSize vsize: sizes.viewSizes) {
+            sb.append(generateSizeRow(vsize, ++nrow));
+        }
+        return sb.toString();
+    }
+
+    static String generateSizeRow(TableSize tsize, int nrow) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<tr class='primaryrow'>");
+
+        // column 1: table name
+        String anchor = String.format("size-%d", nrow);
+        sb.append(String.format(
+            "<td class='table-view-name' id='s-%s'>", anchor)).append(
+                tsize.name).append(
+            "</td>\n");
+
+        // column 2: type
+        sb.append("<td>");
+        if (tsize.isView) {
+            tag(sb, "info", "Materialized View");
+        }
+        else {
+            tag(sb, null, "Table");
+        }
+        sb.append("</td>\n");
+
+        // column 3: estimated row count
+        final String updateCode = "sizes_update_all();";
+        sb.append(
+            "<td>").append(
+                "<div class='ecount'>").append(
+                    "<input type='text' class='form-control count-input'").append(String.format(
+                            " id='s-%s-count'", anchor)).append(String.format(
+                            " onblur='%s'", updateCode)).append(String.format(
+                            " value='%d'", tsize.cardinality)).append(
+                            " class='form-control'").append(
+                            " placeholder='.ecount'").append(
+                        ">").append(
+                    "</input>\n").append(
+                "</div>").append(
+            "</td>\n");
+
+        // column 4: row min size
+        sb.append(String.format("<td id='s-%s-rmin' class='right-cell'>%d</td>\n", anchor, tsize.widthMin));
+
+        // column 5: row max size
+        sb.append(String.format("<td id='s-%s-rmax' class='right-cell'>%d</td>\n", anchor, tsize.widthMax));
+
+        // Roll up index sizes since a table can have multiple indexes.
+        CatalogItemSizeRollup indexSizeRollup = tsize.indexRollup();
+
+        // column 6: index min size
+        sb.append(String.format("<td id='s-%s-imin' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMin));
+
+        // column 7: index max size
+        sb.append(String.format("<td id='s-%s-imax' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMax));
+
+        // column 8: table min size (including index min size)
+        // Updated by Javascript and this initial number is thrown away.
+        long tmin = (tsize.widthMin + indexSizeRollup.widthMin) * tsize.cardinality;
+        sb.append(String.format("<td id='s-%s-tmin' class='right-cell calculated-cell'>%d</td>\n", anchor, tmin));
+
+        // column 9: table max size (including index max size)
+        // Updated by Javascript and this initial number is thrown away.
+        long tmax = (tsize.widthMax + indexSizeRollup.widthMax) * tsize.cardinality;
+        sb.append(String.format("<td id='s-%s-tmax' class='right-cell calculated-cell'>%d</td>\n", anchor, tmax));
+
+        sb.append("</tr>\n");
+
+        //=== Details drop-down.
+
+        sb.append(
+            "<tr class='tablesorter-childRow'>").append(String.format(
+                "<td class='invert' colspan='6' id='s-%s--dropdown'>\n", anchor));
+
+        TableAnnotation annotation = (TableAnnotation) tsize.table.getAnnotation();
+        if (annotation != null) {
+            // output the DDL
+            if (annotation.ddl == null) {
+                sb.append("<p>MISSING DDL</p>\n");
+            }
+            else {
+                String ddl = annotation.ddl;
+                sb.append("<p><pre>" + ddl + "</pre></p>\n");
+            }
+        }
+
+        if (tsize.table.getIndexes().size() > 0) {
+            sb.append(generateIndexesTable(tsize.table));
+        }
+        else {
+            sb.append("<p>No indexes defined on table.</p>\n");
+        }
+
+        sb.append(
+                "</td>").append(
+            "</tr>\n");
+
+        return sb.toString();
+    }
+
+    static String generateSizeSummary(DatabaseSizes dbSizes) {
+        StringBuilder sb = new StringBuilder();
+
+        CatalogItemSizeList<CatalogItemSizeRollup> rollups =
+                new CatalogItemSizeList<CatalogItemSizeRollup>();
+        rollups.add(dbSizes.tableRollup());
+        rollups.add(dbSizes.viewRollup());
+        rollups.add(dbSizes.indexRollup());
+        CatalogItemSizeRollup rollupRollup = rollups.rollup(1);
+
+        sb.append("<table class='table size-summary-table'>\n");
+        generateSizeRollupSummary("tables whose row data ", "table", sb, rollups.get(0));
+        generateSizeRollupSummary("materialized views whose row data ", "view", sb, rollups.get(1));
+        generateSizeRollupSummary("indexes whose key data and overhead ", "index", sb, rollups.get(2));
+
+        sb.append("<tr><td colspan='6'>&nbsp;</td></tr>\n"); // blank row
+
+        // write the totals
+        sb.append("<tr>");
+        if (rollupRollup.widthMin == rollupRollup.widthMax) {
+            sb.append("<td colspan='2'><b>Total user data is expected to use about</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td colspan='3'>&nbsp;of memory.</td>");
+        }
+        else {
+            sb.append("<td colspan='2'><b>Total user data is expected to use between</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td>&nbsp;<b>and</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-max' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMax));
+            sb.append("<td>&nbsp<b>of memory.</b></td>");
+        }
+        sb.append("</tr>\n");
+
+        sb.append("</table>\n");
+        return sb.toString();
+    }
+
+    private static void generateSizeRollupSummary(
+            String name,
+            String label,
+            StringBuilder sb,
+            CatalogItemSizeRollup rollup)
+    {
+        String prefix = String.format("s-size-summary-%s", label);
+        sb.append("<tr>");
+        sb.append(String.format("<td id='%s-count' class='right-cell'>%d</td>", prefix, rollup.itemCount));
+        sb.append(String.format("<td>%s is expected to use", name));
+        // different output if the range is 0
+        if (rollup.widthMin == rollup.widthMax) {
+            sb.append(" about&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td colspan='3'>");
+        }
+        else {
+            sb.append(" between&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td>&nbsp;and&nbsp;</td>");
+            sb.append(String.format("<td id='%s-max' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMax));
+            sb.append("<td>");
+        }
+        sb.append("&nbsp; of memory.&nbsp;</td>");
+        sb.append("</tr>\n");
+    }
+
+
     /**
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
@@ -699,6 +877,14 @@ public class ReportMaker {
 
         String procData = generateProceduresTable(db.getProcedures());
         contents = contents.replace("##PROCS##", procData);
+
+        DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db);
+
+        String sizeData = generateSizeTable(sizes);
+        contents = contents.replace("##SIZES##", sizeData);
+
+        String sizeSummary = generateSizeSummary(sizes);
+        contents = contents.replace("##SIZESUMMARY##", sizeSummary);
 
         String platformData = PlatformProperties.getPlatformProperties().toHTML();
         contents = contents.replace("##PLATFORM##", platformData);

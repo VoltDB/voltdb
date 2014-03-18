@@ -91,4 +91,12 @@ public class SendPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
     }
+
+    @Override
+    public String getUpdatedTable() {
+        assert(m_children.size() == 1);
+        AbstractPlanNode child = m_children.get(0);
+        return child.getUpdatedTable();
+    }
+
 }
