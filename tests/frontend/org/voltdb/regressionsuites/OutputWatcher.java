@@ -23,10 +23,40 @@
 
 package org.voltdb.regressionsuites;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 /**
- * Interface that provides a hook to tests that need to scan output.
+ * Can be used as a pipe output watcher that looks for a string.
+ * Uses a timeout to fail if expected string not seen.
+ * TODO: Extend for regex
  */
-public interface OutputWatcher
+class OutputWatcher
 {
-    public void handleLine(String line);
+    private final String m_searchString;
+    private final long m_timeout;
+    private CountDownLatch m_foundLatch = new CountDownLatch(1);
+
+    OutputWatcher(String string, long timeout, TimeUnit unit) {
+        m_searchString = string;
+        m_timeout = unit.toMillis(timeout); // internally represent timeout as milliseconds
+    }
+
+    public void handleLine(String line)
+    {
+        //TODO: Regex
+        if (line.contains(m_searchString)) {
+            // below line is noop if already triggered
+            m_foundLatch.countDown();
+        }
+    }
+
+    boolean waitForString() {
+        try {
+            m_foundLatch.await(m_timeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
+    }
 }
