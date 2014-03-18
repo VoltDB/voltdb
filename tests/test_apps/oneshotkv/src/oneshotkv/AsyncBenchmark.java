@@ -137,10 +137,10 @@ public class AsyncBenchmark {
         boolean usecompression= false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = true;
+        boolean autotune = false;
 
         @Option(desc = "Server-side latency target for auto-tuning.")
         int latencytarget = 5;
