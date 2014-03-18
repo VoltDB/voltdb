@@ -43,7 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
-import com.google_voltpatches.common.collect.ImmutableList;
 import jsr166y.ThreadLocalRandom;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -63,6 +62,7 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -365,19 +365,17 @@ class Distributer {
              * the rate limiter which can block. If it blocks we can still get a timeout
              * exception to give prompt timeouts
              */
-            if (!ignoreBackpressure) {
-                try {
-                    afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                            nowNanos, timeoutNanos, ignoreBackpressure);
-                } catch (TimeoutException e) {
-                    /*
-                     * It's possible we need to timeout because it took too long to get
-                     * the transaction out on the wire due to max outstanding
-                     */
-                    final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
-                    invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
-                    return;
-                }
+            try {
+                afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                        nowNanos, timeoutNanos, ignoreBackpressure);
+            } catch (TimeoutException e) {
+                /*
+                 * It's possible we need to timeout because it took too long to get
+                 * the transaction out on the wire due to max outstanding
+                 */
+                final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
+                invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
+                return;
             }
 
             assert(m_callbacks.containsKey(handle) == false);
