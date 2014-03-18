@@ -169,10 +169,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
             int tableSize = buf.getInt();
-            byte[] bytes = new byte[tableSize];
-            buf.get(bytes);
-            ByteBuffer tempBuf = ByteBuffer.wrap(bytes);
-            results[i] = new VoltTable(tempBuf, false);
+            final int originalLimit = buf.limit();
+            buf.limit(buf.position() + tableSize);
+            final ByteBuffer slice = buf.slice();
+            buf.position(buf.position() + tableSize);
+            buf.limit(originalLimit);
+            results[i] = new VoltTable(slice, false);
         }
         setProperly = true;
     }
@@ -347,5 +349,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
         t.addRow(hash);
         results = new VoltTable[] { t };
+    }
+
+    public void dropResultTable() {
+        results = new VoltTable[] {};
     }
 }

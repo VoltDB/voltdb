@@ -21,14 +21,19 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google_voltpatches.common.base.Throwables;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
@@ -43,7 +48,7 @@ public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
 
-    private Connection m_connection;
+    final PicoNetwork m_network;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
     private final Integer m_hostId;
@@ -113,7 +118,7 @@ public class ForeignHost {
 
     /** Create a ForeignHost and install in VoltNetwork */
     ForeignHost(HostMessenger host, int hostId, SocketChannel socket, int deadHostTimeout,
-            InetSocketAddress listeningAddress)
+            InetSocketAddress listeningAddress, PicoNetwork network)
     throws IOException
     {
         m_hostMessenger = host;
@@ -125,14 +130,11 @@ public class ForeignHost {
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
+        m_network = network;
     }
 
-    public void register(HostMessenger host) throws IOException {
-        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0, ReverseDNSPolicy.SYNCHRONOUS);
-    }
-
-    public void enableRead() {
-        m_connection.enableReadSelection();
+    public void enableRead(Set<Long> verbotenThreads) {
+        m_network.start(m_handler, verbotenThreads);
     }
 
     synchronized void close()
@@ -140,8 +142,11 @@ public class ForeignHost {
         m_isUp = false;
         if (m_closing) return;
         m_closing = true;
-        if (m_connection != null)
-            m_connection.unregister();
+        try {
+            m_network.shutdownAsync();
+        } catch (InterruptedException e) {
+            Throwables.propagate(e);
+        }
     }
 
     /**
@@ -190,39 +195,42 @@ public class ForeignHost {
             return;
         }
 
-        m_connection.writeStream().enqueue(
-            new DeferredSerialization() {
-                @Override
-                public final ByteBuffer[] serialize() throws IOException{
-                    int len = 4            /* length prefix */
-                            + 8            /* source hsid */
-                            + 4            /* destinationCount */
-                            + 8 * destinations.length  /* destination list */
-                            + message.getSerializedSize();
-                    ByteBuffer buf = ByteBuffer.allocate(len);
-                    buf.putInt(len - 4);
-                    buf.putLong(message.m_sourceHSId);
-                    buf.putInt(destinations.length);
-                    for (int ii = 0; ii < destinations.length; ii++) {
-                        buf.putLong(destinations[ii]);
+        m_network.enqueue(
+                new DeferredSerialization() {
+                    @Override
+                    public final void serialize(final ByteBuffer buf) throws IOException {
+                        buf.putInt(buf.capacity() - 4);
+                        buf.putLong(message.m_sourceHSId);
+                        buf.putInt(destinations.length);
+                        for (int ii = 0; ii < destinations.length; ii++) {
+                            buf.putLong(destinations[ii]);
+                        }
+                        message.flattenToBuffer(buf);
+                        buf.flip();
                     }
-                    message.flattenToBuffer(buf);
-                    buf.flip();
-                    return new ByteBuffer[] { buf };
-                }
 
-                @Override
-                public final void cancel() {
+                    @Override
+                    public final void cancel() {
                     /*
                      * Can this be removed?
                      */
-                }
+                    }
 
-                @Override
-                public String toString() {
-                    return message.getClass().getName();
-                }
-            });
+                    @Override
+                    public String toString() {
+                        return message.getClass().getName();
+                    }
+
+                    @Override
+                    public int getSerializedSize() {
+                        final int len = 4            /* length prefix */
+                                + 8            /* source hsid */
+                                + 4            /* destinationCount */
+                                + 8 * destinations.length  /* destination list */
+                                + message.getSerializedSize();
+                        return len;
+                    }
+                });
 
         long current_time = EstTime.currentTimeMillis();
         long current_delta = current_time - m_lastMessageMillis.get();
@@ -256,11 +264,11 @@ public class ForeignHost {
 
 
     String hostnameAndIPAndPort() {
-        return m_connection.getHostnameAndIPAndPort();
+        return m_network.getHostnameAndIPAndPort();
     }
 
     String hostname() {
-        return m_connection.getHostnameOrIP();
+        return m_network.getHostnameOrIP();
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */
@@ -363,7 +371,7 @@ public class ForeignHost {
         message.putInt(errBytes.length);
         message.put(errBytes);
         message.flip();
-        m_connection.writeStream().enqueue(message);
+        m_network.enqueue(message);
     }
 
     public void updateDeadHostTimeout(int timeout) {

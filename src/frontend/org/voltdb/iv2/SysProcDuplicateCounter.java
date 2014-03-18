@@ -97,7 +97,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             tables.add(dep);
         }
 
-        return checkCommon(hash, message.isRecovering(), message);
+        return checkCommon(hash, message.isRecovering(), null, message);
     }
 
     @Override

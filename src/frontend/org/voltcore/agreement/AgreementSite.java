@@ -401,7 +401,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //in this case because ordering of reads and writes matters
                         if (m_txnQueue.isEmpty()) {
                             r.setOwner(m_hsId);
-                            m_server.prepRequest(r, m_lastUsedTxnId);
+                            m_server.prepRequest(new Request(r), m_lastUsedTxnId);
                             return;
                         }
                         isRead = true;
@@ -435,7 +435,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 //to a recovering agreement site
                 AgreementTaskMessage atm =
                     new AgreementTaskMessage(
-                            r,
+                            new Request(r),
                             txnId,
                             m_hsId,
                             m_safetyState.getNewestGloballySafeTxnId());

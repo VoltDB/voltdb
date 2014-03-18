@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import jsr166y.ThreadLocalRandom;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -51,6 +52,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -1166,7 +1168,7 @@ class Distributer {
 
         Map<Long, Pair<String, long[]>> ioStats;
         try {
-            ioStats = m_network.getIOStats(false);
+            ioStats = m_network.getIOStats(false, ImmutableList.<IOStatsIntf>of());
         } catch (Exception e) {
             return null;
         }

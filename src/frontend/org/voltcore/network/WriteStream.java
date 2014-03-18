@@ -28,6 +28,12 @@ public interface WriteStream {
     public boolean hadBackPressure();
 
     /**
+     * Only implemented for the client network, queues the callback
+     * without acquiring additional locks or doing more work
+     */
+    public void fastEnqueue(final DeferredSerialization ds);
+
+    /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism
      * for serializing and queueing network writes. It allows the sender to define an efficient serialization
      * mechanism that performs a single allocation of the correct size without the overhead of FastSerializer

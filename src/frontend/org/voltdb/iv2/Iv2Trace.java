@@ -35,10 +35,16 @@ public class Iv2Trace
 {
     private static VoltLogger iv2log = new VoltLogger("IV2TRACE");
     private static VoltLogger iv2queuelog = new VoltLogger("IV2QUEUETRACE");
+    public static final boolean IV2_TRACE_ENABLED;
+    public static final boolean IV2_QUEUE_TRACE_ENABLED;
+    static {
+        IV2_TRACE_ENABLED = iv2log.isTraceEnabled();
+        IV2_QUEUE_TRACE_ENABLED = iv2queuelog.isTraceEnabled();
+    }
 
     public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "topology partition %d leader %s replicas (%s)";
             iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(leaderHSId),
                     CoreUtils.hsIdCollectionToString(replicas)));
@@ -47,7 +53,7 @@ public class Iv2Trace
 
     public static void logCreateTransaction(Iv2InitiateTaskMessage msg)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "createTxn %s ciHandle %s initHSId %s proc %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
@@ -58,7 +64,7 @@ public class Iv2Trace
 
     public static void logFinishTransaction(InitiateResponseMessage msg, long localHSId)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "finishTxn %s ciHandle %s initHSId %s status %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
@@ -115,7 +121,7 @@ public class Iv2Trace
 
     public static void logInitiatorRxMsg(VoltMessage msg, long localHSId)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             if (msg instanceof InitiateResponseMessage) {
                 InitiateResponseMessage iresp = (InitiateResponseMessage)msg;
                 String logmsg = "rxInitRsp %s from %s ciHandle %s txnId %s spHandle %s status %s";
@@ -141,7 +147,7 @@ public class Iv2Trace
     public static void logIv2InitiateTaskMessage(Iv2InitiateTaskMessage itask, long localHSId, long txnid,
             long spHandle)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s";
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
@@ -163,7 +169,7 @@ public class Iv2Trace
     public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
             long txnId)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "rxSntlMsg %s from %s txnId %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(message.m_sourceHSId),
@@ -174,7 +180,7 @@ public class Iv2Trace
     public static void logFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId, long spHandle,
             boolean borrow)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String label = "rxFragMsg";
             if (borrow) {
                 label = "rxBrrwMsg";
@@ -195,7 +201,7 @@ public class Iv2Trace
 
     public static void logCompleteTransactionMessage(CompleteTransactionMessage ctask, long localHSId)
     {
-        if (iv2log.isTraceEnabled()) {
+        if (IV2_TRACE_ENABLED) {
             String logmsg = "rxCompMsg %s from %s txnId %s %s %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ctask.m_sourceHSId),
@@ -207,7 +213,7 @@ public class Iv2Trace
 
     public static void logTransactionTaskQueueOffer(TransactionTask task)
     {
-        if (iv2queuelog.isTraceEnabled()) {
+        if (IV2_QUEUE_TRACE_ENABLED) {
             String logmsg = "txnQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                         txnIdToString(task.getSpHandle()),
@@ -217,7 +223,7 @@ public class Iv2Trace
 
     public static void logSiteTaskerQueueOffer(TransactionTask task)
     {
-        if (iv2queuelog.isTraceEnabled()) {
+        if (IV2_QUEUE_TRACE_ENABLED) {
             String logmsg = "tskQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                             txnIdToString(task.getSpHandle()),
