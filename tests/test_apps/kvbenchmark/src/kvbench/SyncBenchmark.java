@@ -263,15 +263,19 @@ public class SyncBenchmark {
 
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%f,%.2f\n",
-                    ts, stats.getEndTimestamp(), stats.getInvocationsCompleted(),
-                    stats.getInvocationAborts(), stats.getInvocationErrors(),
-                    stats.getInvocationTimeouts(),
-                    stats.getTxnThroughput(), stats.getAverageLatency(),
-                    stats.kPercentileLatencyAsDouble(0.99),
-                    stats.kPercentileLatencyAsDouble(0.999),
-                    stats.kPercentileLatencyAsDouble(0.9999),
-                    stats.kPercentileLatencyAsDouble(0.99999)
+            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f\n",
+                    ts,                                        // col 00 string timestamp
+                    stats.getEndTimestamp(),                   // col 01 long   timestamp millis
+                    stats.getInvocationsCompleted(),           // col 02 long   invocations completed
+                    stats.getInvocationAborts(),               // col 03 long   invocation aborts
+                    stats.getInvocationErrors(),               // col 04 long   invocation errors
+                    stats.getInvocationTimeouts(),             // col 05 long   invocation timeouts
+                    stats.getTxnThroughput(),                  // col 06 long   transaction throughput
+                    stats.getAverageLatency(),                 // col 07 double average latency
+                    stats.kPercentileLatencyAsDouble(0.99),    // col 08 double two nines latency
+                    stats.kPercentileLatencyAsDouble(0.999),   // col 09 double three nines latency
+                    stats.kPercentileLatencyAsDouble(0.9999),  // col 10 double four nines latency
+                    stats.kPercentileLatencyAsDouble(0.99999)  // col 11 double five nines latency
                     );
         }
     }

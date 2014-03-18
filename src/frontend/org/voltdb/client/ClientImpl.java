@@ -608,7 +608,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         FileWriter fw = new FileWriter(path);
-        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 stats.getStartTimestamp(),
                 stats.getDuration(),
                 stats.getInvocationsCompleted(),
@@ -618,7 +618,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 stats.kPercentileLatencyAsDouble(0.99),
                 stats.kPercentileLatencyAsDouble(0.999),
                 stats.kPercentileLatencyAsDouble(0.9999),
-                stats.kPercentileLatencyAsDouble(0.99999)));
+                stats.kPercentileLatencyAsDouble(0.99999),
+                stats.getInvocationErrors(),
+                stats.getInvocationAborts(),
+                stats.getInvocationTimeouts()));
         fw.close();
     }
 
