@@ -23,6 +23,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+
 /**
  * Functionality to build a list of every class that's in
  * the classpath as a class file and not a jar. Also the
@@ -31,6 +33,11 @@ import java.util.regex.Pattern;
  *
  */
 public class ClassMatcher {
+    enum ClassNameMatchStatus {
+        MATCH_FOUND,
+        NO_WILDCARD_MATCH,
+        NO_EXACT_MATCH,
+    }
 
     /** List of .class files found in the classpath */
     String m_classList = null;
@@ -46,7 +53,8 @@ public class ClassMatcher {
      * of ant wildcards, such as "org.voltdb.**" or
      * "org.voltdb.*bar" or "org.volt**.Foo"
      */
-    public void addPattern(String classNamePattern) {
+    public ClassNameMatchStatus addPattern(String classNamePattern) {
+        boolean matchFound = false;
         if (m_classList == null) {
             m_classList = getClasspathClassFileNames();
         }
@@ -60,11 +68,12 @@ public class ClassMatcher {
             classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
         }
 
-        preppedName = preppedName.replace("**", "[\\w.\\$]+");
-        preppedName = preppedName.replace("*",  "[\\w\\$]+");
+        String regExPreppedName = preppedName.replace("**", "[\\w.\\$]+");
+        regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]+");
 
+        boolean patternHasNoWildcards = preppedName.compareTo(regExPreppedName) == 0;
         String regex = "^" + // (line start)
-                       preppedName +
+                       regExPreppedName +
                        "$";  // (line end)
 
         Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
@@ -76,8 +85,20 @@ public class ClassMatcher {
             if (match.contains("$")) {
                 continue;
             }
-            m_classNameMatches.add(match);
+            matchFound |= m_classNameMatches.add(match);
         }
+        if (matchFound) {
+            return ClassNameMatchStatus.MATCH_FOUND;
+        }
+        else {
+            if (preppedName.compareTo(regExPreppedName) == 0) {
+                return ClassNameMatchStatus.NO_EXACT_MATCH;
+            }
+            else {
+                return ClassNameMatchStatus.NO_WILDCARD_MATCH;
+            }
+        }
+            
     }
 
     /**

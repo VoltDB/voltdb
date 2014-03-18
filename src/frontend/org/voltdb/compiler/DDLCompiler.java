@@ -756,7 +756,8 @@ public class DDLCompiler {
                         classNameStr)); // remove trailing semicolon
             }
 
-            m_classMatcher.addPattern(classNameStr);
+           m_classMatcher.addPattern(classNameStr);
+            
             return true;
         }
 
