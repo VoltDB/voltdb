@@ -1439,6 +1439,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10"));
         }
 
+
+        try {
+            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, var1) VALUES(%d, '%s' || 'abc')", 2, var1));
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("Value ("+var1+"abc) is too wide for a constant varchar value of size 10"));
+        }
+
+
         // Test inlined varchar with stored procedure
         try {
             client.callProcedure("VARLENGTH.insert", 1, var1, null, null, null);
@@ -1460,21 +1470,21 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
                             174, var2.substring(0, THRESHOLD), 80)));
         }
 
         // Test non-inlined varchar with stored procedure
-        String var3 = "Voltdb is great | Voltdb is great " +
+        var2 = "Voltdb is great | Voltdb is great " +
                 "| Voltdb is great | Voltdb is great| Voltdb is great";
         try {
-            client.callProcedure("VARLENGTH.insert", 21, null, var3, null, null);
+            client.callProcedure("VARLENGTH.insert", 21, null, var2, null, null);
             fail();
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
-                            86, var3, 80)));
+                            86, var2, 80)));
         }
 
         // Test update
@@ -1513,7 +1523,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                             bin1.length()/2, 10)));
         }
 
-        // Test non-inlined varchar with stored procedure and threshold
+        // Test non-inlined varchar with stored procedure
         String bin2 = "111111111111111111111100000011111111111111111111110000001111111111111111111111000000" +
                 "111111111111111111111100000011111111111111111111110000001111111111111111111111000000" +
                 "111111111111111111111100000011111111111111111111110000001111111111111111111111000000";

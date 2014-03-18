@@ -289,7 +289,7 @@ class NValue {
     void serializeTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an Export stream */
-    void serializeToExport(ExportSerializeOutput&) const;
+    void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
     void allocateObjectFromInlinedValue();
@@ -668,29 +668,6 @@ class NValue {
      *
      * Leverage private access and enforce strict requirements on
      * calling correctness.
-     */
-    int32_t getObjectLength() const {
-        if (isNull()) {
-            // Conceptually, I think a NULL object should just have
-            // length 0. In practice, this code path is often a defect
-            // in code not correctly handling null. May favor a more
-            // defensive "return 0" in the future? (rtb)
-            throw SQLException(SQLException::dynamic_sql_error,
-                    "Must not ask  for object length on sql null object.");
-        }
-        if ((getValueType() != VALUE_TYPE_VARCHAR) && (getValueType() != VALUE_TYPE_VARBINARY)) {
-            // probably want getTupleStorageSize() for non-object types.
-            // at the moment, only varchars are using getObjectLength().
-            throw SQLException(SQLException::dynamic_sql_error,
-                    "Must not ask for object length for non-object types");
-        }
-
-        // now safe to read and return the length preceding value.
-        return getObjectLength_withoutNull();
-    }
-
-    /**
-     * Used by varchar or varbinary.
      */
     int32_t getObjectLength_withoutNull() const {
         assert(isNull() == false);
@@ -1086,12 +1063,13 @@ class NValue {
         }
     }
 
-    double getNumberFromString() const
+    double getNumberFromString_withoutNull() const
     {
-        const int32_t strLength = getObjectLength();
+        assert(isNull() == false);
+        const int32_t strLength = getObjectLength_withoutNull();
         // Guarantee termination at end of object -- or strtod might not stop there.
         char safeBuffer[strLength+1];
-        memcpy(safeBuffer, getObjectValue(), strLength);
+        memcpy(safeBuffer, getObjectValue_withoutNull(), strLength);
         safeBuffer[strLength] = '\0';
         char * bufferEnd = safeBuffer;
         double result = strtod(safeBuffer, &bufferEnd);
@@ -1142,7 +1120,7 @@ class NValue {
             retval.getBigInt() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR:
-            retval.getBigInt() = static_cast<int64_t>(getNumberFromString()); break;
+            retval.getBigInt() = static_cast<int64_t>(getNumberFromString_withoutNull()); break;
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
@@ -1194,8 +1172,8 @@ class NValue {
             retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR: {
-            const int32_t length = getObjectLength();
-            const char* bytes = reinterpret_cast<const char*>(getObjectValue());
+            const int32_t length = getObjectLength_withoutNull();
+            const char* bytes = reinterpret_cast<const char*>(getObjectValue_withoutNull());
             const std::string value(bytes, length);
             retval.getTimestamp() = parseTimestampString(value);
             break;
@@ -1244,7 +1222,7 @@ class NValue {
             retval.narrowToInteger(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
-            retval.narrowToInteger(getNumberFromString(), type); break;
+            retval.narrowToInteger(getNumberFromString_withoutNull(), type); break;
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_INTEGER);
@@ -1289,7 +1267,7 @@ class NValue {
             retval.narrowToSmallInt(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
-            retval.narrowToSmallInt(getNumberFromString(), type); break;
+            retval.narrowToSmallInt(getNumberFromString_withoutNull(), type); break;
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_SMALLINT);
@@ -1334,7 +1312,7 @@ class NValue {
             retval.narrowToTinyInt(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
-            retval.narrowToTinyInt(getNumberFromString(), type); break;
+            retval.narrowToTinyInt(getNumberFromString_withoutNull(), type); break;
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_TINYINT);
@@ -1365,7 +1343,7 @@ class NValue {
         case VALUE_TYPE_DECIMAL:
             retval.getDouble() = castAsDoubleAndGetValue(); break;
         case VALUE_TYPE_VARCHAR:
-            retval.getDouble() = getNumberFromString(); break;
+            retval.getDouble() = getNumberFromString_withoutNull(); break;
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_DOUBLE);
@@ -1489,8 +1467,8 @@ class NValue {
         }
         case VALUE_TYPE_VARCHAR:
         {
-            const int32_t length = getObjectLength();
-            const char* bytes = reinterpret_cast<const char*>(getObjectValue());
+            const int32_t length = getObjectLength_withoutNull();
+            const char* bytes = reinterpret_cast<const char*>(getObjectValue_withoutNull());
             const std::string value(bytes, length);
             retval.createDecimalFromString(value);
             break;
@@ -1514,26 +1492,12 @@ class NValue {
             *reinterpret_cast<char*>(storage) = OBJECT_NULL_BIT;
         }
         else {
-            const int32_t objectLength = getObjectLength();
+            const int32_t objectLength = getObjectLength_withoutNull();
             if (objectLength > maxLength) {
                 if (maxLength == 0) {
                     throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
                 }
-                char msg[1024];
-                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                if (m_valueType == VALUE_TYPE_VARCHAR) {
-                    std::string inputValue = std::string(ptr, std::min(objectLength, FULL_STRING_IN_MESSAGE_THRESHOLD));
-                    snprintf(msg, 1024,
-                             "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
-                             objectLength, inputValue.c_str(), maxLength);
-                } else if (m_valueType == VALUE_TYPE_VARBINARY) {
-                    snprintf(msg, 1024,
-                             "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
-                             objectLength, maxLength);
-                }
-
-                throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                                   msg);
+                throwExceptionForVarcharAndVarbinary(objectLength, maxLength);
             }
             if (m_sourceInlined)
             {
@@ -1548,6 +1512,33 @@ class NValue {
             }
         }
 
+    }
+
+    void throwExceptionForVarcharAndVarbinary(int32_t objectLength, int32_t maxLength) const {
+        assert(isNull() == false);
+        assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+        assert(objectLength > maxLength);
+
+        char msg[1024];
+        const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+        if (m_valueType == VALUE_TYPE_VARCHAR) {
+            std::string inputValue;
+            if (objectLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
+                inputValue = std::string(ptr, FULL_STRING_IN_MESSAGE_THRESHOLD) + std::string("...");
+            } else {
+                inputValue = std::string(ptr, objectLength);
+            }
+            snprintf(msg, 1024,
+                     "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                     objectLength, inputValue.c_str(), maxLength);
+        } else if (m_valueType == VALUE_TYPE_VARBINARY) {
+            snprintf(msg, 1024,
+                     "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                     objectLength, maxLength);
+        }
+
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                           msg);
     }
 
     template<typename T>
@@ -2593,20 +2584,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + length;
                 if (length > maxLength) {
-                    char msg[1024];
-                    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                    if (m_valueType == VALUE_TYPE_VARCHAR) {
-                        std::string inputValue = std::string(ptr, std::min(length, FULL_STRING_IN_MESSAGE_THRESHOLD));
-                        snprintf(msg, 1024,
-                                "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
-                                length, inputValue.c_str(), maxLength);
-                    } else if (m_valueType == VALUE_TYPE_VARBINARY) {
-                        snprintf(msg, 1024,
-                                "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
-                                length, maxLength);
-                    }
-                    throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
-
+                    throwExceptionForVarcharAndVarbinary(length, maxLength);
                 }
                 StringRef* sref = StringRef::create(minlength, dataPool);
                 char *copy = sref->get();
@@ -2675,19 +2653,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
             else {
                 const int32_t objectLength = getObjectLength_withoutNull();
-                char msg[1024];
-                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                if (m_valueType == VALUE_TYPE_VARCHAR) {
-                    std::string inputValue = std::string(ptr, std::min(objectLength, FULL_STRING_IN_MESSAGE_THRESHOLD));
-                    snprintf(msg, 1024,
-                             "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
-                             objectLength, inputValue.c_str(), maxLength);
-                } else if (m_valueType == VALUE_TYPE_VARBINARY) {
-                    snprintf(msg, 1024,
-                             "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
-                             objectLength, maxLength);
-                }
-                throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
+                throwExceptionForVarcharAndVarbinary(objectLength, maxLength);
             }
         }
         break;
@@ -2879,17 +2845,16 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
               output.writeInt(OBJECTLENGTH_NULL);
               break;
           }
-          const int32_t length = getObjectLength();
-          if (length < OBJECTLENGTH_NULL) {
+          const int32_t length = getObjectLength_withoutNull();
+          if (length <= OBJECTLENGTH_NULL) {
               throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
           }
           output.writeInt(static_cast<int32_t>(length));
-          if (length != OBJECTLENGTH_NULL) {
-              // Not a null string: write it out
-              const char * str = reinterpret_cast<const char*>(getObjectValue());
-              if (str == NULL) {}
-              output.writeBytes(getObjectValue(), length);
-          }
+
+          // Not a null string: write it out
+          const char * str = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+          if (str == NULL) {}
+          output.writeBytes(getObjectValue_withoutNull(), length);
 
           break;
       }
@@ -2928,8 +2893,9 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     }
 }
 
-inline void NValue::serializeToExport(ExportSerializeOutput &io) const
+inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
+    assert(isNull() == false);
     switch (getValueType()) {
       case VALUE_TYPE_TINYINT:
       case VALUE_TYPE_SMALLINT:
@@ -2937,7 +2903,7 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_BIGINT:
       case VALUE_TYPE_TIMESTAMP:
       {
-          int64_t val = castAsBigIntAndGetValue();
+          int64_t val = castAsBigIntAndGetValue_withoutNull();
           io.writeLong(val);
           return;
       }
@@ -2951,7 +2917,7 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_VARBINARY:
       {
           // requires (and uses) bytecount not character count
-          io.writeBinaryString(getObjectValue(), getObjectLength());
+          io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
           return;
       }
       case VALUE_TYPE_DECIMAL:
@@ -3001,7 +2967,7 @@ inline void NValue::allocateObjectFromInlinedValue()
     // When it isn't inlined, m_data must contain a pointer to a StringRef object
     // that contains that same data in that same format.
 
-    int32_t length = getObjectLength();
+    int32_t length = getObjectLength_withoutNull();
     // inlined objects always have a minimal (1-byte) length field.
     StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, getTempStringPool());
     char* storage = sref->get();
@@ -3127,20 +3093,20 @@ inline void NValue::hashCombine(std::size_t &seed) const {
         }
 #endif
       case VALUE_TYPE_VARCHAR: {
-        if (getObjectValue() == NULL) {
+        if (isNull()) {
             boost::hash_combine( seed, std::string(""));
         } else {
-            const int32_t length = getObjectLength();
-            boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue()), length ));
+            const int32_t length = getObjectLength_withoutNull();
+            boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue_withoutNull()), length ));
         }
         break;
       }
       case VALUE_TYPE_VARBINARY: {
-        if (getObjectValue() == NULL) {
+          if (isNull()) {
             boost::hash_combine( seed, std::string(""));
         } else {
-            const int32_t length = getObjectLength();
-            char* data = reinterpret_cast<char*>(getObjectValue());
+            const int32_t length = getObjectLength_withoutNull();
+            char* data = reinterpret_cast<char*>(getObjectValue_withoutNull());
             for (int32_t i = 0; i < length; i++)
                 boost::hash_combine(seed, data[i]);
         }
@@ -3427,7 +3393,13 @@ inline int32_t NValue::murmurHash3() const {
         return MurmurHash3_x64_128( m_data, 8, 0);
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
-        return MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0);
+        if (isNull()) {
+            // Use NULL check first to be able to get rid of checks inside of other functions.
+            // Maybe it is impossible to be null here. -xin
+            throw SQLException(SQLException::dynamic_sql_error,
+                                "Must not ask  for object length on sql null object.");
+        }
+        return MurmurHash3_x64_128( getObjectValue_withoutNull(), getObjectLength_withoutNull(), 0);
     default:
         throwFatalException("Unknown type for murmur hashing %d", type);
         break;

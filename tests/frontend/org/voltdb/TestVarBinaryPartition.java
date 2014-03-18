@@ -92,7 +92,6 @@ public class TestVarBinaryPartition extends TestCase {
                 byte[] b = new byte[rand.nextInt(128)];
                 rand.nextBytes(b);
                 String hexString = Encoder.hexEncode(b);
-                System.out.println(hexString);
                 resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ("+"'"+hexString+"'"+",5);" );
                 assert( resp.getResults().length == 1 );
             }
