@@ -19,6 +19,7 @@ package org.voltdb.client;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.util.concurrent.TimeUnit;
 
 /**
