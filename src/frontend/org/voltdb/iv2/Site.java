@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -85,9 +83,11 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
-
 import org.voltdb.utils.MinimumRatioMaintainer;
+
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -1049,10 +1049,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
-        if (m_rejoinTaskLog != null) {
-            m_rejoinTaskLog.setEarliestTxnId(
-                    m_replayCompletionAction.getSnapshotTxnId());
-        }
     }
 
     private void setReplayRejoinComplete() {

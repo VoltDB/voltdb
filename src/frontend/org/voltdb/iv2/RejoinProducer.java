@@ -152,8 +152,6 @@ public class RejoinProducer extends JoinProducerBase {
             @Override
             public TransactionInfoBaseMessage getNextMessage() throws IOException {return null;}
             @Override
-            public void setEarliestTxnId(long txnId) {}
-            @Override
             public boolean isEmpty() throws IOException {return true;}
             @Override
             public void close() throws IOException {}

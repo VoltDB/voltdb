@@ -41,14 +41,6 @@ public interface TaskLog {
     public TransactionInfoBaseMessage getNextMessage() throws IOException;
 
     /**
-     * Sets the earliest transaction ID so that any messages returned later will
-     * have a transaction ID larger than this.
-     *
-     * @param txnId
-     */
-    public void setEarliestTxnId(long txnId);
-
-    /**
      * If the queue is empty
      * @return
      */
