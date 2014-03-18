@@ -410,10 +410,10 @@ public class OneShotBenchmark {
         // 3. Write stats to file if requested
         if (!config.exportStatsfalseSPtrueMP) {
             System.out.println("Exporting SP stats context");
-            client.writeSummaryCSVWithDoubles(stats, config.statsfile);
+            client.writeSummaryCSV(stats, config.statsfile);
         } else {
             System.out.println("Exporting MP stats context");
-            mpClient.writeSummaryCSVWithDoubles(mpstats, config.statsfile);
+            mpClient.writeSummaryCSV(mpstats, config.statsfile);
         }
     }
 

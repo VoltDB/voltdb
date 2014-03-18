@@ -314,7 +314,7 @@ public class Benchmark {
         printPlannerStatistics();
 
         // 3. Write stats to file if requested
-        client.writeSummaryCSVWithDoubles(stats, cliConfig.statsfile);
+        client.writeSummaryCSV(stats, cliConfig.statsfile);
     }
 
     /**

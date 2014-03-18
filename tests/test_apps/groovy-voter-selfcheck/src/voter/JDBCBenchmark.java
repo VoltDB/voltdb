@@ -293,7 +293,7 @@ public class JDBCBenchmark {
         stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
-        ((IVoltDBConnection)client).writeSummaryCSVWithDoubles(stats, config.statsfile);
+        ((IVoltDBConnection)client).writeSummaryCSV(stats, config.statsfile);
     }
 
     /**

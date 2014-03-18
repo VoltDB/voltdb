@@ -332,7 +332,7 @@ public class AsyncBenchmark {
             System.out.println(stats.latencyHistoReport());
         }
         // 4. Write stats to file if requested
-        client.writeSummaryCSVWithDoubles(stats, config.statsfile);
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**

@@ -399,7 +399,7 @@ public class AsyncExportClient
             printStatistics(fullStatsContext,false);
 
             // Dump statistics to a CSV file
-            clientRef.get().writeSummaryCSVWithDoubles(
+            clientRef.get().writeSummaryCSV(
                     fullStatsContext.getStatsByProc().get(config.procedure),
                     csv
                     );
