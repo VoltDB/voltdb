@@ -31,6 +31,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
@@ -71,6 +74,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * a callback.
      */
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
+
+    private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
 
     /****************************************************
                         Public API
@@ -638,5 +643,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     public HashinatorLiteType getHashinatorType() {
         return m_distributer.getHashinatorType();
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
+    {
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
+        }
     }
 }

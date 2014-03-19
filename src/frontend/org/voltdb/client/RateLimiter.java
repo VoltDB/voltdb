@@ -174,10 +174,6 @@ class RateLimiter {
         if (m_doesAnyTuning) {
             synchronized (this) {
                 ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
-                //Wake someone up if they are blocked
-                if (m_outstandingTxns > m_maxOutstandingTxns && m_outstandingTxns - 1 == m_maxOutstandingTxns) {
-                    this.notify();
-                }
                 --m_outstandingTxns;
                 assert(m_outstandingTxns >= 0);
                 if (internalLatency != -1) {

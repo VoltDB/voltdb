@@ -26,7 +26,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
@@ -268,12 +267,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public TransactionInfoBaseMessage getNextMessage() throws IOException
     {
         return m_taskLog.getNextMessage();
-    }
-
-    @Override
-    public void setEarliestTxnId(long txnId)
-    {
-        m_taskLog.setEarliestTxnId(txnId);
     }
 
     @Override
