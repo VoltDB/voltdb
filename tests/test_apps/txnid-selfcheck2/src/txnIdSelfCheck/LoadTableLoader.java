@@ -286,6 +286,8 @@ public class LoadTableLoader extends Thread {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);
+                final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
+
                 // try to insert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
@@ -304,7 +306,7 @@ public class LoadTableLoader extends Thread {
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {
                         if (shouldCopy != 0) {
-                            cpDelQueue.add(p);
+                            lcpDelQueue.add(p);
                         } else {
                             onlyDelQueue.add(p);
                         }
@@ -312,6 +314,7 @@ public class LoadTableLoader extends Thread {
                 }
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
+                cpDelQueue.addAll(lcpDelQueue);
                 long nextRowCount = getRowCount();
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
