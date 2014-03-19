@@ -336,7 +336,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     public void convertResultsToHashForDeterminism() {
         int hash = m_hash == null ? 0 : m_hash;
 
-        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
         t.addRow(hash);
         results = new VoltTable[] { t };
     }
