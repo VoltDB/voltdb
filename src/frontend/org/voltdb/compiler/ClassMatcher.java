@@ -71,7 +71,6 @@ public class ClassMatcher {
         String regExPreppedName = preppedName.replace("**", "[\\w.\\$]+");
         regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]+");
 
-        boolean patternHasNoWildcards = preppedName.compareTo(regExPreppedName) == 0;
         String regex = "^" + // (line start)
                        regExPreppedName +
                        "$";  // (line end)
@@ -104,15 +103,15 @@ public class ClassMatcher {
     /**
      * Return the list of matched classnames in lexographical order.
      */
-    public String[] getMatchedClassList() {
-        return m_classNameMatches.toArray(new String[0]);
+    public Set<String> getMatchedClassList() {
+        return m_classNameMatches;
     }
 
     /**
      * Empty the data structures of this class to save memory.
      */
     public void clear() {
-        m_classList = "";
+        m_classList = null;
         m_classNameMatches.clear();
     }
 
