@@ -137,8 +137,8 @@ public abstract class JoinProducerBase extends SiteTasker {
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
-                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e.getCause());
             } catch (Exception e) {

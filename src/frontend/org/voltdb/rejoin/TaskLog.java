@@ -41,14 +41,6 @@ public interface TaskLog {
     public TransactionInfoBaseMessage getNextMessage() throws IOException;
 
     /**
-     * Sets the earliest transaction ID so that any messages returned later will
-     * have a transaction ID larger than this.
-     *
-     * @param txnId
-     */
-    public void setEarliestTxnId(long txnId);
-
-    /**
      * If the queue is empty
      * @return
      */
@@ -62,6 +54,8 @@ public interface TaskLog {
 
     /**
      * Default policy at startup is to drop invocations until recording is necessary
+     * When used for live rejoin the first SnapshotSave plan fragment triggers the start
+     * of recording of transactions for the live rejoin
      */
     public void enableRecording();
 }

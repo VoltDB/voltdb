@@ -1369,6 +1369,9 @@ public class ParserDQL extends ParserBase {
             Expression e = XreadTableSubqueryOrJoinedTable();
 
             table = e.subQuery.getTable();
+            if (table instanceof TableDerived) {
+                ((TableDerived)table).dataExpression = e;
+            }
         } else {
             table = readTableName();
 

@@ -71,6 +71,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -119,6 +120,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
+    static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
@@ -510,7 +512,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             StringBuilder sb = new StringBuilder();
                             sb.append("Timed out authenticating client from ");
                             sb.append(socket.socket().getRemoteSocketAddress().toString());
-                            sb.append(String.format(" after %.2f seconds (timeout target is 1.6 seconds)", seconds));
+                            sb.append(String.format(" after %.2f seconds (timeout target is %.2f seconds)", seconds, AUTH_TIMEOUT_MS / 1000.0));
                             timeoutRef.set(sb.toString());
                             try {
                                 socket.close();
@@ -518,7 +520,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 //Don't care
                             }
                         }
-                    }, 1600, 0, TimeUnit.MILLISECONDS);
+                    }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
             try {
                 while (lengthBuffer.hasRemaining()) {
@@ -839,8 +841,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public ByteBuffer[] serialize() throws IOException
+        public void serialize(ByteBuffer buf) throws IOException
         {
+            buf.putInt(buf.capacity() - 4);
+            clientResponse.flattenToBuffer(buf);
+        }
+
+        @Override
+        public void cancel() {
+        }
+
+        @Override
+        public int getSerializedSize() throws IOException {
             // HACK-O-RIFFIC
             // For now, figure out if this is a transaction that was ignored
             // by the ReplaySequencer and just remove the handle from the CIHM
@@ -855,14 +867,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 clientData = cihm.findHandle(response.getClientInterfaceHandle());
             }
             if (clientData == null) {
-                return new ByteBuffer[] {};
+                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
             // Reuse the creation time of the original invocation to have accurate internal latency
             if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
-                return new ByteBuffer[] {};
+                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
             final long now = System.nanoTime();
@@ -882,14 +894,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
 
-            ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
-            results.putInt(results.capacity() - 4);
-            clientResponse.flattenToBuffer(results);
-            return new ByteBuffer[] { results };
-        }
-
-        @Override
-        public void cancel() {
+            return clientResponse.getSerializedSize() + 4;
         }
 
         @Override
@@ -929,8 +934,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean isReadonly = catProc.getReadonly();
 
                 try {
-                    int partition = getPartitionForProcedure(partitionParamIndex,
-                            partitionParamType, response.getInvocation());
+                    ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
+                    int partition = getPartitionForProcedure(ppi.index,
+                            ppi.type, response.getInvocation());
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,
@@ -1122,7 +1128,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
-                        cihm.connection.writeStream().enqueue(new ClientResponseWork(response, cihm, procedure));
+                        cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -1671,7 +1677,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
-        AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
+        final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
         // ping just responds as fast as possible to show the connection is alive
         // nb: ping is not a real procedure, so this is checked before other "sysprocs"
@@ -1740,6 +1746,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], errorMessage, task.clientHandle);
         }
+
+        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
         // Check procedure policies
         error = checkPolicies(null, user, task, catProc);
@@ -1849,8 +1857,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 partition =
                         getPartitionForProcedure(
-                                catProc.getPartitionparameter(),
-                                catProc.getPartitioncolumn().getType(),
+                                ppi.index,
+                                ppi.type,
                                 task);
             } catch (Exception e) {
                 // unable to hash to a site, return an error
@@ -2298,18 +2306,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     buf.flip();
 
                     //Check for no change
-                    final ByteBuffer oldValue =
-                            m_currentTopologyValues.get() != null ?
-                                    m_currentTopologyValues.get().serialize()[0] : null;
+                    ByteBuffer oldValue = null;
+                    DeferredSerialization ds = m_currentTopologyValues.get();
+                    if (ds != null) {
+                        oldValue = ByteBuffer.allocate(ds.getSerializedSize());
+                        ds.serialize(oldValue);
+                    }
+
                     if (buf.equals(oldValue)) return;
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
-                        public ByteBuffer[] serialize() throws IOException {
-                            return new ByteBuffer[] { buf.duplicate() };
+                        public void serialize(ByteBuffer outbuf) throws IOException {
+                            outbuf.put(buf.duplicate());
                         }
                         @Override
                         public void cancel() {}
+
+                        @Override
+                        public int getSerializedSize() {
+                            return buf.remaining();
+                        }
                     });
                     if (oldValue != null) {
                         m_notifier.queueNotification(
@@ -2452,7 +2469,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return The partition best set up to execute the procedure.
      * @throws Exception
      */
-    static int getPartitionForProcedure(int partitionIndex, int partitionType,
+    static int getPartitionForProcedure(int partitionIndex, VoltType partitionType,
                                         StoredProcedureInvocation task)
             throws Exception
     {
@@ -2575,6 +2592,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public void fastEnqueue(final org.voltcore.utils.DeferredSerialization ds) {
+            enqueue(ds);
+        }
+
+        @Override
         public void enqueue(final org.voltcore.utils.DeferredSerialization ds)
         {
 
@@ -2582,7 +2604,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 @Override
                 public ClientResponseImpl call() throws Exception {
                     ClientResponseImpl resp = new ClientResponseImpl();
-                    ByteBuffer b = ds.serialize()[0];
+                    ByteBuffer b = ByteBuffer.allocate(ds.getSerializedSize());
+                    ds.serialize(b);
                     b.position(4);
                     resp.initFromBuffer(b);
                     return resp;

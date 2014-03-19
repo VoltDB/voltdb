@@ -47,8 +47,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
     }
 
     @Override
-    public ByteBuffer retrieveNextMessage(Connection c) throws BadMessageLength {
-        final NIOReadStream inputStream = c.readStream();
+    public ByteBuffer retrieveNextMessage(final NIOReadStream inputStream) throws BadMessageLength {
 
         /*
          * Note that access to the read stream is not synchronized. In this application

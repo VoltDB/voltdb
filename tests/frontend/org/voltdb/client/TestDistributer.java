@@ -297,7 +297,6 @@ public class TestDistributer extends TestCase {
         }
     }
 
-
     @Test
     public void testCreateConnection() throws Exception {
         MockVolt volt0 = null;
@@ -350,7 +349,7 @@ public class TestDistributer extends TestCase {
             CSL csl = new CSL();
 
             Distributer dist = new Distributer(false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
                     false);
             dist.addClientStatusListener(csl);
@@ -435,7 +434,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -448,13 +447,26 @@ public class TestDistributer extends TestCase {
         Thread.sleep(3000);
         assertTrue(volt.handler.gotPing);
 
+        //Check that we can send a ping and get a response ourselves
+        SyncCallback sc = new SyncCallback();
+        dist.queue(new ProcedureInvocation(88, "@Ping"), sc, true, 0);
+        sc.waitForResponse();
+        assertEquals(ClientResponse.SUCCESS, sc.getResponse().getStatus());
+
         // tell the mock voltdb to stop responding
         volt.handler.sendResponses.set(false);
 
-        // this call should hang until the connection is closed,
-        // then will be called with CONNECTION_LOST
-        ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-        dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+        try {
+            // this call should hang until the connection is closed,
+            // then will be called with CONNECTION_LOST
+            ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
+            dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+        } catch (NoConnectionsException e) {
+            //Ok this is a little odd scheduling wise, would expect to at least be able to submit
+            //the transaction before reaching a multi-second timeout, but such is life
+            //The callback won't be invoked so count the latch down for it
+            latch.countDown();
+        }
 
         // wait for both callbacks
         latch.await();
@@ -489,7 +501,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
                 false);
         dist.createConnection("localhost", "", "", 20000);
@@ -542,7 +554,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -612,7 +624,7 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            config.setMaxOutstandingTxns(8);
+            config.setMaxOutstandingTxns(5);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);

@@ -19,12 +19,15 @@ package org.voltcore.utils;
 
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
+import com.google_voltpatches.common.base.Preconditions;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import sun.misc.Cleaner;
+import sun.nio.ch.DirectBuffer;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -36,6 +39,16 @@ import org.voltcore.logging.VoltLogger;
 public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
+    private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
+#ifndef NO_MEMCHECK
+
+    static {
+        final String msg = "Strict java memory checking is enabled, don't do release builds " +
+                     "or performance runs with this enabled";
+        HOST.warn(msg);
+        System.err.println(msg);
+    }
+#endif
 
     /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
@@ -46,39 +59,159 @@ public final class DBBPool {
      *
      */
     public static abstract class BBContainer {
-        /**
-         * Pointer to the location in memory where this buffer is located. Useful if you
-         * want to pass it to the native side so it doesn't have to call GetDirectBufferAddress.
-         */
-        final public long address;
 
         /**
          * The buffer
          */
-        final public ByteBuffer b;
+        final private ByteBuffer b;
+#ifndef NO_MEMCHECK
+        private volatile Throwable m_freeThrowable;
+        private final Throwable m_allocationThrowable;
+#endif
 
-        public BBContainer(ByteBuffer b, long address) {
+        public BBContainer(ByteBuffer b) {
+#ifndef NO_MEMCHECK
+            m_allocationThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+#endif
             this.b = b;
-            this.address = address;
         }
 
-        abstract public void discard();
+        final public long address() {
+            checkUseAfterFree();
+            return ((DirectBuffer)b).address();
+        }
+
+        public void discard() {
+            checkDoubleFree();
+        }
+
+        public ByteBuffer b() {
+            checkUseAfterFree();
+            return b;
+        }
+
+        final public ByteBuffer bD() {
+            return b().duplicate();
+        }
+
+        final public ByteBuffer bDR() {
+            return b().asReadOnlyBuffer();
+        }
+
+        final protected void checkUseAfterFree() {
+#ifndef NO_MEMCHECK
+            if (m_freeThrowable != null) {
+                System.err.println("Use after free in DBBPool");
+                System.err.println("Free was by:");
+                m_freeThrowable.printStackTrace();
+                System.err.println("Use was by:");
+                Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+                t.printStackTrace();
+                HOST.fatal("Use after free in DBBPool");
+                HOST.fatal("Free was by:", m_freeThrowable);
+                HOST.fatal("Use was by:", t);
+                System.exit(-1);
+            }
+#endif
+        }
+
+        final protected ByteBuffer checkDoubleFree() {
+#ifndef NO_MEMCHECK
+            synchronized (this) {
+                if (m_freeThrowable != null) {
+                    System.err.println("Double free in DBBPool");
+                    System.err.println("Original free was by:");
+                    m_freeThrowable.printStackTrace();
+                    System.err.println("Current free was by:");
+                    Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+                    t.printStackTrace();
+                    HOST.fatal("Double free in DBBPool");
+                    HOST.fatal("Original free was by:", m_freeThrowable);
+                    HOST.fatal("Current free was by:", t);
+                    System.exit(-1);
+                }
+                m_freeThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
+            }
+#endif
+            return b;
+        }
+
+#ifndef NO_MEMCHECK
+        @Override
+        public void finalize() {
+            if (m_freeThrowable == null) {
+                System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
+                m_allocationThrowable.printStackTrace();
+                System.exit(-1);
+            }
+        }
+#endif
     }
 
     /**
      * Wrapper for HeapByteBuffers that allows them to pose as ByteBuffers from a pool.
-     * @author aweisberg
      *
      */
-    private static final class BBWrapperContainer extends BBContainer {
-        protected BBWrapperContainer(ByteBuffer b) {
-            super( b, 0);
+    public static final class BBWrapperContainer extends BBContainer {
+        private BBWrapperContainer(ByteBuffer b) {
+            super( b );
         }
 
         @Override
         public final void discard() {
-
+            super.discard();
         }
+    }
+
+    public static final class DBBWrapperContainer extends BBContainer {
+        private DBBWrapperContainer(ByteBuffer b) {
+            super( b );
+        }
+
+        @Override
+        public final void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            DBBPool.cleanByteBuffer(buf);
+        }
+    }
+
+    public static class MBBContainer extends BBContainer {
+        private MBBContainer(MappedByteBuffer buf) {
+            super(buf);
+        }
+
+        @Override
+        public MappedByteBuffer b() {
+            return (MappedByteBuffer)super.b();
+        }
+
+        @Override
+        public void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            DBBPool.cleanByteBuffer(buf);
+        }
+    }
+
+    public static final BBContainer dummyWrapBB(ByteBuffer b) {
+        return new BBWrapperContainer(b);
+    }
+
+    /**
+     * Static factory method to wrap a ByteBuffer in a BBContainer that is not
+     * associated with any pool
+     * @param b
+     */
+    public static final BBContainer wrapBB(ByteBuffer b) {
+        if (b.isDirect()) {
+            return new DBBWrapperContainer(b);
+        } else {
+            return new BBWrapperContainer(b);
+        }
+    }
+
+    public static final MBBContainer wrapMBB(ByteBuffer b) {
+        Preconditions.checkArgument(b.isDirect());
+        return new MBBContainer((MappedByteBuffer)b);
     }
 
     /**
@@ -92,13 +225,6 @@ public final class DBBPool {
     }
 
     private static final VoltLogger m_logger = new VoltLogger(DBBPool.class.getName());
-
-    /**
-     * Retrieve the native address of a DirectByteBuffer as a long
-     * @param b Buffer you want to retrieve the address of
-     * @return Native address of the buffer as a long.
-     */
-    public static native long getBufferAddress( ByteBuffer b );
 
     /**
      * Retrieve the CRC32C value of a DirectByteBuffer as a long
@@ -163,15 +289,6 @@ public final class DBBPool {
      */
     public static native int getMurmur3128( long value);
 
-    /**
-     * Static factory method to wrap a ByteBuffer in a BBContainer that is not
-     * associated with any pool
-     * @param b
-     */
-    public static final BBWrapperContainer wrapBB(ByteBuffer b) {
-        return new BBWrapperContainer(b);
-    }
-
     private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
             new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
 
@@ -189,16 +306,17 @@ public final class DBBPool {
 
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
-            cont = allocateDirectWithAddress(capacity);
+            cont = allocateDirect(capacity);
         }
         final BBContainer origin = cont;
-        cont = new BBContainer(origin.b, origin.address) {
+        cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
+                final ByteBuffer b = checkDoubleFree();
                 m_pooledBuffers.get(b.capacity()).offer(origin);
             }
         };
-        cont.b.clear();
+        cont.b().clear();
         return cont;
     }
 
@@ -256,39 +374,21 @@ public final class DBBPool {
         bytesAllocatedGlobally.getAndAdd(capacity);
         logAllocation(capacity);
 
-        return new DeallocatingContainer(retval, 0);
-    }
-
-    public static BBContainer allocateDirectWithAddress(final int capacity) {
-        ByteBuffer retval = null;
-        try {
-            retval = ByteBuffer.allocateDirect(capacity);
-        } catch (OutOfMemoryError e) {
-            if (e.getMessage().contains("Direct buffer memory")) {
-                clear();
-                retval = ByteBuffer.allocateDirect(capacity);
-            } else {
-                throw new Error(e);
-            }
-
-        }
-        bytesAllocatedGlobally.getAndAdd(capacity);
-        logAllocation(capacity);
-
-        return new DeallocatingContainer(retval, DBBPool.getBufferAddress(retval));
+        return new DeallocatingContainer(retval);
     }
 
     private static class DeallocatingContainer extends BBContainer {
-        private DeallocatingContainer(ByteBuffer buf, long pointer) {
-            super(buf, pointer);
+        private DeallocatingContainer(ByteBuffer buf) {
+            super(buf);
         }
 
         @Override
         public void discard() {
+            final ByteBuffer buf = checkDoubleFree();
             try {
-                bytesAllocatedGlobally.getAndAdd(-b.capacity());
-                logDeallocation(b.capacity());
-                DirectMemoryUtils.destroyDirectByteBuffer(b);
+                bytesAllocatedGlobally.getAndAdd(-buf.capacity());
+                logDeallocation(buf.capacity());
+                DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on
@@ -306,10 +406,85 @@ public final class DBBPool {
         }
     }
 
+    public static void registerUnsafeMemory(long pointer) {
+#ifdef MEMCHECK_FULL
+        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" registered " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+#endif
+    }
+#ifdef MEMCHECK_FULL
+
+    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+    private static NonBlockingHashMap<Long, Throwable> m_allocatedStuff = new NonBlockingHashMap<Long, Throwable>();
+#endif
 
     /*
      * Delete a char array that was allocated on the native heap
+     *
+     * If you want to debug issues with double free, uncomment m_deletedStuff
+     * and the code that populates it and comment out the call to nativeDeleteCharArrayMemory
+     * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
-    public static native void deleteCharArrayMemory(long pointer);
+    private static void deleteCharArrayMemory(long pointer) {
+#ifdef MEMCHECK_FULL
+        if (!m_allocatedStuff.containsKey(pointer)) {
+            Long closest = Long.MAX_VALUE;
+            for (Long l : m_allocatedStuff.keySet()) {
+                long delta = pointer - l;
+                if (delta < 0) continue;
+                if (delta < pointer - closest) closest = l;
+            }
+            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted a pointer that was never allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis());
+            t.printStackTrace();
+            if (!closest.equals(Long.MAX_VALUE)) {
+                System.err.println("Closest known allocation is:");
+                m_allocatedStuff.get(closest).printStackTrace();
+            }
+            HOST.fatal("Deleted address that was never allocated", t);
+            if (!closest.equals(Long.MAX_VALUE)) HOST.fatal("Closest known allocation was:", m_allocatedStuff.get(closest));
+            System.exit(-1);
+        }
+        m_allocatedStuff.remove(pointer);
+        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis())) != null) {
+            m_deletedStuff.get(pointer).printStackTrace();
+            Throwable t = new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice at " + System.currentTimeMillis());
+            HOST.fatal("Original:", m_deletedStuff.get(pointer));
+            HOST.fatal("Second:", t);
+            System.exit(-1);
+        }
+#else
+        nativeDeleteCharArrayMemory(pointer);
+#endif
+    }
 
+    private static native void nativeDeleteCharArrayMemory(long pointer);
+
+    public static BBContainer allocateUnsafeByteBuffer(long size) {
+        final BBContainer retcont = DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
+#ifdef MEMCHECK_FULL
+        final long pointer = retcont.address();
+        m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+#endif
+        return retcont;
+    }
+
+    /*
+     * Allocate a direct byte buffer that bypasses all GC and Java limits
+     * and requires manual memory management. The memory will not be zeroed
+     * and will come from the new/delete in C++. The pointer can be freed
+     * using deleteCharArrayMemory.
+     */
+    private static native ByteBuffer nativeAllocateUnsafeByteBuffer(long size);
+
+    /*
+     * For managed buffers runs the cleaner, if there is no cleaner,
+     * called deleteCharArrayMemory on the address
+     */
+    private static void cleanByteBuffer(ByteBuffer buf) {
+        if (buf == null) return;
+        if (!buf.isDirect()) return;
+        final DirectBuffer dbuf = (DirectBuffer) buf;
+        final Cleaner cleaner = dbuf.cleaner();
+        if (cleaner != null) cleaner.clean();
+        else deleteCharArrayMemory(dbuf.address());
+    }
 }

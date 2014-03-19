@@ -18,16 +18,14 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -37,13 +35,15 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -115,13 +115,10 @@ public abstract class SubPlanAssembler {
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(int tableAliasIdx,
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(StmtTableScan tableScan,
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        StmtTableScan tableScan = m_parsedStmt.stmtCache.get(tableAliasIdx);
-
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -140,8 +137,7 @@ public abstract class SubPlanAssembler {
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
-        CatalogMap<Index> indexes = tableScan.m_table.getIndexes();
-
+        Collection<Index> indexes = tableScan.getIndexes();
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
             if (path != null) {
@@ -162,7 +158,7 @@ public abstract class SubPlanAssembler {
      * @param filterExprs filter expressions
      * @return Naive access path
      */
-    protected AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected static AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {
@@ -226,6 +222,10 @@ public abstract class SubPlanAssembler {
      */
     protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
     {
+        if (tableScan instanceof StmtTargetTableScan == false) {
+            return null;
+        }
+
         // Track the running list of filter expressions that remain as each is either cherry-picked
         // for optimized coverage via the index keys.
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
@@ -821,7 +821,7 @@ public abstract class SubPlanAssembler {
                         if (indexedExprs == null) {
                             ColumnRef nextColRef = indexedColRefs.get(jj);
                             if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableName.equals(tableScan.m_table.getTypeName()) &&
+                                colInfo.tableName.equals(tableScan.getTableName()) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
                                 break;
                             }
@@ -1103,7 +1103,7 @@ public abstract class SubPlanAssembler {
 
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            if (tableScan.m_tableAlias.equals(tve.getTableAlias())) {
+            if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
                 return true;
             }
         }
@@ -1145,7 +1145,7 @@ public abstract class SubPlanAssembler {
             TupleValueExpression tve = (TupleValueExpression) indexableExpr;
             // Handle a simple indexed column identified by its column id.
             if ((coveringColId == tve.getColumnIndex()) &&
-                (tableScan.m_tableAlias.equals(tve.getTableAlias()))) {
+                (tableScan.getTableAlias().equals(tve.getTableAlias()))) {
                 // A column match never requires parameter binding. Return an empty list.
                 return s_reusableImmutableEmptyBinding;
             }
@@ -1162,8 +1162,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-    static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
-
+    protected static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);
 
@@ -1181,19 +1180,17 @@ public abstract class SubPlanAssembler {
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(int tableAliasIdx, AccessPath path) {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+    protected static AbstractPlanNode getAccessPlanForTable(JoinNode tableNode) {
+        StmtTableScan tableScan = tableNode.getTableScan();
+        AccessPath path = tableNode.m_currentAccessPath;
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
-        if (path.index == null)
-        {
-            scanNode = getScanAccessPlanForTable(tableAliasIdx, path.otherExprs);
-        }
-        else
-        {
-            scanNode = getIndexAccessPlanForTable(tableAliasIdx, path);
+        if (path.index == null) {
+            scanNode = getScanAccessPlanForTable(tableScan, path.otherExprs);
+        } else {
+            scanNode = getIndexAccessPlanForTable(tableScan, path);
         }
         return scanNode;
     }
@@ -1206,33 +1203,17 @@ public abstract class SubPlanAssembler {
      * @param exprs The predicate components.
      * @return A scan plan node
      */
-    protected AbstractScanPlanNode
-    getScanAccessPlanForTable(int tableAliasIdx, ArrayList<AbstractExpression> exprs)
+    private static AbstractScanPlanNode
+    getScanAccessPlanForTable(StmtTableScan tableScan, ArrayList<AbstractExpression> exprs)
     {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
         // build the scan node
-        SeqScanPlanNode scanNode = new SeqScanPlanNode();
-        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
-        scanNode.setTableScan(tableCache);
-
-        //TODO: push scan column identification into "setTargetTableName"
-        // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
-        if (scanColumns != null) {
-            scanNode.setScanColumns(scanColumns);
-        }
-
+        SeqScanPlanNode scanNode = new SeqScanPlanNode(tableScan);
         // build the predicate
         AbstractExpression localWhere = null;
-        if ((exprs != null) && (exprs.isEmpty() == false))
-        {
+        if ((exprs != null) && ! exprs.isEmpty()){
             localWhere = ExpressionUtil.combine(exprs);
             scanNode.setPredicate(localWhere);
         }
-
         return scanNode;
     }
 
@@ -1245,16 +1226,12 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected AbstractPlanNode getIndexAccessPlanForTable(int tableAliasIdx, AccessPath path)
+    protected static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
-        IndexScanPlanNode scanNode = new IndexScanPlanNode();
+        IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
         AbstractPlanNode resultNode = scanNode;
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
-        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
         // Build the list of search-keys for the index in question
@@ -1278,8 +1255,6 @@ public abstract class SubPlanAssembler {
             scanNode.addSearchKeyExpression(expr2);
         }
         // create the IndexScanNode with all its metadata
-        scanNode.setCatalogIndex(index);
-        scanNode.setKeyIterate(path.keyIterate);
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
@@ -1287,26 +1262,13 @@ public abstract class SubPlanAssembler {
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
-        //TODO: push scan column identification into "setTargetTableName"
-        // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
-        if (scanColumns != null) {
-            scanNode.setScanColumns(scanColumns);
-        }
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
-        scanNode.setTargetIndexName(index.getTypeName());
-
-        scanNode.setTableScan(tableCache);
-
         scanNode.setSkipNullPredicate();
         return resultNode;
     }
 
 
     // Generate a plan for an IN-LIST-driven index scan
-    private AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
+    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
                                                                    IndexScanPlanNode scanNode)
     {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
@@ -1326,7 +1288,7 @@ public abstract class SubPlanAssembler {
 
     // Replace the IN LIST condition in the end expression referencing the first given rhs
     // with an equality filter referencing the second given rhs.
-    private void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
+    private static void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
                                                        AbstractExpression inListRhs,
                                                        AbstractExpression equalityRhs)
     {
