@@ -17,26 +17,29 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
-import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.common.Constants;
 
 /**
  *
  * This is a single thread reader which feeds the lines after validating syntax
- * to correct Partition Processors. In caseof MP table or user supplied procedure
+ * to correct Partition Processors. In case of MP table or user supplied procedure
  * we use just one processor.
  *
  */
@@ -47,17 +50,19 @@ class CSVFileReader implements Runnable {
     static CSVLoader.CSVConfig m_config;
     static Client m_csvClient;
     static ICsvListReader m_listReader;
-    //Map of partition to Queues to put CSVLineWithMetaData
-    static Map<Long, BlockingQueue<CSVLineWithMetaData>> m_processorQueues;
-    // This is the last thing put on Queue so that processors will detect the end.
-    static CSVLineWithMetaData m_endOfData;
     static boolean m_errored = false;
     long m_parsingTime = 0;
     private static final Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
     private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
+    private static String m_insertProcedure = "";
+    static int m_columnCnt;
+    //Types of columns
+    static List<VoltType> m_typeList = new ArrayList<VoltType>();
+    final AtomicLong m_processedCount = new AtomicLong(0);
+    final AtomicLong m_acknowledgedCount = new AtomicLong(0);
+    final int m_reportEveryNRows = 10000;
 
     static {
-        m_blankValues.put(VoltType.NUMERIC, "0");
         m_blankValues.put(VoltType.TINYINT, "0");
         m_blankValues.put(VoltType.SMALLINT, "0");
         m_blankValues.put(VoltType.INTEGER, "0");
@@ -65,11 +70,74 @@ class CSVFileReader implements Runnable {
         m_blankValues.put(VoltType.FLOAT, "0.0");
         m_blankValues.put(VoltType.TIMESTAMP, null);
         m_blankValues.put(VoltType.STRING, "");
-        m_blankValues.put(VoltType.DECIMAL, "0");
+        m_blankValues.put(VoltType.DECIMAL, "0.0");
         m_blankValues.put(VoltType.VARBINARY, "");
     }
     //Errors we keep track only upto maxerrors
     final static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+
+    public static boolean initializeReader(CSVLoader.CSVConfig config, Client csvClient, ICsvListReader reader)
+            throws IOException, ProcCallException, InterruptedException {
+        VoltTable procInfo;
+        m_config = config;
+        m_csvClient = csvClient;
+        m_listReader = reader;
+
+        // -p mode where user specified a procedure name could be standard CRUD or written from scratch.
+        boolean isProcExist = false;
+        m_insertProcedure = m_config.procedure;
+        procInfo = csvClient.callProcedure("@SystemCatalog",
+                "PROCEDURECOLUMNS").getResults()[0];
+        while (procInfo.advanceRow()) {
+            if (m_insertProcedure.matches((String) procInfo.get(
+                    "PROCEDURE_NAME", VoltType.STRING))) {
+                m_columnCnt++;
+                isProcExist = true;
+                String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
+                m_typeList.add(VoltType.typeFromString(typeStr));
+            }
+        }
+        if (isProcExist == false) {
+            //csvloader will exit
+            m_log.error("No matching insert procedure available");
+            return false;
+        }
+        return true;
+    }
+
+    //Callback for single row procedure invoke called for rows in failed batch.
+    public class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
+        final CSVLineWithMetaData m_csvLine;
+
+        public PartitionSingleExecuteProcedureCallback(CSVLineWithMetaData csvLine) {
+            m_csvLine = csvLine;
+        }
+
+        //one insert at a time callback
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            byte status = response.getStatus();
+            if (status != ClientResponse.SUCCESS) {
+                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                    System.out.println("Fatal Response from server for: " + response.getStatusString()
+                            + " for: " + m_csvLine.rawLine.toString());
+                    System.exit(1);
+                }
+                String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
+                if (synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
+                    m_errored = true;
+                    return;
+                }
+                m_log.error(response.getStatusString());
+                return;
+            }
+            long currentCount = m_acknowledgedCount.incrementAndGet();
+
+            if (currentCount % m_reportEveryNRows == 0) {
+                m_log.info("Inserted " + currentCount + " rows");
+            }
+        }
+    }
 
     @Override
     public void run() {
@@ -83,10 +151,6 @@ class CSVFileReader implements Runnable {
             } catch (InterruptedException ex) {
                 ;
             }
-        }
-        if (sleptTimes >= 120 && CSVPartitionProcessor.m_isMP) {
-            m_log.info("Unable to retrieve partition information from cluster. "
-                    + "Falling back to single row insertions; CSV loading performance will be degraded.");
         }
         m_log.debug("Client Initialization Done.");
 
@@ -112,12 +176,12 @@ class CSVFileReader implements Runnable {
                     break;
                 }
                 m_totalRowCount.incrementAndGet();
+                int currLineNumber = m_listReader.getLineNumber();
 
                 String[] correctedLine = lineList.toArray(new String[lineList.size()]);
 
                 String lineCheckResult;
-                if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                        CSVPartitionProcessor.m_columnCnt)) != null) {
+                if ((lineCheckResult = checkparams_trimspace(correctedLine, m_columnCnt)) != null) {
                     String[] info = {lineList.toString(), lineCheckResult};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                         m_errored = true;
@@ -127,33 +191,21 @@ class CSVFileReader implements Runnable {
                 }
 
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
-                        m_listReader.getLineNumber());
-                long partitionId = 0;
-                //Find partiton to send this line to and put on correct partition processor queue.
-                //If Parser got error and we have reached limit this loop will exit and no more elements
-                //will be pushed to queue. Queues will break out as well after seeing endOfData
-                if (!CSVPartitionProcessor.m_isMP && !m_config.useSuppliedProcedure) {
-                    partitionId =
-                            clientImpl.getPartitionForParameter(
-                            CSVPartitionProcessor.m_partitionColumnType.getValue(),
-                            lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
-                }
-                BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
-                if (q == null) {
-                    //We have not known about this partition do something.
-                    // We could always bail out to the single row insert and trust the cluster
-                    // to get this row to the right place.
-                    m_log.warn("Unknown or New partition detected possibly because of change in topology.");
-                    String[] info = {lineList.toString(), "Topology changed."};
-                    if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
-                        m_errored = true;
-                        break;
+                        currLineNumber);
+
+                try {
+                    PartitionSingleExecuteProcedureCallback cbmt =
+                            new PartitionSingleExecuteProcedureCallback(lineData);
+                    if (m_csvClient.callProcedure(cbmt, m_insertProcedure, (Object[]) correctedLine)) {
+                        m_processedCount.incrementAndGet();
+                    } else {
+                        m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
+                        System.exit(1);
                     }
-                    continue;
-                }
-                if (!q.offer(lineData)) {
-                    m_log.debug("Failed to insert linedata in processor, waiting and doing put.");
-                    q.put(lineData);
+                } catch (IOException ex) {
+                    String[] info = {lineList.toString(), ex.toString()};
+                    m_errored = synchronizeErrorInfo(currLineNumber, info);
+                    return;
                 }
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
@@ -166,9 +218,6 @@ class CSVFileReader implements Runnable {
             } catch (IOException ex) {
                 m_log.error("Failed to read CSV line from file: " + ex);
                 break;
-            } catch (InterruptedException ex) {
-                m_log.error("Failed to read CSV line from file: " + ex);
-                break;
             }
         }
 
@@ -176,36 +225,6 @@ class CSVFileReader implements Runnable {
         if (m_errorInfo.size() >= m_config.maxerrors) {
             m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
                     + m_config.maxerrors);
-        }
-
-        //Close the reader and push m_endOfData lines to indicate Partition Processor to wind down.
-        try {
-            m_listReader.close();
-        } catch (Exception ex) {
-            m_log.error("Error closing reader: " + ex);
-        } finally {
-            for (BlockingQueue<CSVLineWithMetaData> q : m_processorQueues.values()) {
-                try {
-                    q.put(m_endOfData);
-                } catch (InterruptedException ex) {
-                    m_log.error("Failed to add endOfData for Partition Processor. " + ex);
-                }
-            }
-            m_log.debug("Rows Queued by Reader: " + m_totalRowCount.get());
-        }
-
-        //Now wait for processors to see endOfData and count down. After that drain to finish all callbacks
-        try {
-            m_log.debug("Waiting for partition processors to finish.");
-            CSVPartitionProcessor.m_processor_cdl.await();
-            m_csvClient.drain();
-            m_log.debug("Partition Processors Done.");
-        } catch (InterruptedException ex) {
-            m_log.warn("Stopped processing because of connection error. "
-                    + "A report will be generated with what we processed so far. Error: " + ex);
-        } catch (NoConnectionsException ex) {
-            m_log.warn("Stopped processing because of connection error. "
-                    + "A report will be generated with what we processed so far. Error: " + ex);
         }
     }
 
@@ -240,7 +259,7 @@ class CSVFileReader implements Runnable {
                 if (m_config.blank.equalsIgnoreCase("error")) {
                     return "Error: blank item";
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    slot[i] = m_blankValues.get(CSVPartitionProcessor.m_typeList.get(i));
+                    slot[i] = m_blankValues.get(m_typeList.get(i));
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default

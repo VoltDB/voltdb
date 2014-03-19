@@ -154,15 +154,15 @@ std::string NValue::debug() const {
     case VALUE_TYPE_VARCHAR:
         ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
     case VALUE_TYPE_VARBINARY:
         ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "-bin[@" << addr << "]";
         break;
     case VALUE_TYPE_DECIMAL:

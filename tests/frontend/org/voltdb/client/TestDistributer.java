@@ -447,13 +447,26 @@ public class TestDistributer extends TestCase {
         Thread.sleep(3000);
         assertTrue(volt.handler.gotPing);
 
+        //Check that we can send a ping and get a response ourselves
+        SyncCallback sc = new SyncCallback();
+        dist.queue(new ProcedureInvocation(88, "@Ping"), sc, true, 0);
+        sc.waitForResponse();
+        assertEquals(ClientResponse.SUCCESS, sc.getResponse().getStatus());
+
         // tell the mock voltdb to stop responding
         volt.handler.sendResponses.set(false);
 
-        // this call should hang until the connection is closed,
-        // then will be called with CONNECTION_LOST
-        ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-        dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+        try {
+            // this call should hang until the connection is closed,
+            // then will be called with CONNECTION_LOST
+            ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
+            dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+        } catch (NoConnectionsException e) {
+            //Ok this is a little odd scheduling wise, would expect to at least be able to submit
+            //the transaction before reaching a multi-second timeout, but such is life
+            //The callback won't be invoked so count the latch down for it
+            latch.countDown();
+        }
 
         // wait for both callbacks
         latch.await();
