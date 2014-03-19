@@ -17,9 +17,9 @@
 
 package org.voltdb;
 
-import static org.voltdb.ClientInterface.AUTH_HANDSHAKE;
-import static org.voltdb.ClientInterface.AUTH_HANDSHAKE_VERSION;
-import static org.voltdb.ClientInterface.AUTH_SERVICE_NAME;
+import static org.voltdb.common.Constants.AUTH_HANDSHAKE;
+import static org.voltdb.common.Constants.AUTH_HANDSHAKE_VERSION;
+import static org.voltdb.common.Constants.AUTH_SERVICE_NAME;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -75,7 +75,8 @@ public class AuthSystem {
     /**
      * JASS Login configuration entry designator
      */
-    public static final String VOLTDB_LOGIN_CONFIG_ENTRY_NAME = "VoltDBService";
+    public static final String VOLTDB_SERVICE_LOGIN_MODULE =
+            System.getProperty("VOLTDB_SERVICE_LOGIN_MODULE", "VoltDBService");
 
     /**
      * Authentication provider enumeration
@@ -118,7 +119,7 @@ public class AuthSystem {
         public static AuthProvider fromProvider(String provider) {
             AuthProvider ap = providerMap.get(provider);
             if (ap == null) {
-                throw new IllegalArgumentException("No providere mapping for " + provider);
+                throw new IllegalArgumentException("No provider mapping for " + provider);
             }
             return ap;
         }
@@ -411,7 +412,7 @@ public class AuthSystem {
         m_authProvider = AuthProvider.fromProvider(db.getSecurityprovider());
         if (m_authProvider == AuthProvider.KERBEROS) {
             try {
-                loginContext = new LoginContext(VOLTDB_LOGIN_CONFIG_ENTRY_NAME);
+                loginContext = new LoginContext(VOLTDB_SERVICE_LOGIN_MODULE);
             } catch (LoginException|SecurityException ex) {
                 VoltDB.crashGlobalVoltDB(
                         "Cannot initialize JAAS LoginContext", true, ex);
