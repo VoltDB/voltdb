@@ -867,7 +867,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 clientData = cihm.findHandle(response.getClientInterfaceHandle());
             }
             if (clientData == null) {
-                System.out.println("Didn't find the client data, what hte ever locing fuc!");
                 return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
             }
 
@@ -1148,23 +1147,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
-        new Thread("Reported") {
-            @Override
-            public void run() {
-                while (true) {
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                    System.out.println("****");
-                    for (ClientInterfaceHandleManager cihm : m_cihm.values()) {
-                        System.out.println(cihm.getOutstandingTxns());
-                    }
-                }
-            }
-        }.start();
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {

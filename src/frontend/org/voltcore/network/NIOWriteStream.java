@@ -204,11 +204,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_port.queueTask(new Runnable() {
             @Override
             public void run() {
-                synchronized (NIOWriteStream.this) {
-                    updateLastPendingWriteTimeAndQueueBackpressure();
-                    m_queuedWrites.offer(ds);
-                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
-                }
+                updateLastPendingWriteTimeAndQueueBackpressure();
+                m_queuedWrites.offer(ds);
+                m_port.setInterests( SelectionKey.OP_WRITE, 0);
             }
         });
     }

@@ -64,6 +64,7 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.SocketOptions;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
@@ -74,6 +75,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -261,10 +263,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             }
 
             m_shouldStop = true;
-            if (!m_alreadyStopping) {
-                m_ih.stopping(this);
-                m_alreadyStopping = true;
-            }
+            m_ih.stopping(this);
 
             /*
              * Allow the write queue to drain if possible
@@ -292,7 +291,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         }
     }
 
-    private boolean m_alreadyStopping = false;
     private boolean m_alreadyStopped = false;
 
     /**
@@ -328,16 +326,10 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     private void p_shutdown() {
         try {
-            if (!m_alreadyStopping) {
-                m_ih.stopping(this);
-                m_alreadyStopping = true;
-            }
+            m_ih.stopping(this);
         } finally {
             try {
-                if (!m_alreadyStopped) {
-                    m_ih.stopped(this);
-                    m_alreadyStopped = true;
-                }
+                m_ih.stopped(this);
             } finally {
                 try {
                     m_readStream.shutdown();
@@ -391,7 +383,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             return retval;
     }
 
-    @Override
     public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override

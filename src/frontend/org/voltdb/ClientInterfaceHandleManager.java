@@ -303,7 +303,7 @@ public class ClientInterfaceHandleManager
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
                 // lost txn, do something eventually
-                tmLog.error("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
+                tmLog.debug("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
                         " for partition: " + partitionId + " while searching for handle " +
                         ciHandle);
                 ClientResponseImpl errorResponse =
@@ -321,7 +321,7 @@ public class ClientInterfaceHandleManager
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
-                tmLog.error("CI clientData lookup missing handle: " + ciHandle
+                tmLog.debug("CI clientData lookup missing handle: " + ciHandle
                         + ". Next expected client data handle is: " + inFlight.m_ciHandle);
                 perPartDeque.addFirst(inFlight);
                 break;
@@ -332,7 +332,7 @@ public class ClientInterfaceHandleManager
                 return inFlight;
             }
         }
-        tmLog.error("Unable to find Client data for client interface handle: " + ciHandle);
+        tmLog.debug("Unable to find Client data for client interface handle: " + ciHandle);
         return null;
     }
 
