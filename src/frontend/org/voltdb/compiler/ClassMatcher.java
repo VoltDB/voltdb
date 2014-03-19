@@ -97,7 +97,7 @@ public class ClassMatcher {
                 return ClassNameMatchStatus.NO_WILDCARD_MATCH;
             }
         }
-            
+
     }
 
     /**

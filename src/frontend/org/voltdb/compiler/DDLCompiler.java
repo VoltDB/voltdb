@@ -769,7 +769,7 @@ public class DDLCompiler {
                         "IMPORT CLASS no match for wildcarded class: '%s'",
                         classNameStr), ddlStatement.lineNo);
             }
-            
+
             return true;
         }
 
