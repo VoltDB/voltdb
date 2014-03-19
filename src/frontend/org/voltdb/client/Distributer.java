@@ -645,6 +645,7 @@ class Distributer {
         @Override
         public void stopping(Connection c) {
             super.stopping(c);
+            System.err.println("Running stopping");
             m_isConnected = false;
             //Prevent queueing of new work to this connection
             synchronized (Distributer.this) {

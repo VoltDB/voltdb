@@ -264,11 +264,15 @@ public class JDBC4ClientConnection implements Closeable {
         ClientImpl currentClient = this.getClient();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, TimeUnit.SECONDS, parameters);
+            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, 0, TimeUnit.SECONDS, parameters);
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println("Failed response " + response.getStatusString());
+            }
             this.statistics.update(procedure, response);
             return response;
         }
         catch (ProcCallException pce) {
+            pce.printStackTrace();
             this.statistics.update(procedure, System.currentTimeMillis() - start, false);
             throw pce;
         }
@@ -313,7 +317,9 @@ public class JDBC4ClientConnection implements Closeable {
          */
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println("Tracking callback failed response " + response.getStatusString());
+            }
             this.Owner.getStatistics().update(this.Procedure, response);
             if (this.UserCallback != null)
                 this.UserCallback.clientCallback(response);
