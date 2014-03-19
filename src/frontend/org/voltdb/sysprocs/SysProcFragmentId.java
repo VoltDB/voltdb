@@ -160,13 +160,16 @@ public class SysProcFragmentId
     public static final long PF_systemInformationOverviewAggregate = 193;
 
     // @Update application catalog
-    public static final long PF_updateCatalog = 210;
-    public static final long PF_updateCatalogAggregate = 211;
+    public static final long PF_updateCatalogSync = 210;
+    public static final long PF_updateCatalogSyncAggregate = 211;
+    public static final long PF_updateCatalog = 212;
+    public static final long PF_updateCatalogAggregate = 213;
 
     public static boolean isCatalogUpdateFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
-        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
+        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate ||
+                fragId == PF_updateCatalogSync || fragId == PF_updateCatalogSyncAggregate);
     }
 
     // @BalancePartitions
