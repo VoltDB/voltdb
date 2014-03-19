@@ -759,7 +759,6 @@ class Distributer {
 
                 m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1, callBk.ignoreBackpressure);
             }
-            m_callbacks.clear();
         }
 
         @Override
