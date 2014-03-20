@@ -285,6 +285,8 @@ public interface Client {
      * <p>Write a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.</p>
      *
+     * <p>The format of this output is subject to change between versions</p>
+     *
      * <p>Format:
      * <ol>
      * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
@@ -294,6 +296,9 @@ public interface Client {
      * <li>Max measure round trip latency in ms.</li>
      * <li>95-percentile round trip latency estimate in ms.</li>
      * <li>99-percentile round trip latency estimate in ms.</li>
+     * <li>99.9-percentile round trip latency estimate in ms.</li>
+     * <li>99.99-percentile round trip latency estimate in ms.</li>
+     * <li>99.999-percentile round trip latency estimate in ms.</li>
      * </ol></p>
      *
      * @param stats {@link ClientStats} instance with relevant stats.
