@@ -1566,7 +1566,7 @@ class NValue {
                 char msg[1024];
                 std::string inputValue;
                 if (charLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
-                    const char * end = getIthCharPosition(ptr, charLength, FULL_STRING_IN_MESSAGE_THRESHOLD);
+                    const char * end = getIthCharPosition(ptr, charLength, FULL_STRING_IN_MESSAGE_THRESHOLD+1);
                     int32_t numBytes = (int32_t)(end - ptr);
                     inputValue = std::string(ptr, numBytes) + std::string("...");
                 } else {

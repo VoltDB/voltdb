@@ -338,6 +338,17 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    static public void validateTableOfScalarVarchar(VoltTable vt, String[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            assertEquals(expected[i], vt.getString(0));
+        }
+    }
+
+
     // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
     // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE

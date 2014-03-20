@@ -419,9 +419,9 @@ TEST_F(TableAndIndexTest, BigTest) {
     }
     customerTempTable->deleteAllTuplesNonVirtual(true);
 
-    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
-        (*i).free();
-    }
+//    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
+//        (*i).free();
+//    }
 }
 
 int main() {
