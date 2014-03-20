@@ -178,7 +178,7 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit): ValueFactory::getNullValue());
     int32_t percentage = 0;
     if (hasTupleLimit && tupleLimit > 0) {
-        percentage = static_cast<int32_t> (ceil(tupleCount * 100.0 / tupleLimit));
+        percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
     }
     tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
 }
