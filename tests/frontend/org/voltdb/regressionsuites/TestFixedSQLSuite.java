@@ -1424,10 +1424,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testENG5637() throws IOException, ProcCallException {
         System.out.println("STARTING testing error message......");
+
+        if (isHSQL()) {
+            return;
+        }
         Client client = getClient();
-
         int THRESHOLD = 100;
-
         // Test Varchar
 
         // Test AdHoc
