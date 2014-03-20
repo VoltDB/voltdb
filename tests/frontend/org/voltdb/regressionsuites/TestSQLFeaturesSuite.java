@@ -552,15 +552,15 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {0});
 
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "CAPPED0", 0, 0);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED0", 0, 0);
 
         // Test max row 2
         vt = client.callProcedure("CAPPED2.insert", 0, 0, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimit(client, "CAPPED2", 2, 50);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 50);
         vt = client.callProcedure("CAPPED2.insert", 1, 1, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimit(client, "CAPPED2", 2, 100);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
         e = null;
         try {
@@ -576,24 +576,24 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {2});
 
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "CAPPED2", 2, 100);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
         // Test @Statistics TABLE for normal table
         vt = client.callProcedure("NOCAPPED.insert", 0, 0, 0).getResults()[0];
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "NOCAPPED", VoltType.NULL_INTEGER, 0);
+        validStatisticsForTableLimitAndPercentage(client, "NOCAPPED", VoltType.NULL_INTEGER, 0);
 
 
         // Test percentage with round up
         vt = client.callProcedure("CAPPED3.insert", 0, 0, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimit(client, "CAPPED3", 3, 34);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 34);
         vt = client.callProcedure("CAPPED3.insert", 1, 1, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimit(client, "CAPPED3", 3, 67);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 67);
         vt = client.callProcedure("CAPPED3.insert", 2, 2, 2).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimit(client, "CAPPED3", 3, 100);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 100);
 
         e = null;
         try {
