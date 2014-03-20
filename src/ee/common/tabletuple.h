@@ -201,12 +201,11 @@ public:
                 if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
                     !columnInfo->inlined)
                 {
-                    if (!getNValue(i).isNull())
+                    const NValue val = getNValue(i);
+                    if (!val.isNull())
                     {
-                        bytes +=
-                            StringRef::
-                            computeStringMemoryUsed((ValuePeeker::
-                                                     peekObjectLength_withoutNull(getNValue(i))));
+                        bytes += StringRef::computeStringMemoryUsed(
+                                (ValuePeeker::peekObjectLength_withoutNull(val)));
                     }
                 }
             }
