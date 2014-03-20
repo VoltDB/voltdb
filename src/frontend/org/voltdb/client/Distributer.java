@@ -43,7 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
-import com.google_voltpatches.common.collect.ImmutableList;
 import jsr166y.ThreadLocalRandom;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -63,6 +62,7 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -289,13 +289,9 @@ class Distributer {
                         final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
                         if (deltaNanos > cb.procedureTimeoutNanos) {
 
-                            // make the minimum timeoutMS for certain long running system procedures
-                            //  higher than the default 2m.
-                            // you can still set the default timeoutMS higher than even this value
-                            boolean isLongOp = false;
-                            // this form allows you to list ops to treat specially
-                            isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
-                            isLongOp |= cb.name.equals("@SnapshotSave");
+                            //For expected long operations don't use the default timeout
+                            //unless it is > MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS
+                            final boolean isLongOp = isLongOp(cb.name);
                             if (isLongOp && (deltaNanos < TimeUnit.MILLISECONDS.toNanos(MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS))) {
                                 continue;
                             }
@@ -308,6 +304,22 @@ class Distributer {
                 t.printStackTrace();
             }
         }
+    }
+
+    /*
+     * Check if the proc name is a procedure that is expected to run long
+     * Make the minimum timeoutMS for certain long running system procedures
+     * higher than the default 2m.
+     * you can still set the default timeoutMS higher than even this value
+     *
+     */
+    private static boolean isLongOp(String procName) {
+        if (procName.startsWith("@")) {
+            if (procName.equals("@UpdateApplicationCatalog") || procName.equals("@SnapshotSave")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     class CallbackBookeeping {
@@ -365,19 +377,17 @@ class Distributer {
              * the rate limiter which can block. If it blocks we can still get a timeout
              * exception to give prompt timeouts
              */
-            if (!ignoreBackpressure) {
-                try {
-                    afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                            nowNanos, timeoutNanos, ignoreBackpressure);
-                } catch (TimeoutException e) {
-                    /*
-                     * It's possible we need to timeout because it took too long to get
-                     * the transaction out on the wire due to max outstanding
-                     */
-                    final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
-                    invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
-                    return;
-                }
+            try {
+                afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                        nowNanos, timeoutNanos, ignoreBackpressure);
+            } catch (TimeoutException e) {
+                /*
+                 * It's possible we need to timeout because it took too long to get
+                 * the transaction out on the wire due to max outstanding
+                 */
+                final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
+                invokeCallbackWithTimeout(callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
+                return;
             }
 
             assert(m_callbacks.containsKey(handle) == false);
@@ -395,7 +405,8 @@ class Distributer {
             final long timeoutRemaining = timeoutTime - afterRateLimitNanos;
 
             //Schedule an individual timeout if necessary
-            if (timeoutNanos < TimeUnit.SECONDS.toNanos(1)) {
+            //If it is a long op, don't bother scheduling a discrete timeout
+            if (timeoutNanos < TimeUnit.SECONDS.toNanos(1) && !isLongOp(name)) {
                 submitDiscreteTimeoutTask(handle, Math.max(0, timeoutRemaining));
             }
 
@@ -733,7 +744,6 @@ class Distributer {
 
                 m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1, callBk.ignoreBackpressure);
             }
-            m_callbacks.clear();
         }
 
         @Override

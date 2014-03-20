@@ -120,7 +120,7 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     // alignment doesn't seem to help?
     uint64_t crc64bit = crc;
     for (size_t i = 0; i < length / sizeof(uint64_t); i++) {
-        crc64bit = _mm_crc32_u64(crc64bit, *(uint64_t*) p_buf);
+        crc64bit = _mm_crc32_u64(crc64bit, *(const uint64_t*) p_buf);
         p_buf += sizeof(uint64_t);
     }
 
@@ -137,19 +137,19 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
         case 7:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
         case 6:
-            crc32bit = _mm_crc32_u16(crc32bit, *(uint16_t*) p_buf);
+            crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             p_buf += 2;
         // case 5 is below: 4 + 1
         case 4:
-            crc32bit = _mm_crc32_u32(crc32bit, *(uint32_t*) p_buf);
+            crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             break;
         case 3:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
         case 2:
-            crc32bit = _mm_crc32_u16(crc32bit, *(uint16_t*) p_buf);
+            crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             break;
         case 5:
-            crc32bit = _mm_crc32_u32(crc32bit, *(uint32_t*) p_buf);
+            crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             p_buf += 4;
         case 1:
             crc32bit = _mm_crc32_u8(crc32bit, *p_buf);

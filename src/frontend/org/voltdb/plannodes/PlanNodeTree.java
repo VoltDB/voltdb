@@ -110,11 +110,13 @@ public class PlanNodeTree implements JSONString {
         }
         stringer.endArray(); //end entries
 
-        stringer.key(Members.PARAMETERS.name()).array();
-        for (Pair< Integer, VoltType > parameter : m_parameters) {
-            stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
+        if (m_parameters.size() > 0) {
+            stringer.key(Members.PARAMETERS.name()).array();
+            for (Pair< Integer, VoltType > parameter : m_parameters) {
+                stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
+            }
+            stringer.endArray();
         }
-        stringer.endArray();
     }
 
     public List<AbstractPlanNode> getNodeList() {

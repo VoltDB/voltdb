@@ -779,31 +779,31 @@ TEST_F(NValueTest, TestCastToString) {
 
 
     NValue bigIntCastToString = ValueFactory::castAsString(bigInt);
-    std::string bigIntPeekedString = ValuePeeker::peekStringCopy(bigIntCastToString);
+    std::string bigIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(bigIntCastToString);
     EXPECT_EQ(strcmp(bigIntPeekedString.c_str(), "-64"), 0);
 
     NValue integerCastToString = ValueFactory::castAsString(integer);
-    std::string integerPeekedString = ValuePeeker::peekStringCopy(integerCastToString);
+    std::string integerPeekedString = ValuePeeker::peekStringCopy_withoutNull(integerCastToString);
     EXPECT_EQ(strcmp(integerPeekedString.c_str(), "120"), 0);
 
     NValue smallIntCastToString = ValueFactory::castAsString(smallInt);
-    std::string smallIntPeekedString = ValuePeeker::peekStringCopy(smallIntCastToString);
+    std::string smallIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(smallIntCastToString);
     EXPECT_EQ(strcmp(smallIntPeekedString.c_str(), "120"), 0);
 
     NValue tinyIntCastToString = ValueFactory::castAsString(tinyInt);
-    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy(tinyIntCastToString);
+    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(tinyIntCastToString);
     EXPECT_EQ(strcmp(tinyIntPeekedString.c_str(), "120"), 0);
 
     NValue doubleCastToString = ValueFactory::castAsString(doubleValue);
-    std::string doublePeekedString = ValuePeeker::peekStringCopy(doubleCastToString);
+    std::string doublePeekedString = ValuePeeker::peekStringCopy_withoutNull(doubleCastToString);
     EXPECT_EQ(strcmp(doublePeekedString.c_str(), "-3.2E1"), 0);
 
     NValue decimalCastToString = ValueFactory::castAsString(decimalValue);
-    std::string decimalPeekedString = ValuePeeker::peekStringCopy(decimalCastToString);
+    std::string decimalPeekedString = ValuePeeker::peekStringCopy_withoutNull(decimalCastToString);
     EXPECT_EQ(strcmp(decimalPeekedString.c_str(), "10.220000000000"), 0);
 
     NValue stringCastToString = ValueFactory::castAsString(stringValue);
-    std::string stringPeekedString = ValuePeeker::peekStringCopy(stringCastToString);
+    std::string stringPeekedString = ValuePeeker::peekStringCopy_withoutNull(stringCastToString);
     EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
@@ -1820,21 +1820,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // tinyint
     nv = ValueFactory::getTinyIntValue(-50);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-50, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(50);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(50, sin.readLong());
     sin.unread(out.position());
@@ -1842,21 +1842,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // smallint
     nv = ValueFactory::getSmallIntValue(-128);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-128, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(128);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
@@ -1864,21 +1864,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // int
     nv = ValueFactory::getIntegerValue(-4999999);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(128);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
@@ -1886,21 +1886,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // bigint
     nv = ValueFactory::getBigIntValue(-4999999);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getBigIntValue(0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getBigIntValue(128);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
@@ -1908,7 +1908,7 @@ TEST_F(NValueTest, SerializeToExport)
 
     // timestamp
     nv = ValueFactory::getTimestampValue(99999999);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(99999999, sin.readLong());
     sin.unread(out.position());
@@ -1916,21 +1916,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // double
     nv = ValueFactory::getDoubleValue(-5.5555);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-5.5555, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getDoubleValue(0.0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0.0, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getDoubleValue(128.256);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128.256, sin.readDouble());
     sin.unread(out.position());
@@ -1938,7 +1938,7 @@ TEST_F(NValueTest, SerializeToExport)
 
     // varchar
     nv = ValueFactory::getStringValue("ABCDEFabcdef");
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     nv.free();
     EXPECT_EQ(12 + 4, out.position());         // chardata plus prefix
     EXPECT_EQ(12, sin.readInt()); // 32 bit length prefix
@@ -1959,7 +1959,7 @@ TEST_F(NValueTest, SerializeToExport)
 
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(24 + 4, out.position());
     EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('-', sin.readChar());
@@ -2123,9 +2123,9 @@ TEST_F(NValueTest, TestSubstring)
                 EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
                 EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
 
-                std::string leftString = ValuePeeker::peekStringCopy(leftStringValue);
-                std::string midString = ValuePeeker::peekStringCopy(midStringValue);
-                std::string rightString = ValuePeeker::peekStringCopy(rightExactStringValue);
+                std::string leftString = ValuePeeker::peekStringCopy_withoutNull(leftStringValue);
+                std::string midString = ValuePeeker::peekStringCopy_withoutNull(midStringValue);
+                std::string rightString = ValuePeeker::peekStringCopy_withoutNull(rightExactStringValue);
                 std::string recombined = leftString + midString + rightString;
                 EXPECT_TRUE(testDatum.compare(recombined) == 0);
 
@@ -2847,7 +2847,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     try {
         NValue ts = ValueFactory::getTimestampValue(base);
         NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-        peekString = ValuePeeker::peekStringCopy(str);
+        peekString = ValuePeeker::peekStringCopy_withoutNull(str);
         long roundtrip = NValue::parseTimestampString(peekString.c_str());
         EXPECT_EQ(base, roundtrip);
         if (base != roundtrip) {
@@ -2978,7 +2978,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         try {
             NValue ts = ValueFactory::getTimestampValue(jj);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy(str);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
             long roundtrip = NValue::parseTimestampString(peekString.c_str());
             EXPECT_EQ(jj, roundtrip);
             if (jj != roundtrip) {

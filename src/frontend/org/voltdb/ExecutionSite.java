@@ -881,9 +881,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             initiateRejoin(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.REQUEST_RESPONSE) {
             m_rejoinSnapshotTxnId = rm.getSnapshotTxnId();
-            if (m_rejoinTaskLog != null) {
-                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
-            }
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
