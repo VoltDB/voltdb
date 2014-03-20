@@ -19,11 +19,10 @@ package org.voltdb.compiler;
 
 import java.io.File;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
 /**
  * Functionality to build a list of every class that's in
@@ -42,7 +41,7 @@ public class ClassMatcher {
     /** List of .class files found in the classpath */
     String m_classList = null;
     /** List of matches found after applying patterns */
-    Set<String> m_classNameMatches = new TreeSet<String>();
+    SortedSet<String> m_classNameMatches = new TreeSet<String>();
 
     /**
      * Add a pattern that matches classes from the classpath
@@ -84,7 +83,8 @@ public class ClassMatcher {
             if (match.contains("$")) {
                 continue;
             }
-            matchFound |= m_classNameMatches.add(match);
+            matchFound = true;
+            m_classNameMatches.add(match);
         }
         if (matchFound) {
             return ClassNameMatchStatus.MATCH_FOUND;
@@ -101,9 +101,9 @@ public class ClassMatcher {
     }
 
     /**
-     * Return the list of matched classnames in lexographical order.
+     * Return the set of matched classnames in lexographical order.
      */
-    public Set<String> getMatchedClassList() {
+    public SortedSet<String> getMatchedClassList() {
         return m_classNameMatches;
     }
 

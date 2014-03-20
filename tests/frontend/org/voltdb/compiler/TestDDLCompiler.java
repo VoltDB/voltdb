@@ -256,6 +256,7 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkImportValidity("*org"));
         assertTrue(checkImportValidity("org.**.RealVoltDB"));
         assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
+        assertTrue(checkImportValidity("org.voltdb.RealVoltDB"));
     }
 
     boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
@@ -291,9 +292,11 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.**", true));
         assertTrue(checkMultiDDLImportValidity("org.woltdb.*", "org.voltdb.V**", true));
         assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.*", true));
-        assertFalse(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb", false));
+        assertFalse(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.", false));
         assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.*", false));
         assertFalse(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.woltdb", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.RealVoltDB", false));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.voltdb.RealVoltDB", false));
     }
 
     public void testIndexedMinMaxViews() {

@@ -976,7 +976,7 @@ public class VoltCompiler {
         }
 
         // add extra classes from the DDL
-        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[voltDdlTracker.m_extraClassses.size()]);
+        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         addExtraClasses(jarOutput);
     }
 
