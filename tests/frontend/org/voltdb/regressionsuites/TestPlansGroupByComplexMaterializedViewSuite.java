@@ -837,7 +837,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             client.callProcedure("R6.delete", 0);
             fail();
         } catch (Exception exc) {
-            assertTrue(exc.toString().contains("Object exceeds specified size"));
+            assertTrue(exc.toString().contains("The size 2050 of the value"));
+            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR[\"2048\"] column"));
         }
     }
 
