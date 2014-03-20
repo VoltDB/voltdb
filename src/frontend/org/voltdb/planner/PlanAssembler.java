@@ -597,7 +597,7 @@ public class PlanAssembler {
         // make sure we got a winner
         if (compiledPlan == null) {
             if (m_recentErrorMsg == null) {
-                m_recentErrorMsg = "Unable to plan for subaquery statement. Error unknown.";
+                m_recentErrorMsg = "Unable to plan for subquery statement. Error unknown.";
             }
             return null;
         }
