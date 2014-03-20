@@ -158,7 +158,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     columnInfo->type = static_cast<char>(type);
     columnInfo->allowNull = (char)(allowNull ? 1 : 0);
     columnInfo->length = length;
-    if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
+    if (type == VALUE_TYPE_VARBINARY) {
         if (length < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
             if (length == 0) {
                 throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
@@ -177,6 +177,26 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
             columnInfo->inlined = false;
             setUninlinedObjectColumnInfoIndex(uninlinedObjectColumnIndex++, index);
         }
+    } else if (type == VALUE_TYPE_VARCHAR)  {
+        if (length * 4 < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
+            if (length == 0) {
+                throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
+            }
+            /*
+             * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
+             */
+            columnInfo->inlined = true;
+            // One byte to store the size
+            offset = static_cast<uint32_t>(length * 4 + SHORT_OBJECT_LENGTHLENGTH);
+        } else {
+            /*
+             * Set the length to the size of a String pointer since it won't be inlined.
+             */
+            offset = static_cast<uint32_t>(NValue::getTupleStorageSize(type));
+            columnInfo->inlined = false;
+            setUninlinedObjectColumnInfoIndex(uninlinedObjectColumnIndex++, index);
+        }
+
     } else {
         // All values are inlined if they aren't strings.
         columnInfo->inlined = true;

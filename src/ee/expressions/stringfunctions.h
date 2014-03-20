@@ -20,34 +20,6 @@
 
 namespace voltdb {
 
-static inline int32_t getCharLength(const char *valueChars, const size_t length) {
-    // very efficient code to count characters in UTF string and ASCII string
-    int32_t i = 0, j = 0;
-    size_t len = length;
-    while (len-- > 0) {
-        if ((valueChars[i] & 0xc0) != 0x80) j++;
-        i++;
-    }
-    return j;
-}
-
-// Return the beginning char * place of the ith char.
-// Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
-static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
-    // very efficient code to count characters in UTF string and ASCII string
-    if (ith <= 0) return NULL;
-    int32_t i = 0, j = 0;
-    size_t len = length;
-    while (len-- > 0) {
-        if ((valueChars[i] & 0xc0) != 0x80) {
-            j++;
-            if (ith == j) break;
-        }
-        i++;
-    }
-    return &valueChars[i];
-}
-
 /** implement the 1-argument SQL OCTET_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull())
@@ -62,7 +34,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
         return getNullValue();
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
-    return getBigIntValue(static_cast<int64_t>(getCharLength(valueChars, getObjectLength_withoutNull())));
+    return getIntegerValue(getCharLength(valueChars, getObjectLength_withoutNull()));
 }
 
 /** implement the 1-argument SQL SPACE function */
