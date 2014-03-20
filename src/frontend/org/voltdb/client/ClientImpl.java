@@ -116,12 +116,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
-        // handle the unauthenticated case
-        if (m_createConnectionUsername == null) {
-            m_createConnectionUsername = "";
-            return true;
-        }
-
+        assert(username != null);
         m_credentialComparisonLock.lock();
         try {
             if (m_credentialsSet == false) {
