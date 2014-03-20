@@ -351,7 +351,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
+    static public void validStatisticsForTableLimit(Client client, String tableName, long limit, long percentage) throws Exception {
         long start = System.currentTimeMillis();
         while (true) {
             Thread.sleep(1000);
@@ -366,6 +366,7 @@ public class RegressionSuite extends TestCase {
                     String name = vt.getString("TABLE_NAME");
                     if (tableName.equals(name)) {
                         assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
+                        assertEquals(percentage, vt.getLong("PERCENT_FULL"));
                         return;
                     }
                 }
