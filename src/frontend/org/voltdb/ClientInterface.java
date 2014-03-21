@@ -1918,7 +1918,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
                     buf.putInt(buf.capacity() - 4);
                     response.flattenToBuffer(buf).flip();
-                    handler.m_connection.writeStream().enqueue(buf);
+
+                    ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
+                    if (cihm == null) return;
+                    cihm.connection.writeStream().enqueue(buf);
                 }
             });
             return null;
