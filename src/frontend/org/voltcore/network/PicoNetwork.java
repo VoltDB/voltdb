@@ -315,7 +315,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     void unregistered() {
         try {
             if (!m_alreadyStopped) {
-                m_alreadyStopped = true;
                 try {
                     safeStopping();
                 } finally {
