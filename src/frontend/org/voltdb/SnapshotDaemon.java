@@ -709,6 +709,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     success = false;
                 }
 
+                if (   result.getColumnCount() == 2
+                    && "RESULT".equals(result.getColumnName(0))
+                    && "ERR_MSG".equals(result.getColumnName(1))) {
+                    boolean advanced = result.advanceRow();
+                    assert(advanced);
+                    loggingLog.error("Snapshot failed with failure response: " + result.getString("ERR_MSG"));
+                    success = false;
+                }
+
                 //assert(result.getColumnName(1).equals("TABLE"));
                 if (success) {
                     while (result.advanceRow()) {
