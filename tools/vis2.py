@@ -78,8 +78,8 @@ class Plot:
         plt.xticks(fontsize=10)
         plt.yticks(fontsize=10)
         plt.tick_params(axis='y', labelleft=True, labelright=True)
-        plt.ylabel(ylabel, fontsize=8)
-        plt.xlabel(xlabel, fontsize=8)
+        plt.ylabel(ylabel, fontsize=10)
+        plt.xlabel(xlabel, fontsize=10)
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend):
@@ -87,8 +87,10 @@ class Plot:
                      marker=marker_shape, markerfacecolor=color, markersize=4)
 
     def close(self):
-        formatter = matplotlib.dates.DateFormatter("%b %d %y")
-        self.ax.xaxis.set_major_formatter(formatter)
+        x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
+        self.ax.xaxis.set_major_formatter(x_formatter)
+        y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
+        self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
         #xmax = datetime.datetime.today().toordinal()
@@ -98,19 +100,20 @@ class Plot:
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series):
     global mc
     plot_data = dict()
     for run in data:
         if run['branch'] not in plot_data:
-            plot_data[run['branch']] = {data_type: []}
+            plot_data[run['branch']] = {series: []}
 
-        if data_type == 'tps':
+        if series == 'tppn':
             value = run['tps']/run['nodes']
         else:
-            value = run[data_type]
+            value = run[series]
+
         datenum = matplotlib.dates.date2num(run['date'])
-        plot_data[run['branch']][data_type].append((datenum,value))
+        plot_data[run['branch']][series].append((datenum,value))
 
     if len(plot_data) == 0:
         return
@@ -165,6 +168,7 @@ def generate_index_file(filenames):
     <title>Performance Graphs</title>
   </head>
   <body>
+    Generated on %s
     <table frame="box">
 %s
     </table>
@@ -185,7 +189,7 @@ def generate_index_file(filenames):
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
-        h.append(('','')) 
+        h.append(('',''))
         z -= 1
 
     rows = []
@@ -195,7 +199,7 @@ def generate_index_file(filenames):
         if i%n == 0:
             rows.append(hrow % t)
             t = ()
- 
+
     last_app = None
     for i in filenames:
         if i[0] != last_app:
@@ -203,7 +207,7 @@ def generate_index_file(filenames):
             last_app = i[0]
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
-    return full_content % ''.join(rows)
+    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), ''.join(rows))
 
 def usage():
     print "Usage:"
@@ -242,23 +246,32 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
+
+        conn = FastSerializer(STATS_SERVER, 21212)
+        proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
+        resp = proc.call(["select series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
+        conn.close()
+
         app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
+
+        if len(resp.tables[0].tuples) > 0:
+            legend = resp.tables[0].tuples
+        else:
+            legend = [ ('lat95',    "avg latency95",             "Time",     "Latency (ms)"),
+                       ('lat99',    "avg latency99",             "Time",     "latency (ms)"),
+                       ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
+                     ]
+
         app_filename = app.replace(' ', '_')
-        latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
-        latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
-        throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
-        filenames.append((app, latency95_filename, latency99_filename, throughput_filename, iorder))
+        fns = [app]
+        for r in legend:
+            title = app + " " + r[1]
+            fn = "_" + title.replace(" ","_") + ".png"
+            fns.append(prefix + fn)
+            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0])
 
-        plot(app + " avg latency95", "Time", "Latency (ms)",
-             path + "-latency95-" + app_filename + ".png", width, height, app,
-             data, 'lat95')
-
-        plot(app + " avg latency99(avg)", "Time", "Latency (ms)",
-             path + "-latency99-" + app_filename + ".png", width, height, app,
-             data, 'lat99')
-
-        plot(app+" avg throughput per node", "Time", "Thpt tx/sec",
-                    path + "-throughput-" + app_filename + ".png", width, height, app, data, 'tps')
+        fns.append(iorder)
+        filenames.append(tuple(fns))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')
