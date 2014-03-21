@@ -24,6 +24,7 @@
 #include "storage/tablefactory.h"
 #include <vector>
 #include <string>
+#include <math.h>
 
 using namespace voltdb;
 using namespace std;
@@ -37,6 +38,7 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("TUPLE_DATA_MEMORY");
     columnNames.push_back("STRING_DATA_MEMORY");
     columnNames.push_back("TUPLE_LIMIT");
+    columnNames.push_back("PERCENT_FULL");
     return columnNames;
 }
 
@@ -48,6 +50,7 @@ void TableStats::populateTableStatsSchema(
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_BIGINT);  columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));  allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
@@ -169,10 +172,15 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+
+    bool hasTupleLimit = tupleLimit == INT_MAX ? false : true;
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
-            tupleLimit == INT_MAX ?
-            ValueFactory::getNullValue() :
-            ValueFactory::getIntegerValue(tupleLimit));
+            hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit): ValueFactory::getNullValue());
+    int32_t percentage = 0;
+    if (hasTupleLimit && tupleLimit > 0) {
+        percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
+    }
+    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
 }
 
 /**

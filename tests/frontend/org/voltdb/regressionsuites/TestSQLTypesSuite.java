@@ -589,7 +589,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 client.callProcedure("Insert", params);
             }
             catch (final ProcCallException e) {
-                assertTrue(e.toString().contains("exceeds specified size"));
+                System.err.println(e.getMessage());
+                assertTrue(e.toString().contains("exceeds the size of the VARCHAR"));
                 caught = true;
             }
             assertTrue(caught);

@@ -618,32 +618,20 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         FileWriter fw = new FileWriter(path);
-        fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
-                stats.getStartTimestamp(),
-                stats.getDuration(),
-                stats.getInvocationsCompleted(),
-                stats.kPercentileLatency(0.0),
-                stats.kPercentileLatency(1.0),
-                stats.kPercentileLatency(0.95),
-                stats.kPercentileLatency(0.99)));
-        fw.close();
-    }
-
-    public void writeSummaryCSVWithDoubles(ClientStats stats, String path) throws IOException {
-        // don't do anything (be silent) if empty path
-        if ((path == null) || (path.length() == 0)) {
-            return;
-        }
-
-        FileWriter fw = new FileWriter(path);
-        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f\n",
+        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 stats.getStartTimestamp(),
                 stats.getDuration(),
                 stats.getInvocationsCompleted(),
                 stats.kPercentileLatencyAsDouble(0.0),
                 stats.kPercentileLatencyAsDouble(1.0),
                 stats.kPercentileLatencyAsDouble(0.95),
-                stats.kPercentileLatencyAsDouble(0.99)));
+                stats.kPercentileLatencyAsDouble(0.99),
+                stats.kPercentileLatencyAsDouble(0.999),
+                stats.kPercentileLatencyAsDouble(0.9999),
+                stats.kPercentileLatencyAsDouble(0.99999),
+                stats.getInvocationErrors(),
+                stats.getInvocationAborts(),
+                stats.getInvocationTimeouts()));
         fw.close();
     }
 

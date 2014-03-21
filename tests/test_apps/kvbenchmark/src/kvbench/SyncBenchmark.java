@@ -253,7 +253,7 @@ public class SyncBenchmark {
                 Throwables.propagate(ioex);
             }
             m_writer = pw;
-            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,THROUGHPUT,AVERAGE_LATENCY,FIVE9S_LATENCY");
+            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,TIMEOUTS,THROUGHPUT,AVERAGE_LATENCY,TWO9S_LATENCY,THREE9S_LATENCY,FOUR9S_LATENCY,FIVE9S_LATENCY");
         }
 
         @Override
@@ -263,11 +263,19 @@ public class SyncBenchmark {
 
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%f,%.2f\n",
-                    ts, stats.getEndTimestamp(), stats.getInvocationsCompleted(),
-                    stats.getInvocationAborts(), stats.getInvocationErrors(),
-                    stats.getTxnThroughput(), stats.getAverageLatency(),
-                    stats.kPercentileLatencyAsDouble(0.99999)
+            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f\n",
+                    ts,                                        // col 00 string timestamp
+                    stats.getEndTimestamp(),                   // col 01 long   timestamp millis
+                    stats.getInvocationsCompleted(),           // col 02 long   invocations completed
+                    stats.getInvocationAborts(),               // col 03 long   invocation aborts
+                    stats.getInvocationErrors(),               // col 04 long   invocation errors
+                    stats.getInvocationTimeouts(),             // col 05 long   invocation timeouts
+                    stats.getTxnThroughput(),                  // col 06 long   transaction throughput
+                    stats.getAverageLatency(),                 // col 07 double average latency
+                    stats.kPercentileLatencyAsDouble(0.99),    // col 08 double two nines latency
+                    stats.kPercentileLatencyAsDouble(0.999),   // col 09 double three nines latency
+                    stats.kPercentileLatencyAsDouble(0.9999),  // col 10 double four nines latency
+                    stats.kPercentileLatencyAsDouble(0.99999)  // col 11 double five nines latency
                     );
         }
     }
