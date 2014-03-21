@@ -761,7 +761,7 @@ public class PlanAssembler {
         CompiledPlan retval = new CompiledPlan();
         retval.rootPlanGraph = root;
         retval.readOnly = true;
-        boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic(); // assume any subqueries are ordered?
+        boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
         retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
         return retval;
