@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,15 +29,12 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Request;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.io.CharStreams;
 
 public class HTTPClientInterface {
 
@@ -135,7 +131,6 @@ public class HTTPClientInterface {
                 m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
-            String params;
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
                 if (queryParamSize > 150000) {
@@ -151,7 +146,7 @@ public class HTTPClientInterface {
             String password = request.getParameter("Password");
             String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
-            params = request.getParameter("Parameters");
+            String params = request.getParameter("Parameters");
             String jsonp = request.getParameter("jsonp");
             String admin = request.getParameter("admin");
 
