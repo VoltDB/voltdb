@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -106,15 +107,17 @@ public class DuplicateCounter
              * Replicas will return a response to a write with no result tables
              * always keep the local response which has the result tables
              */
-            if (m_lastResponse != null && resultTables != null) {
-                if (m_lastResultTables.length < resultTables.length) {
-                    m_lastResponse = message;
-                    m_lastResultTables = resultTables;
-                }
-            } else {
-                m_lastResponse = message;
-                m_lastResultTables = resultTables;
-            }
+//            if (m_lastResponse != null && resultTables != null) {
+//                if (m_lastResultTables.length < resultTables.length) {
+//                    m_lastResponse = message;
+//                    m_lastResultTables = resultTables;
+//                }
+//            } else {
+//                m_lastResponse = message;
+//                m_lastResultTables = resultTables;
+//            }
+            m_lastResponse = message;
+            m_lastResultTables = resultTables;
         }
 
         /*
@@ -159,6 +162,7 @@ public class DuplicateCounter
         return m_lastResponse;
     }
 
+    @Override
     public String toString()
     {
         String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,
