@@ -79,8 +79,9 @@ public class AuthSystem {
             System.getProperty("VOLTDB_SERVICE_LOGIN_MODULE", "VoltDBService");
 
     /**
-     * Authentication provider enumeration
-     *
+     * Authentication provider enumeration. It serves also as mapping mechanism
+     * for providers, which are configured in the deployment file, and the login
+     * packet service field.
      */
     public enum AuthProvider {
         HASH("hash","database"),
@@ -108,10 +109,16 @@ public class AuthSystem {
             this.service = service;
         }
 
+        /**
+         * @return its security provider equivalent
+         */
         public String provider() {
             return provider;
         }
 
+        /**
+         * @return its login packet service equivalent
+         */
         public String service() {
             return service;
         }
@@ -703,7 +710,11 @@ public class AuthSystem {
 
             final ByteBuffer bb = ByteBuffer.allocate(4096);
 
-            // write the service principal response
+            /*
+             * write the service principal response. This gives the connecting client
+             * the service principal name form which it constructs the GSS context
+             * used in the client/service authentication handshake
+             */
             bb.putInt(msgSize-4).put(AUTH_HANDSHAKE_VERSION).put(AUTH_SERVICE_NAME);
             bb.putInt(m_principalName.length);
             bb.put(m_principalName);
@@ -714,10 +725,17 @@ public class AuthSystem {
             }
 
             String authenticatedUser = Subject.doAs(m_loginCtx.getSubject(), new PrivilegedAction<String>() {
+                /**
+                 * Establish an authenticated GSS security context
+                 * For further information on GSS please refer to
+                 * <a href="http://en.wikipedia.org/wiki/Generic_Security_Services_Application_Program_Interface">this</a>
+                 * article on Generic Security Services Application Program Interface
+                 */
                 @Override
                 public String run() {
                     GSSContext context = null;
                     try {
+                        // derive the credentials from the authenticated service subject
                         context = m_gssManager.createContext((GSSCredential)null);
                         byte [] token;
 
@@ -734,7 +752,7 @@ public class AuthSystem {
                                 authLogger.warn("Authentication packet exceeded alloted size");
                                 return null;
                             }
-
+                            // read the initiator (client) context token
                             bb.clear().limit(msgSize);
                             while (bb.hasRemaining()) {
                                 if (m_socket.read(bb) == -1) throw new EOFException();
@@ -753,6 +771,8 @@ public class AuthSystem {
                                 return null;
                             }
 
+                            // process the initiator (client) context token. If it returns a non empty token
+                            // transmit it to the initiator
                             token = context.acceptSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
                             if (token != null) {
                                 msgSize = 4 + 1 + 1 + token.length;
@@ -765,16 +785,19 @@ public class AuthSystem {
                                     m_socket.write(bb);
                                 }
                             }
-
-                            String authenticateUserName = context.getSrcName().toString();
-                            if (!context.getMutualAuthState()) {
-                                return null;
-                            }
-                            context.dispose();
-                            context = null;
-
-                            return authenticateUserName;
                         }
+                        // at this juncture we an established security context between
+                        // the client and this service
+                        String authenticateUserName = context.getSrcName().toString();
+
+                        // check if both ends are authenticated
+                        if (!context.getMutualAuthState()) {
+                            return null;
+                        }
+                        context.dispose();
+                        context = null;
+
+                        return authenticateUserName;
 
                     } catch (IOException|GSSException ex) {
                         Throwables.propagate(ex);
