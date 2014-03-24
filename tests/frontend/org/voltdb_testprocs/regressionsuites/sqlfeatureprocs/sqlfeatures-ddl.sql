@@ -1,3 +1,10 @@
+CREATE TABLE VarcharTB (
+  ID INTEGER DEFAULT 0 NOT NULL,
+  var2 VARCHAR(2),
+  var80 VARCHAR(80),
+  PRIMARY KEY (ID)
+);
+
 CREATE TABLE nocapped (
 id INTEGER NOT NULL, 
 wage INTEGER not null,

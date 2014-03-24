@@ -161,6 +161,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
 TEST_F(TableSerializeTest, NullStrings) {
     std::vector<std::string> columnNames(1);
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
+    // UTF-8 characters
     std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
@@ -192,7 +193,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ("", deserialized->columnName(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
-    EXPECT_EQ(true, table_->schema()->columnIsInlined(0));
+    EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
     TableIterator iter = deserialized->iterator();
     TableTuple t(deserialized->schema());

@@ -288,7 +288,6 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     tupleCopy.setNValue(0, ValueFactory::getBigIntValue(5));
     NValue newStringValue = ValueFactory::getStringValue("foo");
     tupleCopy.setNValue(7, newStringValue);
-    NValue oldStringValue = tupleCopy.getNValue(6);
     tupleCopy.setNValue(6, ValueFactory::getStringValue("bar"));
 
     m_table->updateTuple(tuple, tupleCopy);
@@ -303,8 +302,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     tupleCopy.freeObjectColumns();
     delete [] tupleBackup.address();
     delete [] tupleCopy.address();
-    newStringValue.free();
-    oldStringValue.free();
+//    newStringValue.free();
 }
 
 TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
