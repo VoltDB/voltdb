@@ -320,9 +320,9 @@ public class LoadTableLoader extends Thread {
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                if (onlyDelQueue.size() > 100 && m_shouldContinue.get()) {
+                if (onlyDelQueue.size() > 0 && m_shouldContinue.get()) {
                     List<Long> workList = new ArrayList<Long>();
-                    onlyDelQueue.drainTo(workList, 100);
+                    onlyDelQueue.drainTo(workList);
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
                         client.callProcedure(new DeleteCallback(odlatch, 1), m_onlydelprocName, lcid);
