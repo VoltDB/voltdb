@@ -51,6 +51,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -466,7 +467,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db, whichProcs);
+                processed = processVoltDBStatement(stmt, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -548,10 +549,11 @@ public class DDLCompiler {
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement, Database db,
+    private boolean processVoltDBStatement(DDLStatement ddlStatement, Database db,
                                            DdlProceduresToLoad whichProcs)
             throws VoltCompilerException
     {
+        String statement = ddlStatement.statement;
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -756,7 +758,18 @@ public class DDLCompiler {
                         classNameStr)); // remove trailing semicolon
             }
 
-            m_classMatcher.addPattern(classNameStr);
+            ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+            if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "IMPORT CLASS not found: '%s'",
+                        classNameStr)); // remove trailing semicolon
+            }
+            else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                m_compiler.addWarn(String.format(
+                        "IMPORT CLASS no match for wildcarded class: '%s'",
+                        classNameStr), ddlStatement.lineNo);
+            }
+
             return true;
         }
 

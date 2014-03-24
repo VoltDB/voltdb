@@ -274,7 +274,7 @@ public class AuthenticatedConnectionCache {
      * Dec-ref a client.
      * @param client The client to release.
      */
-    public void releaseClient(Client client) {
+    public synchronized void releaseClient(Client client) {
         ClientImpl ci = (ClientImpl) client;
 
         // if no username, this is the unauth client

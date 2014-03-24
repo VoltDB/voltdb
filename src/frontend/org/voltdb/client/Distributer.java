@@ -31,21 +31,27 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 import jsr166y.ThreadLocalRandom;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -56,6 +62,7 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -112,9 +119,9 @@ class Distributer {
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
     //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
-    private final long m_procedureCallTimeoutMS;
+    private final long m_procedureCallTimeoutNanos;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-    private final long m_connectionResponseTimeoutMS;
+    private final long m_connectionResponseTimeoutNanos;
     private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
         new HashMap<Integer, ClientAffinityStats>();
 
@@ -252,70 +259,44 @@ class Distributer {
                     connections.addAll(m_connections);
                 }
 
-                long now = System.currentTimeMillis();
+                final long nowNanos = System.nanoTime();
 
                 // for each connection
-                for (NodeConnection c : connections) {
-                    synchronized(c) {
-                        // check for connection age
-                        long sinceLastResponse = now - c.m_lastResponseTime;
+                for (final NodeConnection c : connections) {
+                    // check for connection age
+                    final long sinceLastResponse = Math.max(1, nowNanos - c.m_lastResponseTimeNanos);
 
-                        // if outstanding ping and timeoutMS, close the connection
-                        if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
-                            // memoize why it's closing
-                            c.m_closeCause = DisconnectCause.TIMEOUT;
-                            // this should trigger NodeConnection.stopping(..)
-                            c.m_connection.unregister();
-                        }
+                    // if outstanding ping and timeoutMS, close the connection
+                    if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutNanos)) {
+                        // memoize why it's closing
+                        c.m_closeCause = DisconnectCause.TIMEOUT;
+                        // this should trigger NodeConnection.stopping(..)
+                        c.m_connection.unregister();
+                    }
 
-                        // if 1/3 of the timeoutMS since last response, send a ping
-                        if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
-                            c.sendPing();
-                        }
+                    // if 1/3 of the timeoutMS since last response, send a ping
+                    if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutNanos / 3))) {
+                        c.sendPing();
+                    }
 
-                        // for each outstanding procedure
-                        Iterator<Entry<Long, CallbackBookeeping>> iter = c.m_callbacks.entrySet().iterator();
-                        while (iter.hasNext()) {
-                            Entry<Long, CallbackBookeeping> e = iter.next();
-                            long handle = e.getKey();
-                            CallbackBookeeping cb = e.getValue();
+                    // for each outstanding procedure
+                    for (final Map.Entry<Long, CallbackBookeeping> e : c.m_callbacks.entrySet()) {
+                        final long handle = e.getKey();
+                        final CallbackBookeeping cb = e.getValue();
 
-                            // if the timeout is expired, call the callback and remove the
-                            // bookeeping data
-                            if ((now - cb.timestamp) > cb.m_procedureTimeoutMS) {
+                        // if the timeout is expired, call the callback and remove the
+                        // bookeeping data
+                        final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
+                        if (deltaNanos > cb.procedureTimeoutNanos) {
 
-                                // make the minimum timeoutMS for certain long running system procedures
-                                //  higher than the default 2m.
-                                // you can still set the default timeoutMS higher than even this value
-                                boolean isLongOp = false;
-                                // this form allows you to list ops to treat specially
-                                isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
-                                isLongOp |= cb.name.equals("@SnapshotSave");
-                                if (isLongOp && ((now - cb.timestamp) < MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS)) {
-                                    continue;
-                                }
-
-                                ClientResponseImpl r = new ClientResponseImpl(
-                                        ClientResponse.CONNECTION_TIMEOUT,
-                                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                        "",
-                                        new VoltTable[0],
-                                        String.format("No response received in the allotted time (set to %d ms).",
-                                                cb.m_procedureTimeoutMS));
-                                r.setClientHandle(handle);
-                                r.setClientRoundtrip((int) (now - cb.timestamp));
-                                r.setClusterRoundtrip((int) (now - cb.timestamp));
-
-                                try {
-                                    cb.callback.clientCallback(r);
-                                } catch (Exception e1) {
-                                    e1.printStackTrace();
-                                }
-                                iter.remove();
-                                m_rateLimiter.transactionResponseReceived(now, -1);
-                                int callbacksToInvoke = c.m_callbacksToInvoke.decrementAndGet();
-                                assert(callbacksToInvoke >= 0);
+                            //For expected long operations don't use the default timeout
+                            //unless it is > MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS
+                            final boolean isLongOp = isLongOp(cb.name);
+                            if (isLongOp && (deltaNanos < TimeUnit.MILLISECONDS.toNanos(MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS))) {
+                                continue;
                             }
+
+                            c.handleTimedoutCallback(handle, nowNanos);
                         }
                     }
                 }
@@ -325,63 +306,205 @@ class Distributer {
         }
     }
 
+    /*
+     * Check if the proc name is a procedure that is expected to run long
+     * Make the minimum timeoutMS for certain long running system procedures
+     * higher than the default 2m.
+     * you can still set the default timeoutMS higher than even this value
+     *
+     */
+    private static boolean isLongOp(String procName) {
+        if (procName.startsWith("@")) {
+            if (procName.equals("@UpdateApplicationCatalog") || procName.equals("@SnapshotSave")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     class CallbackBookeeping {
-        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name, long timeout) {
+        public CallbackBookeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
             assert(callback != null);
-            this.timestamp = timestamp;
+            this.timestampNanos = timestampNanos;
             this.callback = callback;
             this.name = name;
-            this.m_procedureTimeoutMS = (timeout == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutMS : (timeout * 1000L);
+            this.procedureTimeoutNanos = timeoutNanos;
+            this.ignoreBackpressure = ignoreBackpressure;
         }
-        long timestamp;
+        long timestampNanos;
         //Timeout in ms 0 means use conenction specified procedure timeoutMS.
-        final long m_procedureTimeoutMS;
+        final long procedureTimeoutNanos;
         ProcedureCallback callback;
         String name;
+        boolean ignoreBackpressure;
     }
 
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
-        private final HashMap<Long, CallbackBookeeping> m_callbacks;
-        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
+        private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<Long, CallbackBookeeping>();
+        private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<String, ClientStats>();
         private Connection m_connection;
-        private boolean m_isConnected = true;
+        private volatile boolean m_isConnected = true;
 
-        long m_lastResponseTime = System.currentTimeMillis();
+        volatile long m_lastResponseTimeNanos = System.nanoTime();
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[]) {
-            m_callbacks = new HashMap<Long, CallbackBookeeping>();
-        }
+        public NodeConnection(long ids[]) {}
 
-        public void createWork(long handle, String name, ByteBuffer c,
-                ProcedureCallback callback, boolean ignoreBackpressure, long timeout) {
+        /*
+         * NodeConnection uses ignoreBackpressure to get rate limiter to not
+         * apply any permit tracking or rate limits to transactions that should
+         * never be rejected such as those submitted from within a callback thread or
+         * generated internally
+         */
+        public void createWork(final long nowNanos, long handle, String name, ByteBuffer c,
+                ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
-            long now = System.currentTimeMillis();
-            now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                    now, ignoreBackpressure);
-            synchronized (this) {
-                if (!m_isConnected) {
-                    final ClientResponse r = new ClientResponseImpl(
-                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
-                    ") was lost before a response was received");
-                    try {
-                        callback.clientCallback(r);
-                    } catch (Exception e) {
-                        uncaughtException(callback, r, e);
-                    }
-                    // for bookkeeping, but it feels dishonest to call this here
-                    m_rateLimiter.transactionResponseReceived(now, -1);
-                    return;
+
+            //How long from the starting point in time to wait to get this stuff done
+            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
+
+            //Trigger the timeout at this point in time no matter what
+            final long timeoutTime = nowNanos + timeoutNanos;
+
+            //What was the time after the rate limiter returned
+            //Will be the same as timeoutNanos if it didn't block
+            long afterRateLimitNanos = 0;
+
+            /*
+             * Do rate limiting or check for max outstanding related backpressure in
+             * the rate limiter which can block. If it blocks we can still get a timeout
+             * exception to give prompt timeouts
+             */
+            try {
+                afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
+                        nowNanos, timeoutNanos, ignoreBackpressure);
+            } catch (TimeoutException e) {
+                /*
+                 * It's possible we need to timeout because it took too long to get
+                 * the transaction out on the wire due to max outstanding
+                 */
+                final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
+                    invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos,  timeoutNanos, handle, ignoreBackpressure);
+                return;
+            }
+
+            assert(m_callbacks.containsKey(handle) == false);
+
+            //Drain needs to know when all callbacks have been invoked
+            final int callbacksToInvoke = m_callbacksToInvoke.incrementAndGet();
+            assert(callbacksToInvoke >= 0);
+
+            //Optimistically submit the task
+            m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
+
+            //Schedule the timeout to fire relative to the amount of time
+            //spent getting to this point. Might fire immediately
+            //some of the time, but that is fine
+            final long timeoutRemaining = timeoutTime - afterRateLimitNanos;
+
+            //Schedule an individual timeout if necessary
+            //If it is a long op, don't bother scheduling a discrete timeout
+            if (timeoutNanos < TimeUnit.SECONDS.toNanos(1) && !isLongOp(name)) {
+                submitDiscreteTimeoutTask(handle, Math.max(0, timeoutRemaining));
+            }
+
+            //Check for disconnect
+            if (!m_isConnected) {
+                //Check if the disconnect or expiration already handled the callback
+                if (m_callbacks.remove(handle) == null) return;
+                final ClientResponse r = new ClientResponseImpl(
+                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                        "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
+                ") was lost before a response was received");
+                try {
+                    callback.clientCallback(r);
+                } catch (Exception e) {
+                    uncaughtException(callback, r, e);
                 }
 
-                assert(m_callbacks.containsKey(handle) == false);
-                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name, timeout));
-                m_callbacksToInvoke.incrementAndGet();
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
+
+                //for bookkeeping, but it feels dishonest to call this here
+                m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
+                return;
+            } else {
+                m_connection.writeStream().enqueue(c);
             }
-            m_connection.writeStream().enqueue(c);
+        }
+
+        /*
+         * For high precision timeouts, submit a discrete task to a scheduled
+         * executor service to time out the transaction. The timeout task
+         * when run checks if the task is still present in the concurrent map
+         * of tasks and removes it. If it wins the race to remove the map
+         * then the transaction will be timed out even if a response is received
+         * at the same time.
+         *
+         * This will race with the periodic task that checks lower resolution timeouts
+         * and it is fine, the concurrent map makes sure each callback is handled exactly once
+         */
+        void submitDiscreteTimeoutTask(final long handle, long timeoutNanos) {
+            m_ex.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    handleTimedoutCallback(handle, System.nanoTime());
+                }
+            }, timeoutNanos, TimeUnit.NANOSECONDS);
+        }
+
+        /*
+         * Factor out the boilerplate involved in checking whether a timed out callback
+         * still exists and needs to be invoked, or has already been handled by another thread
+         */
+        void handleTimedoutCallback(long handle, long nowNanos) {
+            //Callback doesn't have to be there, it may have already
+            //received a response or been expired by the periodic expiration task, or a discrete expiration task
+            final CallbackBookeeping cb = m_callbacks.remove(handle);
+
+            //It was handled during the race
+            if (cb == null) return;
+
+            final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
+
+            invokeCallbackWithTimeout(cb.name, cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
+        }
+
+        /*
+         * Factor out the boilerplate involved in invoking a callback with a timeout response
+         */
+        void invokeCallbackWithTimeout(String procName,
+                                       ProcedureCallback callback,
+                                       long deltaNanos,
+                                       long nowNanos,
+                                       long timeoutNanos,
+                                       long handle,
+                                       boolean ignoreBackpressure) {
+            ClientResponseImpl r = new ClientResponseImpl(
+                    ClientResponse.CONNECTION_TIMEOUT,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                    "",
+                    new VoltTable[0],
+                    String.format("No response received in the allotted time (set to %d ms).",
+                            TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+            r.setClientHandle(handle);
+            r.setClientRoundtrip(deltaNanos);
+            r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
+            try {
+                callback.clientCallback(r);
+            } catch (Throwable e1) {
+                e1.printStackTrace();
+            }
+
+            //Drain needs to know when all callbacks have been invoked
+            final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+            assert(remainingToInvoke >= 0);
+
+            m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
+            updateStatsForTimeout(procName, r.getClientRoundtripNanos(), r.getClusterRoundtrip());
         }
 
         void sendPing() {
@@ -398,6 +521,18 @@ class Distributer {
             m_outstandingPing = true;
         }
 
+        private void updateStatsForTimeout(
+                final String procName,
+                final long roundTripNanos,
+                final int clusterRoundTrip) {
+            m_connection.queueTask(new Runnable() {
+                @Override
+                public void run() {
+                    updateStats(procName, roundTripNanos, clusterRoundTrip, false, false, true);
+                }
+            });
+        }
+
         /**
          * Update the procedures statistics
          * @param procName Name of procedure being updated
@@ -408,10 +543,11 @@ class Distributer {
          */
         private void updateStats(
                 String procName,
-                int roundTrip,
+                long roundTripNanos,
                 int clusterRoundTrip,
                 boolean abort,
-                boolean failure) {
+                boolean failure,
+                boolean timeout) {
             ClientStats stats = m_stats.get(procName);
             if (stats == null) {
                 stats = new ClientStats();
@@ -423,12 +559,12 @@ class Distributer {
                 stats.m_endTS = Long.MIN_VALUE;
                 m_stats.put(procName, stats);
             }
-            stats.update(roundTrip, clusterRoundTrip, abort, failure);
+            stats.update(roundTripNanos, clusterRoundTrip, abort, failure, timeout);
         }
 
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
-            long now = System.currentTimeMillis();
+            long nowNanos = System.nanoTime();
             ClientResponseImpl response = new ClientResponseImpl();
             try {
                 response.initFromBuffer(buf);
@@ -436,78 +572,78 @@ class Distributer {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
-            ProcedureCallback cb = null;
-            long callTime = 0;
-            int delta = 0;
-            long handle = response.getClientHandle();
-            synchronized (this) {
-                // track the timestamp of the most recent read on this connection
-                m_lastResponseTime = now;
 
-                // handle ping response and get out
-                if (response.getClientHandle() == PING_HANDLE) {
-                    m_outstandingPing = false;
-                    return;
-                } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
-                    /*
-                     * Really didn't want to add this block because it is not DRY
-                     * for the exception handling, but trying to set + reset the async topo callback
-                     * turned out to be pretty challenging
-                     */
-                    cb = new TopoUpdateCallback();
-                    try {
-                        cb.clientCallback(response);
-                    } catch (Exception e) {
-                        uncaughtException(cb, response, e);
-                    }
-                    return;
+            final long handle = response.getClientHandle();
+
+            // handle ping response and get out
+            if (handle == PING_HANDLE) {
+                m_outstandingPing = false;
+                return;
+            } else if (handle == ASYNC_TOPO_HANDLE) {
+                /*
+                 * Really didn't want to add this block because it is not DRY
+                 * for the exception handling, but trying to set + reset the async topo callback
+                 * turned out to be pretty challenging
+                 */
+                ProcedureCallback cb = new TopoUpdateCallback();
+                try {
+                    cb.clientCallback(response);
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
                 }
 
-                CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
-                // presumably (hopefully) this is a response for a timed-out message
-                if (stuff == null) {
-                    // also ignore internal (topology and procedure) calls
-                    if (handle >= 0) {
-                        // notify any listeners of the late response
-                        for (ClientStatusListenerExt listener : m_listeners) {
-                            listener.lateProcedureResponse(
-                                    response,
-                                    m_connection.getHostnameOrIP(),
-                                    m_connection.getRemotePort());
-                        }
-                    }
-                }
-                // handle a proper callback
-                else {
-                    callTime = stuff.timestamp;
-                    delta = (int)(now - callTime);
-                    cb = stuff.callback;
-                    assert(cb != null);
-                    final byte status = response.getStatus();
-                    boolean abort = false;
-                    boolean error = false;
-                    if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
-                        abort = true;
-                    } else if (status != ClientResponse.SUCCESS) {
-                        error = true;
-                    }
-                    int clusterRoundTrip = response.getClusterRoundtrip();
-                    m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
-                    updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
-                }
+                return;
             }
 
-            // cb might be null on late response
-            if (cb != null) {
-                response.setClientRoundtrip(delta);
+            // track the timestamp of the most recent read on this connection
+            m_lastResponseTimeNanos = nowNanos;
+
+            //Race with expiration thread to be the first to remove the callback
+            //from the map and process it
+            final CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
+
+            // presumably (hopefully) this is a response for a timed-out message
+            if (stuff == null) {
+                // also ignore internal (topology and procedure) calls
+                if (handle >= 0) {
+                    // notify any listeners of the late response
+                    for (ClientStatusListenerExt listener : m_listeners) {
+                        listener.lateProcedureResponse(
+                                response,
+                                m_connection.getHostnameOrIP(),
+                                m_connection.getRemotePort());
+                    }
+                }
+            }
+            // handle a proper callback
+            else {
+                final long callTimeNanos = stuff.timestampNanos;
+                final long deltaNanos = Math.max(1, nowNanos - callTimeNanos);
+                final ProcedureCallback cb = stuff.callback;
+                assert(cb != null);
+                final byte status = response.getStatus();
+                boolean abort = false;
+                boolean error = false;
+                if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                    abort = true;
+                } else if (status != ClientResponse.SUCCESS) {
+                    error = true;
+                }
+
+                int clusterRoundTrip = response.getClusterRoundtrip();
+                m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
+                updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
+                response.setClientRoundtrip(deltaNanos);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {
                     uncaughtException(cb, response, e);
                 }
-                int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
-                assert(callbacksToInvoke >= 0);
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
             }
         }
 
@@ -524,100 +660,104 @@ class Distributer {
         @Override
         public void stopping(Connection c) {
             super.stopping(c);
-            synchronized (this) {
-                //Prevent queueing of new work to this connection
-                synchronized (Distributer.this) {
-                    /*
-                     * Repair all cluster topology data with the node connection removed
-                     */
-                    Iterator<Map.Entry<Integer, NodeConnection>> i = m_partitionMasters.entrySet().iterator();
-                    while (i.hasNext()) {
-                        Map.Entry<Integer, NodeConnection> entry = i.next();
-                        if (entry.getValue() == this) {
-                            i.remove();
-                        }
-                    }
-
-                    i = m_hostIdToConnection.entrySet().iterator();
-                    while (i.hasNext()) {
-                        Map.Entry<Integer, NodeConnection> entry = i.next();
-                        if (entry.getValue() == this) {
-                            i.remove();
-                        }
-                    }
-
-                    Iterator<Map.Entry<Integer, NodeConnection[]>> i2 = m_partitionReplicas.entrySet().iterator();
-                    List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<Pair<Integer, NodeConnection[]>>();
-                    while (i2.hasNext()) {
-                        Map.Entry<Integer, NodeConnection[]> entry = i2.next();
-                        for (NodeConnection nc : entry.getValue()) {
-                            if (nc == this) {
-                                entriesToRewrite.add(Pair.of(entry.getKey(), entry.getValue()));
-                            }
-                        }
-                    }
-
-                    for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
-                        m_partitionReplicas.remove(entry.getFirst());
-                        NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
-                        if (survivors.length == 0) break;
-                        int zz = 0;
-                        for (int ii = 0; ii < entry.getSecond().length; ii++) {
-                            if (entry.getSecond()[ii] != this) {
-                                survivors[zz++] = entry.getSecond()[ii];
-                            }
-                        }
-                        m_partitionReplicas.put(entry.getFirst(), survivors);
-                    }
-
-                    m_connections.remove(this);
-                    //Notify listeners that a connection has been lost
-                    for (ClientStatusListenerExt s : m_listeners) {
-                        s.connectionLost(
-                                m_connection.getHostnameOrIP(),
-                                m_connection.getRemotePort(),
-                                m_connections.size(),
-                                m_closeCause);
-                    }
-
-                    /*
-                     * Deal with the fact that this may have been the connection that subscriptions were issued
-                     * to. If a subscription request was pending, don't handle selecting a new node here
-                     * let the callback see the failure and retry
-                     */
-                    if (m_useClientAffinity &&
-                        m_subscribedConnection == this &&
-                        m_subscriptionRequestPending == false &&
-                        !m_ex.isShutdown()) {
-                        //Don't subscribe to a new node immediately
-                        //to somewhat prevent a thundering herd
-                        m_ex.schedule(new Runnable() {
-                            @Override
-                            public void run() {
-                                subscribeToNewNode();
-                            }
-                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
+            m_isConnected = false;
+            //Prevent queueing of new work to this connection
+            synchronized (Distributer.this) {
+                /*
+                 * Repair all cluster topology data with the node connection removed
+                 */
+                Iterator<Map.Entry<Integer, NodeConnection>> i = m_partitionMasters.entrySet().iterator();
+                while (i.hasNext()) {
+                    Map.Entry<Integer, NodeConnection> entry = i.next();
+                    if (entry.getValue() == this) {
+                        i.remove();
                     }
                 }
-                m_isConnected = false;
 
-                //Invoke callbacks for all queued invocations with a failure response
-                final ClientResponse r =
-                    new ClientResponseImpl(
-                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
-                    ") was lost before a response was received");
-                for (final CallbackBookeeping callBk : m_callbacks.values()) {
-                    try {
-                        callBk.callback.clientCallback(r);
+                i = m_hostIdToConnection.entrySet().iterator();
+                while (i.hasNext()) {
+                    Map.Entry<Integer, NodeConnection> entry = i.next();
+                    if (entry.getValue() == this) {
+                        i.remove();
                     }
-                    catch (Exception e) {
-                        uncaughtException(callBk.callback, r, e);
-                    }
-                    m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
-                    m_callbacksToInvoke.decrementAndGet();
                 }
-                m_callbacks.clear();
+
+                Iterator<Map.Entry<Integer, NodeConnection[]>> i2 = m_partitionReplicas.entrySet().iterator();
+                List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<Pair<Integer, NodeConnection[]>>();
+                while (i2.hasNext()) {
+                    Map.Entry<Integer, NodeConnection[]> entry = i2.next();
+                    for (NodeConnection nc : entry.getValue()) {
+                        if (nc == this) {
+                            entriesToRewrite.add(Pair.of(entry.getKey(), entry.getValue()));
+                        }
+                    }
+                }
+
+                for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
+                    m_partitionReplicas.remove(entry.getFirst());
+                    NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
+                    if (survivors.length == 0) break;
+                    int zz = 0;
+                    for (int ii = 0; ii < entry.getSecond().length; ii++) {
+                        if (entry.getSecond()[ii] != this) {
+                            survivors[zz++] = entry.getSecond()[ii];
+                        }
+                    }
+                    m_partitionReplicas.put(entry.getFirst(), survivors);
+                }
+
+                m_connections.remove(this);
+                //Notify listeners that a connection has been lost
+                for (ClientStatusListenerExt s : m_listeners) {
+                    s.connectionLost(
+                            m_connection.getHostnameOrIP(),
+                            m_connection.getRemotePort(),
+                            m_connections.size(),
+                            m_closeCause);
+                }
+
+                /*
+                 * Deal with the fact that this may have been the connection that subscriptions were issued
+                 * to. If a subscription request was pending, don't handle selecting a new node here
+                 * let the callback see the failure and retry
+                 */
+                if (m_useClientAffinity &&
+                    m_subscribedConnection == this &&
+                    m_subscriptionRequestPending == false &&
+                    !m_ex.isShutdown()) {
+                    //Don't subscribe to a new node immediately
+                    //to somewhat prevent a thundering herd
+                    m_ex.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            subscribeToNewNode();
+                        }
+                    }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
+                }
+            }
+
+            //Invoke callbacks for all queued invocations with a failure response
+            final ClientResponse r =
+                new ClientResponseImpl(
+                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                        "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
+                ") was lost before a response was received");
+            for (Map.Entry<Long, CallbackBookeeping> e : m_callbacks.entrySet()) {
+                //Check for race with other threads
+                if (m_callbacks.remove(e.getKey()) == null) continue;
+                final CallbackBookeeping callBk = e.getValue();
+                try {
+                    callBk.callback.clientCallback(r);
+                }
+                catch (Exception ex) {
+                    uncaughtException(callBk.callback, r, ex);
+                }
+
+                //Drain needs to know when all callbacks have been invoked
+                final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(remainingToInvoke >= 0);
+
+                m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1, callBk.ignoreBackpressure);
             }
         }
 
@@ -669,37 +809,45 @@ class Distributer {
 
     void drain() throws InterruptedException {
         boolean more;
+        long sleep = 500;
         do {
             more = false;
-            synchronized (this) {
-                for (NodeConnection cxn : m_connections) {
-                    more = more || cxn.m_callbacksToInvoke.get() > 0;
-                }
+            for (NodeConnection cxn : m_connections) {
+                more = more || cxn.m_callbacksToInvoke.get() > 0;
             }
+            /*
+             * Back off to spinning at five millis. Try and get drain to be a little
+             * more prompt. Spinning sucks!
+             */
             if (more) {
-                Thread.sleep(5);
+                if (Thread.interrupted()) throw new InterruptedException();
+                LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
+                if (Thread.interrupted()) throw new InterruptedException();
+                if (sleep < 5000) {
+                    sleep += 500;
+                }
             }
         } while(more);
     }
 
     Distributer() {
         this( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
                 false);
     }
 
     Distributer(
             boolean useMultipleThreads,
-            long procedureCallTimeoutMS,
+            long procedureCallTimeoutNanos,
             long connectionResponseTimeoutMS,
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
             m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
         m_network.start();
-        m_procedureCallTimeoutMS = procedureCallTimeoutMS;
-        m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
+        m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
+        m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
         m_useClientAffinity = useClientAffinity;
 
         // schedule the task that looks for timed-out proc calls and connections
@@ -792,7 +940,8 @@ class Distributer {
             //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
             final ByteBuffer buf = serializeSPI(spi);
-            cxn.createWork(spi.getHandle(),
+            cxn.createWork(System.nanoTime(),
+                    spi.getHandle(),
                     spi.getProcName(),
                     serializeSPI(spi),
                     new SubscribeCallback(),
@@ -801,7 +950,8 @@ class Distributer {
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            cxn.createWork(spi.getHandle(),
+            cxn.createWork(System.nanoTime(),
+                    spi.getHandle(),
                     spi.getProcName(),
                     serializeSPI(spi),
                     new TopoUpdateCallback(),
@@ -813,7 +963,8 @@ class Distributer {
             if (!m_fetchedCatalog) {
                 spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
-                cxn.createWork(spi.getHandle(),
+                cxn.createWork(System.nanoTime(),
+                        spi.getHandle(),
                         spi.getProcName(),
                         serializeSPI(spi),
                         new ProcUpdateCallback(),
@@ -837,10 +988,13 @@ class Distributer {
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            final boolean ignoreBackpressure, final long timeout)
+            final boolean ignoreBackpressure, final long timeoutNanos)
             throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
+
+        //The time when the transaction was submitted and the timeout and latency should be relative to
+        final long nowNanos = System.nanoTime();
 
         NodeConnection cxn = null;
         boolean backpressure = true;
@@ -965,7 +1119,7 @@ class Distributer {
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
+            cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
         }
 
         return !backpressure;
@@ -1023,13 +1177,11 @@ class Distributer {
                 new TreeMap<Long, Map<String, ClientStats>>();
 
             for (NodeConnection conn : m_connections) {
-                synchronized (conn) {
-                    Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
-                    for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
-                        connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
-                    }
-                    retval.put(conn.connectionId(), connMap);
+                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
+                    connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
                 }
+                retval.put(conn.connectionId(), connMap);
             }
 
 
@@ -1041,7 +1193,7 @@ class Distributer {
 
         Map<Long, Pair<String, long[]>> ioStats;
         try {
-            ioStats = m_network.getIOStats(false);
+            ioStats = m_network.getIOStats(false, ImmutableList.<IOStatsIntf>of());
         } catch (Exception e) {
             return null;
         }

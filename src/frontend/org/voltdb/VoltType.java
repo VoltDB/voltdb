@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -341,11 +342,12 @@ public enum VoltType {
         m_jdbcClass = jdbcClass;
     }
 
-    private final static Map<Class<?>, VoltType> s_classes;
+    private final static ImmutableMap<Class<?>, VoltType> s_classes;
     //Update this if you add a type.
     private final static VoltType s_types[] = new VoltType[26];
     static {
-        s_classes = new HashMap<Class<?>, VoltType>();
+        ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
+        HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
         for (VoltType type : values()) {
             s_types[type.m_val] = type;
             for (Class<?> cls : type.m_classes) {
@@ -358,13 +360,15 @@ public enum VoltType {
                 // Unfortunately, either response gets associated with the source lines of the first call to
                 // VoltType (like in DDLCompiler), rather than here.
                 // assert(s_classes.get(cls) == null);
-                if (s_classes.get(cls) != null) {
+                if (validation.get(cls) != null) {
                     // This message seems to just get buried by the java runtime.
                     throw new RuntimeException("Associate each java class with at most one VoltType.");
                 }
-                s_classes.put(cls, type);
+                validation.put(cls, type);
+                b.put(cls, type);
             }
         }
+        s_classes = b.build();
     }
 
     /**
@@ -500,6 +504,10 @@ public enum VoltType {
                     "Asking for fixed size for non-fixed or unknown type.");
 
         }
+        return m_lengthInBytes;
+    }
+
+    public int getLengthInBytesForFixedTypesWithoutCheck() {
         return m_lengthInBytes;
     }
 

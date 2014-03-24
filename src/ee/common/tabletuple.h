@@ -171,7 +171,7 @@ public:
                   if (!getNValue(i).isNull())
                   {
                       bytes += (sizeof (int32_t) +
-                                ValuePeeker::peekObjectLength(getNValue(i)));
+                                ValuePeeker::peekObjectLength_withoutNull(getNValue(i)));
                   }
                 break;
               default:
@@ -206,7 +206,7 @@ public:
                         bytes +=
                             StringRef::
                             computeStringMemoryUsed((ValuePeeker::
-                                                     peekObjectLength(getNValue(i))));
+                                                     peekObjectLength_withoutNull(getNValue(i))));
                     }
                 }
             }
@@ -743,7 +743,7 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
             continue;
         }
-        getNValue(i).serializeToExport(io);
+        getNValue(i).serializeToExport_withoutNull(io);
     }
 }
 
@@ -787,7 +787,7 @@ inline int TableTuple::compare(const TableTuple &other) const {
             return diff;
         }
     }
-    return 0;
+    return VALUE_COMPARE_EQUAL;
 }
 
 inline size_t TableTuple::hashCode(size_t seed) const {

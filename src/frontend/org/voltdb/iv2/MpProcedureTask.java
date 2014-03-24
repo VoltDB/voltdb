@@ -120,6 +120,7 @@ public class MpProcedureTask extends ProcedureTask
         if (m_isRestart &&
                 spName.startsWith("@") &&
                 !spName.startsWith("@AdHoc") &&
+                !spName.startsWith("@LoadMultipartitionTable") &&
                 !spName.equals("@UpdateApplicationCatalog"))
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);

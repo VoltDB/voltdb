@@ -50,7 +50,9 @@ class Labeler {
 @Canonical
 class Row {
 	long date
-	int five9s
+    double three9s
+    double four9s
+    double five9s
 	int errors
 	String mark
 
@@ -73,9 +75,12 @@ class Row {
 	String getAnnotation() {
 		mark ? "'${mark}'" : 'undefined'
 	}
-	String getRow() {
-		"[new Date(${date}), ${five9s}, ${annotation}, ${text}, ${errors}]"
-	}
+    String getAnnotatedRow() {
+        "[new Date(${date}), ${five9s}, ${annotation}, ${text}]"
+    }
+    String getNinesRow() {
+        "[new Date(${date}), ${three9s}, ${four9s}, ${five9s}]"
+    }
 	void label(Labeler lblr) {
 		if (titles && !mark) mark = lblr.label
 	}
@@ -85,7 +90,8 @@ def cli = new CliBuilder(usage: 'chartbuilder.groovy [options] [log-files]')
 
 cli.c(longOpt: 'csv-file', required:true, argName:'file', args:1, 'periodic measurements csv file' )
 cli.h(longOpt: 'help', required:false, 'usage information')
-cli.o(longOpt: 'output', required:false, argName:'file', args:1, 'chart output file')
+cli.f(longOpt: 'five9s', required:false, argName:'file', args:1, 'fine nines chart output file [default: annotatedFive9s.html]')
+cli.a(longOpt: 'all9s', required:false, argName:'file', args:1, 'all nines chart output file [default: all9s.html')
 
 def opts = cli.parse(args)
 if (!opts) return
@@ -94,10 +100,14 @@ else if (opts.h) {
 	return
 }
 
-def pw = System.out
-if (opts.o) {
-	pw = new PrintWriter(new FileWriter(opts.o),true)
-}
+def five9sFN = "annotatedFive9s.html"
+def all9sFN = "all9s.html"
+
+if (opts.o) five9sFN = opts.o
+if (opts.a) all9sFN = opts.a
+
+def fpw = new PrintWriter(new FileWriter(five9sFN),true)
+def apw = new PrintWriter(new FileWriter(all9sFN),true)
 
 def periodicFH = new File(opts.c)
 
@@ -105,7 +115,14 @@ def data = [:] as TreeMap
 
 new GZIPInputStream(new FileInputStream(periodicFH)).readLines()[1..-1].collectEntries(data) {
 	s=it.split(',')
-	[s[1] as long, new Row(s[1] as long, s[7] as int, s[4] as int)]
+    [s[1] as long,
+    new Row(
+        s[1]  as long,   // timestamp
+        s[9]  as double, // three nines
+        s[10] as double, // four nines
+        s[11] as double, // five nine
+        s[3..5].collect { it as int }.inject(0) {a,i -> a+i} // aborts + errors + timeouts
+    )]
 }
 
 def triggers = []
@@ -180,9 +197,8 @@ def txt = """<html>
         data.addColumn('number', 'Five9s');
         data.addColumn({type: 'string', role: 'annotation'});
         data.addColumn({type: 'string', role: 'annotationText'});
-        data.addColumn('number', 'Errors');
         data.addRows([
-          ${rows.collect {it.row}.join(",\n          ")}
+          ${rows.collect {it.annotatedRow}.join(",\n          ")}
         ]);
 
         var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
@@ -208,4 +224,47 @@ def txt = """<html>
 </html>
 """
 
-pw.println txt
+fpw.println txt
+fpw.close()
+
+txt = """<html>
+  <head>
+    <script type='text/javascript' src='http://www.google.com/jsapi'></script>
+    <script type='text/javascript'>
+      google.load("visualization", "1", {packages:["corechart"]});
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = new google.visualization.DataTable();
+        data.addColumn('datetime', 'Date');
+        data.addColumn('number', 'Three9s');
+        data.addColumn('number', 'Four9s');
+        data.addColumn('number', 'Five9s');
+        data.addRows([
+          ${rows.collect {it.ninesRow}.join(",\n          ")}
+        ]);
+
+        var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+
+        var options = {
+          title: 'KVBenchmark All9s',
+          explorer: {
+            axis: 'horizontal',
+            maxZoomIn: 0.001,
+            actions: ['dragToZoom', 'rightClickToReset']
+          },
+          hAxis : {title: 'Date' }
+        };
+
+        chart.draw(data, options);
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id='chart_div' style='width: 1350px; height: 750px;'></div>
+  </body>
+</html>
+"""
+
+apw.print txt
+apw.close()

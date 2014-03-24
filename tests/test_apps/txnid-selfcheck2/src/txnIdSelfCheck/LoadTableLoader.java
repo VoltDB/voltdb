@@ -137,20 +137,15 @@ public class LoadTableLoader extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE) {
-                // log what happened
-                log.error("LoadTableLoader gracefully failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
+            if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
+                // log what happened status will be logged in json error log.
+                log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 System.exit(-1);
             }
+            //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
-                //Remove from cp or del queue
-                if (shouldCopy != 0) {
-                    cpDelQueue.remove(p);
-                } else {
-                    onlyDelQueue.remove(p);
-                }
                 // log what happened
                 log.error("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
@@ -291,6 +286,8 @@ public class LoadTableLoader extends Thread {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);
+                final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
+
                 // try to insert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
@@ -309,7 +306,7 @@ public class LoadTableLoader extends Thread {
                     //Ad if successfully queued but remove if proc fails.
                     if (success) {
                         if (shouldCopy != 0) {
-                            cpDelQueue.add(p);
+                            lcpDelQueue.add(p);
                         } else {
                             onlyDelQueue.add(p);
                         }
@@ -317,12 +314,13 @@ public class LoadTableLoader extends Thread {
                 }
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
+                cpDelQueue.addAll(lcpDelQueue);
                 long nextRowCount = getRowCount();
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                if (onlyDelQueue.size() > 100) {
+                if (onlyDelQueue.size() > 100 && m_shouldContinue.get()) {
                     List<Long> workList = new ArrayList<Long>();
                     onlyDelQueue.drainTo(workList, 100);
                     CountDownLatch odlatch = new CountDownLatch(workList.size());

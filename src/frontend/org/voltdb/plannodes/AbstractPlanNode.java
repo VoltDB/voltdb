@@ -757,28 +757,32 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.ID.name()).value(m_id);
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
-        stringer.key(Members.INLINE_NODES.name()).array();
 
+        if (m_inlineNodes.size() > 0) {
+            stringer.key(Members.INLINE_NODES.name()).array();
 
-        PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
-        int i = 0;
-        for (PlanNodeType type : m_inlineNodes.keySet()) {
-            types[i++] = type;
+            PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
+            int i = 0;
+            for (PlanNodeType type : m_inlineNodes.keySet()) {
+                types[i++] = type;
+            }
+            Arrays.sort(types);
+            for (PlanNodeType type : types) {
+                AbstractPlanNode node = m_inlineNodes.get(type);
+                assert(node != null);
+                assert(node instanceof JSONString);
+                stringer.value(node);
+            }
+            stringer.endArray();
         }
-        Arrays.sort(types);
-        for (PlanNodeType type : types) {
-            AbstractPlanNode node = m_inlineNodes.get(type);
-            assert(node != null);
-            assert(node instanceof JSONString);
-            stringer.value(node);
-        }
-        stringer.endArray();
 
-        stringer.key(Members.CHILDREN_IDS.name()).array();
-        for (AbstractPlanNode node : m_children) {
-            stringer.value(node.getPlanNodeId().intValue());
+        if (m_children.size() > 0) {
+            stringer.key(Members.CHILDREN_IDS.name()).array();
+            for (AbstractPlanNode node : m_children) {
+                stringer.value(node.getPlanNodeId().intValue());
+            }
+            stringer.endArray();
         }
-        stringer.endArray(); //end inlineNodes
 
         outputSchemaToJSON(stringer);
     }
@@ -788,7 +792,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
             for (SchemaColumn column : m_outputSchema.getColumns()) {
-                column.toJSONString(stringer);
+                column.toJSONString(stringer, true);
             }
             stringer.endArray();
         }

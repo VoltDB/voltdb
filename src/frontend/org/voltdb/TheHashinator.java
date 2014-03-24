@@ -287,6 +287,19 @@ public abstract class TheHashinator {
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
+    public static int getPartitionForParameter(VoltType partitionType, Object invocationParameter) {
+        return instance.get().getSecond().getHashedPartitionForParameter(partitionType, invocationParameter);
+    }
+
+    /**
+     * Given the type of the targeting partition parameter and an object,
+     * coerce the object to the correct type and hash it.
+     * NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT
+     * YOU FIGURE OUT THE PARTITIONING FOR A PARAMETER! ON SERVER
+     *
+     * @return The partition best set up to execute the procedure.
+     * @throws VoltTypeException
+     */
     public static int getPartitionForParameter(int partitionType, Object invocationParameter)
             throws VoltTypeException
     {
@@ -304,10 +317,24 @@ public abstract class TheHashinator {
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
-    public int getHashedPartitionForParameter(int partitionValueType, Object partitionValue)
-            throws VoltTypeException {
+    public int getHashedPartitionForParameter(int partitionValueType, Object partitionValue) {
         final VoltType partitionParamType = VoltType.get((byte) partitionValueType);
+        return getHashedPartitionForParameter(partitionParamType, partitionValue);
+    }
 
+    /**
+     * Given the type of the targeting partition parameter and an object,
+     * coerce the object to the correct type and hash it.
+     * NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT
+     * THE PARTITIONING FOR A PARAMETER! THIS IS SHARED BY SERVER AND CLIENT
+     * CLIENT USES direct instance method as it initializes its own per connection
+     * Hashinator.
+     *
+     * @return The partition best set up to execute the procedure.
+     * @throws VoltTypeException
+     */
+    public int getHashedPartitionForParameter(VoltType partitionParamType, Object partitionValue)
+            throws VoltTypeException {
         // Special cases:
         // 1) if the user supplied a string for a number column,
         // try to do the conversion. This makes it substantially easier to

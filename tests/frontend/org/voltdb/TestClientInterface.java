@@ -167,6 +167,7 @@ public class TestClientInterface {
          * construction
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
+        doReturn(m_cxn.connectionId()).when(m_handler).connectionId();
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
         doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
@@ -495,10 +496,17 @@ public class TestClientInterface {
     public void testGC() throws Exception {
         ByteBuffer msg = createMsg("@GC");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
+        assertNull(resp);
+
+        ByteBuffer b = responses.take();
+        resp = new ClientResponseImpl();
+        b.position(4);
+        resp.initFromBuffer(b);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable vt = resp.getResults()[0];
+        assertTrue(vt.advanceRow());
         //System.gc() should take at least a little time
-        assertTrue(Long.valueOf(resp.getStatusString()) > 10000);
+        assertTrue(resp.getResults()[0].getLong(0) > 10000);
     }
 
     @Test
@@ -650,10 +658,10 @@ public class TestClientInterface {
         DeferredSerialization resp = responsesDS.take();
 
         if (shouldRestart) {
-            assertEquals(0, resp.serialize().length);
+            assertEquals(-1, resp.getSerializedSize());
             checkInitMsgSent("hello", 1, true, true);
         } else {
-            assertEquals(1, resp.serialize().length);
+            assertTrue(-1 != resp.getSerializedSize());
             verify(m_messenger, never()).send(anyLong(), any(VoltMessage.class));
         }
 
@@ -736,7 +744,10 @@ public class TestClientInterface {
             //to make its way to the client
             ByteBuffer expectedBuf = getClientResponse("bar");
             statsAnswers.offer(dsOf(expectedBuf));
-            assertEquals(expectedBuf, responsesDS.take().serialize()[0]);
+            DeferredSerialization ds = responsesDS.take();
+            ByteBuffer actualBuf = ByteBuffer.allocate(ds.getSerializedSize());
+            ds.serialize(actualBuf);
+            assertEquals(expectedBuf, actualBuf);
         } finally {
             RateLimitedClientNotifier.WARMUP_MS = 1000;
             ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 5000;
@@ -747,11 +758,15 @@ public class TestClientInterface {
     private DeferredSerialization dsOf(final ByteBuffer buf) {
         return new DeferredSerialization() {
             @Override
-            public ByteBuffer[] serialize() throws IOException {
-                return new ByteBuffer[] {buf.duplicate()};
+            public void serialize(final ByteBuffer outbuf) throws IOException {
+                outbuf.put(buf);
             }
             @Override
             public void cancel() {}
+            @Override
+            public int getSerializedSize() {
+                return buf.remaining();
+            }
         };
     }
 
