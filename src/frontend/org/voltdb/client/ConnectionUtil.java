@@ -415,7 +415,7 @@ public class ConnectionUtil {
         byte version = loginResponse.get();
         if (version != (byte)0) {
             channel.close();
-            throw new IOException("Ecountered unexpected version for the login response message: " + version);
+            throw new IOException("Encountered unexpected version for the login response message: " + version);
         }
         return loginResponse;
     }
