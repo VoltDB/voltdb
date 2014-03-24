@@ -748,19 +748,19 @@ public class DDLCompiler {
         // match IMPORT CLASS statements
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
-            String classNameStr = statementMatcher.group(1);
-
-            // check that the match pattern is a valid match pattern
-            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
-            if (!wildcardMatcher.matches()) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid IMPORT CLASS match expression: '%s'",
-                        classNameStr)); // remove trailing semicolon
-            }
-
-            ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-                // Only generate warnings and errors if this is not for the StatementPlanner
+                // Only process the statement if this is not for the StatementPlanner
+                String classNameStr = statementMatcher.group(1);
+
+                // check that the match pattern is a valid match pattern
+                Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
+                if (!wildcardMatcher.matches()) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid IMPORT CLASS match expression: '%s'",
+                            classNameStr)); // remove trailing semicolon
+                }
+
+                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
                 if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "IMPORT CLASS not found: '%s'",
