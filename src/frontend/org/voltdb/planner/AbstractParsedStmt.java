@@ -806,4 +806,11 @@ public abstract class AbstractParsedStmt {
         throw new RuntimeException("isOrderDeterministic not supported by DML statements");
     }
 
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
+    }
+
 }

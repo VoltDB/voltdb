@@ -74,6 +74,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -1887,21 +1888,43 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    //Run System.gc() in it's own thread because it will block
+    //until collection is complete and we don't want to do that from an application thread
+    //because the collector is partially concurrent and we can still make progress
+    private final ExecutorService m_systemGCThread =
+            CoreUtils.getCachedSingleThreadExecutor("System.gc() invocation thread", 1000);
+
     /*
      * Allow System.gc() to be invoked remotely even when JMX isn't enabled.
      * Can be used to perform old gen GCs on a schedule during non-peak times
      */
-    private ClientResponseImpl dispatchSystemGC(ClientInputHandler handler,
-            StoredProcedureInvocation task, AuthSystem.AuthUser user) {
+    private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
+            final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
         if (user.hasSystemProcPermission()) {
-            final long start = System.nanoTime();
-            System.gc();
-            final long duration = System.nanoTime() - start;
-            return new ClientResponseImpl(
-                    ClientResponseImpl.SUCCESS,
-                    new VoltTable[] {},
-                    Long.toString(duration),
-                    task.clientHandle);
+            m_systemGCThread.execute(new Runnable() {
+                @Override
+                public void run() {
+                    final long start = System.nanoTime();
+                    System.gc();
+                    final long duration = System.nanoTime() - start;
+                    VoltTable vt = new VoltTable(
+                            new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
+                    vt.addRow(duration);
+                    final ClientResponseImpl response = new ClientResponseImpl(
+                            ClientResponseImpl.SUCCESS,
+                            new VoltTable[] { vt },
+                            null,
+                            task.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    response.flattenToBuffer(buf).flip();
+
+                    ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
+                    if (cihm == null) return;
+                    cihm.connection.writeStream().enqueue(buf);
+                }
+            });
+            return null;
         } else {
             return new ClientResponseImpl(
                     ClientResponseImpl.GRACEFUL_FAILURE,
