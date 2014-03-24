@@ -252,10 +252,51 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkImportValidity("你rg.voltdb.V*"));
         assertTrue(checkImportValidity("org.我不爱你.V*"));
         assertFalse(checkImportValidity("org.1我不爱你.V*"));
-        assertTrue(checkImportValidity("org"));
+        assertFalse(checkImportValidity("org"));
         assertTrue(checkImportValidity("*org"));
         assertTrue(checkImportValidity("org.**.RealVoltDB"));
         assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
+        assertTrue(checkImportValidity("org.voltdb.RealVoltDB"));
+    }
+
+    boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
+        File jarOut = new File("checkImportValidity.jar");
+        jarOut.deleteOnExit();
+
+        String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
+        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
+        schemaFile1.deleteOnExit();
+
+        String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
+        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaFile2.deleteOnExit();
+
+        // compile and fail on bad import
+        VoltCompiler compiler = new VoltCompiler();
+        try {
+            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return rslt;
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return false;
+        }
+    }
+
+    public void testExtraClassesFrom2Ddls() {
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.voltdb.V**", false));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb.**", "org.voltdb.V**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.**", true));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb.*", "org.voltdb.V**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.*", true));
+        assertFalse(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.*", false));
+        assertFalse(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.woltdb", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.RealVoltDB", false));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.voltdb.RealVoltDB", false));
     }
 
     public void testIndexedMinMaxViews() {

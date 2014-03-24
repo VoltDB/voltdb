@@ -976,7 +976,7 @@ public class VoltCompiler {
         }
 
         // add extra classes from the DDL
-        m_addedClasses = voltDdlTracker.m_extraClassses;
+        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         addExtraClasses(jarOutput);
     }
 
@@ -1074,9 +1074,9 @@ public class VoltCompiler {
                     throw new VoltCompilerException(msg);
                 }
                 // reset the added classes to the actual added classes
-                m_addedClasses = addedClasses.toArray(new String[0]);
             }
         }
+        m_addedClasses = addedClasses.toArray(new String[0]);
     }
 
     /**

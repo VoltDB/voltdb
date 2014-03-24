@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import java.io.File;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,11 +32,16 @@ import java.util.regex.Pattern;
  *
  */
 public class ClassMatcher {
+    enum ClassNameMatchStatus {
+        MATCH_FOUND,
+        NO_WILDCARD_MATCH,
+        NO_EXACT_MATCH,
+    }
 
     /** List of .class files found in the classpath */
     String m_classList = null;
     /** List of matches found after applying patterns */
-    Set<String> m_classNameMatches = new TreeSet<String>();
+    SortedSet<String> m_classNameMatches = new TreeSet<String>();
 
     /**
      * Add a pattern that matches classes from the classpath
@@ -46,7 +52,8 @@ public class ClassMatcher {
      * of ant wildcards, such as "org.voltdb.**" or
      * "org.voltdb.*bar" or "org.volt**.Foo"
      */
-    public void addPattern(String classNamePattern) {
+    public ClassNameMatchStatus addPattern(String classNamePattern) {
+        boolean matchFound = false;
         if (m_classList == null) {
             m_classList = getClasspathClassFileNames();
         }
@@ -60,11 +67,11 @@ public class ClassMatcher {
             classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
         }
 
-        preppedName = preppedName.replace("**", "[\\w.\\$]+");
-        preppedName = preppedName.replace("*",  "[\\w\\$]+");
+        String regExPreppedName = preppedName.replace("**", "[\\w.\\$]+");
+        regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]+");
 
         String regex = "^" + // (line start)
-                       preppedName +
+                       regExPreppedName +
                        "$";  // (line end)
 
         Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
@@ -76,22 +83,35 @@ public class ClassMatcher {
             if (match.contains("$")) {
                 continue;
             }
+            matchFound = true;
             m_classNameMatches.add(match);
         }
+        if (matchFound) {
+            return ClassNameMatchStatus.MATCH_FOUND;
+        }
+        else {
+            if (preppedName.compareTo(regExPreppedName) == 0) {
+                return ClassNameMatchStatus.NO_EXACT_MATCH;
+            }
+            else {
+                return ClassNameMatchStatus.NO_WILDCARD_MATCH;
+            }
+        }
+
     }
 
     /**
-     * Return the list of matched classnames in lexographical order.
+     * Return the set of matched classnames in lexographical order.
      */
-    public String[] getMatchedClassList() {
-        return m_classNameMatches.toArray(new String[0]);
+    public SortedSet<String> getMatchedClassList() {
+        return m_classNameMatches;
     }
 
     /**
      * Empty the data structures of this class to save memory.
      */
     public void clear() {
-        m_classList = "";
+        m_classList = null;
         m_classNameMatches.clear();
     }
 
