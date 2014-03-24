@@ -277,7 +277,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             @Override
             public Object call() throws Exception
             {
-                final JSONObject jsObj = new JSONObject((String) params[0]);
+                final String jsString = String.class.cast(params[0]);
+                final JSONObject jsObj = new JSONObject(jsString);
                 final String format = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
                 boolean initiateSnapshot;
                 VoltTable checkResult = null;
@@ -285,7 +286,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 // Only do file check if this snapshot actually writes to files, stream snapshots don't
                 if (SnapshotFormat.getEnumIgnoreCase(format).isFileBased()) {
                     // Do scan work on all known live hosts
-                    VoltMessage msg = new SnapshotCheckRequestMessage((String) params[0]);
+                    VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
                     List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                     for (int hostId : liveHosts) {
                         m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
@@ -700,21 +701,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final VoltTable results[] = clientResponse.getResults();
                 final VoltTable result = results[0];
                 boolean success = true;
-                if (result.getColumnCount() == 1) {
-                    boolean advanced = result.advanceRow();
-                    assert(advanced);
-                    assert(result.getColumnCount() == 1);
-                    assert(result.getColumnType(0) == VoltType.STRING);
-                    loggingLog.error("Snapshot failed with failure response: " + result.getString(0));
-                    success = false;
-                }
 
                 if (   result.getColumnCount() == 2
                     && "RESULT".equals(result.getColumnName(0))
                     && "ERR_MSG".equals(result.getColumnName(1))) {
                     boolean advanced = result.advanceRow();
                     assert(advanced);
-                    loggingLog.error("Snapshot failed with failure response: " + result.getString("ERR_MSG"));
+                    loggingLog.warn("Snapshot failed with failure response: " + result.getString("ERR_MSG"));
                     success = false;
                 }
 
