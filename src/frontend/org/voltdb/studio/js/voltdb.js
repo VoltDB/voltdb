@@ -244,6 +244,7 @@ var IVoltDB = (function(){
                           , '@UpdateLogging': { '1' : ['xml'] }
                           , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
                           , '@GetPartitionKeys': { '1': ['varchar']}
+                          , '@GC' : { '0' : [] }
                         };
         return this;
     }
