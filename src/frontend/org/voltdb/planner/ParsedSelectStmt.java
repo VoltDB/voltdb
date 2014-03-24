@@ -998,6 +998,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     protected static void rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
+
         Collection<AbstractExpression> inExprList = ExpressionUtil.uncombineAny(inListExpr.getLeft());
         int idx = 0;
         assert(inExprList.size() == selectStmt.displayColumns.size());
@@ -1007,12 +1008,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // must be added to the subquery's HAVING expressions. If not, it should be added
         // to the WHERE expressions
         for (AbstractExpression expr : inExprList) {
-            ParsedSelectStmt.ParsedColInfo colInfo = selectStmt.displayColumns.get(idx);
+            ParsedSelectStmt.ParsedColInfo colInfo = selectStmt.displayColumns.get(idx++);
             assert(colInfo.expression != null);
-            AbstractExpression clonedExpr = (AbstractExpression)expr.clone();
             // Create new compare equal expression
+            // The TVE are from parent stmt
+            expr = replaceTveWithPve(selectStmt.m_parameterTveMap, expr);
+
             AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    clonedExpr, (AbstractExpression) colInfo.expression.clone());
+                    expr, (AbstractExpression) colInfo.expression.clone());
             // Check if this column contains aggregate expression
             if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
                 havingList.add(equalityExpr);
@@ -1094,6 +1097,42 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             selectStmt.aggregationList.clear();
             selectStmt.parseHavingExpression(true);
         }
+    }
+
+    /**
+     * Helper method to replace all TVEs with the corresponding PVEs. The original TVE
+     * is placed into the parameter TVE map to be propagated to the EE
+     *
+     * @param paramMap
+     * @param expr
+     * @return
+     */
+    private static AbstractExpression replaceTveWithPve(Map<Integer, TupleValueExpression> paramMap, AbstractExpression expr) {
+        assert(expr != null);
+        if (expr instanceof TupleValueExpression) {
+            TupleValueExpression tve = (TupleValueExpression) expr;
+            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
+            ParameterValueExpression pve = new ParameterValueExpression();
+            pve.setParameterIndex(paramIdx);
+            pve.setValueSize(tve.getValueSize());
+            pve.setValueType(tve.getValueType());
+            paramMap.put(paramIdx, tve);
+            return pve;
+        }
+        if (expr.getLeft() != null) {
+            expr.setLeft(replaceTveWithPve(paramMap, expr.getLeft()));
+        }
+        if (expr.getRight() != null) {
+            expr.setRight(replaceTveWithPve(paramMap, expr.getRight()));
+        }
+        if (expr.getArgs() != null) {
+            List<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression argument : expr.getArgs()) {
+                newArgs.add(replaceTveWithPve(paramMap, argument));
+            }
+            expr.setArgs(newArgs);
+        }
+        return expr;
     }
 
     public boolean hasAggregateExpression () {

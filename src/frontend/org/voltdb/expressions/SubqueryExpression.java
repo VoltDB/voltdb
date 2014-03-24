@@ -17,10 +17,11 @@
 
 package org.voltdb.expressions;
 
-import java.util.Collection;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -37,16 +38,17 @@ public class SubqueryExpression extends AbstractExpression {
 
     public enum Members {
         SUBQUERY_ID,
-        SUBQUERY_ROOT_NODE_ID;
+        SUBQUERY_ROOT_NODE_ID,
+        PARAM_IDX;
     }
 
     private TempTable m_subquery;
     private int m_subqueryId;
     private int m_subqueryNodeId = -1;
     private AbstractPlanNode m_subqueryNode = null;
-    // Parent TVE that are referenced from the child subquery mapped to the corresponding parameter
-    // from that statement
-    private Map<Integer, TupleValueExpression> m_parameterTveMap = new HashMap<Integer, TupleValueExpression>();
+    // TODO ENG_451 - better comment
+    // List of parameter indexes that this subquery depends on
+    private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
 
     /**
      * Create a new SubqueryExpression
@@ -62,10 +64,10 @@ public class SubqueryExpression extends AbstractExpression {
             m_subqueryNode = m_subquery.getBetsCostPlan().rootPlanGraph;
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
-        AbstractExpression expr = m_subquery.getSubQuery().joinTree.getAllFilters();
-        replaceParentTveWithPve(expr);
         m_valueType = VoltType.BIGINT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        m_args = new ArrayList<AbstractExpression>();
+        moveUpTVE();
     }
 
     /**
@@ -82,18 +84,6 @@ public class SubqueryExpression extends AbstractExpression {
 
     public AbstractParsedStmt getSubquery() {
         return m_subquery.getSubQuery();
-    }
-
-    public Collection<TupleValueExpression> getParameterTves() {
-        return m_parameterTveMap.values();
-    }
-
-    public Map<Integer, TupleValueExpression> getParameterTveMap() {
-        return m_parameterTveMap;
-    }
-
-    public void setParameterTveMap(Map<Integer, TupleValueExpression> parameterTveMap) {
-        m_parameterTveMap = parameterTveMap;
     }
 
     public int getSubqueryId() {
@@ -114,16 +104,21 @@ public class SubqueryExpression extends AbstractExpression {
         m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
     }
 
+    public List<Integer> getParameterIdxList() {
+        return m_parameterIdxList;
+    }
 
     @Override
     public Object clone() {
         SubqueryExpression clone = new SubqueryExpression(m_subquery);
-        // The parent TVE map must be cloned explicitly because the original TVEs
+        // The parameter TVE map must be cloned explicitly because the original TVEs
         // from the statement are already replaced with the corresponding PVEs
-        clone.m_parameterTveMap = new HashMap<Integer, TupleValueExpression>();
-        for (Map.Entry<Integer, TupleValueExpression> tveEntry: m_parameterTveMap.entrySet()) {
-            clone.m_parameterTveMap.put(tveEntry.getKey(), (TupleValueExpression)tveEntry.getValue().clone());
+        clone.m_args = new ArrayList<AbstractExpression>();
+        for (AbstractExpression arg: m_args) {
+            clone.m_args.add((AbstractExpression)arg.clone());
         }
+        clone.m_parameterIdxList = new ArrayList<Integer>();
+        clone.m_parameterIdxList.addAll(m_parameterIdxList);
         return clone;
     }
 
@@ -159,12 +154,27 @@ public class SubqueryExpression extends AbstractExpression {
         super.toJSONString(stringer);
         stringer.key(Members.SUBQUERY_ID.name()).value(m_subqueryId);
         stringer.key(Members.SUBQUERY_ROOT_NODE_ID.name()).value(m_subqueryNodeId);
+        if (!m_parameterIdxList.isEmpty()) {
+            stringer.key(Members.PARAM_IDX.name()).array();
+            for (Integer idx : m_parameterIdxList) {
+                stringer.value(idx);
+            }
+            stringer.endArray();
+        }
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
+        if (obj.has(Members.PARAM_IDX.name())) {
+            JSONArray paramIdxArray = obj.getJSONArray(Members.PARAM_IDX.name());
+            int paramSize = paramIdxArray.length();
+            assert(m_args != null && paramSize == m_args.size());
+            for (int i = 0; i < paramSize; ++i) {
+                m_parameterIdxList.add(paramIdxArray.getInt(i));
+            }
+        }
     }
 
     @Override
@@ -185,31 +195,27 @@ public class SubqueryExpression extends AbstractExpression {
         // Nothing to do there
     }
 
-    /** Traverse down the expression tree identifying all the TVEs which reference the
-     * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
-     * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
-     * and new PVE which will be required by the back-end executor
-     *
-     * @param expr
-     * @return modified expression
-     */
-    private AbstractExpression replaceParentTveWithPve(AbstractExpression expr) {
-        if (expr == null) {
-            return null;
-        } else if (expr instanceof TupleValueExpression) {
-            if (((TupleValueExpression)expr).getOrigStmtId() != m_subqueryId) {
-                int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
-                ParameterValueExpression pve = new ParameterValueExpression();
-                pve.setParameterIndex(paramIdx);
-                pve.setValueSize(expr.getValueSize());
-                pve.setValueType(expr.getValueType());
-                m_parameterTveMap.put(paramIdx, (TupleValueExpression)expr);
-                return pve;
+    private void moveUpTVE() {
+        // Get TVE
+        /** Traverse down the expression tree identifying all the TVEs which reference the
+         * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
+         * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
+         * and new PVE which will be required by the back-end executor*/
+        AbstractParsedStmt subqueryStmt = m_subquery.getSubQuery();
+        AbstractParsedStmt parentStmt = m_subquery.getSubQuery().m_parentStmt;
+        // we must have a parent -it's a subquery statement
+        assert(parentStmt != null);
+        for (Map.Entry<Integer, TupleValueExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
+            if(entry.getValue().getOrigStmtId() == parentStmt.stmtId) {
+                // TVE originates from the statement where this SubqueryExpression belongs to
+                m_args.add(entry.getValue());
+                m_parameterIdxList.add(entry.getKey());
+            } else {
+                  // TVE originates from the parent. Move it up
+                parentStmt.m_parameterTveMap.put(entry.getKey(), entry.getValue());
             }
-        } else {
-            expr.setLeft(replaceParentTveWithPve(expr.getLeft()));
-            expr.setRight(replaceParentTveWithPve(expr.getRight()));
         }
-        return expr;
+        subqueryStmt.m_parameterTveMap.clear();
     }
+
 }

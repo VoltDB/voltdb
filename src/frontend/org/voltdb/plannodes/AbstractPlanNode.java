@@ -105,8 +105,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_id = NEXT_PLAN_NODE_ID++;
     }
 
-    public void overrideId(int newId) {
-        m_id = newId;
+    public int overrideId(int newId) {
+        m_id = newId++;
+        return newId;
     }
 
     /**
@@ -911,7 +912,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
             jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadPlanNodesFromJSONArrays(jarray, db);
             List<AbstractPlanNode> list = pnt.getNodeList();
             for( AbstractPlanNode pn : list ) {
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);

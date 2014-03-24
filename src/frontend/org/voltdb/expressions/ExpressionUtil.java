@@ -247,11 +247,11 @@ public abstract class ExpressionUtil {
             tves.add((TupleValueExpression) input);
             return tves;
         } else if (input instanceof SubqueryExpression) {
-            // If the subquery is correlated, it references the columns from the parent query.
-            // Since this method collects only TVEs related to the current (parent) query,
-            // the subquery's TVE are ignored
             SubqueryExpression subqueryExpr = (SubqueryExpression) input;
-            tves.addAll(subqueryExpr.getParameterTves());
+            for(AbstractExpression tve : subqueryExpr.m_args) {
+                assert(tve instanceof TupleValueExpression);
+                tves.add((TupleValueExpression) tve);
+            }
             return tves;
         }
 

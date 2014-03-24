@@ -105,4 +105,43 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     return NULL;
 }
 
+int executeExecutionVector(std::vector<AbstractExecutor*>& executorList,
+                           const NValueArray& params) {
+    // Walk through the queue and execute each plannode.  The query
+    // planner guarantees that for a given plannode, all of its
+    // children are positioned before it in this list, therefore
+    // dependency tracking is not needed here.
+    size_t ttl = executorList.size();
+    Table *cleanUpTable = NULL;
+
+    for (int ctr = 0; ctr < ttl; ++ctr) {
+        AbstractExecutor *executor = executorList[ctr];
+        assert (executor);
+
+        if (executor->needsPostExecuteClear())
+            cleanUpTable =
+                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
+
+        try {
+            // Now call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
+            if (!executor->execute(params)) {
+                VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
+                if (cleanUpTable != NULL)
+                    cleanUpTable->deleteAllTuples(false);
+                return ENGINE_ERRORCODE_ERROR;
+            }
+        } catch (const SerializableEEException &e) {
+            VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
+            if (cleanUpTable != NULL)
+                cleanUpTable->deleteAllTuples(false);
+            throw;
+        }
+    }
+    if (cleanUpTable != NULL)
+        cleanUpTable->deleteAllTuples(false);
+
+    return ENGINE_ERRORCODE_SUCCESS;
+}
+
 }

@@ -30,11 +30,11 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.NestLoopInPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
@@ -250,30 +250,25 @@ public class TestSubQueries   extends PlannerTestCase {
 
     }
 
-    public void testInNlijInject() {
+    public void testExistsWithUserParams() {
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof NestLoopInPlanNode);
-        NestLoopInPlanNode npl = (NestLoopInPlanNode) pn;
-        NodeSchema ns = npl.getOutputSchema();
-        assertEquals(1, npl.getChildCount());
-        AbstractPlanNode cpn = npl.getChild(0);
-        assertEquals(ns, cpn.getOutputSchema());
-        AbstractPlanNode spn = npl.getSubqueryNode();
-        assertEquals(1, spn.getOutputSchema().size());
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
         // Check param indexes
-        AbstractExpression e1 = ((AbstractScanPlanNode) cpn).getPredicate();
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, e1.getExpressionType());
-        AbstractExpression pve = e1.getRight();
+        AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
+        AbstractExpression le = e.getLeft();
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
+        AbstractExpression pve = le.getRight();
         assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
         assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
-        AbstractExpression e2 = ((AbstractScanPlanNode) spn).getPredicate();
-        assertEquals(ExpressionType.COMPARE_EQUAL, e2.getExpressionType());
-        pve = e2.getRight();
-        assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
-        assertEquals(new Integer(1), ((ParameterValueExpression)pve).getParameterIndex());
+        AbstractExpression re = e.getRight();
+        assertEquals(ExpressionType.SUBQUERY, re.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) re;
+        assertEquals(1, subExpr.getArgs().size());
+        assertEquals(1, subExpr.getParameterIdxList().size());
+        assertEquals(Integer.valueOf(1), subExpr.getParameterIdxList().get(0));
     }
-
 
     public void testParamTveInOutputSchema() {
         AbstractPlanNode pn = compile("select r2.a from r2, r1 where r2.a = r1.a or " +
@@ -288,53 +283,33 @@ public class TestSubQueries   extends PlannerTestCase {
         verifyOutputSchema(nlp, "A", "A", "C");
     }
 
-    public void testExistsStay() {
-        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = ? or exists (select c from r1 where r1.c = r2.c)");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof SeqScanPlanNode);
-        SeqScanPlanNode spn = (SeqScanPlanNode) pn;
-        AbstractExpression expr = spn.getPredicate();
-        assertEquals(ExpressionType.CONJUNCTION_OR, expr.getExpressionType());
-        expr = expr.getRight();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, expr.getExpressionType());
-    }
-
     public void testInToExist() {
-        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in  (select c from r1)");
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in (select c from r1)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof NestLoopInPlanNode);
-        NestLoopInPlanNode npl = (NestLoopInPlanNode) pn;
-        NodeSchema ns = npl.getOutputSchema();
-        assertEquals(1, npl.getChildCount());
-        AbstractPlanNode cpn = npl.getChild(0);
-        assertEquals(ns, cpn.getOutputSchema());
-        AbstractPlanNode spn = npl.getSubqueryNode();
-        assertEquals(1, spn.getOutputSchema().size());
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
+        // Check param indexes
+        AbstractExpression e = spl.getPredicate();
+        assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) e;
+        assertEquals(1, subExpr.getArgs().size());
+        assertEquals(1, subExpr.getParameterIdxList().size());
+        assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
+        AbstractExpression tve = subExpr.getArgs().get(0);
+        assertTrue(tve instanceof TupleValueExpression);
+        assertEquals("R2", ((TupleValueExpression)tve).getTableName());
+        assertEquals("A", ((TupleValueExpression)tve).getColumnName());
     }
 
     public void testInToExistsComplex() {
       AbstractPlanNode pn = compile("select * from R1 where (A,C) in (select 2, C from r2 where r2.c > r1.c group by c)");
       pn = pn.getChild(0);
-      assertTrue(pn instanceof NestLoopInPlanNode);
-      NestLoopInPlanNode npl = (NestLoopInPlanNode) pn;
-      AbstractPlanNode spn = npl.getSubqueryNode();
-      assertTrue(spn instanceof SeqScanPlanNode);
-      AbstractExpression expr = ((SeqScanPlanNode) spn).getPredicate();
-      assertEquals(ExpressionType.CONJUNCTION_AND, expr.getExpressionType());
-      // make sure we are not loosing correlated params (from the original IN and
-      // converted EXISTS statements)
-      AbstractExpression rexpr = expr.getRight();
-      assertEquals(ExpressionType.COMPARE_GREATERTHAN, rexpr.getExpressionType());
-      assertEquals(new Integer(0), ((ParameterValueExpression)rexpr.getRight()).getParameterIndex());
-
-      AbstractExpression lexpr = expr.getLeft();
-      assertEquals(ExpressionType.CONJUNCTION_AND, lexpr.getExpressionType());
-      AbstractExpression e1 = lexpr.getRight();
-      assertEquals(ExpressionType.COMPARE_EQUAL, e1.getExpressionType());
-      assertEquals(new Integer(1), ((ParameterValueExpression)e1.getLeft()).getParameterIndex());
-      AbstractExpression e2 = lexpr.getLeft();
-      assertEquals(ExpressionType.COMPARE_EQUAL, e2.getExpressionType());
-      assertEquals(new Integer(2), ((ParameterValueExpression)e2.getLeft()).getParameterIndex());
+      assertTrue(pn instanceof AbstractScanPlanNode);
+      AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
+      AbstractExpression e = spn.getPredicate();
+      SubqueryExpression subExpr = (SubqueryExpression) e;
+      assertEquals(3, subExpr.getArgs().size());
+      assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
     public void testDeleteWhereIn() {
@@ -343,11 +318,10 @@ public class TestSubQueries   extends PlannerTestCase {
         AbstractPlanNode n = lpn.get(1).getChild(0);
         assertTrue(n instanceof DeletePlanNode);
         n = n.getChild(0);
-        assertTrue(n instanceof NestLoopInPlanNode);
-        NestLoopInPlanNode nlinj = (NestLoopInPlanNode) n;
-        AbstractPlanNode sb = nlinj.getSubqueryNode();
-        AbstractExpression e = ((AbstractScanPlanNode) sb).getPredicate();
-        assertEquals(ExpressionType.CONJUNCTION_AND, e.getExpressionType());
+        assertTrue(n instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
+        AbstractExpression e = spn.getPredicate();
+        assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
     }
 
     public void testUpdateWhereIn() {
@@ -356,11 +330,10 @@ public class TestSubQueries   extends PlannerTestCase {
       AbstractPlanNode n = lpn.get(1).getChild(0);
       assertTrue(n instanceof UpdatePlanNode);
       n = n.getChild(0);
-      assertTrue(n instanceof NestLoopInPlanNode);
-      NestLoopInPlanNode nlinj = (NestLoopInPlanNode) n;
-      AbstractPlanNode sb = nlinj.getSubqueryNode();
-      AbstractExpression e = ((AbstractScanPlanNode) sb).getPredicate();
-      assertEquals(ExpressionType.CONJUNCTION_AND, e.getExpressionType());
+      assertTrue(n instanceof AbstractScanPlanNode);
+      AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
+      AbstractExpression e = spn.getPredicate();
+      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
     }
 
     public void testSendReceiveInSubquery() {

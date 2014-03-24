@@ -46,13 +46,20 @@
 #ifndef HSTOREEXECUTORUTIL_H
 #define HSTOREEXECUTORUTIL_H
 
+#include <vector>
+
 #include "common/types.h"
 #include "executors/abstractexecutor.h"
 #include "plannodes/abstractplannode.h"
+#include "common/valuevector.h"
 
 namespace voltdb {
 class VoltDBEngine;
 AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
+int executeExecutionVector(std::vector<AbstractExecutor*>& executorList,
+                           const NValueArray& params);
+
 }
 
 #endif

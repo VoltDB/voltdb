@@ -27,7 +27,10 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -111,6 +114,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_wherePredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_wherePredicate = null;
         }
     }
 
@@ -121,6 +126,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_preJoinPredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_preJoinPredicate = null;
         }
     }
 
@@ -131,7 +138,31 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_joinPredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_joinPredicate = null;
         }
+    }
+
+    @Override
+    public int overrideId(int newId) {
+        m_id = newId++;
+        List<AbstractExpression> subqueries = new ArrayList<AbstractExpression>();
+        if (m_preJoinPredicate != null) {
+            subqueries.addAll(m_preJoinPredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+        }
+        // Now override the ids in the subqueries nodes if any
+        if (m_joinPredicate != null) {
+            subqueries.addAll(m_joinPredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+        }
+        if (m_wherePredicate != null) {
+            subqueries.addAll(m_wherePredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+        }
+        for (AbstractExpression subquery : subqueries) {
+            assert(subquery instanceof SubqueryExpression);
+            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBetsCostPlan();
+            newId = subqueryPlan.resetPlanNodeIds(newId);
+        }
+        return newId;
     }
 
     @Override
@@ -252,17 +283,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
         stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
         stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);
-
-        List<AbstractExpression> predicates = new ArrayList<AbstractExpression>();
-        if (m_preJoinPredicate != null) {
-            predicates.add(m_preJoinPredicate);
-        }
-        if (m_joinPredicate != null) {
-            predicates.add(m_joinPredicate);
-        }
-        if (m_wherePredicate != null) {
-            predicates.add(m_wherePredicate);
-        }
     }
 
     @Override

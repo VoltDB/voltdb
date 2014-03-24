@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 
 /**
@@ -34,12 +33,10 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     public enum Members {
         EXECUTE_LIST,
-        SUBQUERIES_EXECUTE_LISTS,
-        SUBQUERY_ID;
+        EXECUTE_LISTS;
     }
 
-    protected List<AbstractPlanNode> m_list;
-    protected Map<Integer, List<AbstractPlanNode>> m_subqueryLists = new HashMap<Integer, List<AbstractPlanNode>>();
+    protected List<List<AbstractPlanNode>> m_executeLists = new ArrayList<List<AbstractPlanNode>>();
 
     public PlanNodeList() {
         super();
@@ -48,12 +45,10 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
     public PlanNodeList(AbstractPlanNode root_node) {
         super(root_node);
         try {
-            // Construct parent list
-            m_list = constructList(m_planNodes);
-            // Construct subqueries
-            for(Map.Entry<Integer, List<AbstractPlanNode>> entry : m_subqueryPlanList.entrySet()) {
-                List<AbstractPlanNode> list = constructList(entry.getValue());
-                m_subqueryLists.put(entry.getKey(), list);
+            // Construct execute lists for all sub statement
+            for(List<AbstractPlanNode> nodeList : m_planNodesList) {
+                List<AbstractPlanNode> list = constructList(nodeList);
+                m_executeLists.add(list);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -61,20 +56,25 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
     }
 
     public List<AbstractPlanNode> getExecutionList() {
-        return m_list;
+        assert(!m_executeLists.isEmpty());
+        return m_executeLists.get(0);
     }
 
-    public Map<Integer, List<AbstractPlanNode>> getSubqueryExecutionLists() {
-        return m_subqueryLists;
+    public List<AbstractPlanNode> getExecutionList(int idx) {
+        assert(idx < m_executeLists.size());
+        return m_executeLists.get(idx);
     }
 
     @Override
     public String toString() {
-        String ret = "EXECUTE LIST: " + m_list.size() + " nodes\n";
-        for (int ctr = 0, cnt = m_list.size(); ctr < cnt; ctr++) {
-            ret += "   [" + ctr + "] " + m_list.get(ctr) + "\n";
+        String ret = "EXECUTE LISTS: " + m_planNodesList.size() + " lists\n";
+        for (List<AbstractPlanNode> nodeList : m_planNodesList) {
+            ret = "\tEXECUTE LIST: " + nodeList.size() + " nodes\n";
+            for (int ctr = 0, cnt = nodeList.size(); ctr < cnt; ctr++) {
+                ret += "   [" + ctr + "] " + nodeList.get(ctr) + "\n";
+            }
+            ret += nodeList.get(0).toString();
         }
-        ret += m_planNodes.get(0).toString();
         return ret;
     }
 
@@ -122,31 +122,25 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         // Important! Make sure that our list has the same number of entries in our tree
         //
         if (list.size() != planNodes.size()) {
-            throw new Exception("ERROR: The execution list has '" + m_list.size() + "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
+            throw new Exception("ERROR: The execution list has '" + list.size() + "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
         }
         return list;
     }
 
     @Override
     public int compareTo(PlanNodeList o) {
-        if (m_list.size() != o.m_list.size()) return -1;
+        if (m_executeLists.size() != o.m_executeLists.size()) return -1;
+        int size = m_executeLists.size();
+        for (int idx = 0; idx < size; ++idx) {
+            List<AbstractPlanNode> list = m_executeLists.get(idx);
+            List<AbstractPlanNode> olist = o.m_executeLists.get(idx);
+            if (list.size() != olist.size()) return -1;
 
-        int diff = getRootPlanNode().compareTo(o.getRootPlanNode());
-        if (diff != 0) return diff;
-
-        for (int i = 0; i < m_list.size(); i++) {
-            diff = m_list.get(i).m_id - o.m_list.get(i).m_id;
+            int diff = getRootPlanNode().compareTo(o.getRootPlanNode());
             if (diff != 0) return diff;
-        }
 
-        // compare subqueries
-        for (Map.Entry<Integer, List<AbstractPlanNode>> nodeListEntry : m_subqueryLists.entrySet()) {
-            List<AbstractPlanNode> nodeList = nodeListEntry.getValue();
-            int thisId = nodeListEntry.getKey();
-            List<AbstractPlanNode> onodeList = o.m_subqueryLists.get(thisId);
-            if (onodeList == null || nodeList.size() != onodeList.size()) return -1;
-            for (int i = 0; i < nodeList.size(); i++) {
-                diff = nodeList.get(i).m_id - onodeList.get(i).m_id;
+            for (int i = 0; i < list.size(); i++) {
+                diff = list.get(i).m_id - olist.get(i).m_id;
                 if (diff != 0) return diff;
             }
         }
@@ -160,24 +154,23 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             stringer.object();
             super.toJSONString(stringer);
 
-            stringer.key(Members.EXECUTE_LIST.name()).array();
-            for (AbstractPlanNode node : m_list) {
-                stringer.value(node.getPlanNodeId().intValue());
-            }
-            stringer.endArray(); //end execution list
-
-            stringer.key(Members.SUBQUERIES_EXECUTE_LISTS.name()).array();
-            for (Map.Entry<Integer, List<AbstractPlanNode>> nodeListEntry : m_subqueryLists.entrySet()) {
-                stringer.object().key(Members.SUBQUERY_ID.name());
-                stringer.value(nodeListEntry.getKey());
+            if (m_executeLists.size() == 1) {
                 stringer.key(Members.EXECUTE_LIST.name()).array();
-                for (AbstractPlanNode node : nodeListEntry.getValue()) {
-                    assert (node instanceof JSONString);
+                for (AbstractPlanNode node : m_executeLists.get(0)) {
                     stringer.value(node.getPlanNodeId().intValue());
                 }
-                stringer.endArray().endObject(); //end list and entry
+                stringer.endArray(); //end execution list
+            } else {
+                stringer.key(Members.EXECUTE_LISTS.name()).array();
+                for (List<AbstractPlanNode> list : m_executeLists) {
+                    stringer.object().key(Members.EXECUTE_LIST.name()).array();
+                    for (AbstractPlanNode node : list) {
+                        stringer.value(node.getPlanNodeId().intValue());
+                    }
+                    stringer.endArray().endObject(); //end execution list
+                }
+                stringer.endArray(); //end execution list
             }
-            stringer.endArray(); // end map
 
             stringer.endObject(); //end PlanNodeList
         } catch (JSONException e) {
@@ -196,8 +189,11 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         StringBuilder sb = new StringBuilder();
         sb.append("digraph ").append(name).append(" {\n");
 
-        for (AbstractPlanNode node : m_list) {
+        for (List<AbstractPlanNode> list : m_executeLists) {
+            for (AbstractPlanNode node : list) {
                 sb.append(node.toDOTString());
+            }
+            sb.append('\n');
         }
         //TODO ENG-451-exists add subqueries
         sb.append("\n}\n");

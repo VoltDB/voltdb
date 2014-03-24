@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,22 +21,24 @@
 #include <vector>
 #include <sstream>
 
+#include <boost/shared_ptr.hpp>
+
+#include "common/valuevector.h"
 #include "expressions/abstractexpression.h"
-#include "common/NValue.hpp"
 
 namespace voltdb {
 
+class NValue;
+class AbstractExecutor;
+
 class SubqueryExpression : public AbstractExpression {
     public:
-    SubqueryExpression(int subqueryId);
+    SubqueryExpression(int subqueryId, const std::vector<int>& paramIdxs,
+        const std::vector<AbstractExpression*>* tveParams);
 
-    voltdb::NValue
-    eval(const TableTuple *tuple1, const TableTuple *tuple2) const
-    {
-        VOLT_TRACE ("Running subquery: %d", m_subqueryId);
-        assert(false);
-        return voltdb::NValue();
-    }
+    ~SubqueryExpression();
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
@@ -46,9 +48,17 @@ class SubqueryExpression : public AbstractExpression {
 
   protected:
     int m_subqueryId;
-//    pointers to subqueries nodes in execution order
-//    std::vector<AbstractPlanNode*>* m_subqueryExecutionList;
-//    boost::shared_ptr<ExecutorVector> m_executorVector;
+    // The list of parameter indexes that need to be set
+    std::vector<int> m_paramIdxs;
+    // The list of the corresponding TVE for each parameter
+    boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
+    // The size of the parameter vector;
+    int m_tveParamsSize;
+    // The pointer to the execution stack
+    std::vector<AbstractExecutor*>* m_executionStack;
+    // The pointer to the global parameters
+    NValueArray* m_parameterContainer;
+
 };
 }
 #endif

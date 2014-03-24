@@ -18,12 +18,16 @@
 #ifndef _EXECUTORCONTEXT_HPP_
 #define _EXECUTORCONTEXT_HPP_
 
+#include <vector>
+#include <boost/shared_array.hpp>
+
 #include "Topend.h"
 #include "common/UndoQuantum.h"
+#include "common/valuevector.h"
 
 namespace voltdb {
 
-class VoltDBEngine;
+class AbstractExecutor;
 
 /*
  * EE site global data required by executors at runtime.
@@ -45,7 +49,7 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
-                    VoltDBEngine* engine,
+                    NValueArray& params,
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId);
@@ -92,13 +96,17 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
+    void setupForExecutors(boost::shared_array<std::vector<AbstractExecutor*> > executorLists) {
+        m_executorLists = executorLists;
+    }
+
     UndoQuantum *getCurrentUndoQuantum() {
         return m_undoQuantum;
     }
 
-    VoltDBEngine* getEngine() {
-         return m_engine;
-     }
+    NValueArray& getParameterContainer() {
+        return m_staticParams;
+    }
 
     static UndoQuantum *currentUndoQuantum() {
         return getExecutorContext()->m_undoQuantum;
@@ -128,6 +136,12 @@ class ExecutorContext {
         return m_lastCommittedSpHandle;
     }
 
+    /** Executor List for a given sub statement id */
+    std::vector<AbstractExecutor*>& getExecutorLists(int stmtId = 0) {
+        return m_executorLists[stmtId];
+    }
+
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -141,7 +155,8 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
-    VoltDBEngine *m_engine;
+    NValueArray& m_staticParams;
+    boost::shared_array<std::vector<AbstractExecutor*> > m_executorLists;
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;

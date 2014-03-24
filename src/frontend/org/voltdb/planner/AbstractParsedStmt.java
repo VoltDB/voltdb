@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -68,6 +69,11 @@ public abstract class AbstractParsedStmt {
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
+    // The parameter TVEs from the correlated expressions. The key is the parameter index.
+    // This map acts as an intermediate storage for the parameter TVE until they are
+    // distributed to an appropriate subquery expression where they are originated
+    public Map<Integer, TupleValueExpression> m_parameterTveMap = new HashMap<Integer, TupleValueExpression>();
+
     public ArrayList<StmtTableScan> tableList = new ArrayList<StmtTableScan>();
     private Table m_DDLIndexedTable = null;
 
@@ -96,7 +102,7 @@ public abstract class AbstractParsedStmt {
     protected final Database m_db;
 
     // Parent statement if any
-    protected AbstractParsedStmt m_parentStmt = null;
+    public AbstractParsedStmt m_parentStmt = null;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -372,7 +378,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private TupleValueExpression parseColumnRefExpression(VoltXMLElement exprNode) {
+    private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
 
         String tableName = exprNode.attributes.get("table");
         if (tableName == null) {
@@ -390,7 +396,19 @@ public abstract class AbstractParsedStmt {
         String columnAlias = exprNode.attributes.get("alias");
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
         addScanColumn(expr);
-        return expr;
+
+        AbstractExpression retval = expr;
+        if (stmtId != expr.getOrigStmtId()) {
+            // This a TVE from the correlated expression
+            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
+            ParameterValueExpression pve = new ParameterValueExpression();
+            pve.setParameterIndex(paramIdx);
+            pve.setValueSize(expr.getValueSize());
+            pve.setValueType(expr.getValueType());
+            m_parameterTveMap.put(paramIdx, expr);
+            retval = pve;
+        }
+        return retval;
     }
 
     /**
@@ -419,7 +437,11 @@ public abstract class AbstractParsedStmt {
            return parseExpressionTree(exprNode.children.get(0));
        } else {
            List<AbstractExpression> columnExprList = new ArrayList<AbstractExpression>();
-           for(VoltXMLElement nextExpr : exprNode.children) {
+           // Process expressions in the reverse order first because ExpressionUtil.combine
+           // combines (A, B ,C) into C AND (B AND A). For the row expression we must preserver
+           // the original column order
+           for(int i = exprNode.children.size() -1; i >= 0; --i) {
+               VoltXMLElement nextExpr = exprNode.children.get(i);
                columnExprList.add(parseExpressionTree(nextExpr));
            }
            // Combine all the children into a single expression using conjunction AND
@@ -526,6 +548,10 @@ public abstract class AbstractParsedStmt {
 
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
+        } else if (exprType == ExpressionType.OPERATOR_EXISTS) {
+            // bypass one layer
+            assert(exprNode.children.isEmpty() == false);
+            return parseExpressionTree(exprNode.children.get(0));
         }
         try {
             expr = exprType.getExpressionClass().newInstance();
@@ -591,7 +617,7 @@ public abstract class AbstractParsedStmt {
     */
     private AbstractExpression rewriteInExpressionAsExists(AbstractExpression inExpr) {
         assert(ExpressionType.COMPARE_IN == inExpr.getExpressionType());
-        assert(inExpr.getLeft() != null);
+        assert(inExpr.getRight() != null);
         AbstractExpression expr = inExpr.getRight();
         assert(expr != null);
         if (ExpressionType.SUBQUERY != expr.getExpressionType()) {
@@ -614,10 +640,10 @@ public abstract class AbstractParsedStmt {
         int idx = addTableToStmtCache(tableName, tableName, subquery);
         StmtTableScan tableCache = stmtCache.get(idx);
         SubqueryExpression newSubqueryExpr = new SubqueryExpression(tableCache.getTempTable());
-        // Combine the parameters from the original IN expression with the parameters
-        // from the rewritten expression
-        newSubqueryExpr.getParameterTveMap().putAll(subqueryExpr.getParameterTveMap());
-        return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, newSubqueryExpr, null);
+        // don't forget to add the parameters from the original subquery expression
+        newSubqueryExpr.getArgs().addAll(subqueryExpr.getArgs());
+        newSubqueryExpr.getParameterIdxList().addAll(subqueryExpr.getParameterIdxList());
+        return newSubqueryExpr;
     }
 
     /**

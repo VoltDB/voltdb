@@ -18,10 +18,8 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -40,7 +38,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.SubqueryExpression;
@@ -61,7 +58,6 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.NestLoopInPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -362,13 +358,6 @@ public class PlanAssembler {
                 // The same best plan for each sub-query is reused with all parent candidate plans
                 // and needs to be reconnected with the final best parent plan
                 retval.rootPlanGraph = finalizeFromSubqueryBestPlans(retval.rootPlanGraph);
-            }
-            if (subQueryResult.m_hasExistsSubquery == true) {
-                // If possible, replace the scan or join nodes containing the EXISTS/IN sub-queries plans
-                // with an NLIJ-like node with the original scan/join as its outer child,
-                // the same "ouputschema" as the original, and a new "subquery" plan as
-                // its inner inline child.
-                retval.rootPlanGraph = finalizeExistsSubqueryBestPlans(retval.rootPlanGraph);
             }
         }
         return retval;
@@ -699,86 +688,6 @@ public class PlanAssembler {
             }
         }
         return parentPlan;
-    }
-
-    /**
-     * If possible, replace the scan or join nodes containing the EXISTS/IN sub-queries plans
-     * with an NLIJ-like node with the original scan/join as its outer child,
-     * the same "ouputschema" as the original, and a new "subquery" plan as
-     * its inner inline child.
-     * The subquery expression can be replaced with the IN NLIJ node if it constitutes
-     * the whole expression or it is part of the conjunction AND expression.
-     * @param planNode
-     * @return modified plan tree
-     */
-    private AbstractPlanNode finalizeExistsSubqueryBestPlans(AbstractPlanNode planNode) {
-        // Recurse to children first
-         int count = planNode.getChildCount();
-        if (count > 0) {
-            // Disconnect all children just in case a NLInJ node needs to be inserted
-            // between the current parent and the child
-            List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
-            for (int idx = 0; idx < count; ++idx) {
-                AbstractPlanNode child = planNode.getChild(idx);
-                nodeList.add(child);
-            }
-            planNode.disconnectChildren();
-            // process each node
-            for (int idx = 0; idx < count; ++idx) {
-                AbstractPlanNode child = nodeList.get(idx);
-                // disconnect from the current parent
-                child.disconnectParents();
-                // Reconnect the parent and the new child
-                planNode.addAndLinkChild(finalizeExistsSubqueryBestPlans(child));
-            }
-        }
-        // Handle the parent node itself.
-        AbstractPlanNode retval = planNode;
-        if (planNode instanceof AbstractScanPlanNode) {
-            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) planNode;
-            Collection<AbstractExpression> exprs = ExpressionUtil.uncombineAny(scanNode.getPredicate());
-            retval = replaceSubqueyExprInPredicate(scanNode, exprs);
-            // Reassemble the predicate
-            scanNode.setPredicate(ExpressionUtil.combine(exprs));
-        } else if (planNode instanceof AbstractJoinPlanNode) {
-            AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode) planNode;
-            // Join Predicate
-            Collection<AbstractExpression> joinExprs = ExpressionUtil.uncombineAny(joinNode.getJoinPredicate());
-            retval = replaceSubqueyExprInPredicate(joinNode, joinExprs);
-            // Reassemble the join predicate
-            joinNode.setJoinPredicate(ExpressionUtil.combine(joinExprs));
-            // Prejoin Predicate
-            Collection<AbstractExpression> preJoinExprs = ExpressionUtil.uncombineAny(joinNode.getPreJoinPredicate());
-            retval = replaceSubqueyExprInPredicate(retval, preJoinExprs);
-            // Reassemble the join predicate
-            joinNode.setPreJoinPredicate(ExpressionUtil.combine(preJoinExprs));
-            // Where Predicate
-            Collection<AbstractExpression> whereExprs = ExpressionUtil.uncombineAny(joinNode.getWherePredicate());
-            retval = replaceSubqueyExprInPredicate(retval, whereExprs);
-            // Reassemble the join predicate
-            joinNode.setWherePredicate(ExpressionUtil.combine(whereExprs));
-        }
-        return retval;
-    }
-
-    private AbstractPlanNode replaceSubqueyExprInPredicate(AbstractPlanNode planNode, Collection<AbstractExpression> exprs) {
-        AbstractPlanNode retval = planNode;
-        Iterator<AbstractExpression> it = exprs.iterator();
-        while (it.hasNext()) {
-            AbstractExpression nextExpr = it.next();
-            if (ExpressionType.OPERATOR_EXISTS.equals(nextExpr.getExpressionType())) {
-                AbstractExpression subqueryExpr = nextExpr.getLeft();
-                assert(subqueryExpr != null && subqueryExpr instanceof SubqueryExpression);
-                AbstractPlanNode subqueryPlan = ((SubqueryExpression)subqueryExpr).getSubqueryNode();
-                NestLoopInPlanNode join = new NestLoopInPlanNode(
-                        ((SubqueryExpression)subqueryExpr).getSubqueryId(), retval, subqueryPlan,
-                        ((SubqueryExpression)subqueryExpr).getParameterTveMap());
-                retval = join;
-                // Remove the EXISTS expressions from the original predicate
-                it.remove();
-            }
-        }
-        return retval;
     }
 
     private AbstractPlanNode getNextSelectPlan() {
