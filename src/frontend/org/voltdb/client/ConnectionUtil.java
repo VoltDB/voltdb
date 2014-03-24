@@ -299,7 +299,13 @@ public class ConnectionUtil {
                 public GSSContext run() {
                     GSSContext context = null;
                     try {
+                        /*
+                         * The standard type designation for kerberos v5 secure service context
+                         */
                         final Oid krb5Oid = new Oid("1.2.840.113554.1.2.2");
+                        /*
+                         * The standard type designation for principal 
+                         */
                         final Oid krb5PrincipalNameType = new Oid("1.2.840.113554.1.2.2.1");
                         final GSSName serverName = m_gssManager.createName(serviceName, krb5PrincipalNameType);
 
@@ -313,6 +319,10 @@ public class ConnectionUtil {
                         byte [] token;
                         int msgSize = 0;
 
+                        /*
+                         * Establishing a kerberos secure context, requires a handshake conversation
+                         * where client, and server exchange and use tokens generated via calls to initSecContext
+                         */
                         bb.limit(msgSize);
                         while (!context.isEstablished()) {
                             token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
