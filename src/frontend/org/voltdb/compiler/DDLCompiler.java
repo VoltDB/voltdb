@@ -429,7 +429,7 @@ public class DDLCompiler {
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
 
-    private Set<String> tableLimitConstraintCounter = new HashSet<>();
+    private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     private class DDLStatement {
         public DDLStatement() {
@@ -759,15 +759,18 @@ public class DDLCompiler {
             }
 
             ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
-            if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "IMPORT CLASS not found: '%s'",
-                        classNameStr)); // remove trailing semicolon
-            }
-            else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
-                m_compiler.addWarn(String.format(
-                        "IMPORT CLASS no match for wildcarded class: '%s'",
-                        classNameStr), ddlStatement.lineNo);
+            if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                // Only generate warnings and errors if this is not for the StatementPlanner
+                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "IMPORT CLASS not found: '%s'",
+                            classNameStr)); // remove trailing semicolon
+                }
+                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                    m_compiler.addWarn(String.format(
+                            "IMPORT CLASS no match for wildcarded class: '%s'",
+                            classNameStr), ddlStatement.lineNo);
+                }
             }
 
             return true;
