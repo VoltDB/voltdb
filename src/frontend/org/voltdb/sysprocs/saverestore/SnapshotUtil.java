@@ -1212,7 +1212,7 @@ public class SnapshotUtil {
         return save_files;
     }
 
-    public static String didSnapshotRequestSucceedWithErr(VoltTable results[]) {
+    public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
         if (results.length < 1) return "HAD NO RESULT TABLES";
         final VoltTable result = results[0];
         result.resetRowPosition();
@@ -1238,7 +1238,7 @@ public class SnapshotUtil {
     }
 
     public static boolean didSnapshotRequestSucceed(VoltTable result[]) {
-        return didSnapshotRequestSucceedWithErr(result) == null;
+        return didSnapshotRequestFailWithErr(result) == null;
     }
 
     public static boolean isSnapshotInProgress(VoltTable results[]) {
