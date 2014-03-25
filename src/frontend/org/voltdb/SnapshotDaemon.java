@@ -1418,7 +1418,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
         if (err != null) {
-            SNAP_LOG.warn("Snapshot failed with failure response: " + result.getString(0));
+            SNAP_LOG.warn("Snapshot failed with failure response: " +  err);
             m_snapshots.removeLast();
             return;
         }

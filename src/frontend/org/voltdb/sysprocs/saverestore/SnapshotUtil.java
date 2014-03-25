@@ -1230,7 +1230,7 @@ public class SnapshotUtil {
         String err = null;
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
-                err = result.getString(1);
+                err = result.getString("ERR_MSG");
             }
         }
         result.resetRowPosition();
