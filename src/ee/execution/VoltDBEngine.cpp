@@ -1006,7 +1006,7 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         PlanSet::iterator iter2 = m_plans.project<0>(iter);
         m_plans.get<0>().relocate(m_plans.begin(), iter2);
         VoltDBEngine::ExecutorVector *retval = (*iter).get();
-        assert(retval);       
+        assert(retval);
         // update the context
         m_executorContext->setupForExecutors(retval->lists);
 

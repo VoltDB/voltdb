@@ -52,8 +52,8 @@ namespace voltdb {
     NValue
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
-        std::vector<AbstractExecutor*>* executionStack = 
-            &ExecutorContext::getExecutorContext()->getExecutorLists(m_subqueryId);  
+        std::vector<AbstractExecutor*>* executionStack =
+            &ExecutorContext::getExecutorContext()->getExecutorLists(m_subqueryId);
         assert(executionStack != NULL);
         assert(!executionStack->empty());
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
