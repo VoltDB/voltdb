@@ -28,25 +28,30 @@ import java.nio.ByteBuffer;
  */
 public class MpReplayAckMessage extends VoltMessage {
     private long m_txnId;
+    // This MP transaction is NOT reinitiated because it lacks sentinels
+    private boolean m_poison;
 
     /** Empty constructor for de-serialization */
     MpReplayAckMessage() {
         super();
     }
 
-    public MpReplayAckMessage(long txnId)
+    public MpReplayAckMessage(long txnId, boolean isPoison)
     {
         super();
         m_txnId = txnId;
+        m_poison = isPoison;
     }
 
     public long getTxnId() { return m_txnId; }
+    public boolean isPoison() { return m_poison; }
 
     @Override
     public int getSerializedSize()
     {
         int size = super.getSerializedSize();
-        size += 8; // m_txnId
+        size += 8 // m_txnId
+                + 1; // m_poison
         return size;
     }
 
@@ -54,6 +59,7 @@ public class MpReplayAckMessage extends VoltMessage {
     protected void initFromBuffer(ByteBuffer buf) throws IOException
     {
         m_txnId = buf.getLong();
+        m_poison = buf.get() == 1;
     }
 
     @Override
@@ -61,5 +67,6 @@ public class MpReplayAckMessage extends VoltMessage {
     {
         buf.put(VoltDbMessageFactory.MP_REPLAY_ACK_ID);
         buf.putLong(m_txnId);
+        buf.put(m_poison ? 1 : (byte) 0);
     }
 }

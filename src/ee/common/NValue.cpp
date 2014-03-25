@@ -132,44 +132,45 @@ std::string NValue::debug() const {
     int64_t addr;
     buffer << getTypeName(type) << "::";
     switch (type) {
-      case VALUE_TYPE_BOOLEAN:
+    case VALUE_TYPE_BOOLEAN:
         buffer << (getBoolean() ? "true" : "false");
         break;
-      case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_TINYINT:
         buffer << static_cast<int32_t>(getTinyInt());
         break;
-      case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_SMALLINT:
         buffer << getSmallInt();
         break;
-      case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_INTEGER:
         buffer << getInteger();
         break;
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TIMESTAMP:
         buffer << getBigInt();
         break;
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         buffer << getDouble();
         break;
-      case VALUE_TYPE_VARCHAR:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARCHAR:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
-      case VALUE_TYPE_VARBINARY:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARBINARY:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "-bin[@" << addr << "]";
         break;
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
-      default:
-          buffer << "(no details)";
+    default:
+        buffer << "(no details)";
+        break;
     }
     std::string ret(buffer.str());
     return (ret);
@@ -462,7 +463,7 @@ bool NValue::inList(const NValue& rhs) const
     if (rhsType != VALUE_TYPE_ARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
-    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue_withoutNull();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values

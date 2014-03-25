@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -40,12 +41,14 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.PosixAdvise;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -107,6 +110,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
     public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
+    public static final int SNAPSHOT_FADVISE_BYTES = Integer.getInteger("SNAPSHOT_FADVISE_BYTES", 1024 * 1024 * 2);
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -202,15 +206,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         fs.write(jsonBytes);
 
         final BBContainer container = fs.getBBContainer();
-        container.b.position(4);
-        container.b.putInt(container.b.remaining() - 4);
-        container.b.position(0);
+        container.b().position(4);
+        container.b().putInt(container.b().remaining() - 4);
+        container.b().position(0);
 
         final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
-        aggregateBuffer.put(container.b);
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);
+        aggregateBuffer.put(container.b());
+        container.discard();
         aggregateBuffer.put(schemaBytes);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
@@ -232,7 +237,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
          */
         m_acceptOneWrite = true;
         ListenableFuture<?> writeFuture =
-                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
+                write(Callables.returning(DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -249,13 +254,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         ScheduledFuture<?> syncTask = null;
         syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
+            private long fadvisedBytes = 0;
             @Override
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
                     final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
+                    long positionAtSync = 0;
                     try {
+                        positionAtSync = m_channel.position();
                         m_channel.force(false);
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
@@ -265,6 +273,33 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
+
+                    /*
+                     * Don't pollute the page cache with snapshot data, use fadvise
+                     * to periodically request the kernel drop pages we have written
+                     */
+                    try {
+                        if (positionAtSync - fadvisedBytes > SNAPSHOT_FADVISE_BYTES) {
+                            //Get aligned start and end position
+                            final long fadviseStart = fadvisedBytes;
+                            //-1 because we don't want to drop the last page because
+                            //we might modify it while appending
+                            fadvisedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
+                            final long retval = PosixAdvise.fadvise(
+                                    m_fos.getFD(),
+                                    fadviseStart,
+                                    fadvisedBytes - fadviseStart,
+                                    PosixAdvise.POSIX_FADV_DONTNEED );
+                            if (retval != 0) {
+                                SNAP_LOG.error("Error fadvising snapshot data: " + retval);
+                                SNAP_LOG.error(
+                                        "Params offset " + fadviseStart +
+                                        " length " + (fadvisedBytes - fadviseStart));
+                            }
+                        }
+                    } catch (Throwable t) {
+                        SNAP_LOG.error("Error fadvising snapshot data", t);
+                    }
                 }
             }
         }, SNAPSHOT_SYNC_FREQUENCY, SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
@@ -289,6 +324,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
+            try {
+                m_syncTask.get();
+            } catch (CancellationException ignore) {
+                // Ignored because we just called cancel
+            } catch (ExecutionException e) {
+                SNAP_LOG.error("Error cancelling snapshot sync task", e);
+            }
+
             m_channel.force(false);
         } finally {
             m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
@@ -334,12 +377,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         } catch (Throwable t) {
             return Futures.immediateFailedFuture(t);
         }
-        final BBContainer tupleData = tupleDataTemp;
+        final BBContainer tupleDataCont = tupleDataTemp;
+
 
         if (m_writeFailed) {
-            tupleData.discard();
+            tupleDataCont.discard();
             return null;
         }
+
+        ByteBuffer tupleData = tupleDataCont.b();
 
         m_outstandingWriteTasks.incrementAndGet();
 
@@ -349,14 +395,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     DBBPool.allocateDirectAndPool(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
             //Skip 4-bytes so the partition ID is not compressed
             //That way if we detect a corruption we know what partition is bad
-            tupleData.b.position(tupleData.b.position() + 4);
+            tupleData.position(tupleData.position() + 4);
             /*
              * Leave 12 bytes, it's going to be a 4-byte length prefix, a 4-byte partition id,
              * and a 4-byte CRC32C of just the header bytes, in addition to the compressed payload CRC
              * that is 16 bytes, but 4 of those are done by CompressionService
              */
-            cont.b.position(12);
-            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData.b, cont);
+            cont.b().position(12);
+            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData, cont);
         }
         final Future<BBContainer> compressionTaskFinal = compressionTask;
 
@@ -371,15 +417,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             m_simulateBlockedWrite.await();
                         }
                         if (m_simulateFullDiskWritingChunk) {
+                            //Make sure to consume the result of the compression
+                            compressionTaskFinal.get().discard();
                             throw new IOException("Disk full");
                         }
                     }
 
+                    final ByteBuffer tupleData = tupleDataCont.b();
                     int totalWritten = 0;
                     if (prependLength) {
                         BBContainer payloadContainer = compressionTaskFinal.get();
                         try {
-                            final ByteBuffer payloadBuffer = payloadContainer.b;
+                            final ByteBuffer payloadBuffer = payloadContainer.b();
                             payloadBuffer.position(0);
 
                             ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
@@ -387,7 +436,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
                             lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
-                            lengthPrefix.putInt(tupleData.b.getInt(0)); // partitionId
+                            lengthPrefix.putInt(tupleData.getInt(0)); // partitionId
 
                             /*
                              * Checksum the header and put it in the payload buffer
@@ -409,8 +458,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadContainer.discard();
                         }
                     } else {
-                        while (tupleData.b.hasRemaining()) {
-                            totalWritten += m_channel.write(tupleData.b);
+                        while (tupleData.hasRemaining()) {
+                            totalWritten += m_channel.write(tupleData);
                         }
                     }
                     m_bytesWritten += totalWritten;
@@ -422,7 +471,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     try {
-                        tupleData.discard();
+                        tupleDataCont.discard();
                     } finally {
                         m_outstandingWriteTasksLock.lock();
                         try {

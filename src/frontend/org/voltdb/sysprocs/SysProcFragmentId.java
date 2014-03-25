@@ -60,14 +60,6 @@ public class SysProcFragmentId
 
     // @SnapshotSave
     /*
-     * Once per host confirm the file is accessible
-     */
-    public static final long PF_saveTest = 40;
-    /*
-     * Agg test results
-     */
-    public static final long PF_saveTestResults = 41;
-    /*
      * Create and distribute tasks and targets to each EE
      */
     public static final long PF_createSnapshotTargets = 42;
@@ -86,14 +78,12 @@ public class SysProcFragmentId
 
     public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
-
-        return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
-                fragId == PF_snapshotSaveQuiesce);
+        return (fragId == PF_createSnapshotTargets || fragId == PF_snapshotSaveQuiesce);
     }
 
-    public static boolean isSnapshotSaveTestFragment(byte[] planHash) {
+    public static boolean isFirstSnapshotFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
-        return fragId == PF_saveTest;
+        return fragId == PF_snapshotSaveQuiesce;
     }
 
     //This method exists because there is no procedure name in fragment task message
@@ -170,13 +160,16 @@ public class SysProcFragmentId
     public static final long PF_systemInformationOverviewAggregate = 193;
 
     // @Update application catalog
-    public static final long PF_updateCatalog = 210;
-    public static final long PF_updateCatalogAggregate = 211;
+    public static final long PF_updateCatalogSync = 210;
+    public static final long PF_updateCatalogSyncAggregate = 211;
+    public static final long PF_updateCatalog = 212;
+    public static final long PF_updateCatalogAggregate = 213;
 
     public static boolean isCatalogUpdateFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
-        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
+        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate ||
+                fragId == PF_updateCatalogSync || fragId == PF_updateCatalogSyncAggregate);
     }
 
     // @BalancePartitions

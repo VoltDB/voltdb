@@ -108,8 +108,6 @@
 using namespace std;
 namespace voltdb {
 
-const int64_t AD_HOC_FRAG_ID = -1;
-
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(0),
       m_allTuplesScanned(0),
@@ -166,7 +164,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit)
+                         int64_t tempTableMemoryLimit,
+                         int32_t compactionThreshold)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -175,6 +174,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -660,17 +660,19 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
             return false;
         }
 
-        if (t2->schema()->columnAllowNull(index) != nullable) {
+        const TupleSchema::ColumnInfo *columnInfo = t2->schema()->getColumnInfo(index);
+
+        if (columnInfo->allowNull != nullable) {
             return false;
         }
 
-        if (t2->schema()->columnType(index) != type) {
+        if (columnInfo->getVoltType() != type) {
             return false;
         }
 
         // check the size of types where size matters
         if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+            if (columnInfo->length != size) {
                 return false;
             }
         }
@@ -708,7 +710,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
                                                                  catalogTable->path(),
-                                                                 catalogTable->signature());
+                                                                 catalogTable->signature(),
+                                                                 m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {

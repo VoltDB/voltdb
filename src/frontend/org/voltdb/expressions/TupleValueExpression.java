@@ -22,10 +22,10 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -257,25 +257,10 @@ public class TupleValueExpression extends AbstractValueExpression {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
         }
         if (tableScan != null) {
-            m_tableAlias = tableScan.m_tableAlias;
-            m_tableName = tableScan.m_table.getTypeName();
+            m_tableAlias = tableScan.getTableAlias();
+            m_tableName = tableScan.getTableName();
             m_columnName = tableScan.getColumnName(m_columnIndex);
         }
-    }
-
-    @Override
-    public void resolveForDB(Database db) {
-        if (m_tableName == null && m_columnName == null) {
-            // This is a dummy TVE standing in for a simplecolumn
-            // -- the assumption has to be that it is not being used in a general expression,
-            // so the schema-dependent type implications don't matter
-            // and its "target" value is getting properly validated, so we can shortcut checking here.
-            assert(false);
-            return;
-        }
-        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
-        Table table = db.getTables().getIgnoreCase(m_tableName);
-        resolveForTable(table);
     }
 
     @Override
@@ -285,7 +270,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         // table name is not specified (and not missed?).
         // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
         // -- not bothering for now.
-        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        Column column = table.getColumns().getExact(m_columnName);
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
@@ -298,7 +283,15 @@ public class TupleValueExpression extends AbstractValueExpression {
      * expressions.
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
-        return inputSchema.getIndexOfTve(this);
+        int index = inputSchema.getIndexOfTve(this);
+        if (getValueType() == null && index != -1) {
+            // In case of sub-queries the TVE may not have its value type and size
+            // resolved yet. Try to resolve it now
+            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+            setValueType(inputColumn.getType());
+            setValueSize(inputColumn.getSize());
+        }
+        return index;
     }
 
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,

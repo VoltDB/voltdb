@@ -433,6 +433,7 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
                     break;
                 default:
                     assert(false); // Should have been caught when the matview was loaded.
+                    /* no break */
                 }
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
@@ -518,8 +519,8 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
                 break;
             case EXPRESSION_TYPE_AGGREGATE_MIN:
-                reversedForMin = -1;
-                // fall through...
+                reversedForMin = -1; // fall through...
+                /* no break */
             case EXPRESSION_TYPE_AGGREGATE_MAX:
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
@@ -539,6 +540,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 break;
             default:
                 assert(false); // Should have been caught when the matview was loaded.
+                /* no break */
             }
         }
         VOLT_TRACE("updating matview tuple column %d\n", (int)(aggOffset+aggIndex));

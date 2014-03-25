@@ -43,6 +43,7 @@
 
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
+<envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -234,7 +235,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="distcheck" />
@@ -252,7 +253,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_noclustering" />
         <arg value="distcheck" />
@@ -270,7 +271,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="licensecheck" />
         <arg value="junit_quick" />
         <arg value="distcheck" />
@@ -288,7 +289,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit_sql" />
         <arg value="distcheck" />
@@ -307,7 +308,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="/usr/bin/ant" failonerror="true" timeout="1800000">
+    <exec executable="ant" failonerror="true" timeout="1800000">
         <arg value="junit_quarantine" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
@@ -731,6 +732,12 @@ CLEANING
     <arg line="-c 'rm -rf src/frontend/org/voltdb/catalog/*.java'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/DBBPool.java'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/.flagfile'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf *.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
@@ -800,6 +807,7 @@ JAR BUILDING
 	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/spearce_voltpatches/**" />
         </fileset>
@@ -885,6 +893,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
+            <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/**" />
             <include name="vanilla/**" />
@@ -922,7 +931,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, project_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -1022,6 +1031,7 @@ JAVA COMPILATION
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
                   javax/annotation_voltpatches/**/*.java
@@ -1071,12 +1081,17 @@ NATIVE EE STUFF
     unless='uptodate_jni_h'>
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
     <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
+    <delete file="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h" />
     <move
         file='${build.dir}/org_voltdb_jni_ExecutionEngine.h'
         todir='${src.ee.dir}'
     />
     <move
         file='${build.dir}/org_voltcore_utils_DBBPool.h'
+        todir='${src.ee.dir}'
+    />
+    <move
+        file='${build.dir}/org_voltdb_utils_PosixAdvise.h'
         todir='${src.ee.dir}'
     />
 </target>
@@ -1093,6 +1108,10 @@ NATIVE EE STUFF
                 file1="${src.ee.dir}/org_voltcore_utils_DBBPool.h"
                 file2="${build.dir}/org_voltcore_utils_DBBPool.h"
             />
+            <filesmatch
+                file1="${src.ee.dir}/org_voltdb_utils_PosixAdvise.h"
+                file2="${build.dir}/org_voltdb_utils_PosixAdvise.h"
+            />
         </and>
     </condition>
 </target>
@@ -1100,6 +1119,7 @@ NATIVE EE STUFF
 <target name='jnicompile_temp'>
     <delete file="${build.dir}/org_voltdb_jni_ExecutionEngine.h"/>
     <delete file="${build.dir}/org_voltcore_utils_DBBPool.h" />
+    <delete file="${build.dir}/org_voltdb_utils_PosixAdvise.h" />
     <javah
         classpathref="project.classpath"
         force="yes"
@@ -1112,6 +1132,13 @@ NATIVE EE STUFF
         force="yes"
         verbose="yes"
         class="org.voltcore.utils.DBBPool"
+        destdir="${build.dir}"
+    />
+    <javah
+        classpathref="project.classpath"
+        force="yes"
+        verbose="yes"
+        class="org.voltdb.utils.PosixAdvise"
         destdir="${build.dir}"
     />
 </target>
@@ -2185,6 +2212,38 @@ DEPLOYMENT FILE SCHEMA CODE GENERATION
         <arg line="-c 'rm -rfv ${deployment.parsergen.dir}'" />
     </exec>
 </target>
+
+<!--
+***************************************
+DBBPool.java preprocessing
+***************************************
+-->
+
+<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate">
+    <delete file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+    <exec dir='${src.gpl.dir}/org/voltcore/utils'
+          executable='gcc'
+          failonerror='true'>
+          <arg value='-E'/>
+          <arg value='-CC'/>
+          <arg value='-xc' />
+          <arg value='-Wp,-P' />
+          <arg value='-traditional-cpp' />
+          <arg value='-D${jmemcheck}' />
+          <arg value='-o' />
+          <arg value='DBBPool.java' />
+          <arg value='DBBPool.java.template' />
+    </exec>
+    <touch file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+</target>
+
+<target name="dbbpool_gen_check" depends="">
+    <uptodate property="dbbpool_gen_uptodate"
+              targetfile="${src.gpl.dir}/org/voltcore/utils/.flagfile">
+        <srcfiles file="${src.gpl.dir}/org/voltcore/utils/DBBPool.java.template" />
+    </uptodate>
+</target>
+
 
 <!--
 ***********************

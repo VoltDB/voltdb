@@ -52,7 +52,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.GZIPOutputStream;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -110,6 +109,8 @@ public class SyncBenchmark {
     final AtomicLong failedPuts = new AtomicLong(0);
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
+
+    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss,SSS");
 
     private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -229,7 +230,7 @@ public class SyncBenchmark {
             m_writer.printf("volt.kv.aborts %d %.3f\n", stats.getInvocationAborts(), now);
             m_writer.printf("volt.kv.errors %d %.3f\n", stats.getInvocationErrors(), now);
             m_writer.printf("volt.kv.latency.average %f %.3f\n", stats.getAverageLatency(), now);
-            m_writer.printf("volt.kv.latency.five9s %d %.3f\n", stats.kPercentileLatency(0.99999), now);
+            m_writer.printf("volt.kv.latency.five9s %.2f %.3f\n", stats.kPercentileLatencyAsDouble(0.99999), now);
             m_writer.printf("volt.kv.completed %d %.3f\n", stats.getInvocationsCompleted(), now);
             m_writer.printf("volt.kv.throughput %d %.3f\n", stats.getTxnThroughput(), now);
         }
@@ -244,16 +245,13 @@ public class SyncBenchmark {
             File fh = new File(csvFN);
             PrintWriter pw = null;
             try {
-                pw =
-                    new PrintWriter(
-                            new OutputStreamWriter(
-                                    new GZIPOutputStream(
-                                            new FileOutputStream(fh), 16384)));
+                // 'true' to flush the buffer every println/printf
+                pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fh)), true);
             } catch (IOException ioex) {
                 Throwables.propagate(ioex);
             }
             m_writer = pw;
-            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,THROUGHPUT,AVERAGE_LATENCY,FIVE9S_LATENCY");
+            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,TIMEOUTS,THROUGHPUT,AVERAGE_LATENCY,TWO9S_LATENCY,THREE9S_LATENCY,FOUR9S_LATENCY,FIVE9S_LATENCY");
         }
 
         @Override
@@ -263,11 +261,19 @@ public class SyncBenchmark {
 
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%f,%d\n",
-                    ts, stats.getEndTimestamp(), stats.getInvocationsCompleted(),
-                    stats.getInvocationAborts(), stats.getInvocationErrors(),
-                    stats.getTxnThroughput(), stats.getAverageLatency(),
-                    stats.kPercentileLatency(0.99999)
+            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f\n",
+                    ts,                                        // col 00 string timestamp
+                    stats.getEndTimestamp(),                   // col 01 long   timestamp millis
+                    stats.getInvocationsCompleted(),           // col 02 long   invocations completed
+                    stats.getInvocationAborts(),               // col 03 long   invocation aborts
+                    stats.getInvocationErrors(),               // col 04 long   invocation errors
+                    stats.getInvocationTimeouts(),             // col 05 long   invocation timeouts
+                    stats.getTxnThroughput(),                  // col 06 long   transaction throughput
+                    stats.getAverageLatency(),                 // col 07 double average latency
+                    stats.kPercentileLatencyAsDouble(0.99),    // col 08 double two nines latency
+                    stats.kPercentileLatencyAsDouble(0.999),   // col 09 double three nines latency
+                    stats.kPercentileLatencyAsDouble(0.9999),  // col 10 double four nines latency
+                    stats.kPercentileLatencyAsDouble(0.99999)  // col 11 double five nines latency
                     );
         }
     }
@@ -416,15 +422,15 @@ public class SyncBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long now = stats.getEndTimestamp();
-        long time = Math.round((now - benchmarkStartTS) / 1000.0);
 
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
+        // log merger correlate correctly
+        System.out.println(LOG_DF.format(new Date(stats.getEndTimestamp())));
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/99.999%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.99999));
+        System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.99999));
 
         logMetric(stats);
     }
@@ -482,16 +488,16 @@ public class SyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
-        System.out.printf("99.999th percentile latency:   %,9d ms\n", stats.kPercentileLatency(.99999));
+        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
+        System.out.printf("99.999th percentile latency:   %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");

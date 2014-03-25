@@ -644,20 +644,17 @@ SnapshotCompletionInterest, Promotable
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
 
-        // The expected partition count could be determined by the partition count in the current
-        // cluster or the new partition count recorded in the truncation snapshot,
-        // whichever is larger. Truncation snapshot taken at the end of the join process actually
-        // records the new partition count in the digest.
-        final int newPartitionCount =
-            (infoWithMinHostId == null ? 0 : infoWithMinHostId.newPartitionCount);
-        final int expectedPartitionCount = Math.max(m_allPartitions.length, newPartitionCount);
-
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
         if (m_action.doesRecover()) {
-            m_replayAgent.generateReplayPlan(expectedPartitionCount, m_isLeader);
+            if (infoWithMinHostId != null) {
+                // The expected partition count could be determined by the new partition count recorded
+                // in the truncation snapshot. Truncation snapshot taken at the end of the join process
+                // actually records the new partition count in the digest.
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+            }
         }
 
         m_planned = true;
@@ -1164,7 +1161,7 @@ SnapshotCompletionInterest, Promotable
                                       restoreProc.getEverysite(),
                                       0,//Can provide anything for multi-part
                                       0,
-                                      EstTime.currentTimeMillis());
+                                      System.nanoTime());
     }
 
     /**

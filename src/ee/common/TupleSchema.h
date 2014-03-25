@@ -38,6 +38,19 @@ namespace voltdb {
  */
 class TupleSchema {
 public:
+    // holds per column info
+    struct ColumnInfo {
+        uint32_t offset;
+        uint32_t length;   // does not include length prefix for ObjectTypes
+        char type;
+        char allowNull;
+        bool inlined;      // Stored inside the tuple or outside the tuple.
+
+        const ValueType getVoltType() const {
+            return static_cast<ValueType>(type);
+        }
+    };
+
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
@@ -77,22 +90,6 @@ public:
     /** Static factory method to destroy a TupleSchema object. Set to null after this call */
     static void freeTupleSchema(TupleSchema *schema);
 
-    /** Get the type of the column at a given index.
-        Behavior unpredicatble if invalid index. */
-    inline ValueType columnType(int index) const;
-    /** Get the nullability of the column at a given index.
-        Behavior unpredicatble if invalid index. */
-    inline bool columnAllowNull(int index) const;
-    inline bool columnIsInlined(const int index) const;
-    /** Get the oftset in the tuples bytes of the column at a given index.
-        Behavior unpredicatble if invalid index. */
-    inline uint32_t columnOffset(int index) const;
-    /** Get the length in bytes of the column at a given index.
-        Behavior unpredictable if invalid index. Length for inlined
-        strings will be the maximum length specified or 8 if string is
-        not inlined. */
-    inline uint32_t columnLength(int index) const;
-
     /** Return the number of columns in the schema for the tuple. */
     inline uint16_t columnCount() const;
     /** Return the number of bytes used by one tuple. */
@@ -109,24 +106,27 @@ public:
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
     bool equals(const TupleSchema *other) const;
+    bool isCompatibleForCopy(const TupleSchema *other) const;
+
+    const ColumnInfo* getColumnInfo(int columnIndex) const;
+    ColumnInfo* getColumnInfo(int columnIndex);
+
+    ValueType columnType(int idx) const {
+        const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(idx);
+        return columnInfo->getVoltType();
+    }
+
+    bool columnIsInlined(int idx) const {
+        const TupleSchema::ColumnInfo *columnInfo = getColumnInfo(idx);
+        return columnInfo->inlined;
+    }
 
 private:
-    // holds per column info
-    struct ColumnInfo {
-        uint32_t offset;
-        uint32_t length;   // does not include length prefix for ObjectTypes
-        char type;
-        char allowNull;
-        bool inlined;      // Stored inside the tuple or outside the tuple.
-    };
 
     /*
      * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
      */
     uint32_t columnLengthPrivate(const int index) const;
-
-    const ColumnInfo* getColumnInfo(int columnIndex) const;
-    ColumnInfo* getColumnInfo(int columnIndex);
 
     void setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex);
 
@@ -164,41 +164,6 @@ private:
 ///////////////////////////////////
 // METHOD IMPLEMENTATIONS
 ///////////////////////////////////
-
-inline ValueType TupleSchema::columnType(int index) const {
-    // In theory, the error response, here can be reset dynamically at a gdb breakpoint.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(index < m_columnCount,
-                                   "Fallout from planner error. The tuple schema index " << index <<
-                                   " exceeds the limit for schema:\n" << debug());
-    assert(index > -1);
-    const ColumnInfo *columnInfo = getColumnInfo(index);
-    return static_cast<ValueType>(columnInfo->type);
-}
-
-inline bool TupleSchema::columnAllowNull(int index) const {
-    assert(index < m_columnCount);
-    const ColumnInfo *columnInfo = getColumnInfo(index);
-    return columnInfo->allowNull;
-}
-
-inline bool TupleSchema::columnIsInlined(const int index) const {
-    assert(index < m_columnCount);
-    const ColumnInfo *columnInfo = getColumnInfo(index);
-    return columnInfo->inlined;
-}
-
-inline uint32_t TupleSchema::columnOffset(int index) const {
-    assert(index < m_columnCount);
-    const ColumnInfo *columnInfo = getColumnInfo(index);
-    return columnInfo->offset;
-}
-
-/** Return the column length in DDL terms (do not include length-prefix bytes) */
-inline uint32_t TupleSchema::columnLength(const int index) const {
-    assert(index < m_columnCount);
-    const ColumnInfo *columnInfo = getColumnInfo(index);
-    return columnInfo->length;
-}
 
 inline uint32_t TupleSchema::columnLengthPrivate(const int index) const {
     assert(index < m_columnCount);

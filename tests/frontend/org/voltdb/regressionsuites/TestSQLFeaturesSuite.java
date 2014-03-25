@@ -523,8 +523,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {0});
     }
 
-    public void testTableLimit() throws Exception {
-        System.out.println("STARTING TABLE LIMIT TEST......");
+    public void testTableLimitAndPercentage() throws Exception {
+        System.out.println("STARTING TABLE LIMIT AND PERCENTAGE FULL TEST......");
         Client client = getClient();
         VoltTable vt = null;
         Exception e = null;
@@ -552,13 +552,15 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {0});
 
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "CAPPED0", 0);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED0", 0, 0);
 
         // Test max row 2
         vt = client.callProcedure("CAPPED2.insert", 0, 0, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 50);
         vt = client.callProcedure("CAPPED2.insert", 1, 1, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
         e = null;
         try {
@@ -574,12 +576,38 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {2});
 
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "CAPPED2", 2);
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
         // Test @Statistics TABLE for normal table
         vt = client.callProcedure("NOCAPPED.insert", 0, 0, 0).getResults()[0];
         // Test @Statistics TABLE
-        validStatisticsForTableLimit(client, "NOCAPPED", VoltType.NULL_INTEGER);
+        validStatisticsForTableLimitAndPercentage(client, "NOCAPPED", VoltType.NULL_INTEGER, 0);
+
+
+        // Test percentage with round up
+        vt = client.callProcedure("CAPPED3.insert", 0, 0, 0).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 34);
+        vt = client.callProcedure("CAPPED3.insert", 1, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 67);
+        vt = client.callProcedure("CAPPED3.insert", 2, 2, 2).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 100);
+
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED3.insert", 3, 3, 3).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED3 exceeds table maximum row count 3"));
+        } finally {
+            assertNotNull(e);
+        }
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED3").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {3});
+
     }
 
 

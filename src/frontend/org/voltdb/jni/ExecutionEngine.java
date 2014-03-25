@@ -618,7 +618,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
-            long tempTableMemory);
+            long tempTableMemory,
+            int compactionThreshold);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

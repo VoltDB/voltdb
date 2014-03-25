@@ -34,8 +34,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT
     };
 
-    ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    UnionType m_unionType = UnionType.NOUNION;
+    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    public UnionType m_unionType = UnionType.NOUNION;
 
     /**
     * Class constructor
@@ -69,7 +69,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
-        tableList.clear();
+        m_tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
@@ -77,13 +77,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 m_children.add(childStmt);
 
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
                 childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
@@ -93,23 +93,19 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     /**Miscellaneous post parse activity
      * .
      * @param sql
-     * @param db
      * @param joinOrder
      */
     @Override
-    void postParse(String sql, String joinOrder)
-    {
+    void postParse(String sql, String joinOrder) {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
         }
 
-        // these just shouldn't happen right?
-        assert(noTableSelectionList.size() == 0);
-
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        m_sql = sql;
+        m_joinOrder = joinOrder;
     }
 
+    @Override
     public boolean isOrderDeterministic() {
         for (AbstractParsedStmt childStmt : m_children) {
             if ( ! childStmt.isOrderDeterministic()) {
@@ -119,6 +115,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return true;
     }
 
+    @Override
     public boolean hasLimitOrOffset() {
         for (AbstractParsedStmt childStmt : m_children) {
             if ( childStmt.hasLimitOrOffset()) {
@@ -126,5 +123,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

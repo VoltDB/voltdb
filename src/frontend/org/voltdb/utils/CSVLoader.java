@@ -24,12 +24,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.io.CsvListReader;
@@ -37,7 +32,6 @@ import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -285,74 +279,75 @@ public class CSVLoader {
         assert (csvClient != null);
 
         try {
-            if (!CSVPartitionProcessor.initializeProcessorInformation(config, csvClient)) {
-                System.exit(-1);
+            long readerTime;
+            long insertCount;
+            long ackCount;
+            long rowsQueued;
+
+            if (config.useSuppliedProcedure) {
+                if (!CSVFileReader.initializeReader(cfg, csvClient, listReader)) {
+                    System.exit(-1);
+                }
+
+                CSVFileReader csvReader = new CSVFileReader();
+                Thread readerThread = new Thread(csvReader);
+                readerThread.setName("CSVFileReader");
+                readerThread.setDaemon(true);
+
+                readerThread.start();
+                readerThread.join();
+
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+
+                insertTimeEnd = System.currentTimeMillis();
+
+                csvClient.drain();
+                csvClient.close();
+                insertCount = csvReader.m_processedCount.get();
+                ackCount = csvReader.m_acknowledgedCount.get();
+                rowsQueued = CSVFileReader.m_totalRowCount.get();
+            }
+            else {
+                //CSVFileReaderBL.initializeReader(cfg, csvClient, listReader);
+                CSVFileReaderBL.m_config = cfg;
+                CSVFileReaderBL.m_csvClient = csvClient;
+                CSVFileReaderBL.m_listReader = listReader;
+
+                CSVFileReaderBL csvReader = new CSVFileReaderBL();
+                Thread readerThread = new Thread(csvReader);
+                readerThread.setName("CSVFileReader");
+                readerThread.setDaemon(true);
+
+                //Wait for reader to finish.
+                readerThread.start();
+                readerThread.join();
+
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+
+                insertTimeEnd = System.currentTimeMillis();
+
+                csvClient.close();
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+                insertCount = csvReader.bulkLoader.getCompletedRowCount();
+                ackCount = insertCount - csvReader.m_failedInsertCount.get();
+                rowsQueued = CSVFileReaderBL.m_totalRowCount.get();
             }
 
-            //Create launch processor threads. If Multipartitioned only 1 processor is launched.
-            List<Thread> spawned = new ArrayList<Thread>(CSVPartitionProcessor.m_numProcessors);
-            CSVLineWithMetaData endOfData = new CSVLineWithMetaData(null, null, -1);
-
-            Map<Long, BlockingQueue<CSVLineWithMetaData>> lineq =
-                    new HashMap<Long, BlockingQueue<CSVLineWithMetaData>>(CSVPartitionProcessor.m_numProcessors);
-            List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(CSVPartitionProcessor.m_numProcessors);
-            int numBatchesInQueuePerPartition = (1000 / CSVPartitionProcessor.m_numProcessors);
-            if (numBatchesInQueuePerPartition < 5) {
-                numBatchesInQueuePerPartition = 5;
-            }
-            m_log.debug("Max Number of batches per partition processor: " + numBatchesInQueuePerPartition);
-            for (long i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
-                //Keep only numBatchesInQueuePerPartition batches worth data in queue.
-                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue
-                        = new LinkedBlockingQueue<CSVLineWithMetaData>(config.batch * numBatchesInQueuePerPartition);
-                lineq.put(i, partitionQueue);
-                CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i,
-                        CSVPartitionProcessor.m_partitionedColumnIndex, partitionQueue, endOfData);
-                processors.add(processor);
-
-                Thread th = new Thread(processor);
-                th.setName(processor.m_processorName);
-                spawned.add(th);
+            //Close the reader.
+            try {
+               listReader.close();
+            } catch (Exception ex) {
+                m_log.error("Error closing reader: " + ex);
+            } finally {
+                m_log.debug("Rows Queued by Reader: " + rowsQueued);
             }
 
-            CSVFileReader.m_config = config;
-            CSVFileReader.m_listReader = listReader;
-            CSVFileReader.m_processorQueues = lineq;
-            CSVFileReader.m_endOfData = endOfData;
-            CSVFileReader.m_csvClient = csvClient;
-
-            CSVFileReader csvReader = new CSVFileReader();
-            Thread th = new Thread(csvReader);
-            th.setName("CSVFileReader");
-            th.setDaemon(true);
-
-            //Start the processor threads.
-            for (Thread th2 : spawned) {
-                th2.start();
-            }
-
-            //Wait for reader to finish it count downs the procesors.
-            th.start();
-            th.join();
-
-            long readerTime = (csvReader.m_parsingTime) / 1000000;
-
-            insertTimeEnd = System.currentTimeMillis();
-
-            csvClient.drain();
-            csvClient.close();
-            long insertCount = 0;
-            //Sum up all the partition processed count i.e the number of rows we sent to server.
-            for (CSVPartitionProcessor pp : processors) {
-                insertCount += pp.m_partitionProcessedCount.get();
-            }
-            long ackCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.get();
             m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
-            boolean noerrors = CSVFileReader.m_errorInfo.isEmpty();
+            boolean noerrors = config.useSuppliedProcedure ? CSVFileReader.m_errorInfo.isEmpty() : CSVFileReaderBL.m_errorInfo.isEmpty();
             close_cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
@@ -427,7 +422,7 @@ public class CSVLoader {
     }
 
     private static void produceFiles(long ackCount, long insertCount) {
-        Map<Long, String[]> errorInfo = CSVFileReader.m_errorInfo;
+        Map<Long, String[]> errorInfo = config.useSuppliedProcedure?CSVFileReader.m_errorInfo:CSVFileReaderBL.m_errorInfo;
         latency = System.currentTimeMillis() - start;
         m_log.info("Elapsed time: " + latency / 1000F
                 + " seconds");
@@ -456,22 +451,33 @@ public class CSVLoader {
             out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
             long trueSkip;
-            //get the actuall number of lines skipped
-            if (config.skip < CSVFileReader.m_totalLineCount.get()) {
+            long totolLineCnt;
+            long totalRowCnt;
+
+            if (config.useSuppliedProcedure) {
+                totolLineCnt = CSVFileReader.m_totalLineCount.get();
+                totalRowCnt = CSVFileReader.m_totalRowCount.get();
+            } else {
+                totolLineCnt = CSVFileReaderBL.m_totalLineCount.get();
+                totalRowCnt = CSVFileReaderBL.m_totalRowCount.get();
+            }
+
+            //get the actual number of lines skipped
+            if (config.skip < totolLineCnt) {
                 trueSkip = config.skip;
             } else {
-                trueSkip = CSVFileReader.m_totalLineCount.get();
+                trueSkip = totolLineCnt;
             }
             out_reportfile.write("Number of input lines skipped: "
                     + trueSkip + "\n");
             out_reportfile.write("Number of lines read from input: "
-                    + (CSVFileReader.m_totalLineCount.get() - trueSkip) + "\n");
+                    + (totolLineCnt - trueSkip) + "\n");
             if (config.limitrows == -1) {
                 out_reportfile.write("Input stopped after "
-                        + CSVFileReader.m_totalRowCount.get() + " rows read" + "\n");
+                        + totalRowCnt + " rows read" + "\n");
             }
             out_reportfile.write("Number of rows discovered: "
-                    + CSVFileReader.m_totalLineCount.get() + "\n");
+                    + totolLineCnt + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
@@ -498,15 +504,23 @@ public class CSVLoader {
 
     private static void close_cleanup() throws IOException,
             InterruptedException {
-        //Reset all this for tests which uses main to load csv data.
-        CSVFileReader.m_errorInfo.clear();
-        CSVFileReader.m_errored = false;
-        CSVPartitionProcessor.m_numProcessors = 1;
-        CSVPartitionProcessor.m_columnCnt = 0;
-        CSVFileReader.m_totalLineCount = new AtomicLong(0);
-        CSVFileReader.m_totalRowCount = new AtomicLong(0);
+        if (config != null) {
+            if (config.useSuppliedProcedure) {
+                //Reset all this for tests which uses main to load csv data.
+                CSVFileReader.m_errorInfo.clear();
+                CSVFileReader.m_errored = false;
+                CSVFileReader.m_totalLineCount = new AtomicLong(0);
+                CSVFileReader.m_totalRowCount = new AtomicLong(0);
+            }
+            else {
+                //Reset all this for tests which uses main to load csv data.
+                CSVFileReaderBL.m_errorInfo.clear();
+                CSVFileReaderBL.m_errored = false;
+                CSVFileReaderBL.m_totalLineCount = new AtomicLong(0);
+                CSVFileReaderBL.m_totalRowCount = new AtomicLong(0);
+            }
+        }
 
-        CSVPartitionProcessor.m_partitionAcknowledgedCount = new AtomicLong(0);
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();

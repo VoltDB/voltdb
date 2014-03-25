@@ -28,8 +28,12 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     char msg_format_buffer[1024];
     char state_format_buffer[6];
     if (type == VALUE_TYPE_VARCHAR) {
-        const int32_t valueLength = getObjectLength();
-        const char *valueChars = reinterpret_cast<char*>(getObjectValue());
+        if (isNull()) {
+             throw SQLException(SQLException::dynamic_sql_error,
+                                "Must not ask  for object length on sql null object.");
+        }
+        const int32_t valueLength = getObjectLength_withoutNull();
+        const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
@@ -72,8 +76,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLength();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+        const int32_t valueLength = strValue.getObjectLength_withoutNull();
+        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }

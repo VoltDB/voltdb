@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -54,6 +55,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -108,7 +110,7 @@ import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -132,17 +134,43 @@ public abstract class CatalogUtil {
      * @param catalogBytes
      * @param log
      * @return The serialized string of the catalog content.
-     * @throws IOException
+     * @throws Exception
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log)
-            throws IOException
-    {
-        // Throws IOException on load failure.
-        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
+        assert(catalogBytes != null);
+
+        String serializedCatalog = null;
+        String voltVersionString = null;
+        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
+        }
+
+        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+
+        // Get Volt version string
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+        }
+        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String[] buildInfoLines = buildInfo.split("\n");
+        if (buildInfoLines.length != 5) {
+            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
+        }
+        voltVersionString = buildInfoLines[0].trim();
+
+        // Check if it's compatible
+        if (!isCatalogCompatible(voltVersionString)) {
+            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
+                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
+        }
+
+        return serializedCatalog;
     }
 
     /**
@@ -150,12 +178,12 @@ public abstract class CatalogUtil {
      *
      * @param catalogBytes
      * @param log
-     * @return The serialized string of the catalog content.
+     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
             throws IOException
     {
         // Throws IOException on load failure.
@@ -163,9 +191,10 @@ public abstract class CatalogUtil {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
-        compiler.upgradeCatalogAsNeeded(jarfile);
+        String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+        String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
     }
 
     /**
@@ -497,7 +526,7 @@ public abstract class CatalogUtil {
                 List<AbstractExpression> indexedExprs = null;
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
-                            StmtTableScan.getStmtTableScan(catalog_tbl));
+                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -559,6 +588,34 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Check if a catalog compiled with the given version of VoltDB is
+     * compatible with the current version of VoltDB.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's compatible, false otherwise.
+     */
+
+    public static boolean isCatalogCompatible(String catalogVersionStr)
+    {
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        //Check that it is a properly formed verstion string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        if (catalogVersion == null) {
+            throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
+        }
+
+        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Check if a catalog version string is valid.
      *
      * @param catalogVersionStr
@@ -573,8 +630,8 @@ public abstract class CatalogUtil {
             return false;
         }
 
-        // Is it properly formed?
-        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        //Check that it is a properly formed version string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
             return false;
         }
@@ -1568,38 +1625,51 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        Collection<String> tablesRead = new TreeSet<String>();
-        Collection<String> tablesUpdated = new TreeSet<String>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
         Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
-            topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            topPlan.getTablesAndIndexes(tablesRead, indexes);
         }
         if (bottomPlan != null) {
-            bottomPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            bottomPlan.getTablesAndIndexes(tablesRead, indexes);
         }
 
-        // make useage only in either read or updated, not both
-        tablesRead.removeAll(tablesUpdated);
+        String updated = null;
+        if ( ! stmt.getReadonly()) {
+            updated = topPlan.getUpdatedTable();
+            if (updated == null) {
+                updated = bottomPlan.getUpdatedTable();
+            }
+            assert(updated != null);
+        }
+
+        Set<String> readTableNames = tablesRead.keySet();
 
         for (Table table : db.getTables()) {
-            for (String indexName : indexes) {
-                Index index = table.getIndexes().get(indexName);
-                if (index != null) {
-                    updateIndexUsageAnnotation(index, stmt);
+            if (readTableNames.contains(table.getTypeName())) {
+                readTableNames.remove(table.getTypeName());
+                for (String indexName : indexes) {
+                    Index index = table.getIndexes().get(indexName);
+                    if (index != null) {
+                        updateIndexUsageAnnotation(index, stmt);
+                    }
                 }
-            }
-            if (tablesRead.contains(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
-                tablesRead.remove(table.getTypeName());
-            }
-            if (tablesUpdated.contains(table.getTypeName())) {
+                if (updated != null && updated.equals(table.getTypeName())) {
+                    // make useage only in either read or updated, not both
+                    updateTableUsageAnnotation(table, stmt, true);
+                    updated = null;
+                    continue;
+                }
                 updateTableUsageAnnotation(table, stmt, false);
-                tablesUpdated.remove(table.getTypeName());
+            }
+            else if (updated != null && updated.equals(table.getTypeName())) {
+                updateTableUsageAnnotation(table, stmt, true);
+                updated = null;
             }
         }
 
         assert(tablesRead.size() == 0);
-        assert(tablesUpdated.size() == 0);
+        assert(updated == null);
     }
 
     private static void updateIndexUsageAnnotation(Index index, Statement stmt) {

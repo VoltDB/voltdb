@@ -62,27 +62,27 @@ namespace voltdb {
 
 class CmpEq {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_equals(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_equals_withoutNull(r);}
 };
 class CmpNe {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_notEquals(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_notEquals_withoutNull(r);}
 };
 class CmpLt {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThan(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThan_withoutNull(r);}
 };
 class CmpGt {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThan(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThan_withoutNull(r);}
 };
 class CmpLte {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThanOrEqual(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThanOrEqual_withoutNull(r);}
 };
 class CmpGte {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThanOrEqual(r);}
+    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThanOrEqual_withoutNull(r);}
 };
 class CmpLike {
 public:

@@ -345,7 +345,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         long txnId = m_idManager.getNextUniqueTransactionId();
         for (long initiatorId : hsIds) {
             HeartbeatMessage heartbeat =
-                new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
+                new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestGloballySafeTxnId());
             m_mailbox.send( initiatorId, heartbeat);
         }
     }
@@ -364,7 +364,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 // use the heartbeat to unclog the priority queue if clogged
                 long lastSeenTxnFromInitiator = m_txnQueue.noteTransactionRecievedAndReturnLastSeen(
                         info.getInitiatorHSId(), info.getTxnId(),
-                        true, ((HeartbeatMessage) info).getLastSafeTxnId());
+                        ((HeartbeatMessage) info).getLastSafeTxnId());
 
                 // respond to the initiator with the last seen transaction
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
@@ -379,8 +379,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             HeartbeatResponseMessage hrm = (HeartbeatResponseMessage)message;
             m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(
                     hrm.getExecHSId(),
-                    hrm.getLastReceivedTxnId(),
-                    hrm.isBlocked());
+                    hrm.getLastReceivedTxnId());
         } else if (message instanceof LocalObjectMessage) {
             LocalObjectMessage lom = (LocalObjectMessage)message;
             if (lom.payload instanceof Runnable) {
@@ -402,7 +401,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //in this case because ordering of reads and writes matters
                         if (m_txnQueue.isEmpty()) {
                             r.setOwner(m_hsId);
-                            m_server.prepRequest(r, m_lastUsedTxnId);
+                            m_server.prepRequest(new Request(r), m_lastUsedTxnId);
                             return;
                         }
                         isRead = true;
@@ -426,7 +425,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                                     r,
                                     txnId,
                                     m_hsId,
-                                    m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
+                                    m_safetyState.getNewestGloballySafeTxnId());
                         m_mailbox.send( initiatorHSId, atm);
                     }
                 }
@@ -436,10 +435,10 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 //to a recovering agreement site
                 AgreementTaskMessage atm =
                     new AgreementTaskMessage(
-                            r,
+                            new Request(r),
                             txnId,
                             m_hsId,
-                            m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
+                            m_safetyState.getNewestGloballySafeTxnId());
                 atm.m_sourceHSId = m_hsId;
                 processMessage(atm);
 
@@ -463,7 +462,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             if (!m_transactionsById.containsKey(atm.m_txnId) && atm.m_txnId >= m_minTxnIdAfterRecovery) {
                 m_txnQueue.noteTransactionRecievedAndReturnLastSeen(atm.m_initiatorHSId,
                         atm.m_txnId,
-                        false,
                         atm.m_lastSafeTxnId);
 
                 AgreementTransactionState transactionState =
@@ -530,7 +528,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
                 m_txnQueue.noteTransactionRecievedAndReturnLastSeen(initiatorHSId,
                         txnId,
-                        false,
                         lastSafeTxnId);
                 AgreementRejoinTransactionState transactionState =
                     new AgreementRejoinTransactionState(txnId, initiatorHSId, joiningHSId, null);
@@ -781,8 +778,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
                     m_txnQueue.noteTransactionRecievedAndReturnLastSeen(m_hsId,
                             txnId,
-                            false,
-                            m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
+                            m_safetyState.getNewestGloballySafeTxnId());
 
                     AgreementRejoinTransactionState arts =
                         new AgreementRejoinTransactionState( txnId, m_hsId, joiningSite, cdl );

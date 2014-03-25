@@ -18,10 +18,8 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,39 +35,40 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.planner.parseinfo.SubqueryLeafNode;
+import org.voltdb.planner.parseinfo.TableLeafNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
 public abstract class AbstractParsedStmt {
 
-    public String sql;
+    public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
     private ParameterValueExpression[] m_paramList = new ParameterValueExpression[0];
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
-    public ArrayList<Table> tableList = new ArrayList<Table>();
+    public ArrayList<Table> m_tableList = new ArrayList<Table>();
     private Table m_DDLIndexedTable = null;
 
-    public void setTable(Table tbl) {
-        m_DDLIndexedTable = tbl;
-    }
+    public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
-
-    protected ArrayList<AbstractExpression> aggregationList = null;
+    protected ArrayList<AbstractExpression> m_aggregationList = null;
 
     // Hierarchical join representation
-    public JoinNode joinTree = null;
+    public JoinNode m_joinTree = null;
 
     //User specified join order, null if none is specified
-    public String joinOrder = null;
+    public String m_joinOrder = null;
 
-    // Statement cache
-    public List<StmtTableScan> stmtCache = new ArrayList<StmtTableScan>();
-    public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
+    public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -90,52 +89,84 @@ public abstract class AbstractParsedStmt {
         this.m_db = db;
     }
 
+    public void setTable(Table tbl) {
+        m_DDLIndexedTable = tbl;
+        // Add this table to the cache
+        assert(tbl.getTypeName() != null);
+        addTableToStmtCache(tbl.getTypeName(), tbl.getTypeName(), null);
+    }
+
+    /**
+    *
+    * @param stmtTypeElement
+    * @param paramValues
+    * @param db
+    */
+   private static AbstractParsedStmt getParsedStmt(VoltXMLElement stmtTypeElement, String[] paramValues,
+           Database db) {
+       AbstractParsedStmt retval = null;
+
+       if (stmtTypeElement == null) {
+           System.err.println("Unexpected error parsing hsql parsed stmt xml");
+           throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
+       }
+
+       // create non-abstract instances
+       if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
+           retval = new ParsedInsertStmt(paramValues, db);
+       }
+       else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+           retval = new ParsedUpdateStmt(paramValues, db);
+       }
+       else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+           retval = new ParsedDeleteStmt(paramValues, db);
+       }
+       else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+           retval = new ParsedSelectStmt(paramValues, db);
+       }
+       else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+           retval = new ParsedUnionStmt(paramValues, db);
+       }
+       else {
+           throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
+       }
+       return retval;
+   }
+
+   /**
+   * @param parsedStmt
+   * @param sql
+   * @param xmlSQL
+   * @param db
+   * @param joinOrder
+   */
+  private static AbstractParsedStmt parse(AbstractParsedStmt parsedStmt, String sql,
+          VoltXMLElement stmtTypeElement,  String[] paramValues, Database db, String joinOrder) {
+      // parse tables and parameters
+      parsedStmt.parseTablesAndParams(stmtTypeElement);
+
+      // parse specifics
+      parsedStmt.parse(stmtTypeElement);
+
+      // post parse action
+      parsedStmt.postParse(sql, joinOrder);
+
+      return parsedStmt;
+
+  }
     /**
      *
      * @param sql
-     * @param xmlSQL
+     * @param stmtTypeElement
+     * @param paramValues
      * @param db
+     * @param joinOrder
      */
     public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
             Database db, String joinOrder) {
 
-        AbstractParsedStmt retval = null;
-
-        if (stmtTypeElement == null) {
-            System.err.println("Unexpected error parsing hsql parsed stmt xml");
-            throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
-        }
-
-        // create non-abstract instances
-        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
-            retval = new ParsedInsertStmt(paramValues, db);
-        }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
-            retval = new ParsedUpdateStmt(paramValues, db);
-        }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
-            retval = new ParsedDeleteStmt(paramValues, db);
-        }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-            retval = new ParsedSelectStmt(paramValues, db);
-        }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-            retval = new ParsedUnionStmt(paramValues, db);
-        }
-        else {
-            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
-        }
-
-        // parse tables and parameters
-        retval.parseTablesAndParams(stmtTypeElement);
-
-        // parse specifics
-        retval.parse(stmtTypeElement);
-
-        // post parse action
-        retval.postParse(sql, joinOrder);
-
-        return retval;
+        AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
+        return parse(retval, sql, stmtTypeElement, paramValues, db, joinOrder);
     }
 
     /**
@@ -152,7 +183,7 @@ public abstract class AbstractParsedStmt {
 
             String name = child.attributes.get("name");
             assert(name != null);
-            Column col = table.getColumns().getIgnoreCase(name.trim());
+            Column col = table.getColumns().getExact(name.trim());
 
             assert(child.children.size() == 1);
             VoltXMLElement subChild = child.children.get(0);
@@ -193,8 +224,8 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        m_sql = sql;
+        m_joinOrder = joinOrder;
     }
 
     /**
@@ -222,9 +253,9 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("aggregation")) {
             retval = parseAggregationExpression(root);
-            if (aggregationList != null) {
+            if (m_aggregationList != null) {
                 ExpressionUtil.finalizeValueTypes(retval);
-                aggregationList.add(retval);
+                m_aggregationList.add(retval);
             }
         }
         else if (elementName.equals("function")) {
@@ -232,6 +263,9 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("asterisk")) {
             return null;
+        }
+        else if (elementName.equals("row")) {
+            throw new PlanningErrorException("Unsupported subquery syntax within an expression.");
         }
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
@@ -326,62 +360,38 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
+        assert(tableScan != null);
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
-        expr.resolveForDB(m_db);
-        addScanColumn(expr);
+        // Collect the unique columns used in the plan for a given scan.
+        // Resolve the tve and add it to the scan's cache of referenced columns
+        tableScan.resolveTVE(expr, columnName);
         return expr;
     }
 
     /**
-     * Collect unique columns used in the plan for a given table.
-     *
-     * @param tveColumn - scan column to add
+     * Add a table or a sub-query to the statement cache. If the subQuery is not NULL,
+     * the table name and the alias specify the sub-query
+     * @param tableName
+     * @param tableAlias
+     * @param subQuery
+     * @return index into the cache array
      */
-
-    private void addScanColumn(TupleValueExpression tveColumn)
-    {
-        // add table to the query cache
-        int tableCacheIdx = addTableToStmtCache(tveColumn.getTableName(), tveColumn.getTableAlias());
-
-        SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
-                tveColumn.getTableAlias(),
-                tveColumn.getColumnName(),
-                tveColumn.getColumnAlias(),
-                tveColumn);
-
-        StmtTableScan tableCache = stmtCache.get(tableCacheIdx);
-        if (tableCache.m_scanColumns == null) {
-            tableCache.m_scanColumns = new HashSet<SchemaColumn>();
-        }
-        tableCache.m_scanColumns.add(col);
-    }
-
-
-
-    /**
-    * Add table to the statement cache
-    * @param tableName
-    * @param tableAlias
-    * @return index into the cache array
-    */
-    private int addTableToStmtCache(String tableName, String tableAlias) {
+    private StmtTableScan addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subquery) {
         // Create an index into the query Catalog cache
-        if (!tableAliasIndexMap.containsKey(tableAlias)) {
-            int nextIndex = stmtCache.size();
-            tableAliasIndexMap.put(tableAlias, nextIndex);
-            StmtTableScan tableCache = new StmtTableScan();
-            tableCache.m_tableAlias = tableAlias;
-            tableCache.m_table = getTableFromDB(tableName);
-            assert(tableCache.m_table != null);
-            tableCache.populateColumnDictionary();
-
-            stmtCache.add(tableCache);
-            tableAliasIndexMap.put(tableAlias, nextIndex);
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
+        if (tableScan == null) {
+            if (subquery == null) {
+                tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
+            } else {
+                // Temp table always have name SYSTEM_SUBQUERY + hashCode.
+                tableScan = new StmtSubqueryScan(subquery, tableAlias);
+            }
+            m_tableAliasMap.put(tableAlias, tableScan);
         }
-        return tableAliasIndexMap.get(tableAlias);
+        return tableScan;
     }
 
     /**
@@ -548,9 +558,8 @@ public abstract class AbstractParsedStmt {
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
             expr.setParameterArg(parameter_idx);
+            expr.negotiateInitialValueTypes();
         }
-
-        expr.resolveForDB(m_db);
         return expr;
     }
 
@@ -558,11 +567,11 @@ public abstract class AbstractParsedStmt {
      * Build a WHERE expression for a single-table statement.
      */
     public AbstractExpression getSingleTableFilterExpression() {
-        if (joinTree == null) { // Not possible.
-            assert(joinTree != null);
+        if (m_joinTree == null) { // Not possible.
+            assert(m_joinTree != null);
             return null;
         }
-        return joinTree.getSimpleFilterExpression();
+        return m_joinTree.getSimpleFilterExpression();
     }
 
     /**
@@ -577,26 +586,33 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-        // add table to the query cache
-        int aliasIdx = addTableToStmtCache(tableName, tableAlias);
+        // Possible sub-query
+        AbstractParsedStmt subquery = parseSubQuery(tableNode);
+
+        // add table to the query cache before processing the JOIN/WHERE expressions
+        // The order is important because processing sub-query expressions assumes that
+        // the sub-query is already registered
+        StmtTableScan tableScan = addTableToStmtCache(tableName, tableAlias, subquery);
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
-        Table table = getTableFromDB(tableName);
-        tableList.add(table);
-
-        // @TODO ENG_3038 This method of building join trees works for joins without
-        // sub-queries
-
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
-        int nodeId = (joinTree == null) ? 0 : joinTree.m_id + 1;
-        JoinNode leafNode = new JoinNode(nodeId, JoinType.INNER, aliasIdx, joinExpr, whereExpr);
+        int nodeId = (m_joinTree == null) ? 0 : m_joinTree.getId() + 1;
 
-        if (joinTree == null) {
+        JoinNode leafNode;
+        if (tableScan instanceof StmtTargetTableScan) {
+            Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
+            m_tableList.add(table);
+            leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
+        } else {
+            leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
+        }
+
+        if (m_joinTree == null) {
             // this is the first table
-            joinTree = leafNode;
+            m_joinTree = leafNode;
         } else {
             // Build the tree by attaching the next table always to the right
             // The node's join type is determined by the type of its right node
@@ -607,8 +623,8 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("VoltDB does not support full outer joins");
             }
 
-            JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree, leafNode);
-            joinTree = joinNode;
+            JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
+            m_joinTree = joinNode;
        }
     }
 
@@ -673,268 +689,18 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
-        analyzeJoinExpressions(joinTree);
-        return joinTree.getAllEquivalenceFilters();
-    }
-
-    /**
-     * Analyze join expressions
-     */
-    void analyzeJoinExpressions(JoinNode joinNode) {
-        //assert (joinNode != null);
-        if (joinNode == null) {
-            return;
-        }
-        if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            // Leaf node. Simply un-combine expressions and move them to the inner lists
-            // The expressions will be classified later at the join node level.
-            // If this is a single table select then classification is not required.
-            assert(joinNode.m_leftNode == null && joinNode.m_rightNode == null);
-            joinNode.m_joinInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
-            joinNode.m_whereInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
-            return;
-        }
-
-        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        analyzeJoinExpressions(joinNode.m_leftNode);
-        analyzeJoinExpressions(joinNode.m_rightNode);
-
-        // At this moment all RIGHT joins are already converted to the LEFT ones
-        assert (joinNode.m_joinType == JoinType.LEFT || joinNode.m_joinType == JoinType.INNER);
-
-        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
-
-        // Collect node's own join and where expressions
-        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
-        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
-
-        // Collect children expressions only if a child is a leaf. They are not classified yet
-        if (joinNode.m_leftNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
-            joinNode.m_leftNode.m_joinInnerList.clear();
-            whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
-            joinNode.m_leftNode.m_whereInnerList.clear();
-        }
-        if (joinNode.m_rightNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
-            joinNode.m_rightNode.m_joinInnerList.clear();
-            whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
-            joinNode.m_rightNode.m_whereInnerList.clear();
-        }
-
-        Collection<Integer> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
-        Collection<Integer> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
-
-        // Classify join expressions into the following categories:
-        // 1. The OUTER-only join conditions. If any are false for a given outer tuple,
-        // then NO inner tuples should match it (and it can automatically get null-padded by the join
-        // without even considering the inner table). Testing the outer-only conditions
-        // COULD be considered as an optimal first step to processing each outer tuple
-        // 2. The INNER-only join conditions apply to the inner tuples (even prior to considering any outer tuple).
-        // if true for a given inner tuple, the condition has no effect, if false,
-        // it prevents the inner tuple from matching ANY outer tuple,
-        // In case of multi-tables join, they could be pushed down to a child node if this node is a join itself
-        // 3. The two-sided expressions that get evaluated on each combination of outer and inner tuple
-        // and either accept or reject that particular combination.
-        // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
-        // for the currently supported two table joins but could change if number of tables > 2
-        classifyJoinExpressions(joinList, outerTables, innerTables,  joinNode.m_joinOuterList,
-                joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
-
-        // Apply implied transitive constant filter to join expressions
-        // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
-        // outer.partkey = ? and inner.partkey = ?
-        applyTransitiveEquivalence(joinNode.m_joinOuterList, joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
-
-        // Classify where expressions into the following categories:
-        // 1. The OUTER-only filter conditions. If any are false for a given outer tuple,
-        // nothing in the join processing of that outer tuple will get it past this filter,
-        // so it makes sense to "push this filter down" to pre-qualify the outer tuples before they enter the join.
-        // 2. The INNER-only join conditions. If these conditions reject NULL inner tuple it make sense to
-        // move them "up" to the join conditions, otherwise they must remain post-join conditions
-        // to preserve outer join semantic
-        // 3. The two-sided expressions. Same as the inner only conditions.
-        // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
-        classifyJoinExpressions(whereList, outerTables, innerTables,  joinNode.m_whereOuterList,
-                joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-
-        // Apply implied transitive constant filter to where expressions
-        applyTransitiveEquivalence(joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-
-        // In case of multi-table joins certain expressions could be pushed down to the children
-        // to improve join performance.
-        pushDownExpressions(joinNode);
-    }
-
-    /**
-     * Split the input expression list into the three categories
-     * 1. TVE expressions with outer tables only
-     * 2. TVE expressions with inner tables only
-     * 3. TVE expressions with inner and outer tables
-     * The outer tables are the tables reachable from the outer node of the join
-     * The inner tables are the tables reachable from the inner node of the join
-     * @param exprList expression list to split
-     * @param outerTables outer table
-     * @param innerTable outer table
-     * @param outerList expressions with outer table only
-     * @param innerList expressions with inner table only
-     * @param innerOuterList with inner and outer tables
-     */
-    void classifyJoinExpressions(Collection<AbstractExpression> exprList,
-            Collection<Integer> outerTables, Collection<Integer> innerTables,
-            List<AbstractExpression> outerList, List<AbstractExpression> innerList,
-            List<AbstractExpression> innerOuterList) {
-        HashSet<Integer> tableAliasSet = new HashSet<Integer>();
-        HashSet<Integer> outerSet = new HashSet<Integer>(outerTables);
-        HashSet<Integer> innerSet = new HashSet<Integer>(innerTables);
-        for (AbstractExpression expr : exprList) {
-            tableAliasSet.clear();
-            getTablesForExpression(expr, tableAliasSet);
-            Integer tableAliasIdxs[] = tableAliasSet.toArray(new Integer[0]);
-            if (tableAliasSet.isEmpty()) {
-                noTableSelectionList.add(expr);
-            } else {
-                boolean outer = false;
-                boolean inner = false;
-                for (Integer aliasIdx : tableAliasIdxs) {
-                    outer = outer || outerSet.contains(aliasIdx);
-                    inner = inner || innerSet.contains(aliasIdx);
-                }
-                if (outer && inner) {
-                    innerOuterList.add(expr);
-                } else if (outer) {
-                    outerList.add(expr);
-                } else if (inner) {
-                    innerList.add(expr);
-                } else {
-                    // can not be, right?
-                    assert(false);
-                }
-            }
-        }
-    }
-
-    /**
-     * Apply implied transitive constant filter to join expressions
-     * outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
-     * outer.partkey = ? and inner.partkey = ?
-     * @param innerTableExprs inner table expressions
-     * @param outerTableExprs outer table expressions
-     * @param innerOuterTableExprs inner-outer tables expressions
-     */
-    private static void applyTransitiveEquivalence(List<AbstractExpression> outerTableExprs,
-            List<AbstractExpression> innerTableExprs,
-            List<AbstractExpression> innerOuterTableExprs)
-    {
-        List<AbstractExpression> simplifiedOuterExprs = applyTransitiveEquivalence(innerTableExprs, innerOuterTableExprs);
-        List<AbstractExpression> simplifiedInnerExprs = applyTransitiveEquivalence(outerTableExprs, innerOuterTableExprs);
-        outerTableExprs.addAll(simplifiedOuterExprs);
-        innerTableExprs.addAll(simplifiedInnerExprs);
-    }
-
-    private static List<AbstractExpression>
-    applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs,
-                               List<AbstractExpression> twoTableExprs)
-    {
-        ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<AbstractExpression>();
-        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 =
-                new HashMap<AbstractExpression, Set<AbstractExpression> >();
-        ExpressionUtil.collectPartitioningFilters(singleTableExprs, eqMap1);
-
-        for (AbstractExpression expr : twoTableExprs) {
-            if (! ExpressionUtil.isColumnEquivalenceFilter(expr)) {
-                continue;
-            }
-            AbstractExpression leftExpr = expr.getLeft();
-            AbstractExpression rightExpr = expr.getRight();
-            assert(leftExpr instanceof TupleValueExpression && rightExpr instanceof TupleValueExpression);
-            Set<AbstractExpression> eqSet1 = eqMap1.get(leftExpr);
-            AbstractExpression singleExpr = leftExpr;
-            if (eqSet1 == null) {
-                eqSet1 = eqMap1.get(rightExpr);
-                if (eqSet1 == null) {
-                    continue;
-                }
-                singleExpr = rightExpr;
-            }
-
-            for (AbstractExpression eqExpr : eqSet1) {
-                if (eqExpr instanceof ConstantValueExpression) {
-                    if (singleExpr == leftExpr) {
-                        expr.setLeft(eqExpr);
-                    } else {
-                        expr.setRight(eqExpr);
-                    }
-                    simplifiedExprs.add(expr);
-                    // Having more than one const value for a single column doesn't make
-                    // much sense, right?
-                    break;
-                }
-            }
-
-        }
-
-         twoTableExprs.removeAll(simplifiedExprs);
-         return simplifiedExprs;
-    }
-
-    /**
-     * Push down each WHERE expression on a given join node to the most specific child join
-     * or table the expression applies to.
-     *  1. The OUTER WHERE expressions can be pushed down to the outer (left) child for all joins
-     *    (INNER and LEFT).
-     *  2. The INNER WHERE expressions can be pushed down to the inner (right) child for the INNER joins.
-     * @param joinNode JoinNode
-     */
-    private void pushDownExpressions(JoinNode joinNode) {
-        assert (joinNode != null && joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        JoinNode outerNode = joinNode.m_leftNode;
-        if (outerNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
-            pushDownExpressionsRecursively(outerNode, joinNode.m_whereOuterList);
-        }
-        JoinNode innerNode = joinNode.m_rightNode;
-        if (innerNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX && joinNode.m_joinType == JoinType.INNER) {
-            pushDownExpressionsRecursively(innerNode, joinNode.m_whereInnerList);
-        }
-    }
-
-    private void pushDownExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
-        assert(joinNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX);
-        // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
-        // WHERE expressions.
-        Collection<Integer> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
-        Collection<Integer> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
-        classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
-                joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-        // Remove them from the original list
-        pushDownExprList.clear();
-        // Descend to the inner child
-        pushDownExpressions(joinNode);
-    }
-
-    /**
-     *
-     * @param expr
-     * @param tables
-     */
-    void getTablesForExpression(AbstractExpression expr, HashSet<Integer> tables) {
-        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-        for (TupleValueExpression tupleExpr : tves) {
-            String tableAlias = tupleExpr.getTableAlias();
-            assert(tableAliasIndexMap.containsKey(tableAlias));
-            tables.add(tableAliasIndexMap.get(tableAlias));
-        }
+        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList);
+        return m_joinTree.getAllEquivalenceFilters();
     }
 
     protected Table getTableFromDB(String tableName) {
-        Table table = m_db.getTables().getIgnoreCase(tableName);
+        Table table = m_db.getTables().getExact(tableName);
         return table;
     }
 
     @Override
     public String toString() {
-        String retval = "SQL:\n\t" + sql + "\n";
+        String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
         for (ParameterValueExpression param : m_paramList) {
@@ -942,38 +708,54 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nTABLE SOURCES:\n\t";
-        for (Table table : tableList) {
+        for (Table table : m_tableList) {
             retval += table.getTypeName() + " ";
         }
 
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;
-        for (StmtTableScan tableCache : stmtCache) {
-            if (tableCache.m_scanColumns != null) {
+        for (StmtTableScan tableScan : m_tableAliasMap.values()) {
+            if ( ! tableScan.getScanColumns().isEmpty()) {
                 hasAll = false;
-                retval += "\tTable Alias: " + tableCache.m_tableAlias + ":\n";
-                for (SchemaColumn col : tableCache.m_scanColumns)
-                {
+                retval += "\tTable Alias: " + tableScan.getTableAlias() + ":\n";
+                for (SchemaColumn col : tableScan.getScanColumns()) {
                     retval += "\t\tColumn: " + col.getColumnName() + ": ";
                     retval += col.getExpression().toString() + "\n";
                 }
             }
         }
-        if (hasAll == true) {
+        if (hasAll) {
             retval += "\tALL\n";
         }
 
         retval += "\nJOIN TREE :\n";
-        if (joinTree != null ) {
-            retval += joinTree.toString();
+        if (m_joinTree != null ) {
+            retval += m_joinTree.toString();
         }
 
         retval += "NO TABLE SELECTION LIST:\n";
         int i = 0;
-        for (AbstractExpression expr : noTableSelectionList)
+        for (AbstractExpression expr : m_noTableSelectionList)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
+    }
+
+    private AbstractParsedStmt parseSubQuery(VoltXMLElement tableScan) {
+        for (VoltXMLElement childNode : tableScan.children) {
+            if (childNode.name.equals("tablesubquery")) {
+                if (!childNode.children.isEmpty()) {
+                    AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(childNode.children.get(0), m_paramValues, m_db);
+                    // Propagate parameters from the parent to the child
+                    subQuery.m_paramsById.putAll(m_paramsById);
+                    subQuery.m_paramList = m_paramList;
+                    subQuery = AbstractParsedStmt.parse(subQuery, m_sql, childNode.children.get(0), m_paramValues, m_db, m_joinOrder);
+
+                    return subQuery;
+                }
+            }
+        }
+        return null;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.
@@ -1022,6 +804,13 @@ public abstract class AbstractParsedStmt {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt and ParsedUnionStmt.
         throw new RuntimeException("isOrderDeterministic not supported by DML statements");
+    }
+
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
     }
 
 }
