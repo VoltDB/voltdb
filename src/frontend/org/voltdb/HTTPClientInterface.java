@@ -29,11 +29,11 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Request;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
@@ -131,6 +131,17 @@ public class HTTPClientInterface {
                 m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
+            if (request.getMethod().equalsIgnoreCase("POST")) {
+                int queryParamSize = request.getContentLength();
+                if (queryParamSize > 150000) {
+                    // We don't want to be building huge strings
+                    throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
+                }
+                if (queryParamSize == 0) {
+                    throw new Exception("Received POST with no parameters in the body.");
+                }
+            }
+
             String username = request.getParameter("User");
             String password = request.getParameter("Password");
             String hashedPassword = request.getParameter("Hashedpassword");
@@ -188,7 +199,6 @@ public class HTTPClientInterface {
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
-
             if (params != null) {
                 ParameterSet paramSet = null;
                 try {
