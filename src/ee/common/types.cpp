@@ -632,6 +632,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
+    } else if (str == "SUBQUERY") {
+        return EXPRESSION_TYPE_SUBQUERY;
     }
 
     return EXPRESSION_TYPE_INVALID;

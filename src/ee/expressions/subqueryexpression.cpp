@@ -30,11 +30,9 @@ namespace voltdb {
             AbstractExpression(EXPRESSION_TYPE_SUBQUERY),
             m_subqueryId(subqueryId), m_paramIdxs(paramIdxs),
             m_tveParams(tveParams), m_tveParamsSize(0),
-            m_executionStack(NULL), m_parameterContainer(NULL)
+            m_parameterContainer(NULL)
     {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
-        m_executionStack = &ExecutorContext::getExecutorContext()->getExecutorLists(subqueryId);
-        assert(m_executionStack != NULL);
         m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
         if (m_tveParams.get() != NULL) {
             m_tveParamsSize = m_tveParams->size();
@@ -54,6 +52,10 @@ namespace voltdb {
     NValue
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
+        std::vector<AbstractExecutor*>* executionStack = 
+            &ExecutorContext::getExecutorContext()->getExecutorLists(m_subqueryId);  
+        assert(executionStack != NULL);
+        assert(!executionStack->empty());
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
         // Substitute parameters
         if (m_tveParams.get() != NULL) {
@@ -64,14 +66,13 @@ namespace voltdb {
             }
         }
         // Run the executors
-        int status = executeExecutionVector(*m_executionStack, *m_parameterContainer);
+        int status = executeExecutionVector(*executionStack, *m_parameterContainer);
         if (status != ENGINE_ERRORCODE_SUCCESS) {
             char message[256];
             snprintf(message, 256, "Failed to execute the subquery '%d'", m_subqueryId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
-        assert(!m_executionStack->empty());
-        bool result = m_executionStack->back()->getPlanNode()->getOutputTable()->activeTupleCount() != 0;
+        bool result = executionStack->back()->getPlanNode()->getOutputTable()->activeTupleCount() != 0;
         return (result) ? NValue::getTrue() : NValue::getFalse();
     }
 

@@ -121,7 +121,7 @@ class PlanNodeFragment {
     // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
     std::string m_serializedType;
     // total number of the statements in the fragment
-    size_t m_stmtCnt;
+    int m_stmtCnt;
     // translate id from catalog to pointer to plannode
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
     // pointers to nodes in execution order grouped by substatement

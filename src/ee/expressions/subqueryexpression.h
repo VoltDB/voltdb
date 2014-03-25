@@ -29,7 +29,6 @@
 namespace voltdb {
 
 class NValue;
-class AbstractExecutor;
 
 class SubqueryExpression : public AbstractExpression {
     public:
@@ -53,9 +52,7 @@ class SubqueryExpression : public AbstractExpression {
     // The list of the corresponding TVE for each parameter
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
     // The size of the parameter vector;
-    int m_tveParamsSize;
-    // The pointer to the execution stack
-    std::vector<AbstractExecutor*>* m_executionStack;
+    size_t m_tveParamsSize;
     // The pointer to the global parameters
     NValueArray* m_parameterContainer;
 

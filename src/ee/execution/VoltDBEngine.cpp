@@ -1006,7 +1006,10 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         PlanSet::iterator iter2 = m_plans.project<0>(iter);
         m_plans.get<0>().relocate(m_plans.begin(), iter2);
         VoltDBEngine::ExecutorVector *retval = (*iter).get();
-        assert(retval);
+        assert(retval);       
+        // update the context
+        m_executorContext->setupForExecutors(retval->lists);
+
         return retval;
     }
     else {
@@ -1683,14 +1686,14 @@ void VoltDBEngine::ExecutorVector::initExecutors(VoltDBEngine* engine)
     arrayListsSize = planFragment->getStatementCount();
     lists.reset(new std::vector<AbstractExecutor*>[arrayListsSize]);
     // Initialize each node!
-    for (size_t stmtId = 0; stmtId < planFragment->getStatementCount(); ++stmtId) {
+    for (int stmtId = 0; stmtId < planFragment->getStatementCount(); ++stmtId) {
         const std::vector<AbstractPlanNode*>& executeList = planFragment->getExecuteList(stmtId);
         for (int ctr = 0, cnt = (int)executeList.size(); ctr < cnt; ctr++) {
             if (!engine->initPlanNode(fragId, executeList[ctr], &limits))
             {
                 char msg[1024 * 10];
                 snprintf(msg, 1024 * 10,
-                "Failed to initialize PlanNode '%s' at position '%d' in statement '%ld' for PlanFragment '%jd'",
+                "Failed to initialize PlanNode '%s' at position '%d' in statement '%d' for PlanFragment '%jd'",
                          executeList[ctr]->debug().c_str(), ctr, stmtId, (intmax_t)fragId);
                 VOLT_ERROR("%s", msg);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
