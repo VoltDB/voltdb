@@ -1416,11 +1416,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final VoltTable results[] = response.getResults();
         final VoltTable result = results[0];
 
-        if (result.getColumnCount() == 1) {
-            boolean advanced = result.advanceRow();
-            assert(advanced);
-            assert(result.getColumnCount() == 1);
-            assert(result.getColumnType(0) == VoltType.STRING);
+        final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+        if (err != null) {
             SNAP_LOG.warn("Snapshot failed with failure response: " + result.getString(0));
             m_snapshots.removeLast();
             return;
