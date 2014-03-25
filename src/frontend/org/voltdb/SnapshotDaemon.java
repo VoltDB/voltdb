@@ -700,7 +700,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final VoltTable result = results[0];
                 boolean success = true;
 
-                final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+                final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
                 if (err != null) {
                     loggingLog.warn("Snapshot failed with failure response: " + err);
                     success = false;
@@ -1344,7 +1344,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
-        assert(response != null);
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
@@ -1402,7 +1401,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final VoltTable results[] = response.getResults();
         final VoltTable result = results[0];
 
-        final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+        final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
         if (err != null) {
             SNAP_LOG.warn("Snapshot failed with failure response: " +  err);
             m_snapshots.removeLast();
@@ -1441,7 +1440,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         final VoltTable results[] = response.getResults();
-        final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+        final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
         if (err != null) {
             SNAP_LOG.warn("Snapshot delete failed with failure response: " + err);
             return;

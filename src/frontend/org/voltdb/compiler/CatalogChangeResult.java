@@ -32,4 +32,6 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public ProcedureInvocationType invocationType;
     public long originalTxnId;
     public long originalUniqueId;
+    // null or source version string if an automatic upgrade was done.
+    public String upgradedFromVersion;
 }
