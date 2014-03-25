@@ -1212,22 +1212,33 @@ public class SnapshotUtil {
         return save_files;
     }
 
-    public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
-        if (results.length < 1) return false;
+    public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
+        if (results.length < 1) return "HAD NO RESULT TABLES";
         final VoltTable result = results[0];
         result.resetRowPosition();
+        //Crazy old code would return one column with an error message.
+        //Not sure any of it exists anymore
         if (result.getColumnCount() == 1) {
-            return false;
+            if (result.advanceRow()) {
+                return result.getString(0);
+            } else {
+                return "UNKNOWN ERROR WITH ONE COLUMN NO ROW RESULT TABLE";
+            }
         }
 
         //assert(result.getColumnName(1).equals("TABLE"));
-        boolean success = true;
+        String err = null;
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
-                success = false;
+                err = result.getString("ERR_MSG");
             }
         }
-        return success;
+        result.resetRowPosition();
+        return err;
+    }
+
+    public static boolean didSnapshotRequestSucceed(VoltTable result[]) {
+        return didSnapshotRequestFailWithErr(result) == null;
     }
 
     public static boolean isSnapshotInProgress(VoltTable results[]) {
