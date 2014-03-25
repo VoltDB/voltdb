@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -707,10 +708,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId,
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers);
     }
 
@@ -1001,6 +1001,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public Future<?> doSnapshotWork()
     {
         return m_snapshotter.doSnapshotWork(m_sysprocContext, false);
+    }
+
+    @Override
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets)
+    {
+        m_snapshotter.startSnapshotWithTargets(targets, System.currentTimeMillis());
     }
 
     @Override
