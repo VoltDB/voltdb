@@ -48,6 +48,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -382,6 +383,9 @@ public class SystemInformation extends VoltSystemProcedure
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
         vt.addRow(hostId, "IV2ENABLED", "true");
+        long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
+        vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
+        vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
 
         return vt;
     }
