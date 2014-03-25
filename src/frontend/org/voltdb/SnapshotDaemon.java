@@ -1358,7 +1358,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
-        assert(response != null);
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
