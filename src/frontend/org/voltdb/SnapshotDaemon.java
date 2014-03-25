@@ -702,12 +702,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final VoltTable result = results[0];
                 boolean success = true;
 
-                if (   result.getColumnCount() == 2
-                    && "RESULT".equals(result.getColumnName(0))
-                    && "ERR_MSG".equals(result.getColumnName(1))) {
-                    boolean advanced = result.advanceRow();
-                    assert(advanced);
-                    loggingLog.warn("Snapshot failed with failure response: " + result.getString("ERR_MSG"));
+                final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+                if (err != null) {
+                    loggingLog.warn("Snapshot failed with failure response: " + err);
                     success = false;
                 }
 
@@ -1361,6 +1358,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
+        assert(response != null);
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
@@ -1460,14 +1458,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         final VoltTable results[] = response.getResults();
-        assert(results.length > 0);
-        if (results[0].getColumnCount() == 1) {
-            final VoltTable result = results[0];
-            boolean advanced = result.advanceRow();
-            assert(advanced);
-            assert(result.getColumnCount() == 1);
-            assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.warn("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
+        final String err = SnapshotUtil.didSnapshotRequestSucceedWithErr(results);
+        if (err != null) {
+            SNAP_LOG.warn("Snapshot delete failed with failure response: " + err);
             return;
         }
     }
