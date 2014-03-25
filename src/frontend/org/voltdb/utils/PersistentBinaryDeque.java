@@ -16,13 +16,10 @@
  */
 package org.voltdb.utils;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.RandomAccessFile;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
@@ -34,16 +31,15 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
-import com.google_voltpatches.common.base.Throwables;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-
-import com.google_voltpatches.common.base.Joiner;
 import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltdb.EELibraryLoader;
 import org.xerial.snappy.Snappy;
+
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
@@ -153,7 +149,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             m_numObjects += qs.getNumEntries();
                             segments.put( index, qs);
                         } catch (IOException e) {
-                            new RuntimeException(e);
+                            throw new RuntimeException(e);
                         }
                     }
                     return false;
