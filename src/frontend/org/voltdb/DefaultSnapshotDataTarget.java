@@ -255,6 +255,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         ScheduledFuture<?> syncTask = null;
         syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
             private long fadvisedBytes = 0;
+            private long syncedBytes = 0;
             @Override
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
@@ -264,7 +265,22 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
-                        m_channel.force(false);
+                        final long syncStart = syncedBytes;
+                        //Don't start writeback on the currently appending page to avoid
+                        //issues with stables pages, hence we move the end back one page
+                        syncedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
+                        final long retval = PosixAdvise.sync_file_range(m_fos.getFD(),
+                                                                        syncStart,
+                                                                        syncedBytes - syncStart,
+                                                                        PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                        if (retval != 0) {
+                            SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
+                            SNAP_LOG.error(
+                                    "Params offset " + syncedBytes +
+                                    " length " + (syncedBytes - syncStart) +
+                                    " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                            m_channel.force(false);
+                        }
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);
