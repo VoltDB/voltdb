@@ -344,11 +344,11 @@ public class SnapshotSaveAPI
      * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
-    public static boolean createSnapshotCompletionNode(String path,
-                                                       String nonce,
-                                                       long txnId,
-                                                       boolean isTruncation,
-                                                       String truncReqId) {
+    public static ZKUtil.StringCallback createSnapshotCompletionNode(String path,
+                                                                     String nonce,
+                                                                     long txnId,
+                                                                     boolean isTruncation,
+                                                                     String truncReqId) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -377,15 +377,7 @@ public class SnapshotSaveAPI
                 snapshotPath, nodeBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 cb, null);
 
-        try {
-            cb.get();
-            return true;
-        } catch (KeeperException.NodeExistsException e) {
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception logging snapshot completion to ZK", true, e);
-        }
-
-        return false;
+        return cb;
     }
 
     /**
