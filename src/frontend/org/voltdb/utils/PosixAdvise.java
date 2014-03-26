@@ -68,6 +68,10 @@ public class PosixAdvise {
         return fallocate(filedescriptor, offset, size);
     }
 
+    /*
+     * Be aware sync_file_range does not make data durable. It doesn't handle ordering with metadata
+     * nor does it emit write barriers
+     */
     public static native long sync_file_range(long fd, long offset, long size, int flags);
     public static long sync_file_range(FileDescriptor fd, long offset, long size, int flags) {
         final long filedescriptor = SharedSecrets.getJavaIOFileDescriptorAccess().get(fd);

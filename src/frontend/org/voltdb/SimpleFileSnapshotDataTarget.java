@@ -82,7 +82,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         m_fc = m_ras.getChannel();
         m_needsFinalClose = needsFinalClose;
 
-        m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
+        m_es = CoreUtils.getListeningSingleThreadExecutor("Snapshot write thread for " + m_file);
         ScheduledFuture<?> syncTask = null;
         syncTask = DefaultSnapshotDataTarget.m_syncService.scheduleAtFixedRate(new Runnable() {
             private long syncedBytes = 0;

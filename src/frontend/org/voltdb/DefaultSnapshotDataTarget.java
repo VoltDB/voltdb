@@ -105,7 +105,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final Condition m_noMoreOutstandingWriteTasksCondition =
             m_outstandingWriteTasksLock.newCondition();
 
-    private static final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Snapshot write service ");
+    private static final ListeningExecutorService m_es = CoreUtils.getListeningSingleThreadExecutor("Snapshot write service ");
     static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
