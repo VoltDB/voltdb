@@ -615,14 +615,20 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         Client client = getClient();
         VoltTable vt = null;
-        String var = "贾鑫";
+        String var;
 
-        // It used to fail to insert if VARCHAR column is calculated by BYTEs.
+        var = "VO";
+        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 0, var));
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 0").getResults()[0];
+        validateTableOfScalarVarchar(vt, new String[] {var});
+
+        var = "V贾";
         client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 1, var));
         vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 1").getResults()[0];
         validateTableOfScalarVarchar(vt, new String[] {var});
 
-        var = "V贾";
+        // It used to fail to insert if VARCHAR column is calculated by BYTEs.
+        var = "贾鑫";
         client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 2, var));
         vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 2").getResults()[0];
         validateTableOfScalarVarchar(vt, new String[] {var});
@@ -637,7 +643,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                                 var.length(), var, 2)));
                 // var.length is 26;
             }
@@ -659,16 +665,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             if (isHSQL()) {
                 assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
             } else {
-//                System.err.println("==============");
-//                System.err.println(String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
-//                        var.length(), var.substring(0, 100), 80));
-//                assertTrue(ex.getMessage().contains(
-//                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
-//                                var.length(), var.substring(0, 100), 80)));
-                // Has a problem to get the first 100 characters from EE.
-                assertTrue(ex.getMessage().contains(String.format("The size %d of the value", var.length(), var.substring(0, 100), 80)));
-                assertTrue(ex.getMessage().contains(String.format("exceeds the size of the VARCHAR[\"%d\"] column.", 80)));
-                // var.length is 152;
+                assertTrue(ex.getMessage().contains(
+                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                                var.length(), var.substring(0, 100), 80)));
             }
         }
 

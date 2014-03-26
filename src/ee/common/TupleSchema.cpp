@@ -178,12 +178,12 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
             setUninlinedObjectColumnInfoIndex(uninlinedObjectColumnIndex++, index);
         }
     } else if (type == VALUE_TYPE_VARCHAR) {
-        if (length * 4 < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
+        if (length < UNINLINEABLE_CHARACTER_LENGTH && m_allowInlinedObjects) {
             if (length == 0) {
                 throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
             }
             /*
-             * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
+             * Inline the string if it is less then UNINLINEABLE_CHARACTER_LENGTH characters.
              */
             columnInfo->inlined = true;
             // One byte to store the size
@@ -299,7 +299,7 @@ uint16_t TupleSchema::countUninlineableObjectColumns(
         } else if (columnTypes[ii] == VALUE_TYPE_VARCHAR) {
             if (!allowInlineObjects) {
                 numUninlineableObjects++;
-            } else if (columnSizes[ii] * 4 >= UNINLINEABLE_OBJECT_LENGTH) {
+            } else if (columnSizes[ii] >= UNINLINEABLE_CHARACTER_LENGTH) {
                 numUninlineableObjects++;
             }
         }

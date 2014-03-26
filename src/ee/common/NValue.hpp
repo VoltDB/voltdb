@@ -1541,6 +1541,25 @@ class NValue {
         return &valueChars[i];
     }
 
+    static inline bool valiadVarcharSize (const char *valueChars, const size_t length, const int32_t maxLength) {
+        if (length <= maxLength) {
+            return true;
+        }
+
+        int32_t bytes = length - maxLength;
+        int32_t i = 0;
+        size_t len = length;
+        while (len-- > 0) {
+            if ((valueChars[i] & 0xc0) == 0x80) bytes--;
+            i++;
+
+            if (bytes <= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void checkTooNarrowVarcharAndVarbinary(int32_t objLength, int32_t maxLength) const {
         assert(isNull() == false);
 
@@ -1552,26 +1571,27 @@ class NValue {
             if (objLength > maxLength) {
                 char msg[1024];
                 snprintf(msg, 1024,
-                        "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                        "The size %d of the value exceeds the size of the VARBINARY(%d) column.",
                         objLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                         msg);
             }
         } else if (m_valueType == VALUE_TYPE_VARCHAR) {
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-            const int32_t charLength = getCharLength(ptr, objLength);
-            if (charLength > maxLength) {
+
+            if (!valiadVarcharSize(ptr, objLength, maxLength)) {
+                const int32_t charLength = getCharLength(ptr, objLength);
                 char msg[1024];
                 std::string inputValue;
                 if (charLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
-                    const char * end = getIthCharPosition(ptr, charLength, FULL_STRING_IN_MESSAGE_THRESHOLD+1);
+                    const char * end = getIthCharPosition(ptr, objLength, FULL_STRING_IN_MESSAGE_THRESHOLD+1);
                     int32_t numBytes = (int32_t)(end - ptr);
                     inputValue = std::string(ptr, numBytes) + std::string("...");
                 } else {
                     inputValue = std::string(ptr, objLength);
                 }
                 snprintf(msg, 1024,
-                        "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                         charLength, inputValue.c_str(), maxLength);
 
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
