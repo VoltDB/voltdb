@@ -1325,7 +1325,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
  * Method:    sync_file_range
  * Signature: (JJJI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_file_range
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
   (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
     return sync_file_range(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
