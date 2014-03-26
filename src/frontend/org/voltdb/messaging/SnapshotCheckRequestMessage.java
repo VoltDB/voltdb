@@ -17,15 +17,16 @@
 
 package org.voltdb.messaging;
 
-import com.google_voltpatches.common.base.Charsets;
-import org.voltcore.messaging.VoltMessage;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.messaging.VoltMessage;
+
+import com.google_voltpatches.common.base.Charsets;
+
 public class SnapshotCheckRequestMessage extends VoltMessage {
 
-    private String m_requestJson;
+    private byte [] m_requestJson;
 
     /** Empty constructor for de-serialization */
     SnapshotCheckRequestMessage()
@@ -36,32 +37,31 @@ public class SnapshotCheckRequestMessage extends VoltMessage {
     public SnapshotCheckRequestMessage(String requestJson)
     {
         super();
-        m_requestJson = requestJson;
+        m_requestJson = requestJson.getBytes(Charsets.UTF_8);
     }
 
-    public String getRequestJson() { return m_requestJson; }
+    public String getRequestJson() { return new String(m_requestJson,Charsets.UTF_8); }
 
     @Override
     public int getSerializedSize()
     {
         int size = super.getSerializedSize();
-        size += 4 + m_requestJson.length();
+        size += 4 + m_requestJson.length;
         return size;
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        final byte[] strBytes = new byte[buf.getInt()];
-        buf.get(strBytes);
-        m_requestJson = new String(strBytes, Charsets.UTF_8);
+        m_requestJson = new byte[buf.getInt()];
+        buf.get(m_requestJson);
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.SNAPSHOT_CHECK_REQUEST_ID);
-        buf.putInt(m_requestJson.length());
-        buf.put(m_requestJson.getBytes(Charsets.UTF_8));
+        buf.putInt(m_requestJson.length);
+        buf.put(m_requestJson);
     }
 }

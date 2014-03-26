@@ -379,4 +379,42 @@ public class TestJDBCQueries {
             }
         }
     }
+
+    @Test
+    public void testVarbinarySetBytes() throws Exception
+    {
+        // Verify that setBytes() works to set VARBINARY with byte[] input
+        PreparedStatement ps = conn.prepareStatement("insert into T_VARBINARY values (?, ?)");
+        byte[] data = {'a', 'b', 'g', '0', 0, 1, 127, -128};
+        ps.setBytes(1, data);
+        ps.setString(2, "bytes");
+        ps.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_VARBINARY where VALUE='bytes'");
+        ps.executeQuery();
+        ResultSet rs = ps.getResultSet();
+        while (rs.next()) {
+            byte[] data2 = rs.getBytes(1);
+            assertEquals(data.length, data2.length);
+            for (int i = 0; i < data.length; i++) {
+                assertEquals(data[i], data2[i]);
+            }
+        }
+
+        // Also verify that setString() with a hex-encoded string works to set VARBINARY
+        ps = conn.prepareStatement("insert into T_VARBINARY values (?, ?)");
+        String stringdata = "000102030405060708090a";
+        ps.setString(1, stringdata);
+        ps.setString(2, "string");
+        ps.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_VARBINARY where VALUE='string'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            byte[] data2 = rs.getBytes(1);
+            assertEquals(stringdata.length()/2, data2.length);
+            for (int i = 0; i < data2.length; i++) {
+                assertEquals(i, data2[i]);
+            }
+        }
+    }
 }

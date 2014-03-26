@@ -124,4 +124,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
         return false;
     }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

@@ -197,9 +197,9 @@ public abstract class CatalogSizing {
         }
     }
 
-    private static double LOG2 = Math.log(2);
-
     private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex) {
+        assert(capacity >= 0);
+        assert(dataSize >= 0);
         // Smaller capacities get fully consumed (plus 1 byte).
         if (capacity < 64) {
             return capacity + 1;
@@ -208,10 +208,19 @@ public abstract class CatalogSizing {
         if (forIndex) {
             return 8;
         }
-        // Larger capacities use a power of 2 buffer size plus overhead.
+        // Larger capacities use pooled buffers sized in powers of 2 or values halfway
+        // between powers of 2.
+        // The 12 byte overhead includes a 4 byte length and an 8 byte reverse pointer.
         int content = 4 + 8 + dataSize;
-        double power = Math.ceil(Math.log(content) / LOG2);
-        int bufferSize = (int)Math.pow(2, power);
+        int bufferSize = 64;
+        while (bufferSize < content) {
+            int increment = bufferSize / 2;
+            bufferSize += increment;
+            if (bufferSize >= content) {
+                break;
+            }
+            bufferSize += increment;
+        }
         return bufferSize + 8 + 24;
     }
 

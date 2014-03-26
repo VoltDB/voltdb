@@ -51,6 +51,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -428,7 +429,7 @@ public class DDLCompiler {
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
 
-    private Set<String> tableLimitConstraintCounter = new HashSet<>();
+    private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     private class DDLStatement {
         public DDLStatement() {
@@ -466,7 +467,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db, whichProcs);
+                processed = processVoltDBStatement(stmt, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -548,10 +549,11 @@ public class DDLCompiler {
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement, Database db,
+    private boolean processVoltDBStatement(DDLStatement ddlStatement, Database db,
                                            DdlProceduresToLoad whichProcs)
             throws VoltCompilerException
     {
+        String statement = ddlStatement.statement;
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -746,17 +748,31 @@ public class DDLCompiler {
         // match IMPORT CLASS statements
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
-            String classNameStr = statementMatcher.group(1);
+            if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                // Only process the statement if this is not for the StatementPlanner
+                String classNameStr = statementMatcher.group(1);
 
-            // check that the match pattern is a valid match pattern
-            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
-            if (!wildcardMatcher.matches()) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid IMPORT CLASS match expression: '%s'",
-                        classNameStr)); // remove trailing semicolon
+                // check that the match pattern is a valid match pattern
+                Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
+                if (!wildcardMatcher.matches()) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid IMPORT CLASS match expression: '%s'",
+                            classNameStr)); // remove trailing semicolon
+                }
+
+                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "IMPORT CLASS not found: '%s'",
+                            classNameStr)); // remove trailing semicolon
+                }
+                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                    m_compiler.addWarn(String.format(
+                            "IMPORT CLASS no match for wildcarded class: '%s'",
+                            classNameStr), ddlStatement.lineNo);
+                }
             }
 
-            m_classMatcher.addPattern(classNameStr);
             return true;
         }
 

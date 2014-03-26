@@ -976,6 +976,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     public boolean isOrderDeterministic()
     {
+        if ( ! hasTopLevelScans()) {
+            // This currently applies to parent queries that do all their scanning in subqueries and so
+            // take on the order determinism of their subqueries. This might have to be rethought to allow
+            // ordering in parent queries to effect determinism of unordered "FROM CLAUSE" subquery results.
+            return true;
+        }
         if (hasAOneRowResult()) {
             return true;
         }
@@ -1008,6 +1014,25 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (orderByColumnsCoverUniqueKeys()) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries()
+    {
+        if (hasAOneRowResult()) {
+            return true;
+        }
+        if ( ! hasOrderByColumns() ) {
+            return false;
+        }
+
+        // This is a trivial empty container.
+        // In other code paths, it would list expressions that have been pre-determined to be nonOrdered.
+        ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+
+        if (orderByColumnsDetermineAllDisplayColumns(nonOrdered)) {
+            return true;
         }
         return false;
     }
@@ -1230,6 +1255,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     {
         if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
+        }
+        return false;
+    }
+
+    private boolean hasTopLevelScans() {
+        for (StmtTableScan scan : m_tableAliasMap.values()) {
+            if (scan instanceof StmtTargetTableScan) {
+                return true;
+            }
         }
         return false;
     }

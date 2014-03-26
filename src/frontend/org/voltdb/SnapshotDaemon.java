@@ -35,7 +35,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -63,12 +62,13 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltdb.utils.VoltTableUtil;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -76,6 +76,9 @@ import org.voltdb.utils.VoltTableUtil;
  * the old automated snapshots. They just share the same event processing threads. Future work
  * should merge them.
  *
+ * Note: comments that start with TRAIL [TruncSnap] TruncationSnapshot legend
+ *       are way to document code trails which may be perused via the code trails
+ *       eclipse plugin https://marketplace.eclipse.org/content/code-trails
  */
 public class SnapshotDaemon implements SnapshotCompletionInterest {
 
@@ -267,11 +270,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                       final long handle,
                                       final Object params[])
     {
+        // TRAIL [TruncSnap:11] initiate is in a retriable code block
         Callable<Object> work = new Callable<Object>() {
             @Override
             public Object call() throws Exception
             {
-                final JSONObject jsObj = new JSONObject((String) params[0]);
+                final String jsString = String.class.cast(params[0]);
+                final JSONObject jsObj = new JSONObject(jsString);
                 final String format = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
                 boolean initiateSnapshot;
                 VoltTable checkResult = null;
@@ -279,7 +284,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 // Only do file check if this snapshot actually writes to files, stream snapshots don't
                 if (SnapshotFormat.getEnumIgnoreCase(format).isFileBased()) {
                     // Do scan work on all known live hosts
-                    VoltMessage msg = new SnapshotCheckRequestMessage((String) params[0]);
+                    VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
                     List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                     for (int hostId : liveHosts) {
                         m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
@@ -306,7 +311,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     if (responses.size() != liveHosts.size()) {
                         throw new CoreUtils.RetryException();
                     }
-
+                    // TRAIL [TruncSnap:12] all participating nodes have initiated successfully
                     // Call @SnapshotSave if check passed, return the failure otherwise
                     checkResult = VoltTableUtil.unionTables(responses.values());
                     initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[] {checkResult});
@@ -550,6 +555,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }, 0, 1, TimeUnit.HOURS);
         try {
+            // TRAIL [TruncSnap:1] elected as leader
             truncationRequestExistenceCheck();
             userSnapshotRequestExistenceCheck(false);
         } catch (Exception e) {
@@ -568,6 +574,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              * Do it 10 seconds later because these requests tend to come in bunches
              * and we want one truncation snapshot to do truncation for all nodes
              * so we don't get them back to back
+             *
+             * TRAIL [TruncSnap:5] wait 10 secs to process request
              */
             m_es.schedule(new Runnable() {
                 @Override
@@ -601,7 +609,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
-        // Get the snapshot path.
+        // TRAIL [TruncSnap:6] Get the snapshot path.
         try {
             snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
@@ -629,6 +637,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         //Allow nodes to check and see if the nonce incoming for a snapshot is
         //for a truncation snapshot. In that case they will mark the completion node
         //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
+        // TRAIL [TruncSnap:7] write current ts to request zk node data
         try {
             ByteBuffer payload = ByteBuffer.allocate(8);
             payload.putLong(0, now);
@@ -637,6 +646,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             //Cause a cascading failure?
             VoltDB.crashLocalVoltDB("Setting data on the truncation snapshot request in ZK should never fail", true, e);
         }
+        // for the snapshot save invocations
         JSONObject jsObj = new JSONObject();
         try {
             String sData = "";
@@ -656,8 +666,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             VoltDB.crashLocalVoltDB("", true, e);
         }
 
+        // for the snapshot save invocations
         long handle = m_nextCallbackHandle++;
 
+        // for the snapshot save invocation
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
             @Override
@@ -669,7 +681,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             clientResponse.getStatusString());
                     loggingLog.warn("Retrying log truncation snapshot in 5 minutes");
                     /*
-                     * Try again in a few minute
+                     * TRAIL [TruncSnap:8] (callback) on failed response try again in a few minute
                      */
                     m_es.schedule(new Runnable() {
                         @Override
@@ -687,12 +699,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final VoltTable results[] = clientResponse.getResults();
                 final VoltTable result = results[0];
                 boolean success = true;
-                if (result.getColumnCount() == 1) {
-                    boolean advanced = result.advanceRow();
-                    assert(advanced);
-                    assert(result.getColumnCount() == 1);
-                    assert(result.getColumnType(0) == VoltType.STRING);
-                    loggingLog.error("Snapshot failed with failure response: " + result.getString(0));
+
+                final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
+                if (err != null) {
+                    loggingLog.warn("Snapshot failed with failure response: " + err);
                     success = false;
                 }
 
@@ -730,6 +740,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         snapshotAttempt.nonce = nonce;
                         snapshotAttempt.path = snapshotPath;
                     } finally {
+                        // TRAIL [TruncSnap:9] (callback) restart the whole request check cycle
                         try {
                             truncationRequestExistenceCheck();
                         } catch (Exception e) {
@@ -741,7 +752,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 } else {
                     loggingLog.info("Retrying log truncation snapshot in 60 seconds");
                     /*
-                     * Try again in a few minutes
+                     * TRAIL [TruncSnap:10] (callback) on table reported failure try again in a few minutes
                      */
                     m_es.schedule(new Runnable() {
                         @Override
@@ -784,6 +795,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         public void pProcess(final WatchedEvent event) {
             if (event.getState() == KeeperState.Disconnected) return;
             try {
+                // TRAIL [TruncSnap:4] watch event on zk node fires
                 processTruncationRequestEvent(event);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error procesing truncation request event", true, e);
@@ -1080,9 +1092,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Checking for existence of snapshot truncation request");
         m_currentTruncationWatcher.cancel();
         m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
+        // TRAIL [TruncSnap:2] checking for zk node existence
         if (m_zk.exists(VoltZK.request_truncation_snapshot, m_currentTruncationWatcher) != null) {
             loggingLog.info("A truncation request node already existed, processing truncation request event");
             m_currentTruncationWatcher.cancel();
+            // TRAIL [TruncSnap:3] fake a node created event (req ZK node already there)
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
@@ -1387,12 +1401,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final VoltTable results[] = response.getResults();
         final VoltTable result = results[0];
 
-        if (result.getColumnCount() == 1) {
-            boolean advanced = result.advanceRow();
-            assert(advanced);
-            assert(result.getColumnCount() == 1);
-            assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.warn("Snapshot failed with failure response: " + result.getString(0));
+        final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
+        if (err != null) {
+            SNAP_LOG.warn("Snapshot failed with failure response: " +  err);
             m_snapshots.removeLast();
             return;
         }
@@ -1429,14 +1440,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         final VoltTable results[] = response.getResults();
-        assert(results.length > 0);
-        if (results[0].getColumnCount() == 1) {
-            final VoltTable result = results[0];
-            boolean advanced = result.advanceRow();
-            assert(advanced);
-            assert(result.getColumnCount() == 1);
-            assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.warn("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
+        final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
+        if (err != null) {
+            SNAP_LOG.warn("Snapshot delete failed with failure response: " + err);
             return;
         }
     }

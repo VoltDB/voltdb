@@ -976,7 +976,7 @@ public class VoltCompiler {
         }
 
         // add extra classes from the DDL
-        m_addedClasses = voltDdlTracker.m_extraClassses;
+        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         addExtraClasses(jarOutput);
     }
 
@@ -1074,9 +1074,9 @@ public class VoltCompiler {
                     throw new VoltCompilerException(msg);
                 }
                 // reset the added classes to the actual added classes
-                m_addedClasses = addedClasses.toArray(new String[0]);
             }
         }
+        m_addedClasses = addedClasses.toArray(new String[0]);
     }
 
     /**
@@ -2262,14 +2262,17 @@ public class VoltCompiler {
      * an upgraded jar file.
      *
      * @param outputJar  in-memory jar file (updated in place here)
+     * @return source version upgraded from or null if not upgraded
      * @throws IOException
      */
-    public void upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
+    public String upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
                     throws IOException
     {
         // getBuildInfoFromJar() performs some validation.
         String[] buildInfoLines = CatalogUtil.getBuildInfoFromJar(outputJar);
         String versionFromCatalog = buildInfoLines[0];
+        // Set if an upgrade happens.
+        String upgradedFromVersion = null;
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
@@ -2330,6 +2333,11 @@ public class VoltCompiler {
                 // Do the compilation work.
                 boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
 
+                if (success) {
+                    // Set up the return string.
+                    upgradedFromVersion = versionFromCatalog;
+                }
+
                 // Summarize the results to a file.
                 // Briefly log success or failure and mention the output text file.
                 PrintStream outputStream = new PrintStream(outputTextPath);
@@ -2370,5 +2378,6 @@ public class VoltCompiler {
                 m_classLoader = originalClassLoader;
             }
         }
+        return upgradedFromVersion;
     }
 }
