@@ -96,16 +96,21 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                         //Don't start writeback on the currently appending page to avoid
                         //issues with stables pages, hence we move the end back one page
                         syncedBytes = ((m_fc.position() / Bits.pageSize()) - 1) * Bits.pageSize();
-                        final long retval = PosixAdvise.sync_file_range(m_ras.getFD(),
-                                                                        syncStart,
-                                                                        syncedBytes - syncStart,
-                                                                        PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                        if (retval != 0) {
-                            SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
-                            SNAP_LOG.error(
-                                    "Params offset " + syncedBytes +
-                                    " length " + (syncedBytes - syncStart) +
-                                    " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+
+                        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
+                            final long retval = PosixAdvise.sync_file_range(m_ras.getFD(),
+                                                                            syncStart,
+                                                                            syncedBytes - syncStart,
+                                                                            PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                            if (retval != 0) {
+                                SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
+                                SNAP_LOG.error(
+                                        "Params offset " + syncedBytes +
+                                        " length " + (syncedBytes - syncStart) +
+                                        " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                                m_fc.force(false);
+                            }
+                        } else {
                             m_fc.force(false);
                         }
                     } catch (IOException e) {

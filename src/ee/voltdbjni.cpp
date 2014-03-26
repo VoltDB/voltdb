@@ -1329,8 +1329,10 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
   (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
     return sync_file_range(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length), advice);
+#elif MACOSX
+    return -1;
 #else
-    return fdatasync(fd);
+    return fdatasync(static_cast<int>(fd));
 #endif
 }
 

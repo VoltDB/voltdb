@@ -25,6 +25,13 @@ import sun.misc.SharedSecrets;
 public class PosixAdvise {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static final boolean FALLOCATE_SUPPORTED;
+    public static final boolean SYNC_FILE_RANGE_SUPPORTED;
+    static {
+        SYNC_FILE_RANGE_SUPPORTED = System.getProperty("os.name").equalsIgnoreCase("linux") ;
+        FALLOCATE_SUPPORTED = System.getProperty("os.name").equalsIgnoreCase("linux") ;
+    }
+
     /*
      * madvise
      */

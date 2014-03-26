@@ -59,7 +59,6 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
-
     /*
      * Make it possible for test code to block a write and thus snapshot completion
      */
@@ -269,16 +268,20 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         //Don't start writeback on the currently appending page to avoid
                         //issues with stables pages, hence we move the end back one page
                         syncedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
-                        final long retval = PosixAdvise.sync_file_range(m_fos.getFD(),
-                                                                        syncStart,
-                                                                        syncedBytes - syncStart,
-                                                                        PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                        if (retval != 0) {
-                            SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
-                            SNAP_LOG.error(
-                                    "Params offset " + syncedBytes +
-                                    " length " + (syncedBytes - syncStart) +
-                                    " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
+                            final long retval = PosixAdvise.sync_file_range(m_fos.getFD(),
+                                                                            syncStart,
+                                                                            syncedBytes - syncStart,
+                                                                            PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                            if (retval != 0) {
+                                SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
+                                SNAP_LOG.error(
+                                        "Params offset " + syncedBytes +
+                                        " length " + (syncedBytes - syncStart) +
+                                        " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                                m_channel.force(false);
+                            }
+                        } else {
                             m_channel.force(false);
                         }
                     } catch (IOException e) {
