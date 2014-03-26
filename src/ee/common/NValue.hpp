@@ -1546,7 +1546,7 @@ class NValue {
             return true;
         }
 
-        int32_t bytes = length - maxLength;
+        int32_t bytes = static_cast<int32_t>(length - maxLength);
         int32_t i = 0;
         size_t len = length;
         while (len-- > 0) {
