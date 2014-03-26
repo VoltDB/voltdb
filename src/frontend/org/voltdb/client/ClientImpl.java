@@ -33,9 +33,6 @@ import java.util.logging.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
@@ -498,6 +495,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             synchronized (m_backpressureLock) {
                 if (m_backpressure) {
                     while (m_backpressure && !m_isShutdown) {
+                       if (start != 0) {
                             //Wait on the condition for the specified timeout remaining
                             m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
 
@@ -513,6 +511,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
                             //Reassigning timeout nanos with remainder of timeout
                             timeoutNanos -= deltaNanos;
+                       } else {
+                           m_backpressureLock.wait();
+                       }
                     }
                 }
             }
