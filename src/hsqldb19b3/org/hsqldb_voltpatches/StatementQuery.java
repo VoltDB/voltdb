@@ -481,7 +481,7 @@ public class StatementQuery extends StatementDMQL {
         List<VoltXMLElement> exprCols = new ArrayList<VoltXMLElement>();
         extractColumnReferences(query, exprCols);
         resolveUsingColumns(exprCols, select.rangeVariables);
-ddd
+
         return query;
     }
 
