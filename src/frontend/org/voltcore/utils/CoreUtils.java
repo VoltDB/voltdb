@@ -112,7 +112,7 @@ public class CoreUtils {
                 1,
                 keepAlive,
                 TimeUnit.MILLISECONDS,
-                new LinkedTransferQueue<Runnable>(),
+                new LinkedBlockingQueue<Runnable>(),
                 CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
     }
 
@@ -123,7 +123,7 @@ public class CoreUtils {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
+                        new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return ste;
     }
@@ -132,7 +132,7 @@ public class CoreUtils {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
+                        new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, size, false, null));
         return ste;
     }
@@ -144,7 +144,7 @@ public class CoreUtils {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
+                        new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
@@ -153,7 +153,7 @@ public class CoreUtils {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
+                        new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
