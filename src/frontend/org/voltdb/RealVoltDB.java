@@ -875,8 +875,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_myHostId = m_messenger.getHostId();
                         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                        hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
                         scheduleWork(new DailyLogTask(),
                                 nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
@@ -2538,5 +2538,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         assert m_snapshotIOAgent != null;
         return m_snapshotIOAgent.submit(work);
+    }
+
+    @Override
+    public long getClusterUptime()
+    {
+        return System.currentTimeMillis() - getHostMessenger().getInstanceId().getTimestamp();
     }
 }
