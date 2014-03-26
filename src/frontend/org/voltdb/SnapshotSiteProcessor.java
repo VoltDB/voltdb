@@ -705,13 +705,23 @@ public class SnapshotSiteProcessor {
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
+        // Timeout after 10 minutes
+        final long endTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
+            if (System.currentTimeMillis() > endTime) {
+                VoltDB.crashLocalVoltDB("Timed out logging snapshot completion to ZK");
+            }
+
             Stat stat = new Stat();
             byte data[] = null;
             try {
                 data = zk.getData(snapshotPath, false, stat);
+            } catch (NoNodeException e) {
+                // The MPI creates the snapshot completion node asynchronously,
+                // if the node doesn't exist yet, retry
+                continue;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
             }
