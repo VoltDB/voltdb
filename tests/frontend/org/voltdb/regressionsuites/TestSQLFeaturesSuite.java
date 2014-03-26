@@ -610,6 +610,70 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
+    public void testVarcharByCharacter() throws IOException, ProcCallException {
+        System.out.println("STARTING testing varchar by character ......");
+
+        Client client = getClient();
+        VoltTable vt = null;
+        String var = "贾鑫";
+
+        // It used to fail to insert if VARCHAR column is calculated by BYTEs.
+        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 1, var));
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 1").getResults()[0];
+        validateTableOfScalarVarchar(vt, new String[] {var});
+
+        var = "V贾";
+        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 2, var));
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 2").getResults()[0];
+        validateTableOfScalarVarchar(vt, new String[] {var});
+
+        var = "VoltDB是一个以内存数据库为主要产品的创业公司.";
+        try {
+            client.callProcedure("VARCHARTB.insert", 3, var, null);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            if (isHSQL()) {
+                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+            } else {
+                assertTrue(ex.getMessage().contains(
+                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                                var.length(), var, 2)));
+                // var.length is 26;
+            }
+        }
+
+        // insert into
+        client.callProcedure("VARCHARTB.insert", 3, null, var);
+        vt = client.callProcedure("@AdHoc", "select var80 from VarcharTB where id = 3").getResults()[0];
+        validateTableOfScalarVarchar(vt, new String[] {var});
+
+        // Test threshold
+        var += "它是Postgres和Ingres联合创始人Mike Stonebraker领导开发的下一代开源数据库管理系统。它能在现有的廉价服务器集群上实现每秒数百万次数据处理。" +
+                "VoltDB大幅降低了服务器资源 开销，单节点每秒数据处理远远高于其它数据库管理系统。";
+        try {
+            client.callProcedure("VARCHARTB.insert", 4, null, var);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            if (isHSQL()) {
+                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+            } else {
+//                System.err.println("==============");
+//                System.err.println(String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
+//                        var.length(), var.substring(0, 100), 80));
+//                assertTrue(ex.getMessage().contains(
+//                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
+//                                var.length(), var.substring(0, 100), 80)));
+                // Has a problem to get the first 100 characters from EE.
+                assertTrue(ex.getMessage().contains(String.format("The size %d of the value", var.length(), var.substring(0, 100), 80)));
+                assertTrue(ex.getMessage().contains(String.format("exceeds the size of the VARCHAR[\"%d\"] column.", 80)));
+                // var.length is 152;
+            }
+        }
+
+
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.

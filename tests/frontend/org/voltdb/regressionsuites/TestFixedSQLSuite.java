@@ -1553,7 +1553,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     }
 
-
     //
     // JUnit / RegressionSuite boilerplate
     //
