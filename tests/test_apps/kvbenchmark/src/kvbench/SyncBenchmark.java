@@ -35,9 +35,8 @@
 package kvbench;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -52,7 +51,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.GZIPOutputStream;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -110,6 +108,8 @@ public class SyncBenchmark {
     final AtomicLong failedPuts = new AtomicLong(0);
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
+
+    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
     private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -237,18 +237,15 @@ public class SyncBenchmark {
 
     static class CsvLogger implements AutoCloseable {
         final PrintWriter m_writer;
-        final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS");
+        final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
 
         public CsvLogger(String csvFN) {
             Preconditions.checkArgument(csvFN != null && !csvFN.trim().isEmpty(),"file name is null or empty");
             File fh = new File(csvFN);
             PrintWriter pw = null;
             try {
-                pw =
-                    new PrintWriter(
-                            new OutputStreamWriter(
-                                    new GZIPOutputStream(
-                                            new FileOutputStream(fh), 16384)));
+                // 'true' to flush the buffer every println/printf
+                pw = new PrintWriter(new FileWriter(fh), true);
             } catch (IOException ioex) {
                 Throwables.propagate(ioex);
             }
@@ -424,11 +421,11 @@ public class SyncBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long now = stats.getEndTimestamp();
-        long time = Math.round((now - benchmarkStartTS) / 1000.0);
 
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
+        // log merger correlate correctly
+        System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
+        System.out.printf(" Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),

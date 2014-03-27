@@ -33,6 +33,7 @@ import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -905,5 +906,20 @@ public class MiscUtils {
         {
             return formatRate(value, nanos, "");
         }
+    }
+
+    public static String formatUptime(long uptimeInMs)
+    {
+        long remainingMs = uptimeInMs;
+        long days = TimeUnit.MILLISECONDS.toDays(remainingMs);
+        remainingMs -= TimeUnit.DAYS.toMillis(days);
+        long hours = TimeUnit.MILLISECONDS.toHours(remainingMs);
+        remainingMs -= TimeUnit.HOURS.toMillis(hours);
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingMs);
+        remainingMs -= TimeUnit.MINUTES.toMillis(minutes);
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingMs);
+        remainingMs -= TimeUnit.SECONDS.toMillis(seconds);
+        return String.format("%d days %02d:%02d:%02d.%03d",
+                days, hours, minutes, seconds, remainingMs);
     }
 }

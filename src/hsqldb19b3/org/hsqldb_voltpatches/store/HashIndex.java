@@ -62,6 +62,12 @@ class HashIndex {
     int     reclaimedNodePointer = -1;
     boolean fixedSize;
     boolean modified;
+    // A VoltDB extension to diagnose ArrayOutOfBounds.
+    int voltDBresetCount = 0;
+    int voltDBresetCapacity = -1;
+    int voltDBclearCount = 0;
+    int voltDBclearCapacity = -1;
+    // End of VoltDB extension
 
     HashIndex(int hashTableSize, int capacity, boolean fixedSize) {
 
@@ -82,6 +88,12 @@ class HashIndex {
      * @param capacity
      */
     void reset(int hashTableSize, int capacity) {
+        // A VoltDB extension to diagnose ArrayOutOfBounds.
+        if (linkTable != null) {
+            voltDBresetCapacity = linkTable.length;
+        }
+        ++voltDBresetCount;
+        // End of VoltDB extension
 
         int[] newHT = new int[hashTableSize];
         int[] newLT = new int[capacity];
@@ -112,6 +124,12 @@ class HashIndex {
      * Reset the index as empty.
      */
     void clear() {
+        // A VoltDB extension to diagnose ArrayOutOfBounds.
+        if (linkTable != null) {
+            voltDBclearCapacity = linkTable.length;
+        }
+        ++voltDBclearCount;
+        // End of VoltDB extension
 
         int   to       = linkTable.length;
         int[] intArray = linkTable;
@@ -169,6 +187,9 @@ class HashIndex {
         // get the first reclaimed slot
         int lookup = reclaimedNodePointer;
 
+        // A VoltDB extension to diagnose ArrayOutOfBounds.
+        boolean voltDBreclaimed = (reclaimedNodePointer != -1);
+        // End of VoltDB extension
         if (lookup == -1) {
             lookup = newNodePointer++;
         } else {
@@ -184,6 +205,30 @@ class HashIndex {
             linkTable[lastLookup] = lookup;
         }
 
+        // A VoltDB extension to diagnose ArrayOutOfBounds.
+        if (lookup >= linkTable.length) {
+            StringBuilder report = new StringBuilder();
+            report.append("linkTable size is ").append(linkTable.length);
+            report.append(voltDBreclaimed ? " reclaimed" : " new").append(" index is ").append(lookup);
+            report.append(" linkTable content is [");
+            for (int link : linkTable) {
+                report.append(link).append(", ");
+            }
+            report.append("]\n");
+            report.append(" hashTable content is [");
+            for (int look : hashTable) {
+                report.append(look).append(", ");
+            }
+            report.append("]\n");
+            report.append("next reclaimedPointer is").append(reclaimedNodePointer);
+            report.append(" next newNodePointer is").append(newNodePointer);
+            report.append(" last reset was #").append(voltDBresetCount);
+            report.append(" from ").append(voltDBresetCapacity);
+            report.append(" last clear was #").append(voltDBclearCount);
+            report.append(" from ").append(voltDBclearCapacity);
+            throw new ArrayIndexOutOfBoundsException(report.toString());
+        }
+        // End of VoltDB extension
         linkTable[lookup] = -1;
 
         elementCount++;

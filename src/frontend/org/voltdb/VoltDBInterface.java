@@ -114,6 +114,11 @@ public interface VoltDBInterface
     public boolean isRunning();
 
     /**
+     * @return The number of milliseconds the cluster has been up
+     */
+    public long getClusterUptime();
+
+    /**
      * Notify RealVoltDB that recovery is complete
      */
     void onExecutionSiteRejoinCompletion(long transferred);
