@@ -5,6 +5,15 @@ CREATE TABLE VarcharTB (
   PRIMARY KEY (ID)
 );
 
+CREATE TABLE VarLength (
+  ID INTEGER DEFAULT 0 NOT NULL,
+  var1 VARCHAR(10),
+  var2 VARCHAR(80),
+  bin1 VARBINARY(10),
+  bin2 VARBINARY(80),
+  PRIMARY KEY (ID)
+);
+
 CREATE TABLE nocapped (
 id INTEGER NOT NULL, 
 wage INTEGER not null,
