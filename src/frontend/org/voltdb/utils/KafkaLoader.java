@@ -26,8 +26,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.atomic.AtomicLong;
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
@@ -63,7 +62,7 @@ public class KafkaLoader {
         String topic = "";
 
         @Option(shortOpt = "m", desc = "maximum errors allowed")
-        int maxerrors = 100;
+        int maxerrors = -1;
 
         @Option(desc = "different ways to handle blank items: {error|null|empty} (default: error)")
         String blank = "error";
@@ -80,8 +79,8 @@ public class KafkaLoader {
         @Option(shortOpt = "b", desc = "list of brokers to connect to (default: localhost:9092)")
         String brokers = "localhost:9092";
 
-        @Option(shortOpt = "z", desc = "zookeeper to connect to (default: localhost:2181)")
-        String zookeeper = "localhost:2181";
+        @Option(shortOpt = "z", desc = "kafka zookeeper to connect to.")
+        String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
         /**
          * Batch size for processing batched operations.
@@ -112,7 +111,10 @@ public class KafkaLoader {
                 exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
             }
             if (topic.length() <= 0) {
-                exitWithMessageAndUsage("Tpoic must be specified.");
+                exitWithMessageAndUsage("Topic must be specified.");
+            }
+            if (zookeeper.length() <= 0) {
+                exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
             }
         }
 
@@ -127,24 +129,36 @@ public class KafkaLoader {
         }
     }
 
-    static class MyBulkLoaderCallback implements BulkLoaderFailureCallBack {
+    private final static AtomicLong failedCount = new AtomicLong(0);
+
+    static class KafkaBulkLoaderCallback implements BulkLoaderFailureCallBack {
 
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-            System.out.println("Callback called: " + response.getStatusString());
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                long fc = failedCount.incrementAndGet();
+                if (config.maxerrors > 0 && fc > config.maxerrors) {
+                    System.exit(1);
+                }
+            }
         }
 
     }
 
     private static class KafkaConsumerConnector {
 
-        @SuppressWarnings("unused")
-        String host;
-        String port;
+        final String m_host;
+        final String m_port;
         ConsumerConfig consumerConfig;
         ConsumerConnector consumer;
 
+        public KafkaConsumerConnector(String host, String port) {
+            m_host = host;
+            m_port = port;
+        }
+
         public void buildConfig(String a_zookeeper) {
+            //Should get this from properties file or something.
             Properties props = new Properties();
             props.put("zookeeper.connect", a_zookeeper);
             props.put("group.id", "exportverifier");
@@ -167,15 +181,14 @@ public class KafkaLoader {
 
 
     /**
-     * kafkaloader main. (main is directly used by tests as well be sure to reset statics that you need to start over)
+     * kafkaloader main
      *
      * @param args
      * @throws IOException
      * @throws InterruptedException
      *
      */
-    public static void main(String[] args) throws IOException,
-            InterruptedException {
+    public static void main(String[] args) {
 
         final KafkaConfig cfg = new KafkaConfig();
         cfg.parse(KafkaLoader.class.getName(), args);
@@ -192,7 +205,7 @@ public class KafkaLoader {
         VoltBulkLoader loader = null;
         try {
             csvClient = KafkaLoader.getClient(c_config, serverlist);
-            loader = csvClient.getNewBulkLoader(config.table, config.batch, new MyBulkLoaderCallback());
+            loader = csvClient.getNewBulkLoader(config.table, config.batch, new KafkaBulkLoaderCallback());
         } catch (Exception e) {
             m_log.error("Error connecting to the servers: "
                     + config.servers);
@@ -207,53 +220,54 @@ public class KafkaLoader {
             es = getConsumerExecutor(loader);
             es.awaitTermination(365, TimeUnit.DAYS);
         } catch (Exception ex) {
-            Logger.getLogger(KafkaLoader.class.getName()).log(Level.SEVERE, null, ex);
+            m_log.error("Error in getting Kafka Consumer", ex);
         }
 
         Runtime.getRuntime().addShutdownHook(
                 new Thread() {
                     @Override
                     public void run() {
-                        System.out.println("Shuttind Down...");
                         for (KafkaConsumerConnector consumerConnector : m_consumers) {
                             consumerConnector.stop();
                         }
                     }
                 });
 
-        loader.drain();
-        loader.close();
+        try {
+            loader.drain();
+            loader.close();
+        } catch (InterruptedException ex) {
+        }
+        //TODO: process reports
+        System.exit(0);
     }
 
     public static class KafkaConsumer implements Runnable {
 
-        private KafkaStream m_stream;
-        final private int m_threadNumber;
-        final private VoltBulkLoader m_loader;
-        final private CSVParser m_csvParser;
+        private final KafkaStream m_stream;
+        private final VoltBulkLoader m_loader;
+        private final CSVParser m_csvParser;
 
-        public KafkaConsumer(KafkaStream a_stream, int a_threadNumber, VoltBulkLoader loader) {
-            m_threadNumber = a_threadNumber;
+        public KafkaConsumer(KafkaStream a_stream, VoltBulkLoader loader) {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
         }
 
+        @Override
         public void run() {
             ConsumerIterator<byte[], byte[]> it = m_stream.iterator();
             while (it.hasNext()) {
                 byte msg[] = it.next().message();
                 String smsg = new String(msg);
-                System.out.println("Consuming " + m_threadNumber + ": " + smsg);
                 try {
                     m_loader.insertRow(this, (Object[]) m_csvParser.parseLine(smsg));
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(KafkaLoader.class.getName()).log(Level.SEVERE, null, ex);
+                    m_log.error("Consumer stopped", ex);
                 } catch (IOException ex) {
-                    Logger.getLogger(KafkaLoader.class.getName()).log(Level.SEVERE, null, ex);
+                    m_log.error("Consumer stopped", ex);
                 }
             }
-            System.out.println("Shutting down Thread: " + m_threadNumber);
         }
 
     }
@@ -264,11 +278,9 @@ public class KafkaLoader {
 
         for (String hostString : blist) {
             String split[] = hostString.split(":");
-            KafkaConsumerConnector conn = new KafkaConsumerConnector();
             String host = split[0];
             String port = split[1];
-            conn.host = host;
-            conn.port = port;
+            KafkaConsumerConnector conn = new KafkaConsumerConnector(host, port);
 
             m_consumers.add(conn);
         }
@@ -277,18 +289,17 @@ public class KafkaLoader {
         }
 
         ExecutorService executor = Executors.newFixedThreadPool(m_consumers.size() * 2);
-        KafkaConsumer bconsumer = null;
+        KafkaConsumer bconsumer;
         Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+        //Get this from config or arg.
         topicCountMap.put(config.topic, new Integer(3));
         for (KafkaConsumerConnector rh : m_consumers) {
             Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = rh.consumer.createMessageStreams(topicCountMap);
             List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(config.topic);
 
-            // now launch all the threads
-            //
-            int threadNumber = 0;
+            // now launch all the threads for partitions.
             for (final KafkaStream stream : streams) {
-                bconsumer = new KafkaConsumer(stream, threadNumber++, loader);
+                bconsumer = new KafkaConsumer(stream, loader);
                 executor.submit(bconsumer);
             }
         }
@@ -302,7 +313,7 @@ public class KafkaLoader {
      * @param config
      * @param servers
      * @param port
-     * @return
+     * @return client
      * @throws Exception
      */
     public static Client getClient(ClientConfig config, String[] servers) throws Exception {
