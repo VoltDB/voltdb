@@ -460,6 +460,9 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:+UseTLAB");
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        cmdline.add("-XX:+CMSClassUnloadingEnabled");
+        cmdline.add("-XX:PermSize=64m");
+
         /*
          * Have RMI not invoke System.gc constantly
          */

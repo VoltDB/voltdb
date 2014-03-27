@@ -35,9 +35,8 @@
 package kvbench;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -246,7 +245,7 @@ public class SyncBenchmark {
             PrintWriter pw = null;
             try {
                 // 'true' to flush the buffer every println/printf
-                pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fh)), true);
+                pw = new PrintWriter(new FileWriter(fh), true);
             } catch (IOException ioex) {
                 Throwables.propagate(ioex);
             }
