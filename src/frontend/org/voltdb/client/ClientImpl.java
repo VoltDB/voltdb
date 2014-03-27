@@ -61,6 +61,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
+    final CSL m_listener = new CSL();
 
     /*
      * Username and password as set by the constructor.
@@ -100,7 +101,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity);
-        m_distributer.addClientStatusListener(new CSL());
+        m_distributer.addClientStatusListener(m_listener);
         m_username = config.m_username;
 
         if (config.m_cleartext) {
@@ -486,7 +487,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * Timeout nanos is the initial timeout quantity which will be adjusted to reflect remaining
      * time on spurious wakeups
      */
-    private boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
+    public boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
             return false;
         }
