@@ -1515,11 +1515,10 @@ class NValue {
 
     static inline int32_t getCharLength(const char *valueChars, const size_t length) {
         // very efficient code to count characters in UTF string and ASCII string
-        int32_t i = 0, j = 0;
-        size_t len = length;
-        while (len-- > 0) {
+        int32_t j = 0;
+        size_t i = length;
+        while (i-- > 0) {
             if ((valueChars[i] & 0xc0) != 0x80) j++;
-            i++;
         }
         return j;
     }
@@ -1541,20 +1540,17 @@ class NValue {
         return &valueChars[i];
     }
 
-    static inline bool valiadVarcharSize (const char *valueChars, const size_t length, const int32_t maxLength) {
-        if (length <= maxLength) {
+    static inline bool validVarcharSize (const char *valueChars, const size_t length, const int32_t maxLength) {
+        int32_t min_continuation_bytes = static_cast<int32_t>(length - maxLength);
+        if (min_continuation_bytes <= 0) {
             return true;
         }
-
-        int32_t bytes = static_cast<int32_t>(length - maxLength);
-        int32_t i = 0;
-        size_t len = length;
-        while (len-- > 0) {
-            if ((valueChars[i] & 0xc0) == 0x80) bytes--;
-            i++;
-
-            if (bytes <= 0) {
-                return true;
+        size_t i = length;
+        while (i--) {
+            if ((valueChars[i] & 0xc0) == 0x80) {
+                if (--min_continuation_bytes == 0) {
+                    return true;
+                }
             }
         }
         return false;
@@ -1579,7 +1575,7 @@ class NValue {
         } else if (m_valueType == VALUE_TYPE_VARCHAR) {
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
 
-            if (!valiadVarcharSize(ptr, objLength, maxLength)) {
+            if (!validVarcharSize(ptr, objLength, maxLength)) {
                 const int32_t charLength = getCharLength(ptr, objLength);
                 char msg[1024];
                 std::string inputValue;

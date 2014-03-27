@@ -338,11 +338,11 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfScalarVarchar(VoltTable vt, String[] expected) {
-        validateTableOfScalarVarchar(vt, 0, expected);
+    static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
+        validateTableColumnOfScalarVarchar(vt, 0, expected);
     }
 
-    static public void validateTableOfScalarVarchar(VoltTable vt, int col, String[] expected) {
+    static public void validateTableColumnOfScalarVarchar(VoltTable vt, int col, String[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;

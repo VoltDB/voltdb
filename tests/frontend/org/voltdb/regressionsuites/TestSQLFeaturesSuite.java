@@ -618,20 +618,20 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         String var;
 
         var = "VO";
-        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 0, var));
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (0,'" + var + "')");
         vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 0").getResults()[0];
-        validateTableOfScalarVarchar(vt, new String[] {var});
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
 
         var = "V贾";
-        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 1, var));
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (1,'" + var + "')");
         vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 1").getResults()[0];
-        validateTableOfScalarVarchar(vt, new String[] {var});
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
 
         // It used to fail to insert if VARCHAR column is calculated by BYTEs.
         var = "贾鑫";
-        client.callProcedure("@AdHoc", String.format("Insert into VarcharTB (id, var2) VALUES(%d, '%s')", 2, var));
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (2,'" + var + "')");
         vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 2").getResults()[0];
-        validateTableOfScalarVarchar(vt, new String[] {var});
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
 
         var = "VoltDB是一个以内存数据库为主要产品的创业公司.";
         try {
@@ -652,7 +652,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // insert into
         client.callProcedure("VARCHARTB.insert", 3, null, var);
         vt = client.callProcedure("@AdHoc", "select var80 from VarcharTB where id = 3").getResults()[0];
-        validateTableOfScalarVarchar(vt, new String[] {var});
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
 
         // Test threshold
         var += "它是Postgres和Ingres联合创始人Mike Stonebraker领导开发的下一代开源数据库管理系统。它能在现有的廉价服务器集群上实现每秒数百万次数据处理。" +
@@ -685,21 +685,19 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // Test AdHoc
         String var1 = "Voltdb is a great database product";
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, var1) VALUES(%d, '%s')", 2, var1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10"));
         }
 
-
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, var1) VALUES(%d, '%s' || 'abc')", 2, var1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "' || 'abc')");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains("Value ("+var1+"abc) is too wide for a constant varchar value of size 10"));
         }
-
 
         // Test inlined varchar with stored procedure
         try {
@@ -752,12 +750,11 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
 
 
-
         // Test varbinary
         // Test AdHoc
         String bin1 = "1111111111111111111111000000";
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, bin1) VALUES(%d, '%s')", 6, bin1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, bin1) VALUES (6,'" + bin1 + "')");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
