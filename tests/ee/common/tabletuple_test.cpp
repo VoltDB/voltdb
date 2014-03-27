@@ -45,7 +45,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     vector<int32_t> all_inline_lengths;
     all_inline_lengths.push_back(NValue::
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
-    all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH - 1);
+    all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH/4 - 1);
     TupleSchema* all_inline_schema =
         TupleSchema::createTupleSchema(all_types,
                                        all_inline_lengths,

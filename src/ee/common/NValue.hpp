@@ -1495,53 +1495,105 @@ class NValue {
             *reinterpret_cast<char*>(storage) = OBJECT_NULL_BIT;
         }
         else {
-            const int32_t objectLength = getObjectLength_withoutNull();
-            if (objectLength > maxLength) {
-                if (maxLength == 0) {
-                    throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
-                }
-                throwExceptionForTooNarrowVarcharAndVarbinary(objectLength, maxLength);
-            }
+            const int32_t objLength = getObjectLength_withoutNull();
+            checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
+
             if (m_sourceInlined)
             {
-                ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objectLength);
+                ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objLength);
             }
             else
             {
                 const StringRef* sref =
                     *reinterpret_cast<StringRef* const*>(m_data);
                 ::memcpy(storage, sref->get(),
-                         getObjectLengthLength() + objectLength);
+                         getObjectLengthLength() + objLength);
             }
         }
 
     }
 
-    void throwExceptionForTooNarrowVarcharAndVarbinary(int32_t objectLength, int32_t maxLength) const {
-        assert(isNull() == false);
-        assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
-        assert(objectLength > maxLength);
+    static inline int32_t getCharLength(const char *valueChars, const size_t length) {
+        // very efficient code to count characters in UTF string and ASCII string
+        int32_t j = 0;
+        size_t i = length;
+        while (i-- > 0) {
+            if ((valueChars[i] & 0xc0) != 0x80) j++;
+        }
+        return j;
+    }
 
-        char msg[1024];
-        const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-        if (m_valueType == VALUE_TYPE_VARCHAR) {
-            std::string inputValue;
-            if (objectLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
-                inputValue = std::string(ptr, FULL_STRING_IN_MESSAGE_THRESHOLD) + std::string("...");
-            } else {
-                inputValue = std::string(ptr, objectLength);
+    // Return the beginning char * place of the ith char.
+    // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
+    static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
+        // very efficient code to count characters in UTF string and ASCII string
+        if (ith <= 0) return NULL;
+        int32_t i = 0, j = 0;
+        size_t len = length;
+        while (len-- > 0) {
+            if ((valueChars[i] & 0xc0) != 0x80) {
+                j++;
+                if (ith == j) break;
             }
-            snprintf(msg, 1024,
-                     "The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
-                     objectLength, inputValue.c_str(), maxLength);
-        } else if (m_valueType == VALUE_TYPE_VARBINARY) {
-            snprintf(msg, 1024,
-                     "The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
-                     objectLength, maxLength);
+            i++;
+        }
+        return &valueChars[i];
+    }
+
+    static inline bool validVarcharSize (const char *valueChars, const size_t length, const int32_t maxLength) {
+        int32_t min_continuation_bytes = static_cast<int32_t>(length - maxLength);
+        if (min_continuation_bytes <= 0) {
+            return true;
+        }
+        size_t i = length;
+        while (i--) {
+            if ((valueChars[i] & 0xc0) == 0x80) {
+                if (--min_continuation_bytes == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void checkTooNarrowVarcharAndVarbinary(int32_t objLength, int32_t maxLength) const {
+        assert(isNull() == false);
+
+        if (maxLength == 0) {
+            throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
         }
 
-        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                           msg);
+        if (m_valueType == VALUE_TYPE_VARBINARY) {
+            if (objLength > maxLength) {
+                char msg[1024];
+                snprintf(msg, 1024,
+                        "The size %d of the value exceeds the size of the VARBINARY(%d) column.",
+                        objLength, maxLength);
+                throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                        msg);
+            }
+        } else if (m_valueType == VALUE_TYPE_VARCHAR) {
+            const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+
+            if (!validVarcharSize(ptr, objLength, maxLength)) {
+                const int32_t charLength = getCharLength(ptr, objLength);
+                char msg[1024];
+                std::string inputValue;
+                if (charLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
+                    const char * end = getIthCharPosition(ptr, objLength, FULL_STRING_IN_MESSAGE_THRESHOLD+1);
+                    int32_t numBytes = (int32_t)(end - ptr);
+                    inputValue = std::string(ptr, numBytes) + std::string("...");
+                } else {
+                    inputValue = std::string(ptr, objLength);
+                }
+                snprintf(msg, 1024,
+                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                        charLength, inputValue.c_str(), maxLength);
+
+                throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                        msg);
+            }
+        }
     }
 
     template<typename T>
@@ -2548,7 +2600,6 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                                                        const int32_t maxLength, Pool *dataPool) const
 {
     const ValueType type = getValueType();
-    int32_t length = 0;
 
     switch (type) {
     case VALUE_TYPE_TIMESTAMP:
@@ -2583,16 +2634,15 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 *reinterpret_cast<void**>(storage) = NULL;
             }
             else {
-                length = getObjectLength_withoutNull();
+                int32_t objLength = getObjectLength_withoutNull();
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
+
                 const int8_t lengthLength = getObjectLengthLength();
-                const int32_t minlength = lengthLength + length;
-                if (length > maxLength) {
-                    throwExceptionForTooNarrowVarcharAndVarbinary(length, maxLength);
-                }
+                const int32_t minlength = lengthLength + objLength;
                 StringRef* sref = StringRef::create(minlength, dataPool);
                 char *copy = sref->get();
-                setObjectLengthToLocation(length, copy);
-                ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), length);
+                setObjectLengthToLocation(objLength, copy);
+                ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), objLength);
                 *reinterpret_cast<StringRef**>(storage) = sref;
             }
         }
@@ -2650,10 +2700,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
 
             if (!isNull()) {
-                int objectLength = getObjectLength_withoutNull();
-                if (objectLength > maxLength) {
-                    throwExceptionForTooNarrowVarcharAndVarbinary(objectLength, maxLength);
-                }
+                int objLength = getObjectLength_withoutNull();
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
             }
             // copy the StringRef pointers, even for NULL case.
             *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);

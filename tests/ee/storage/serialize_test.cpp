@@ -192,7 +192,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ("", deserialized->columnName(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
-    EXPECT_EQ(true, table_->schema()->columnIsInlined(0));
+    EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
     TableIterator iter = deserialized->iterator();
     TableTuple t(deserialized->schema());
