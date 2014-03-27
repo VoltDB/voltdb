@@ -75,9 +75,9 @@ public:
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_DOUBLE));
         m_tableSchemaColumnSizes.push_back(300);
-        m_tableSchemaColumnSizes.push_back(16);
+        m_tableSchemaColumnSizes.push_back(10);
         m_tableSchemaColumnSizes.push_back(500);
-        m_tableSchemaColumnSizes.push_back(32);
+        m_tableSchemaColumnSizes.push_back(15);
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
