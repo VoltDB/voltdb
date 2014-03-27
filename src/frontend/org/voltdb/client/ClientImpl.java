@@ -33,6 +33,9 @@ import java.util.logging.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
