@@ -76,7 +76,7 @@ void StatsSource::configure(
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     populateSchema(columnTypes, columnLengths, columnAllowNull);
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
 
     for (int ii = 0; ii < columnNames.size(); ii++) {
         m_columnName2Index[columnNames[ii]] = ii;

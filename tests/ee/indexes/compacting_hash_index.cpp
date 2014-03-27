@@ -89,8 +89,7 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
                                                          columnLengths,
-                                                         columnAllowNull,
-                                                         true);
+                                                         columnAllowNull);
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),

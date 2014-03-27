@@ -118,8 +118,7 @@ public:
         m_schema =
           TupleSchema::createTupleSchema(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero

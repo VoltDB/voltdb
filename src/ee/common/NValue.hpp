@@ -257,7 +257,7 @@ class NValue {
        allocated storage for a copy of the object. */
     void serializeToTupleStorageAllocateForObjects(
         void *storage, const bool isInlined, const int32_t maxLength,
-        Pool *dataPool) const;
+        const bool isInBytes, Pool *dataPool) const;
 
     /* Serialize the scalar this NValue represents to the storage area
        provided. If the scalar is an Object type then the object will
@@ -265,7 +265,7 @@ class NValue {
        pointer to the object will be copied into the storage area. No
        allocations are performed. */
     void serializeToTupleStorage(
-        void *storage, const bool isInlined, const int32_t maxLength) const;
+        void *storage, const bool isInlined, const int32_t maxLength, const bool isInBytes) const;
 
     /* Deserialize a scalar value of the specified type from the
        SerializeInput directly into the tuple storage area
@@ -1486,7 +1486,7 @@ class NValue {
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided storage area
      */
-    void inlineCopyObject(void *storage, int32_t maxLength) const {
+    void inlineCopyObject(void *storage, int32_t maxLength, bool isInBytes) const {
         if (isNull()) {
             /*
              * The 7th bit of the length preceding value
@@ -1496,7 +1496,7 @@ class NValue {
         }
         else {
             const int32_t objLength = getObjectLength_withoutNull();
-            checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
+            checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
 
             if (m_sourceInlined)
             {
@@ -1556,7 +1556,7 @@ class NValue {
         return false;
     }
 
-    void checkTooNarrowVarcharAndVarbinary(int32_t objLength, int32_t maxLength) const {
+    void checkTooNarrowVarcharAndVarbinary(int32_t objLength, int32_t maxLength, bool isInBytes) const {
         assert(isNull() == false);
 
         if (maxLength == 0) {
@@ -1575,7 +1575,22 @@ class NValue {
         } else if (m_valueType == VALUE_TYPE_VARCHAR) {
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
 
-            if (!validVarcharSize(ptr, objLength, maxLength)) {
+            if (isInBytes) {
+                if (objLength > maxLength) {
+                    std::string inputValue;
+                    if (objLength > FULL_STRING_IN_MESSAGE_THRESHOLD) {
+                        inputValue = std::string(ptr, FULL_STRING_IN_MESSAGE_THRESHOLD) + std::string("...");
+                    } else {
+                        inputValue = std::string(ptr, objLength);
+                    }
+                    char msg[1024];
+                    snprintf(msg, 1024,
+                            "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            objLength, inputValue.c_str(), maxLength);
+                    throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                            msg);
+                }
+            } else if (!validVarcharSize(ptr, objLength, maxLength)) {
                 const int32_t charLength = getCharLength(ptr, objLength);
                 char msg[1024];
                 std::string inputValue;
@@ -2597,7 +2612,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
  * allocated storage for a copy of the object.
  */
 inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, const bool isInlined,
-                                                       const int32_t maxLength, Pool *dataPool) const
+        const int32_t maxLength, const bool isInBytes, Pool *dataPool) const
 {
     const ValueType type = getValueType();
 
@@ -2627,7 +2642,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
     case VALUE_TYPE_VARBINARY:
         //Potentially non-inlined type requires special handling
         if (isInlined) {
-            inlineCopyObject(storage, maxLength);
+            inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
             if (isNull()) {
@@ -2635,7 +2650,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             }
             else {
                 int32_t objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
 
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + objLength;
@@ -2662,7 +2677,8 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
  * pointer to the object will be copied into the storage area. No
  * allocations are performed.
  */
-inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined, const int32_t maxLength) const
+inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
+        const int32_t maxLength, const bool isInBytes) const
 {
     const ValueType type = getValueType();
     switch (type) {
@@ -2691,7 +2707,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
     case VALUE_TYPE_VARBINARY:
         //Potentially non-inlined type requires special handling
         if (isInlined) {
-            inlineCopyObject(storage, maxLength);
+            inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
             if (m_sourceInlined) {
@@ -2701,7 +2717,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
 
             if (!isNull()) {
                 int objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength);
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
             }
             // copy the StringRef pointers, even for NULL case.
             *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);

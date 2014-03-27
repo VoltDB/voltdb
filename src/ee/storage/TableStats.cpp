@@ -73,7 +73,7 @@ TableStats::generateEmptyTableStatsTable()
                                          columnAllowNull);
     TupleSchema *schema =
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
+                                       columnAllowNull);
 
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,

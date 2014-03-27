@@ -49,8 +49,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     TupleSchema* all_inline_schema =
         TupleSchema::createTupleSchema(all_types,
                                        all_inline_lengths,
-                                       column_allow_null,
-                                       true);
+                                       column_allow_null);
 
     TableTuple inline_tuple(all_inline_schema);
     inline_tuple.move(new char[inline_tuple.tupleLength()]);
@@ -71,8 +70,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
     TupleSchema* non_inline_schema =
         TupleSchema::createTupleSchema(all_types,
                                        non_inline_lengths,
-                                       column_allow_null,
-                                       true);
+                                       column_allow_null);
 
     TableTuple non_inline_tuple(non_inline_schema);
     non_inline_tuple.move(new char[non_inline_tuple.tupleLength()]);

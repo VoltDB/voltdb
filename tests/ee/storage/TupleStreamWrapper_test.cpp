@@ -125,8 +125,7 @@ public:
         m_schema =
           TupleSchema::createTupleSchema(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // allocate a new buffer and wrap it
         m_wrapper = new TupleStreamWrapper(1, 1);

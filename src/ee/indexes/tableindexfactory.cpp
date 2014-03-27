@@ -272,7 +272,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
     std::vector<bool> keyColumnAllowNull(valueCount, true);
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
+    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
     assert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);

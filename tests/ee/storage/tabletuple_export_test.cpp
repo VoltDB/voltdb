@@ -76,7 +76,7 @@ class TableTupleExportTest : public Test {
         columnAllowNull.push_back(allownull);
 
         m_schema = TupleSchema::createTupleSchema(
-            columnTypes, columnLengths, columnAllowNull, true /* allow inlined strs */);
+            columnTypes, columnLengths, columnAllowNull);
     }
 
     ~TableTupleExportTest() {

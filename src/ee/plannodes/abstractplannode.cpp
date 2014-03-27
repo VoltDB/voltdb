@@ -289,7 +289,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
 
     TupleSchema* schema =
         TupleSchema::createTupleSchema(columnTypes, columnSizes,
-                                       columnAllowNull, true);
+                                       columnAllowNull);
     return schema;
 }
 
@@ -301,7 +301,7 @@ AbstractPlanNode::generateDMLCountTupleSchema()
     vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
-    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull);
     return schema;
 }
 

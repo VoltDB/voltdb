@@ -458,8 +458,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     }
     m_groupByKeySchema = TupleSchema::createTupleSchema(groupByColumnTypes,
                                                         groupByColumnSizes,
-                                                        groupByColumnAllowNull,
-                                                        true);
+                                                        groupByColumnAllowNull);
     return true;
 }
 

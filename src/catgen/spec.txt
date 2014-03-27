@@ -220,6 +220,7 @@ begin Column                    "A table column"
   MaterializedViewInfo? matview "If part of a materialized view, ref of view info"
   int aggregatetype             "If part of a materialized view, represents aggregate type"
   Column? matviewsource         "If part of a materialized view, represents source column"
+  bool inbytes                  "If varchar column is in bytes or not"
 end
 
 begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"
