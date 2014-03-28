@@ -109,12 +109,14 @@ java_opts.append('-XX:+UseTLAB')
 java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
 java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
 java_opts.append('-XX:+UseCondCardMark')
-java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775808')
-java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775808')
+java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775807')
+java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775807')
 java_opts.append('-XX:CMSWaitDuration=120000')
 java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
+java_opts.append('-XX:+CMSClassUnloadingEnabled')
+java_opts.append('-XX:PermSize=64m')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """

@@ -800,6 +800,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@GC",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception

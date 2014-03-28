@@ -1,3 +1,9 @@
+jQuery.extend({
+    postJSON: function( url, data, callback) {
+       return jQuery.post(url, data, callback, "json");
+    }
+});
+
 (function (window, unused){
 
 var IVoltDB = (function(){
@@ -24,7 +30,7 @@ var IVoltDB = (function(){
         this.Key = (this.Server + '_' + this.Port + '_' + (user == ''?'':user) + '_' + (this.Admin == true?'Admin':'')).replace(/[^_a-zA-Z0-9]/g,"_");
         this.Display = this.Server + ':' + this.Port + (user == ''?'':' (' + user + ')') + (this.Admin == true?' - Admin':'');
 
-        this.BuildURI = function(procedure, parameters)
+        this.BuildParamSet = function(procedure, parameters)
         {
             var s = [];
             if (!this.Procedures.hasOwnProperty(procedure)) {
@@ -97,14 +103,15 @@ var IVoltDB = (function(){
                 s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
             if (this.Admin)
                 s[s.length] = 'admin=true';
-            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/?' + s.join('&') + '&jsonp=?';
-            return uri;
+            var paramSet = s.join('&') + '&jsonp=?';
+            return paramSet;
         }
         this.CallExecute = function(procedure, parameters, callback)
         {
-            var uri = this.BuildURI(procedure, parameters);
-            if (typeof(uri) == 'string')
-                jQuery.getJSON(uri, callback);
+            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/' 
+            var params = this.BuildParamSet(procedure, parameters);
+            if (typeof(uri) == 'string' && typeof(uri) == 'string')
+                jQuery.postJSON(uri, params, callback);
             else
                 if (callback != null)
                     callback({"status":-1,"statusstring":"PrepareStatement error: " + uri[0],"results":[]});
@@ -244,6 +251,7 @@ var IVoltDB = (function(){
                           , '@UpdateLogging': { '1' : ['xml'] }
                           , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
                           , '@GetPartitionKeys': { '1': ['varchar']}
+                          , '@GC' : { '0' : [] }
                         };
         return this;
     }

@@ -316,7 +316,9 @@ class VoltNetwork implements Runnable, IOStatsIntf
                         if (m_networkId == 0) {
                             Long delta = EstTimeUpdater.update(System.currentTimeMillis());
                             if ( delta != null ) {
-                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
+                                m_logger.warn("A VoltDB thread has not run for more than " + delta +
+                                        " milliseconds. System resource contention could be" +
+                                        " impacting VoltDB operations.");
                             }
                         }
                     }

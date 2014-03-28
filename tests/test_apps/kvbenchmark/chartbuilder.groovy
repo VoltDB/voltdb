@@ -3,87 +3,86 @@
 import groovy.transform.Canonical
 import java.text.SimpleDateFormat
 import java.util.regex.*
-import java.util.zip.GZIPInputStream
 
 def logPFX = "^(\\d{4}-\\d{2}-\\d{2}\\s\\d{1,2}:\\d{2}:\\d{2},\\d{3})\\s+(TRACE|DEBUG|INFO|WARN|ERROR)\\s+(\\[[^]]+?\\])\\s+"
 
 class LogFeeder {
-	final ArrayList<String> records = new ArrayList<>()
-	final Pattern logRE = ~/^\d{4}-\d{2}-\d{2}\s\d{1,2}:\d{2}:\d{2},\d{3}\s+/
+        final ArrayList<String> records = new ArrayList<>()
+        final Pattern logRE = ~/^\d{4}-\d{2}-\d{2}\s\d{1,2}:\d{2}:\d{2},\d{3}\s+/
 
-	List<String> feed(String ln) {
-		Matcher mtc = ln =~ logRE
-		List<String> logEntry = Collections.emptyList();
-		if (mtc.find(0) && records.size() > 0) {
-        	logEntry = new ArrayList<String>(records)
-        	records.clear()
+        List<String> feed(String ln) {
+            Matcher mtc = ln =~ logRE
+            List<String> logEntry = Collections.emptyList();
+            if (mtc.find(0) && records.size() > 0) {
+            logEntry = new ArrayList<String>(records)
+            records.clear()
         }
         records << ln
         logEntry
-	} 
+    }
 }
 
 @Canonical
 class Trigger {
-	Pattern re
-	Closure<?> onMatch
-	final SimpleDateFormat dtfmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS Z")
+    Pattern re
+    Closure<?> onMatch
+    final SimpleDateFormat dtfmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS Z")
 
-	void probe(List<String> lines) {
-		if (!lines) return
-		Matcher mtc = lines[0] =~ re
-		if (mtc.find(0)) {
-			long tm = dtfmt.parse("${mtc.group(1)} UTC").time
-			onMatch(lines, mtc, tm)
-		}
-	}
+    void probe(List<String> lines) {
+        if (!lines) return
+        Matcher mtc = lines[0] =~ re
+        if (mtc.find(0)) {
+            long tm = dtfmt.parse("${mtc.group(1)} UTC").time
+            onMatch(lines, mtc, tm)
+        }
+    }
 }
 
 @Canonical
 class Labeler {
-	int count = 0
-	String getLabel() {
-		Integer.toString(++count, Character.MAX_RADIX)
-	}
+    int count = 0
+    String getLabel() {
+        Integer.toString(++count, Character.MAX_RADIX)
+    }
 }
 
 @Canonical
 class Row {
-	long date
+    long date
     double three9s
     double four9s
     double five9s
-	int errors
-	String mark
+    int errors
+    String mark
 
-	TreeSet<String> titles = new TreeSet<String>()
-	TreeSet<String> texts = new TreeSet<String>()
-	Row annotate( String title, String text) {
-		if(title) titles << title
-		if(text) texts << text
-		this
-	}
-	Row annotate( String label, String title, String text) {
-		if(label && !mark) mark = label
-		if(title) titles << title
-		if(text) texts << text
-		this
-	}
-	String getText() {
-		titles ? "'${titles.join(',')} ${texts.join(',')}'" : 'undefined'
-	}
-	String getAnnotation() {
-		mark ? "'${mark}'" : 'undefined'
-	}
+    TreeSet<String> titles = new TreeSet<String>()
+    TreeSet<String> texts = new TreeSet<String>()
+    Row annotate( String title, String text) {
+        if(title) titles << title
+        if(text) texts << text
+        this
+    }
+    Row annotate( String label, String title, String text) {
+        if(label && !mark) mark = label
+        if(title) titles << title
+        if(text) texts << text
+        this
+    }
+    String getText() {
+        titles ? "'${titles.join(',')} ${texts.join(',')}'" : 'undefined'
+    }
+    String getAnnotation() {
+        mark ? "'${mark}'" : 'undefined'
+    }
     String getAnnotatedRow() {
         "[new Date(${date}), ${five9s}, ${annotation}, ${text}]"
     }
     String getNinesRow() {
         "[new Date(${date}), ${three9s}, ${four9s}, ${five9s}]"
     }
-	void label(Labeler lblr) {
-		if (titles && !mark) mark = lblr.label
-	}
+    void label(Labeler lblr) {
+        if (titles && !mark) mark = lblr.label
+    }
 }
 
 def cli = new CliBuilder(usage: 'chartbuilder.groovy [options] [log-files]')
@@ -96,14 +95,14 @@ cli.a(longOpt: 'all9s', required:false, argName:'file', args:1, 'all nines chart
 def opts = cli.parse(args)
 if (!opts) return
 else if (opts.h) {
-	cli.usage()
-	return
+    cli.usage()
+    return
 }
 
 def five9sFN = "annotatedFive9s.html"
 def all9sFN = "all9s.html"
 
-if (opts.o) five9sFN = opts.o
+if (opts.f) five9sFN = opts.f
 if (opts.a) all9sFN = opts.a
 
 def fpw = new PrintWriter(new FileWriter(five9sFN),true)
@@ -113,8 +112,8 @@ def periodicFH = new File(opts.c)
 
 def data = [:] as TreeMap
 
-new GZIPInputStream(new FileInputStream(periodicFH)).readLines()[1..-1].collectEntries(data) {
-	s=it.split(',')
+periodicFH.readLines()[1..-1].collectEntries(data) {
+    s=it.split(',')
     [s[1] as long,
     new Row(
         s[1]  as long,   // timestamp
@@ -129,58 +128,58 @@ def triggers = []
 def node = ""
 
 def noteWorthy = { long tm, String label, String event ->
-	if (data.subMap(tm-2500,true,tm+2500,true).findAll {k,v -> v.five9s > 5}.size() > 0) {
-		data.floorEntry(tm)?.value?.annotate(label,event,node)
-	}
+    if (data.subMap(tm-2500,true,tm+2500,true).findAll {k,v -> v.five9s > 5}.size() > 0) {
+        data.floorEntry(tm)?.value?.annotate(label,event,node)
+    }
 }
 
 def snapinzRE = ~/${logPFX}SNAPSHOT:\sSnapshot\sinitiation\stook\s(\d+)\smilliseconds/
 
 triggers << new Trigger(re: snapinzRE, onMatch: { lines, mtc, tm ->
-	int dur = mtc.group(4) as int
-	noteWorthy(tm,'P','snapinit')
+    int dur = mtc.group(4) as int
+    noteWorthy(tm,'P','snapinit')
 })
 
 def snapendRE = ~/${logPFX}SNAPSHOT:\sSnapshot\s(\d+)\sfinished\sat\s\d+\sand\stook\s(\d+(?:\.\d+)?)\sseconds/
 
 triggers << new Trigger(re: snapendRE, onMatch: { lines, mtc, tm ->
-	noteWorthy(tm,'P','snapend')
+    noteWorthy(tm,'P','snapend')
 })
 
 def segunavailRE = ~/${logPFX}Attempted\sto\sloan\sa\spreallocated\slog\ssegment/
 
 triggers << new Trigger(re: segunavailRE, onMatch: { lines, mtc, tm ->
-	noteWorthy(tm,'G','segunavail')
+    noteWorthy(tm,'G','segunavail')
 })
 
 def segaddRE = ~/${logPFX}LOGGING:\sFinished\sadding\ssegment/
 
 triggers << new Trigger(re: segaddRE, onMatch: { lines, mtc, tm ->
-	noteWorthy(tm,'G','segadd')
+    noteWorthy(tm,'G','segadd')
 })
 
 def nodefailRE = ~/${logPFX}REJOIN:\sAgreement,\sAdding\s(\d+:-\d+)\sto\sfailed\ssites\shistory/
 
 triggers << new Trigger(re: nodefailRE, onMatch: { lines, mtc, tm ->
-	data.floorEntry(tm)?.value?.annotate('N','nodefail', node)
+    data.floorEntry(tm)?.value?.annotate('N','nodefail', node)
 })
 
 def feeder = new LogFeeder()
 def voltRE = ~/(?i)(?:volt|-log)/
 
 opts.arguments().each { logFN ->
-	def logFH = new File(logFN)
+    def logFH = new File(logFN)
 
-	def fmtc = logFH.name[0..<logFH.name.indexOf('.')] =~ voltRE
-	node = fmtc.replaceAll('')
+    def fmtc = logFH.name[0..<logFH.name.indexOf('.')] =~ voltRE
+    node = fmtc.replaceAll('')
 
-	logFH.eachLine {ln ->
-		
-		def logEntry = feeder.feed(ln)
-		if (logEntry) {
-			triggers*.probe(logEntry)
-		}
-	}
+    logFH.eachLine {ln ->
+
+        def logEntry = feeder.feed(ln)
+        if (logEntry) {
+            triggers*.probe(logEntry)
+        }
+    }
 }
 
 def rows = data.values()
@@ -266,5 +265,5 @@ txt = """<html>
 </html>
 """
 
-apw.print txt
+apw.println txt
 apw.close()

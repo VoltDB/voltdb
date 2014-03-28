@@ -29,14 +29,20 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Request;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
+
+    private static VoltLogger m_log = new VoltLogger("HOST");
+    private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
     AuthenticatedConnectionCache m_connections = null;
     static final int CACHE_TARGET_SIZE = 10;
@@ -79,8 +85,7 @@ public class HTTPClientInterface {
              } catch (IllegalStateException e){
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                 // Essentially we're closing everything down from underneath the HTTP request.
-                 VoltLogger log = new VoltLogger("HOST");
-                 log.warn("JSON request completion exception: ", e);
+                 m_log.warn("JSON request completion exception: ", e);
              }
             m_latch.countDown();
         }
@@ -129,6 +134,17 @@ public class HTTPClientInterface {
                     adminInterface = VoltDB.instance().getConfig().m_adminInterface;
                 }
                 m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
+            }
+
+            if (request.getMethod().equalsIgnoreCase("POST")) {
+                int queryParamSize = request.getContentLength();
+                if (queryParamSize > 150000) {
+                    // We don't want to be building huge strings
+                    throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
+                }
+                if (queryParamSize == 0) {
+                    throw new Exception("Received POST with no parameters in the body.");
+                }
             }
 
             String username = request.getParameter("User");
@@ -188,7 +204,6 @@ public class HTTPClientInterface {
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
-
             if (params != null) {
                 ParameterSet paramSet = null;
                 try {
@@ -234,8 +249,7 @@ public class HTTPClientInterface {
         }
         catch (Exception e) {
             String msg = e.getMessage();
-            VoltLogger log = new VoltLogger("HOST");
-            log.warn("JSON interface exception: " + msg, e);
+            m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             msg = rimpl.toJSONString();
             response.setStatus(HttpServletResponse.SC_OK);
@@ -254,8 +268,7 @@ public class HTTPClientInterface {
                         try {
                             client.close();
                         } catch (InterruptedException e) {
-                            VoltLogger log = new VoltLogger("HOST");
-                            log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                            m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
                         }
                     }
                 }
