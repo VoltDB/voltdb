@@ -275,6 +275,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
     vector<bool> columnAllowNull(schema_size, allowNulls);
+    vector<bool> columnInBytes;
 
     for (int i = 0; i < schema_size; i++)
     {
@@ -283,13 +284,15 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
         // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
         // Someone should put that class out of our misery.
         SchemaColumn* col = outputSchema[i];
-        columnTypes.push_back(col->getExpression()->getValueType());
-        columnSizes.push_back(col->getExpression()->getValueSize());
+        AbstractExpression * expr = col->getExpression();
+        columnTypes.push_back(expr->getValueType());
+        columnSizes.push_back(expr->getValueSize());
+        columnInBytes.push_back(expr->getInBytes());
     }
 
     TupleSchema* schema =
         TupleSchema::createTupleSchema(columnTypes, columnSizes,
-                                       columnAllowNull);
+                                       columnAllowNull, columnInBytes);
     return schema;
 }
 

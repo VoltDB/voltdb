@@ -981,6 +981,10 @@ public class PlanAssembler {
 
             // get the expression for the column
             AbstractExpression expr = m_parsedInsert.columns.get(column);
+            if (column.getInbytes()) {
+                assert(column.getType() == VoltType.STRING.getValue());
+                expr.setInBytes();
+            }
 
             // if there's no expression, make sure the column has
             // some supported default value

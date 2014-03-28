@@ -43,6 +43,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         RIGHT,
         VALUE_TYPE,
         VALUE_SIZE,
+        IN_BYTES,
         ARGS,
     }
 
@@ -54,6 +55,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
+    protected boolean m_inBytes = false;
 
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
@@ -256,6 +258,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         assert (size >= 0);
         assert (size <= 10000000);
         m_valueSize = size;
+    }
+
+    public void setInBytes() {
+        m_inBytes = true;
     }
 
     @Override
@@ -464,6 +470,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.getValue());
             if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
                 stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+            }
+
+            if (m_valueType == VoltType.STRING && m_inBytes) {
+                stringer.key(Members.IN_BYTES.name()).value(true);
             }
         }
 
