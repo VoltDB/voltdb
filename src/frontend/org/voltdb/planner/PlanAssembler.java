@@ -981,11 +981,6 @@ public class PlanAssembler {
 
             // get the expression for the column
             AbstractExpression expr = m_parsedInsert.columns.get(column);
-            if (column.getInbytes()) {
-                assert(column.getType() == VoltType.STRING.getValue());
-                expr.setInBytes();
-            }
-
             // if there's no expression, make sure the column has
             // some supported default value
             if (expr == null) {
@@ -1046,6 +1041,11 @@ public class PlanAssembler {
             if (column.equals(m_partitioning.getColumn())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
+            }
+
+            if (column.getInbytes()) {
+                assert(column.getType() == VoltType.STRING.getValue());
+                expr.setInBytes();
             }
 
             // The current insertexecutor implementation requires its input tuple from the
