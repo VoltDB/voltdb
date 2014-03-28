@@ -46,25 +46,29 @@ public class VoltNetworkPool {
 
     private final VoltNetwork m_networks[];
     private final AtomicLong m_nextNetwork = new AtomicLong();
+    public final String m_poolName;
 
     public VoltNetworkPool() {
-        this(1, null);
+        this(1, 1, null, "");
     }
 
-    public VoltNetworkPool(int numThreads, Queue<String> coreBindIds) {
+    public VoltNetworkPool(int numThreads, int startThreadId, Queue<String> coreBindIds, String poolName) {
+        m_poolName = poolName;
         if (numThreads < 1) {
             throw new IllegalArgumentException("Must specify a positive number of threads");
         }
         if (coreBindIds == null || coreBindIds.isEmpty()) {
             m_networks = new VoltNetwork[numThreads];
             for (int ii = 0; ii < numThreads; ii++) {
-                m_networks[ii] = new VoltNetwork(ii, null);
+                // Adding startThreadId avoids unnecessary polling for non-Server VoltNetworkPools
+                m_networks[ii] = new VoltNetwork(ii+startThreadId, null, poolName);
             }
         } else {
             final int coreBindIdsSize = coreBindIds.size();
             m_networks = new VoltNetwork[coreBindIdsSize];
             for (int ii = 0; ii < coreBindIdsSize; ii++) {
-                m_networks[ii] = new VoltNetwork(ii, coreBindIds.poll());
+                // Adding startThreadId avoids unnecessary polling for non-Server VoltNetworkPools
+                m_networks[ii] = new VoltNetwork(ii+startThreadId, coreBindIds.poll(), poolName);
             }
         }
     }
