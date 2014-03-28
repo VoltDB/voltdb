@@ -34,6 +34,7 @@ import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
@@ -123,13 +124,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     /**
      * For each site, generate a task for each target it has for this table.
      */
-    private void createTasksForTable(org.hsqldb_voltpatches.Table table,
+    private void createTasksForTable(Table table,
                                      Collection<IndexSnapshotRequestConfig.PartitionRanges> partitionRanges,
                                      Map<Integer, Long> pidToLocalHSIDs,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
-        SNAP_LOG.info("Creating tasks for table " + table.getTypeName() + " id " + table.getId());
         // no work on this node
         if (pidToLocalHSIDs.isEmpty()) {
             return;
@@ -146,12 +146,10 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
 
         // go over all local sites, create a task for each source site
         for (IndexSnapshotRequestConfig.PartitionRanges partitionRange : partitionRanges) {
-            SNAP_LOG.info("Checking to see if we should create a task for partition " + partitionRange.partitionId + " ranges " + partitionRange.ranges.size());
             Long localHSId = pidToLocalHSIDs.get(partitionRange.partitionId);
 
             // The partition may not exist on this node. If so, keep calm and carry on
             if (localHSId != null) {
-                SNAP_LOG.info("Creating task for partition for partition " + partitionRange.partitionId);
                 // based on the source partition, the predicate is different
                 final SnapshotTableTask task =
                     new SnapshotTableTask(table,
