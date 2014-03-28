@@ -138,6 +138,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         clone.m_type = m_type;
         clone.m_valueType = m_valueType;
         clone.m_valueSize = m_valueSize;
+        clone.m_inBytes = m_inBytes;
         if (m_left != null)
         {
             AbstractExpression left_clone = (AbstractExpression)m_left.clone();
@@ -260,8 +261,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         m_valueSize = size;
     }
 
-    public void setInBytes() {
-        m_inBytes = true;
+    public boolean getInBytes() {
+        return m_inBytes;
+    }
+
+    public void setInBytes(boolean bytes) {
+        m_inBytes = bytes;
     }
 
     @Override

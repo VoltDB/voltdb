@@ -1043,10 +1043,7 @@ public class PlanAssembler {
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
 
-            if (column.getInbytes()) {
-                assert(column.getType() == VoltType.STRING.getValue());
-                expr.setInBytes();
-            }
+            expr.setInBytes(column.getInbytes());
 
             // The current insertexecutor implementation requires its input tuple from the
             // materializeexecutor to be formatted exactly like the target persistent tuple.
@@ -1532,6 +1529,7 @@ public class PlanAssembler {
                             "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
                     tve.setValueType(rootExpr.getValueType());
                     tve.setValueSize(rootExpr.getValueSize());
+                    tve.setInBytes(rootExpr.getInBytes());
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);

@@ -2710,15 +2710,16 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
+            if (!isNull()) {
+                int objLength = getObjectLength_withoutNull();
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
+            }
+
             if (m_sourceInlined) {
                 throwDynamicSQLException(
                         "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
             }
 
-            if (!isNull()) {
-                int objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
-            }
             // copy the StringRef pointers, even for NULL case.
             *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);
         }
