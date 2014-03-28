@@ -71,7 +71,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         if (m_isSubQuery) {
             // Get estimates from the sub-query
-            assert(m_children.size() == 1);
             // @TODO For the sub-query the cost estimates will be calculated separately
             // At the moment its contribution to the parent's cost plan is irrelevant because
             // all parent plans have the same best cost plan for the sub-query
