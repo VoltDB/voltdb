@@ -34,7 +34,6 @@ import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
@@ -124,13 +123,13 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     /**
      * For each site, generate a task for each target it has for this table.
      */
-    private void createTasksForTable(Table table,
+    private void createTasksForTable(org.hsqldb_voltpatches.Table table,
                                      Collection<IndexSnapshotRequestConfig.PartitionRanges> partitionRanges,
                                      Map<Integer, Long> pidToLocalHSIDs,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
-        SNAP_LOG.info("Creating tasks for table " + table.getTypeName() + " id " + table.getRelativeIndex());
+        SNAP_LOG.info("Creating tasks for table " + table.getTypeName() + " id " + table.getId());
         // no work on this node
         if (pidToLocalHSIDs.isEmpty()) {
             return;
