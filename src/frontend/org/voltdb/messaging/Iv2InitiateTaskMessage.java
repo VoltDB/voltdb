@@ -220,10 +220,14 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append("COORD ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
 
-        sb.append("\n  PROCEDURE: ");
-        sb.append(m_invocation.getProcName());
-        sb.append("\n  PARAMS: ");
-        sb.append(m_invocation.getParams().toString());
+        if (m_invocation != null) {
+            sb.append("\n  PROCEDURE: ");
+            sb.append(m_invocation.getProcName());
+            sb.append("\n  PARAMS: ");
+            sb.append(m_invocation.getParams().toString());
+        } else {
+            sb.append("\n NO INVOCATION");
+        }
 
         return sb.toString();
     }
