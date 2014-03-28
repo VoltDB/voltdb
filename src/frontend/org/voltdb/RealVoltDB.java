@@ -56,6 +56,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -216,6 +217,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Yes, this is fragile having two booleans.  We could aggregate them into
     // some rejoining state enum at some point.
     volatile boolean m_rejoinDataPending = false;
+    // Since m_rejoinDataPending is set asynchronously, sites could have inconsistent
+    // view of what the value is during the execution of a sysproc. Use this and
+    // m_safeMpTxnId to prevent the race. The m_safeMpTxnId is updated once in the
+    // lifetime of the node to reflect the first MP txn that witnessed the flip of
+    // m_rejoinDataPending.
+    private final AtomicLong m_lastSeenMpTxnId = new AtomicLong(Long.MIN_VALUE);
+    private volatile long m_safeMpTxnId = Long.MAX_VALUE;
     String m_rejoinTruncationReqId = null;
 
     // Are we adding the node to the cluster instead of rejoining?
@@ -264,6 +272,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public boolean rejoinDataPending() { return m_rejoinDataPending; }
+
+    @Override
+    public boolean isMpSysprocSafeToExecute(long txnId)
+    {
+        synchronized (m_lastSeenMpTxnId) {
+            if (txnId >= m_safeMpTxnId) {
+                return true;
+            }
+
+            if (txnId > m_lastSeenMpTxnId.get()) {
+                m_lastSeenMpTxnId.set(txnId);
+                if (!rejoinDataPending() && m_safeMpTxnId == Long.MAX_VALUE) {
+                    m_safeMpTxnId = txnId;
+                }
+            }
+
+            return txnId >= m_safeMpTxnId;
+        }
+    }
 
     private long m_recoveryStartTime;
 
