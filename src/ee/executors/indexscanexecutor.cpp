@@ -253,13 +253,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-<<<<<<< HEAD
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key: '%s'", m_searchKey.debugNoHeader().c_str());
-=======
-    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
->>>>>>> master
 
     //
     // END EXPRESSION

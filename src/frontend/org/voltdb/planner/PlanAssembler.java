@@ -439,7 +439,7 @@ public class PlanAssembler {
         return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
     }
 
-    
+
     /**
      * Generate the best cost plans for the immediate EXISTS/IN (SELECT...) sub-queries
      * of the current SQL statement context.

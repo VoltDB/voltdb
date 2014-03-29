@@ -291,7 +291,7 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("tablesubquery")) {
             retval = parseSubqueryExpression(root);
-        } 
+        }
         else if (elementName.equals("row")) {
             retval = parseRowExpression(root);
 // ENG-451-MERGE

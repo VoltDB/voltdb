@@ -300,8 +300,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             //
             index_values.setAllNulls();
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-                // in a normal index scan, params would be substituted here,
-                // but this scan fills in params outside the loop
                 NValue candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
                 try {
                     index_values.setNValue(ctr, candidateValue);

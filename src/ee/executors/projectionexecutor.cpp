@@ -116,11 +116,6 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
-    //
-    // Since we have the input params, we need to call substitute to change any
-    // nodes in our expression tree to be ready for the projection operations in
-    // execute
-    //
     assert (m_columnCount == (int)node->getOutputColumnNames().size());
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {

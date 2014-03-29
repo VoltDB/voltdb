@@ -132,11 +132,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     //
     // OPTIMIZATION: NESTED PROJECTION
-    //
-    // Since we have the input params, we need to call substitute to
-    // change any nodes in our expression tree to be ready for the
-    // projection operations in execute
-    //
     int num_of_columns = (int)output_table->columnCount();
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
