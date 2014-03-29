@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -83,6 +83,7 @@ class StreamBlock;
 class Topend;
 class TupleBlock;
 class PersistentTableUndoDeleteAction;
+class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -103,6 +104,7 @@ class Table {
     friend class StatsSource;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoTruncateTableAction;
 
   private:
     Table();
@@ -188,6 +190,10 @@ class Table {
         return m_nonInlinedMemorySize;
     }
 
+    virtual int tupleLimit() const {
+        return INT_MIN;
+    }
+
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
@@ -195,7 +201,6 @@ class Table {
     const std::vector<std::string>& getColumnNames() const {
         return m_columnNames;
     }
-
 
     inline const TupleSchema* schema() const {
         return m_schema;
@@ -389,20 +394,14 @@ protected:
         if (m_tuplesPinnedByUndo != 0) {
             return false;
         }
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+        return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {
     };
-
-    double loadFactor() {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
 
     // ------------------------------------------------------------------
     // DATA
@@ -444,6 +443,7 @@ protected:
   private:
     int32_t m_refcount;
     ThreadLocalPool m_tlPool;
+    int m_compactionThreshold;
 };
 
 }

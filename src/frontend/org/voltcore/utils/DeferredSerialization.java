@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,15 +27,22 @@ import java.nio.ByteBuffer;
  */
 public interface DeferredSerialization {
     /**
+     * Value to return for an empty message
+     */
+    public static final int EMPTY_MESSAGE_LENGTH = -1;
+
+    /**
      * Serialize the Object contained in this DeferredSerialization
      * @return Serialized representation of the object stored
      * @throws IOException Thrown here because FastSerialzier throws IOException
      */
-    ByteBuffer[] serialize() throws IOException;
+    void serialize(ByteBuffer buf) throws IOException;
 
     /**
      * A deferred serialization might not be able to take place if a stream is closed
      * so a method for canceling the serialization and freeing associated resources must be provided.
      */
     void cancel();
+
+    int getSerializedSize() throws IOException;
 }

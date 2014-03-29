@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,9 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.URL;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -48,7 +46,6 @@ import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.compilereport.ReportMaker;
-import org.voltdb.dtxn.SiteTracker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
@@ -291,7 +288,7 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, int port) throws Exception {
+    public HTTPAdminListener(boolean jsonEnabled, String intf, int port) throws Exception {
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -307,6 +304,10 @@ public class HTTPAdminListener {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
             SocketConnector connector = new SocketConnector();
+
+            if (intf != null && intf.length() > 0) {
+                connector.setHost(intf);
+            }
 
             connector.setPort(port);
             connector.setName("VoltDB-HTTPD");

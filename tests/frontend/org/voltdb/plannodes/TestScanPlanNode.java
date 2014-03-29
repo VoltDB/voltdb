@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,8 +37,8 @@ import org.voltdb.types.ExpressionType;
 
 public class TestScanPlanNode extends TestCase
 {
-    static final String TABLE1 = "table1";
-    static final String[] COLS = { "col0", "col1", "col2", "col3", "col4" };
+    static final String TABLE1 = "TABLE1";
+    static final String[] COLS = { "COL0", "COL1", "COL2", "COL3", "COL4" };
     static final VoltType[] COLTYPES = { VoltType.INTEGER, VoltType.TINYINT,
                                          VoltType.TIMESTAMP, VoltType.FLOAT,
                                          VoltType.BIGINT };
@@ -87,36 +87,28 @@ public class TestScanPlanNode extends TestCase
     // a scan node consists of those columns
     public void testOutputSchemaSomeScanColumns()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
-
         int[] scan_col_indexes = { 1, 3 };
         ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
-        for (int index : scan_col_indexes)
-        {
+        for (int index : scan_col_indexes) {
             TupleValueExpression tve = new TupleValueExpression(TABLE1, TABLE1, COLS[index], COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index],
-                                                COLS[index], tve);
+            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index], COLS[index], tve);
             scanColumns.add(col);
         }
-        dut.setScanColumns(scanColumns);
+        AbstractScanPlanNode dut = SeqScanPlanNode.createDummyForTest(TABLE1, scanColumns);
 
         // Should be able to do this safely and repeatably multiple times
-        for (int i = 0; i < 3; i++)
-        {
+        for (int i = 0; i < 3; i++) {
             dut.generateOutputSchema(m_voltdb.getDatabase());
             NodeSchema dut_schema = dut.getOutputSchema();
             System.out.println(dut_schema.toString());
             assertEquals(scan_col_indexes.length, dut_schema.size());
-            for (int index : scan_col_indexes)
-            {
+            for (int index : scan_col_indexes) {
                 SchemaColumn col = dut_schema.find(TABLE1, TABLE1, COLS[index], "");
                 assertNotNull(col);
-                assertEquals(col.getExpression().getExpressionType(),
-                             ExpressionType.VALUE_TUPLE);
-                assertEquals(col.getExpression().getValueType(),
-                             COLTYPES[index]);
+                assertEquals(col.getExpression().getExpressionType(), ExpressionType.VALUE_TUPLE);
+                assertEquals(col.getExpression().getValueType(), COLTYPES[index]);
             }
         }
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -112,8 +112,8 @@ class AE {
     /* this is how java serializes.. note derived class data follows
        the serialization of children */
     virtual void serialize(Json::Value &json) {
-        json["TYPE"] = expressionToString(m_type);
-        json["VALUE_TYPE"] = valueToString(m_valueType);
+        json["TYPE"] = static_cast<int>(m_type);
+        json["VALUE_TYPE"] = static_cast<int>(m_valueType);
         json["VALUE_SIZE"] = m_valueSize;
 
         if (left)

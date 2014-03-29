@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -177,6 +177,8 @@ public interface SiteProcedureConnection {
     public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
-    public void updateHashinator(HashinatorConfig config);
+    public TheHashinator getCurrentHashinator();
+    public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
+    public void notifyOfSnapshotNonce(String nonce);
 }

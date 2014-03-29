@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,8 +57,9 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     assert ((int)output_table->columnCount() == 1);
 
     // get the output type
-    ValueType outputType = output_table->schema()->columnType(0);
-    bool outputCantBeNull = !output_table->schema()->columnAllowNull(0);
+    const TupleSchema::ColumnInfo *columnInfo = output_table->schema()->getColumnInfo(0);
+    ValueType outputType = columnInfo->getVoltType();
+    bool outputCantBeNull = !columnInfo->allowNull;
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     assert(rowsExpression);

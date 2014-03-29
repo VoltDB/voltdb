@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
@@ -223,6 +222,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public TaskLog constructTaskLog(String voltroot)
     {
         m_taskLog = initializeTaskLog(voltroot, m_partitionId);
+        m_taskLog.enableRecording();
         return this;
     }
 
@@ -270,12 +270,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    public void setEarliestTxnId(long txnId)
-    {
-        m_taskLog.setEarliestTxnId(txnId);
-    }
-
-    @Override
     public boolean isEmpty() throws IOException
     {
         return m_taskLog.isEmpty();
@@ -286,4 +280,12 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         m_taskLog.close();
     }
+
+    @Override
+    public void enableRecording() {
+        //Implemented by the nest task log, it is enabled immediately on construction
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {}//don't need to do anything
 }

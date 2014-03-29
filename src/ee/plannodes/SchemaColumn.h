@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,7 @@ namespace voltdb
 class SchemaColumn
 {
 public:
-    SchemaColumn(PlannerDomValue colObject);
+    SchemaColumn(PlannerDomValue colObject, int idx);
     ~SchemaColumn();
 
     std::string getColumnName() const;

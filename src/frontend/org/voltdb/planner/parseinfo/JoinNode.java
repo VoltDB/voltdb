@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,11 +21,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -37,25 +40,8 @@ import org.voltdb.types.JoinType;
  * filter expressions
  */
 public abstract class JoinNode implements Cloneable {
-
-    public enum NodeType {
-        JOIN,
-        LEAF,
-        SUBQUERY
-    }
-
-    // Node Type
-    final private NodeType m_nodeType;
-    // Join type
-    protected JoinType m_joinType;
     // Node id. Must be unique within a given tree
     protected int m_id;
-    // Left child
-    protected JoinNode m_leftNode = null;
-    // Right child
-    protected JoinNode m_rightNode = null;
-    // index into the query catalog cache for a table alias
-    protected int m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
     // Join expression associated with this node
     protected AbstractExpression m_joinExpr = null;
     // Additional filter expression (WHERE) associated with this node
@@ -77,11 +63,8 @@ public abstract class JoinNode implements Cloneable {
     /**
      * Construct an empty join node
      */
-    protected JoinNode(int id, JoinType joinType, NodeType nodeType) {
+    protected JoinNode(int id) {
         m_id = id;
-        m_joinType = joinType;
-        m_nodeType = nodeType;
-        m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
     }
 
     /**
@@ -89,6 +72,8 @@ public abstract class JoinNode implements Cloneable {
      */
     @Override
     abstract public Object clone();
+
+    abstract public boolean containSubSelects();
 
     public int getId() {
         return m_id;
@@ -98,26 +83,12 @@ public abstract class JoinNode implements Cloneable {
         m_id = id;
     }
 
-    public NodeType getNodeType() {
-        return m_nodeType;
-    }
-
-    public JoinType getJoinType() {
-        return m_joinType;
-    }
-
-    public void setJoinType(JoinType joinType) {
-        m_joinType = joinType;
-    }
-
-    public int getTableAliasIndex() {
-        return StmtTableScan.NULL_ALIAS_INDEX;
-    }
-
+    @SuppressWarnings("static-method")
     public JoinNode getLeftNode() {
         return null;
     }
 
+    @SuppressWarnings("static-method")
     public JoinNode getRightNode() {
         return null;
     }
@@ -148,15 +119,10 @@ public abstract class JoinNode implements Cloneable {
     }
 
     public void explain_recurse(StringBuilder sb, String indent) {
-
         // Node id. Must be unique within a given tree
         sb.append(indent).append("JOIN NODE id: " + m_id).append("\n");
-
         // Table
-        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            sb.append(indent).append("table alias index: ").append(m_tableAliasIndex).append("\n");
-        }
-
+        sb.append(indent).append("table alias: ").append(getTableAlias()).append("\n");
         // Join expression associated with this node
         if (m_joinExpr != null) {
             sb.append(indent).append(m_joinExpr.explain("be explicit")).append("\n");
@@ -165,15 +131,6 @@ public abstract class JoinNode implements Cloneable {
         if (m_whereExpr != null) {
             sb.append(indent).append(m_whereExpr.explain("be explicit")).append("\n");
         }
-
-        // Node type type
-        sb.append(indent).append("node type: ").append(m_nodeType.name()).append("\n");
-
-        // Join type
-        if (m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
-            sb.append(indent).append("join type: ").append(m_joinType.name()).append("\n");
-        }
-
         // Buckets for children expression classification
         explain_filter_list(sb, indent, "join outer:", m_joinOuterList);
         explain_filter_list(sb, indent, "join inner:", m_joinInnerList);
@@ -181,18 +138,9 @@ public abstract class JoinNode implements Cloneable {
         explain_filter_list(sb, indent, "where outer:", m_whereOuterList);
         explain_filter_list(sb, indent, "where inner:", m_whereInnerList);
         explain_filter_list(sb, indent, "where inner outer:", m_whereInnerOuterList);
-
-        String extraIndent = " ";
-
-        if (m_leftNode != null) {
-            m_leftNode.explain_recurse(sb, indent + extraIndent);
-        }
-        if (m_rightNode != null) {
-            m_rightNode.explain_recurse(sb, indent + extraIndent);
-        }
     }
 
-    private void explain_filter_list(StringBuilder sb, String indent, String label,
+    protected static void explain_filter_list(StringBuilder sb, String indent, String label,
                                      Collection<AbstractExpression> filterListMember) {
         String prefix = label + "\n" + indent;
         for (AbstractExpression filter : filterListMember) {
@@ -223,57 +171,14 @@ public abstract class JoinNode implements Cloneable {
         joinNodes.add(this);
         while ( ! joinNodes.isEmpty()) {
             JoinNode joinNode = joinNodes.poll();
-            if ( ! joinNode.m_whereInnerList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(joinNode.m_whereInnerList,
-                                                          equivalenceSet);
-            }
-            if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-                assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
-                // HSQL sometimes tags single-table filters in inner joins as join clauses
-                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-                // conditions that determine partitioning, so process them as where clauses.
-                if ( ! joinNode.m_joinInnerList.isEmpty()) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
-                                                              equivalenceSet);
-                }
-                continue;
-            }
-            if ( ! joinNode.m_whereOuterList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(joinNode.m_whereOuterList,
-                                                          equivalenceSet);
-            }
-            if ( ! joinNode.m_whereInnerOuterList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(joinNode.m_whereInnerOuterList,
-                                                          equivalenceSet);
-            }
-            if ( ! joinNode.m_joinInnerOuterList.isEmpty()) {
-                ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerOuterList,
-                                                          equivalenceSet);
-            }
-            if (joinNode.m_joinType == JoinType.INNER) {
-                // HSQL sometimes tags single-table filters in inner joins as join clauses
-                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-                // conditions that determine partitioning, so process them as where clauses.
-                if ( ! joinNode.m_joinInnerList.isEmpty()) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
-                                                              equivalenceSet);
-                }
-                if ( ! joinNode.m_joinOuterList.isEmpty()) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinOuterList,
-                                                              equivalenceSet);
-                }
-            }
-            if (joinNode.m_leftNode != null) {
-                joinNodes.add(joinNode.m_leftNode);
-            }
-            if (joinNode.m_rightNode != null) {
-                joinNodes.add(joinNode.m_rightNode);
-            }
+            joinNode.collectEquivalenceFilters(equivalenceSet, joinNodes);
         }
         return equivalenceSet;
     }
+
+    protected abstract void collectEquivalenceFilters(
+            HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
+            ArrayDeque<JoinNode> joinNodes);
 
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
@@ -292,12 +197,7 @@ public abstract class JoinNode implements Cloneable {
             if (joinNode.m_whereExpr != null) {
                 in.add(joinNode.m_whereExpr);
             }
-            if (joinNode.m_leftNode != null) {
-                joinNodes.add(joinNode.m_leftNode);
-            }
-            if (joinNode.m_rightNode != null) {
-                joinNodes.add(joinNode.m_rightNode);
-            }
+            joinNode.queueChildren(joinNodes);
         }
 
         // this chunk of code breaks the code into a list of expression that
@@ -315,13 +215,13 @@ public abstract class JoinNode implements Cloneable {
         return ExpressionUtil.combine(out);
     }
 
+    protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }
+
     /**
      * Get the WHERE expression for a single-table statement.
      */
     public AbstractExpression getSimpleFilterExpression()
     {
-        assert(m_leftNode == null);
-        assert(m_rightNode == null);
         if (m_whereExpr != null) {
             if (m_joinExpr != null) {
                 return ExpressionUtil.combine(m_whereExpr, m_joinExpr);
@@ -332,60 +232,29 @@ public abstract class JoinNode implements Cloneable {
     }
 
     /**
-     * Transform all RIGHT joins from the tree into the LEFT ones by swapping the nodes and their join types
-     */
-    public void toLeftJoin() {
-        assert((m_leftNode != null && m_rightNode != null) || (m_leftNode == null && m_rightNode == null));
-        if (m_leftNode == null && m_rightNode == null) {
-            // End of recursion
-            return;
-        }
-        // recursive calls
-        m_leftNode.toLeftJoin();
-        m_rightNode.toLeftJoin();
-
-        // Swap own children
-        if (m_joinType == JoinType.RIGHT) {
-            JoinNode node = m_rightNode;
-            m_rightNode = m_leftNode;
-            m_leftNode = node;
-            m_joinType = JoinType.LEFT;
-        }
-    }
-
-    /**
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
     public List<JoinNode> generateLeafNodesJoinOrder() {
         ArrayList<JoinNode> leafNodes = new ArrayList<JoinNode>();
-        generateLeafNodesJoinOrderRecursive(this, leafNodes);
+        listNodesJoinOrderRecursive(leafNodes, false);
         return leafNodes;
-    }
-
-    private void generateLeafNodesJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> leafNodes) {
-        if (node == null) {
-            return;
-        }
-        if (node.m_leftNode != null || node.m_rightNode != null) {
-            assert(node.m_leftNode != null && node.m_rightNode != null);
-            generateLeafNodesJoinOrderRecursive(node.m_leftNode, leafNodes);
-            generateLeafNodesJoinOrderRecursive(node.m_rightNode, leafNodes);
-        } else {
-            assert(node.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            leafNodes.add(node);
-        }
     }
 
     /**
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
-    public List<Integer> generateTableJoinOrder() {
+    public Collection<String> generateTableJoinOrder() {
         List<JoinNode> leafNodes = generateLeafNodesJoinOrder();
-        ArrayList<Integer> tables = new ArrayList<Integer>();
+        Collection<String> tables = new ArrayList<String>();
         for (JoinNode node : leafNodes) {
-            tables.add(node.m_tableAliasIndex);
+            tables.add(node.getTableAlias());
         }
         return tables;
+    }
+
+    @SuppressWarnings("static-method")
+    public String getTableAlias() {
+        return null;
     }
 
     /**
@@ -393,56 +262,25 @@ public abstract class JoinNode implements Cloneable {
      */
     public List<JoinNode> generateAllNodesJoinOrder() {
         ArrayList<JoinNode> nodes = new ArrayList<JoinNode>();
-        generateAllNodesJoinOrderRecursive(this, nodes);
+        listNodesJoinOrderRecursive(nodes, true);
         return nodes;
     }
 
-    private void generateAllNodesJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> nodes) {
-        if (node == null) {
-            return;
-        }
-        if (node.m_leftNode != null || node.m_rightNode != null) {
-            assert(node.m_leftNode != null && node.m_rightNode != null);
-            generateAllNodesJoinOrderRecursive(node.m_leftNode, nodes);
-            generateAllNodesJoinOrderRecursive(node.m_rightNode, nodes);
-        }
-        nodes.add(node);
+    protected void listNodesJoinOrderRecursive(ArrayList<JoinNode> nodes, boolean appendBranchNodes) {
+        nodes.add(this);
     }
 
     /**
      * Returns true if one of the tree nodes has outer join
      */
-    public boolean hasOuterJoin() {
-        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            return false;
-        }
-        assert(m_leftNode != null && m_rightNode != null);
-        return m_joinType != JoinType.INNER ||
-                m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
-    }
+    @SuppressWarnings("static-method")
+    public boolean hasOuterJoin() { return false; }
 
     /**
      * Returns a list of immediate sub-queries which are part of this query.
      * @return List<AbstractParsedStmt> - list of sub-queries from this query
      */
-    public List<JoinNode> extractSubQueries() {
-        List<JoinNode> subQueries = new ArrayList<JoinNode>();
-        extractSubQueries(this, subQueries);
-        return subQueries;
-    }
-
-    private void extractSubQueries(JoinNode joinTree, List<JoinNode> subQueries) {
-        if (joinTree.m_nodeType == NodeType.SUBQUERY) {
-            subQueries.add(joinTree);
-        }
-        if (joinTree.m_leftNode != null) {
-            extractSubQueries(joinTree.m_leftNode, subQueries);
-        }
-        if (joinTree.m_rightNode != null) {
-            extractSubQueries(joinTree.m_rightNode, subQueries);
-        }
-    }
-
+    public void extractSubQueries(List<StmtSubqueryScan> subQueries) { }
 
     /**
      * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
@@ -454,10 +292,10 @@ public abstract class JoinNode implements Cloneable {
     public List<JoinNode> extractSubTrees() {
         List<JoinNode> subTrees = new ArrayList<JoinNode>();
         // Extract the first sub-tree starting at the root
-        List<JoinNode> leafNodes = new ArrayList<JoinNode>();
-        extractSubTree(leafNodes);
         subTrees.add(this);
 
+        List<JoinNode> leafNodes = new ArrayList<JoinNode>();
+        extractSubTree(leafNodes);
         // Continue with the leafs
         for (JoinNode leaf : leafNodes) {
             subTrees.addAll(leaf.extractSubTrees());
@@ -473,43 +311,7 @@ public abstract class JoinNode implements Cloneable {
      * @param root - The root of the join tree
      * @param leafNodes - the list of the root nodes of the next sub-trees
      */
-    private void extractSubTree(List<JoinNode> leafNodes) {
-        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            return;
-        }
-        JoinNode[] children = {m_leftNode, m_rightNode};
-        for (JoinNode child : children) {
-
-            // Leaf nodes don't have a significant join type,
-            // test for them first and never attempt to start a new tree at a leaf.
-            if (child.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-                continue;
-            }
-
-            if (child.m_joinType == m_joinType) {
-                // The join type for this node is the same as the root's one
-                // Keep walking down the tree
-                child.extractSubTree(leafNodes);
-            } else {
-                // The join type for this join differs from the root's one
-                // Terminate the sub-tree
-                leafNodes.add(child);
-                // Replace the join node with the temporary node having the id negated
-                // the tree at the later stage
-                // We also need to generate a dummy alias index to preserve JoinNode invariant
-                // that a node represent either a table (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) or
-                // a join of two nodes m_leftNode != null && m_rightNode != null
-                int tempAliasIdx = StmtTableScan.NULL_ALIAS_INDEX - 1 - child.m_id;
-                JoinNode tempNode = new TableLeafNode(
-                        -child.m_id, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
-                if (child == m_leftNode) {
-                    m_leftNode = tempNode;
-                } else {
-                    m_rightNode = tempNode;
-                }
-            }
-        }
-    }
+    protected void extractSubTree(List<JoinNode> leafNodes) { }
 
     /**
      * Reconstruct a join tree from the list of tables always appending the next node to the right.
@@ -520,14 +322,7 @@ public abstract class JoinNode implements Cloneable {
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
-            JoinNode node = null;
-            if (leafNode.getNodeType() == JoinNode.NodeType.LEAF) {
-                node = new TableLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
-            } else if (leafNode.getNodeType() == JoinNode.NodeType.SUBQUERY) {
-                node = new SubqueryLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
-            } else {
-                assert(false);
-            }
+            JoinNode node = leafNode.cloneWithoutFilters();
             if (root == null) {
                 root = node;
             } else {
@@ -539,6 +334,9 @@ public abstract class JoinNode implements Cloneable {
         }
         return root;
     }
+
+    @SuppressWarnings("static-method")
+    protected JoinNode cloneWithoutFilters() { assert(false); return null; }
 
     /**
      * Reconstruct a join tree from the list of sub-trees connecting the sub-trees in the order
@@ -556,32 +354,145 @@ public abstract class JoinNode implements Cloneable {
         JoinNode joinNode = subTrees.get(0);
         for (int i = 1; i < subTrees.size(); ++i) {
             JoinNode nextNode = subTrees.get(i);
-            boolean replaced = replaceChild(joinNode, nextNode);
+            boolean replaced = joinNode.replaceChild(nextNode);
             // There must be a node in the current tree to be replaced
-            assert(replaced == true);
+            assert(replaced);
         }
         return joinNode;
     }
 
-    private static boolean replaceChild(JoinNode root, JoinNode node) {
+    protected boolean replaceChild(JoinNode node) {
         // can't replace self
-        assert (root != null && Math.abs(root.m_id) != Math.abs(node.m_id));
-        if (root.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-            return false;
-        } else if (Math.abs(root.m_leftNode.m_id) == Math.abs(node.m_id)) {
-            root.m_leftNode  = node;
-            return true;
-        } else if (Math.abs(root.m_rightNode.m_id) == Math.abs(node.m_id)) {
-            root.m_rightNode  = node;
-            return true;
-        } else if (replaceChild(root.m_leftNode, node) == true) {
-            return true;
-        } else if (replaceChild(root.m_rightNode, node) == true) {
-            return true;
-        }
-
+        assert (Math.abs(m_id) != Math.abs(node.m_id));
         return false;
     }
 
+    public abstract void analyzeJoinExpressions(List<AbstractExpression> noneList);
 
+    /**
+     * Apply implied transitive constant filter to join expressions
+     * outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
+     * outer.partkey = ? and inner.partkey = ?
+     * @param innerTableExprs inner table expressions
+     * @param outerTableExprs outer table expressions
+     * @param innerOuterTableExprs inner-outer tables expressions
+     */
+    protected static void applyTransitiveEquivalence(List<AbstractExpression> outerTableExprs,
+            List<AbstractExpression> innerTableExprs,
+            List<AbstractExpression> innerOuterTableExprs)
+    {
+        List<AbstractExpression> simplifiedOuterExprs = applyTransitiveEquivalence(innerTableExprs, innerOuterTableExprs);
+        List<AbstractExpression> simplifiedInnerExprs = applyTransitiveEquivalence(outerTableExprs, innerOuterTableExprs);
+        outerTableExprs.addAll(simplifiedOuterExprs);
+        innerTableExprs.addAll(simplifiedInnerExprs);
+    }
+
+    private static List<AbstractExpression>
+    applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs,
+                               List<AbstractExpression> twoTableExprs)
+    {
+        ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<AbstractExpression>();
+        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 =
+                new HashMap<AbstractExpression, Set<AbstractExpression> >();
+        ExpressionUtil.collectPartitioningFilters(singleTableExprs, eqMap1);
+
+        for (AbstractExpression expr : twoTableExprs) {
+            if (! ExpressionUtil.isColumnEquivalenceFilter(expr)) {
+                continue;
+            }
+            AbstractExpression leftExpr = expr.getLeft();
+            AbstractExpression rightExpr = expr.getRight();
+            assert(leftExpr instanceof TupleValueExpression && rightExpr instanceof TupleValueExpression);
+            Set<AbstractExpression> eqSet1 = eqMap1.get(leftExpr);
+            AbstractExpression singleExpr = leftExpr;
+            if (eqSet1 == null) {
+                eqSet1 = eqMap1.get(rightExpr);
+                if (eqSet1 == null) {
+                    continue;
+                }
+                singleExpr = rightExpr;
+            }
+
+            for (AbstractExpression eqExpr : eqSet1) {
+                if (eqExpr instanceof ConstantValueExpression) {
+                    if (singleExpr == leftExpr) {
+                        expr.setLeft(eqExpr);
+                    } else {
+                        expr.setRight(eqExpr);
+                    }
+                    simplifiedExprs.add(expr);
+                    // Having more than one const value for a single column doesn't make
+                    // much sense, right?
+                    break;
+                }
+            }
+
+        }
+
+         twoTableExprs.removeAll(simplifiedExprs);
+         return simplifiedExprs;
+    }
+
+    /**
+     * Split the input expression list into the three categories
+     * 1. TVE expressions with outer tables only
+     * 2. TVE expressions with inner tables only
+     * 3. TVE expressions with inner and outer tables
+     * The outer tables are the tables reachable from the outer node of the join
+     * The inner tables are the tables reachable from the inner node of the join
+     * @param exprList expression list to split
+     * @param outerTables outer table
+     * @param innerTable outer table
+     * @param outerList expressions with outer table only
+     * @param innerList expressions with inner table only
+     * @param innerOuterList with inner and outer tables
+     */
+    protected static void classifyJoinExpressions(Collection<AbstractExpression> exprList,
+            Collection<String> outerTables, Collection<String> innerTables,
+            List<AbstractExpression> outerList, List<AbstractExpression> innerList,
+            List<AbstractExpression> innerOuterList, List<AbstractExpression> noneList)
+    {
+        HashSet<String> tableAliasSet = new HashSet<String>();
+        HashSet<String> outerSet = new HashSet<String>(outerTables);
+        HashSet<String> innerSet = new HashSet<String>(innerTables);
+        for (AbstractExpression expr : exprList) {
+            tableAliasSet.clear();
+            getTablesForExpression(expr, tableAliasSet);
+            String tableAliases[] = tableAliasSet.toArray(new String[0]);
+            if (tableAliasSet.isEmpty()) {
+                noneList.add(expr);
+            } else {
+                boolean outer = false;
+                boolean inner = false;
+                for (String alias : tableAliases) {
+                    outer = outer || outerSet.contains(alias);
+                    inner = inner || innerSet.contains(alias);
+                }
+                if (outer && inner) {
+                    innerOuterList.add(expr);
+                } else if (outer) {
+                    outerList.add(expr);
+                } else if (inner) {
+                    innerList.add(expr);
+                } else {
+                    // can not be, right?
+                    assert(false);
+                }
+            }
+        }
+    }
+
+    private static void getTablesForExpression(AbstractExpression expr, HashSet<String> tableAliasSet)
+    {
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+        for (TupleValueExpression tupleExpr : tves) {
+            String tableAlias = tupleExpr.getTableAlias();
+            tableAliasSet.add(tableAlias);
+        }
+    }
+
+    @SuppressWarnings("static-method")
+    public StmtTableScan getTableScan() {
+        return null;
+    }
 }

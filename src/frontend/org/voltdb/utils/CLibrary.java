@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,9 @@ package org.voltdb.utils;
 
 import org.voltcore.logging.VoltLogger;
 import com.sun.jna.Native;
+import sun.misc.SharedSecrets;
+
+import java.io.FileDescriptor;
 
 public class CLibrary {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -65,4 +68,5 @@ public class CLibrary {
     }
 
     public static native final int getpid();
+
 }

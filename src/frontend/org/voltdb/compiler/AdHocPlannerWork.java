@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,7 @@
 
 package org.voltdb.compiler;
 
-import java.util.List;
-
+import org.voltcore.network.Connection;
 import org.voltdb.CatalogContext;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -28,39 +27,107 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
 
     final String sqlBatchText;
     final String[] sqlStatements;
-    final Object partitionParam;
+    final Object[] userParamSet;
     final CatalogContext catalogContext;
-    final boolean allowParameterization;
-    final boolean inferSinglePartition;
-    final ProcedureInvocationType type;
-    final long originalTxnId;
-    final long originalUniqueId;
-    private boolean isExplainWork = false;
+    final boolean inferPartitioning;
+    // The user partition key is usually null
+    // -- otherwise, it contains one element to support @AdHocSpForTest and
+    // ad hoc statements queued within single-partition stored procs.
+    final Object[] userPartitionKey;
+    public final ProcedureInvocationType type;
+    public final long originalTxnId;
+    public final long originalUniqueId;
+    public final boolean isExplainWork;
 
-    public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
-            long connectionId, String hostname, boolean adminConnection, Object clientData,
-            String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
-            boolean allowParameterization, final boolean inferSinglePartition,
+    public AdHocPlannerWork(long replySiteId, long clientHandle, long connectionId,
+            boolean adminConnection, Connection clientConnection,
+            String sqlBatchText, String[] sqlStatements,
+            Object[] userParamSet, CatalogContext context, boolean isExplain,
+            boolean inferPartitioning, Object[] userPartitionKey,
             ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
-        super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
-              adminConnection, clientData, completionHandler);
+        super(replySiteId, false, clientHandle, connectionId,
+              clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
+              adminConnection, clientConnection, completionHandler);
         this.sqlBatchText = sqlBatchText;
-        this.sqlStatements = sqlStatements.toArray(new String[sqlStatements.size()]);
-        this.partitionParam = partitionParam;
+        this.sqlStatements = sqlStatements;
+        this.userParamSet = userParamSet;
         this.catalogContext = context;
-        this.allowParameterization = allowParameterization;
-        this.inferSinglePartition = inferSinglePartition;
+        this.isExplainWork = isExplain;
+        this.inferPartitioning = inferPartitioning;
+        this.userPartitionKey = userPartitionKey;
         this.type = type;
         this.originalUniqueId = originalUniqueId;
         this.originalTxnId = originalTxnId;
     }
 
+    /**
+     * A mutated clone method, allowing override of completionHandler and
+     * clearing of (obsolete) catalogContext
+     */
+    public static AdHocPlannerWork rework(AdHocPlannerWork orig,
+            AsyncCompilerWorkCompletionHandler completionHandler) {
+        return new AdHocPlannerWork(orig.replySiteId,
+                orig.clientHandle,
+                orig.connectionId,
+                orig.adminConnection,
+                (Connection) orig.clientData,
+                orig.sqlBatchText,
+                orig.sqlStatements,
+                orig.userParamSet,
+                null /* context */,
+                orig.isExplainWork,
+                orig.inferPartitioning,
+                orig.userPartitionKey,
+                orig.type,
+                orig.originalTxnId,
+                orig.originalUniqueId,
+                completionHandler);
+        }
+
+    /**
+     * Special factory of a mostly mocked up instance for calling from inside a stored proc.
+     * It's also convenient for simple tests that need to mock up a quick planner request to
+     * test related parts of the system.
+     */
+    public static AdHocPlannerWork makeStoredProcAdHocPlannerWork(long replySiteId,
+            String sql, Object[] userParams, boolean singlePartition, CatalogContext context,
+            AsyncCompilerWorkCompletionHandler completionHandler)
+    {
+        return new AdHocPlannerWork(replySiteId, 0, 0, false, null,
+            sql, new String[] { sql },
+            userParams, context, false,
+            // ??? The settings passed here for the single partition stored proc caller
+            // denote that the partitioning has already been done so something like the planner
+            // code path for @AdHocSpForTest is called for.
+            // The plan is required to be single-partition regardless of its internal logic
+            // -- EXCEPT that writes to replicated tables are strictly forbdden -- and there
+            // should be no correlation inferred or assumed between the partitioning and the
+            // statement's constants or parameters.
+            false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
+            ProcedureInvocationType.ORIGINAL, 0, 0, completionHandler);
+    }
+
     @Override
     public String toString() {
         String retval = super.toString();
-        retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
+        if (userParamSet == null || (userParamSet.length == 0)) {
+            retval += "\n  user params: empty";
+        } else {
+            int i = 0;
+            for (Object param : userParamSet) {
+                i++;
+                retval += String.format("\n  user param[%d]: %s",
+                                        i, (param == null ? "null" : param.toString()));
+            }
+        }
+        if (userPartitionKey == null) {
+            retval += "\n  user partitioning: none";
+        } else {
+            retval += "\n  user partitioning: " +
+                      (userPartitionKey[0] == null ? "null" : userPartitionKey[0].toString());
+    }
         assert(sqlStatements != null);
         if (sqlStatements.length == 0) {
             retval += "\n  sql: empty";
@@ -74,11 +141,4 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         return retval;
     }
 
-    public void setIsExplainWork() {
-        isExplainWork = true;
-    }
-
-    public boolean isExplainWork() {
-        return isExplainWork;
-    }
 }

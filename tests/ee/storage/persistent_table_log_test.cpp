@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -313,6 +313,38 @@ TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
     ASSERT_EQ( m_table->activeTupleCount(), 10);
     m_engine->undoUndoToken(INT64_MIN + 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
+}
+
+TEST_F(PersistentTableLogTest, FindBlockTest) {
+    initTable(true);
+    const int blockSize = m_table->getTableAllocationSize();
+    TBBucketPtr bucket(new TBBucket());
+
+    // these will be used as artificial tuple block addresses
+    TBPtr block1(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
+    TBPtr block2(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
+    TBPtr block3(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
+
+    TBMap blocks;
+    char *base = block1->address();
+
+    // block2 is adjacent to block1, block3 is 1 block away from block2
+    blocks.insert(base,                 block1);
+    blocks.insert(base + blockSize,     block2);
+    blocks.insert(base + blockSize * 3, block3);
+
+    // in the middle but land on a missing boundary
+    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 2, blocks, blockSize).get(), NULL);
+    // past the end but on a boundary
+    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4, blocks, blockSize).get(), NULL);
+
+    // the following tuples should be found in the map
+    ASSERT_EQ(PersistentTable::findBlock(base,                     blocks, blockSize)->address(),
+              block1->address());
+    ASSERT_EQ(PersistentTable::findBlock(base + blockSize - 1,     blocks, blockSize)->address(),
+              block1->address());
+    ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4 - 1, blocks, blockSize)->address(),
+              block3->address());
 }
 
 int main() {

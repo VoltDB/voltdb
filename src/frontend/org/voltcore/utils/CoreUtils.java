@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltcore.utils;
 
 import java.io.ByteArrayOutputStream;
@@ -37,25 +38,62 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.base.*;
+import jsr166y.LinkedTransferQueue;
 
-import com.google_voltpatches.common.util.concurrent.*;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.network.ReverseDNSCache;
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+
+    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
+
+    public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
+        @Override
+        public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) { return false; }
+        @Override
+        public boolean isCancelled() { return false;  }
+        @Override
+        public boolean isDone() { return true; }
+        @Override
+        public Object get() { return null; }
+        @Override
+        public Object get(long timeout, TimeUnit unit) { return null; }
+    };
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -251,12 +289,16 @@ public class CoreUtils {
                     @Override
                     public void run() {
                         if (core != null) {
-                            PosixJNAAffinity.INSTANCE.setAffinity(core);
+                            // Remove Affinity for now to make this dependency dissapear from the client.
+                            // Goal is to remove client dependency on this class in the medium term.
+                            //PosixJNAAffinity.INSTANCE.setAffinity(core);
                         }
                         try {
                             r.run();
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
+                        } finally {
+                            m_threadLocalDeallocator.run();
                         }
                     }
                 };
@@ -312,7 +354,7 @@ public class CoreUtils {
                         }
                     }
                 }
-            }, 3600, TimeUnit.SECONDS);
+            }, 1, TimeUnit.DAYS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,
@@ -470,19 +512,22 @@ public class CoreUtils {
         }
     }
 
-    /*
+    /**
      * A helper for retrying tasks asynchronously returns a settable future
-     * that can be used to attempt to cancel the task
+     * that can be used to attempt to cancel the task.
      *
      * The first executor service is used to schedule retry attempts
      * The second is where the task will be subsmitted for execution
      * If the two services are the same only the scheduled service is used
+     *
+     * @param maxAttempts It is the number of total attempts including the first one.
+     * If the value is 0, that means there is no limit.
      */
     public static final<T>  ListenableFuture<T> retryHelper(
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
-            final Long maxAttempts,
+            final long maxAttempts,
             final long startInterval,
             final TimeUnit startUnit,
             final long maxInterval,
@@ -504,7 +549,7 @@ public class CoreUtils {
                     retval.set(callable.call());
                 } catch (RetryException e) {
                     //Now schedule a retry
-                    retryHelper(ses, es, callable, maxAttempts, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
+                    retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
                 } catch (Exception e) {
                     retval.setException(e);
                 }
@@ -517,13 +562,18 @@ public class CoreUtils {
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
-            final Long maxAttempts,
+            final long maxAttempts,
             final long startInterval,
             final TimeUnit startUnit,
             final long maxInterval,
             final TimeUnit maxUnit,
             final long ii,
             final SettableFuture<T> retval) {
+        if (maxAttempts == 0) {
+            retval.setException(new RuntimeException("Max attempts reached"));
+            return;
+        }
+
         long intervalMax = maxUnit.toMillis(maxInterval);
         final long interval = Math.min(intervalMax, startUnit.toMillis(startInterval) * 2);
         ses.schedule(new Runnable() {
@@ -537,7 +587,7 @@ public class CoreUtils {
                         try {
                             retval.set(callable.call());
                         } catch (RetryException e) {
-                            retryHelper(ses, es, callable, maxAttempts, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
+                            retryHelper(ses, es, callable, maxAttempts - 1, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
                         } catch (Exception e3) {
                             retval.setException(e3);
                         }

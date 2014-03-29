@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,7 +63,10 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -75,15 +78,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable
+class VoltNetwork implements Runnable, IOStatsIntf
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -92,6 +95,7 @@ class VoltNetwork implements Runnable
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
+    private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
     private final String m_coreBindId;
 
@@ -188,6 +192,7 @@ class VoltNetwork implements Runnable
                     return port;
                 } finally {
                     m_ports.add(port);
+                    m_numPorts.incrementAndGet();
                 }
             }
         };
@@ -223,6 +228,7 @@ class VoltNetwork implements Runnable
                             selectionKey.cancel();
                         } finally {
                             m_ports.remove(port);
+                            m_numPorts.decrementAndGet();
                         }
                     }
                 } finally {
@@ -270,7 +276,9 @@ class VoltNetwork implements Runnable
     @Override
     public void run() {
         if (m_coreBindId != null) {
-            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+            // Remove Affinity for now to make this dependency dissapear from the client.
+            // Goal is to remove client dependency on this class in the medium term.
+            //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
             while (m_shouldStop == false) {
@@ -306,8 +314,9 @@ class VoltNetwork implements Runnable
                         }
 
                         if (m_networkId == 0) {
-                            if (EstTimeUpdater.update(System.currentTimeMillis())) {
-                                m_logger.warn("Network was more than two seconds late in updating the estimated time");
+                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                            if ( delta != null ) {
+                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
                             }
                         }
                     }
@@ -322,6 +331,7 @@ class VoltNetwork implements Runnable
             try {
                 p_shutdown();
             } catch (Throwable t) {
+                m_logger.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
@@ -335,8 +345,8 @@ class VoltNetwork implements Runnable
             if (port != null) {
                 try {
                     getUnregisterRunnable(port).run();
-                } catch (Exception e) {
-                    networkLog.error("Exception unregisering port " + port, e);
+                } catch (Throwable e) {
+                    networkLog.error("Exception unregistering port " + port, e);
                 }
             }
         }
@@ -379,6 +389,7 @@ class VoltNetwork implements Runnable
             key.interestOps (port.interestOps());
         } else {
             m_ports.remove(port);
+            m_numPorts.decrementAndGet();
         }
     }
 
@@ -394,8 +405,12 @@ class VoltNetwork implements Runnable
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            if (e instanceof IOException) {
-                m_logger.trace( "VoltPort died, probably of natural causes", e);
+            final String trimmed = e.getMessage() == null ? "" : e.getMessage().trim();
+            if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
+                    e instanceof AsynchronousCloseException ||
+                    e instanceof ClosedChannelException ||
+                    e instanceof ClosedByInterruptException) {
+                m_logger.debug( "VoltPort died, probably of natural causes", e);
             } else {
                 e.printStackTrace();
                 networkLog.error( "VoltPort died due to an unexpected exception", e);
@@ -456,7 +471,8 @@ class VoltNetwork implements Runnable
             return retval;
     }
 
-    Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
+    @Override
+    public Future<Map<Long, Pair<String, long[]>>> getIOStats(final boolean interval) {
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {
@@ -479,5 +495,9 @@ class VoltNetwork implements Runnable
     void queueTask(Runnable r) {
         m_tasks.offer(r);
         m_selector.wakeup();
+    }
+
+    int numPorts() {
+        return m_numPorts.get();
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,8 +63,8 @@ class TheHashinator {
         case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
         {
-            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
-                    ValuePeeker::peekObjectLength(value));
+            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(value)),
+                    ValuePeeker::peekObjectLength_withoutNull(value));
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",

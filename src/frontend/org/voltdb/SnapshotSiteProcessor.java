@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -167,7 +167,6 @@ public class SnapshotSiteProcessor {
     private Map<Integer, TableStreamer> m_streamers = null;
 
     private long m_lastSnapshotTxnId;
-    private int m_lastSnapshotNumHosts;
     private final int m_snapshotPriority;
 
     private boolean m_lastSnapshotSucceded = true;
@@ -263,9 +262,10 @@ public class SnapshotSiteProcessor {
 
     private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
-        return new BBContainer(origin.b, origin.address) {
+        return new BBContainer(origin.b()) {
             @Override
             public void discard() {
+                checkDoubleFree();
                 origin.discard();
                 m_availableSnapshotBuffers.incrementAndGet();
 
@@ -355,7 +355,6 @@ public class SnapshotSiteProcessor {
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
-            int numHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
@@ -363,7 +362,6 @@ public class SnapshotSiteProcessor {
         m_quietUntil = now + 200;
         m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
-        m_lastSnapshotNumHosts = numHosts;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
@@ -618,7 +616,6 @@ public class SnapshotSiteProcessor {
             if (IamLast) {
                 SNAP_LOG.debug("I AM LAST!");
                 final long txnId = m_lastSnapshotTxnId;
-                final int numHosts = m_lastSnapshotNumHosts;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
                         m_exportSequenceNumbersToLogOnCompletion;
                 m_exportSequenceNumbersToLogOnCompletion = null;
@@ -665,7 +662,6 @@ public class SnapshotSiteProcessor {
                             try {
                                 logSnapshotCompleteToZK(
                                         txnId,
-                                        numHosts,
                                         m_lastSnapshotSucceded,
                                         exportSequenceNumbers);
                             } finally {
@@ -700,7 +696,6 @@ public class SnapshotSiteProcessor {
 
     private static void logSnapshotCompleteToZK(
             long txnId,
-            int numHosts,
             boolean snapshotSuccess,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -232,7 +233,14 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        try {
+            return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testExtraClasses() {
@@ -244,18 +252,59 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkImportValidity("你rg.voltdb.V*"));
         assertTrue(checkImportValidity("org.我不爱你.V*"));
         assertFalse(checkImportValidity("org.1我不爱你.V*"));
-        assertTrue(checkImportValidity("org"));
+        assertFalse(checkImportValidity("org"));
         assertTrue(checkImportValidity("*org"));
         assertTrue(checkImportValidity("org.**.RealVoltDB"));
         assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
+        assertTrue(checkImportValidity("org.voltdb.RealVoltDB"));
+    }
+
+    boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
+        File jarOut = new File("checkImportValidity.jar");
+        jarOut.deleteOnExit();
+
+        String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
+        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
+        schemaFile1.deleteOnExit();
+
+        String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
+        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaFile2.deleteOnExit();
+
+        // compile and fail on bad import
+        VoltCompiler compiler = new VoltCompiler();
+        try {
+            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return rslt;
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return false;
+        }
+    }
+
+    public void testExtraClassesFrom2Ddls() {
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.voltdb.V**", false));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb.**", "org.voltdb.V**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.**", true));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb.*", "org.voltdb.V**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.V**", "org.woltdb.*", true));
+        assertFalse(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.*", false));
+        assertFalse(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.woltdb", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db.RealVoltDB", "org.voltdb.RealVoltDB", false));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb.RealVoltDB", "org.voltdb.RealVoltDB", false));
     }
 
     public void testIndexedMinMaxViews() {
         File jarOut = new File("indexedMinMaxViews.jar");
         jarOut.deleteOnExit();
 
-        // no indexes (should produce warnings)
-        String schema1 =
+        String schema[] = {
+                // no indexes (should produce warnings)
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                 "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
@@ -264,14 +313,14 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T " +
-                "GROUP BY D1 + D2, ABS(D3);";
+                "GROUP BY D1 + D2, ABS(D3);",
 
-        // schema with indexes (should have no warnings)
-        String schema2 =
+                // schema with indexes (should have no warnings)
                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                "CREATE INDEX T_TREE_1 ON T(D1);\n" +
                "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
-               "CREATE INDEX T_TREE_3 ON T(D1 + D2, ABS(D3));\n" +
+               "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
+               "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                "FROM T " +
@@ -279,10 +328,9 @@ public class TestDDLCompiler extends TestCase {
                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);";
+               "GROUP BY D1 + D2, ABS(D3);",
 
-        // schema with no indexes and mat view with no min / max
-        String schema3 =
+               // schema with no indexes and mat view with no min / max
                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
                "AS SELECT D1, D2, D3, COUNT(*) " +
@@ -291,17 +339,38 @@ public class TestDDLCompiler extends TestCase {
                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
                "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
                "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);";
+               "GROUP BY D1 + D2, ABS(D3);",
 
-        // schema with index but can not be used for mat view with min / max
-        String schema4 =
+                // schema with index but can not be used for mat view with min / max
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                 "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
+                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
                 "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                 "FROM T " +
-                "GROUP BY D1, D2, D3;" ;
+                "GROUP BY D1, D2, D3;",
 
+                // schemas with index but can not be used for mat view with min / max
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
+                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
+                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
+                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
+                "CREATE INDEX T_TREE_6 ON T(D1, D2-D3);\n" +
+                "CREATE INDEX T_TREE_7 ON T(D1, D2-D3, D3, D2);\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2-D3, D3;",
+        };
+
+        int expectWarning[] = { 2, 0, 0, 1, 2 };
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +
@@ -309,100 +378,39 @@ public class TestDDLCompiler extends TestCase {
                 "<schema path='%s' />" +
                 "</schemas></database></project>";
 
-        // RUN EXPECTING WARNINGS
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
-
-        // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
 
-        // verify the warnings exist
-        int foundWarnings = 0;
-        for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("min")) {
-                System.out.println(f.message);
-                foundWarnings++;
+            File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                    String.format(simpleProject, schemaPath));
+            String projectPath = projectFile.getPath();
+
+            // compile successfully (but with two warnings hopefully)
+            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            assertTrue(success);
+
+            // verify the warnings exist
+            int foundWarnings = 0;
+            for (VoltCompiler.Feedback f : compiler.m_warnings) {
+                if (f.message.toLowerCase().contains("min")) {
+                    System.out.println(f.message);
+                    foundWarnings++;
+                }
             }
-        }
-        assertEquals(2, foundWarnings);
-
-        // cleanup after the test
-        jarOut.delete();
-
-        // RUN EXPECTING NO WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaPath = schemaFile.getPath();
-
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
-
-        // don't reinitialize the compiler to test that it can be re-called
-        //compiler = new VoltCompiler();
-
-        // compile successfully with no warnings
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
-
-        // verify no warnings
-        assertEquals(0, compiler.m_warnings.size());
-
-        // cleanup after the test
-        jarOut.delete();
-
-        // RUN EXPECTING NO WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema3);
-        schemaPath = schemaFile.getPath();
-
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
-
-        // don't reinitialize the compiler to test that it can be re-called
-        //compiler = new VoltCompiler();
-
-        // compile successfully with no warnings
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
-
-        // verify no warnings
-        assertEquals(0, compiler.m_warnings.size());
-
-        // cleanup after the test
-        jarOut.delete();
-
-        // RUN EXPECTING WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema4);
-        schemaPath = schemaFile.getPath();
-
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
-
-        // don't reinitialize the compiler to test that it can be re-called
-        //compiler = new VoltCompiler();
-
-        // compile successfully with no warnings
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
-
-        // verify the warnings exist
-        foundWarnings = 0;
-        for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("min")) {
-                System.out.println(f.message);
-                foundWarnings++;
+            if (expectWarning[ii] != foundWarnings) {
+                if (expectWarning[ii] > foundWarnings) {
+                    System.out.println("Missed expected warning(s) for schema:");
+                } else {
+                    System.out.println("Unexpected warning(s) for schema:");
+                }
+                System.out.println(schema[ii]);
             }
-        }
-        assertEquals(1, foundWarnings);
+            assertEquals(expectWarning[ii], foundWarnings);
 
-        // cleanup after the test
-        jarOut.delete();
+            // cleanup after the test
+            jarOut.delete();
+        }
     }
 }

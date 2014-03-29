@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,10 +33,10 @@ public interface InputHandler {
      * read stream. If a discrete unit of work is available, copy those bytes
      * (via NIOReadStream.getBytes()) to a new byte buffer and return them.
      *
-     * @param c
+     * @param inputStream
      * @return ByteBuffer containing the message data
      */
-    ByteBuffer retrieveNextMessage(Connection c) throws IOException;
+    ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
      * Handle the incoming message produced by retrieve next message

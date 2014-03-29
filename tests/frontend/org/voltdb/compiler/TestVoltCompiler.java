@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,6 +52,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -381,7 +382,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(builder.compile("/tmp/snapshot_settings_test.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true, false);
@@ -411,7 +412,7 @@ public class TestVoltCompiler extends TestCase {
             boolean success = project.compile("/tmp/exportsettingstest.jar");
             assertTrue(success);
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
 
@@ -444,7 +445,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true, false);
@@ -695,7 +696,7 @@ public class TestVoltCompiler extends TestCase {
 
         final Catalog c1 = compiler.getCatalog();
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -880,13 +881,42 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-        final Catalog catalog = compiler1.compileCatalog(projectPath);
+        final Catalog catalog = compileCatalogFromProject(compiler1, projectPath);
         final String cat1 = catalog.serialize();
         final boolean success = compiler2.compileWithProjectXML(projectPath, testout_jar);
-        final String cat2 = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         assertTrue(success);
         assertTrue(cat1.compareTo(cat2) == 0);
+    }
+
+    private Catalog compileCatalogFromProject(
+            final VoltCompiler compiler,
+            final String projectPath)
+    {
+        try {
+            return compiler.compileCatalogFromProject(projectPath);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return null;
+        }
+    }
+
+    private boolean compileFromDDL(
+            final VoltCompiler compiler,
+            final String jarPath,
+            final String... schemaPaths)
+    {
+        try {
+            return compiler.compileFromDDL(jarPath, schemaPaths);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testDDLTableTooManyColumns() throws IOException {
@@ -955,7 +985,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
 
-        final String sql = VoltCompiler.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
+        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
         assertNotNull(sql);
     }
 
@@ -992,7 +1022,7 @@ public class TestVoltCompiler extends TestCase {
         //System.out.println("PRINTING Catalog 1");
         //System.out.println(c1.serialize());
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1032,7 +1062,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1076,7 +1106,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1218,7 +1248,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1257,7 +1287,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1299,7 +1329,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1370,6 +1400,16 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
+    public void testDDLCompilerLeadingCommentAndHashMarks() throws IOException {
+        final String s =
+            "-- ### this is a leading comment\n" +
+            "  -- with some ### leading whitespace\n" +
+            "     create table t(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
     public void testDDLCompilerNoNewlines() throws IOException {
         final String s =
             "create table t(id integer); create table r(id integer);";
@@ -1402,6 +1442,15 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerTrailingComment2() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
+            ";\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingCommentAndHashMarks() throws IOException {
+        final String s =
+            "create table t(id varchar(128) default '###')  -- ### this ###### is a trailing comment\n" +
             ";\n";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
@@ -1789,7 +1838,6 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
-
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
@@ -1994,12 +2042,59 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMatView()
     {
         // Test MatView.
-        String ddl = "";
-        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+        String ddl;
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total, sumwage) " +
+                "as select num, count(*), sum(wage) from t group by num; \n" +
+
+                "create view my_view2 (num, total, sumwage) " +
+                "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
+        checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+    }
+
+    public void testDDLCompilerTableLimit()
+    {
+        String ddl;
+
+        // test failed cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
+        checkDDLErrorMessage(ddl, "unexpected token: XX");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);";
+        checkDDLErrorMessage(ddl, "incompatible data type in operation");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);";
+        checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
+        checkDDLErrorMessage(ddl, "Too many table limit constraints for table T");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT Rows 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
+
+
+        // Test success cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table t(id integer not null, num integer," +
+                "LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
     }
 
     public void testPartitionOnBadType() {
@@ -2423,6 +2518,206 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
+    public void testInvalidGtroovyProcedureDDL() throws Exception {
+        ArrayList<Feedback> fbs;
+        String expectedError;
+
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "user lacks privilege or object not found: PKEY";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    \n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block has syntax errors";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    runMeInstead = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "package voltkv.procedures;\n" +
+                "\n" +
+                "import org.voltdb.*;\n" +
+                "\n" +
+                "@ProcInfo(partitionInfo=\"store.key:0\", singlePartition=true)\n" +
+                "public class Put extends VoltProcedure {\n" +
+                "    // Checks if key exists\n" +
+                "    public final SQLStmt checkStmt = new SQLStmt(\"SELECT key FROM store WHERE key = ?;\");\n" +
+                "    // Updates a key/value pair\n" +
+                "    public final SQLStmt updateStmt = new SQLStmt(\"UPDATE store SET value = ? WHERE key = ?;\");\n" +
+                "    // Inserts a key/value pair\n" +
+                "    public final SQLStmt insertStmt = new SQLStmt(\"INSERT INTO store (key, value) VALUES (?, ?);\");\n" +
+                "\n" +
+                "    public VoltTable[] run(String key, byte[] value) {\n" +
+                "        // Check whether the pair exists\n" +
+                "        voltQueueSQL(checkStmt, key);\n" +
+                "        // Insert new or update existing key depending on result\n" +
+                "        if (voltExecuteSQL()[0].getRowCount() == 0)\n" +
+                "            voltQueueSQL(insertStmt, key, value);\n" +
+                "        else\n" +
+                "            voltQueueSQL(updateStmt, value, key);\n" +
+                "        return voltExecuteSQL(true);\n" +
+                "    }\n" +
+                "}\n" +
+                "### LANGUAGE GROOVY;\n"
+                );
+        expectedError = "Procedure \"voltkv.procedures.Put\" is not a groovy script";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = 'Is it me that you wanted instead?'\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    // ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ##\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE KROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+    }
+
+    public void testValidGroovyProcedureDDL() throws Exception {
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
+
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        Procedure proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    // #\n" +
+                "    // ##\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        def str = '# ## # ##'\n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE   \n" +
+                "PROCEDURE     Foo    \n" +
+                "  AS   \n" +
+                "###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "###\n" +
+                "   LANGUAGE   \n" +
+                "GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+    }
+
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
@@ -2474,7 +2769,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -2511,7 +2806,7 @@ public class TestVoltCompiler extends TestCase {
 
             assertTrue(success);
 
-            final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+            final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
             final Catalog c2 = new Catalog();
             c2.execute(catalogContents);
@@ -2831,13 +3126,13 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        boolean success = compileFromDDL(compiler, testout_jar, schemaPath);
         assertTrue(success);
 
-        success = compiler.compileFromDDL(testout_jar, schemaPath + "???");
+        success = compileFromDDL(compiler, testout_jar, schemaPath + "???");
         assertFalse(success);
 
-        success = compiler.compileFromDDL(testout_jar);
+        success = compileFromDDL(compiler, testout_jar);
         assertFalse(success);
     }
 

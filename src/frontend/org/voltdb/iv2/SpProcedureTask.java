@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,6 +40,15 @@ public class SpProcedureTask extends ProcedureTask
 {
     final private PartitionDRGateway m_drGateway;
 
+    private static final boolean EXEC_TRACE_ENABLED;
+    private static final boolean HOST_DEBUG_ENABLED;
+    private static final boolean HOST_TRACE_ENABLED;
+    static {
+        EXEC_TRACE_ENABLED = execLog.isTraceEnabled();
+        HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
+        HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
+    }
+
     SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
@@ -52,7 +61,8 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if (hostLog.isDebugEnabled()) {
+        waitOnDurabilityBackpressureFuture();
+        if (HOST_DEBUG_ENABLED) {
             hostLog.debug("STARTING: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -68,8 +78,10 @@ public class SpProcedureTask extends ProcedureTask
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (hostLog.isDebugEnabled()) {
+        if (EXEC_TRACE_ENABLED) {
+            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        }
+        if (HOST_DEBUG_ENABLED) {
             hostLog.debug("COMPLETE: " + this);
         }
 
@@ -105,7 +117,7 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        if (hostLog.isTraceEnabled()) {
+        if (HOST_TRACE_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -136,8 +148,10 @@ public class SpProcedureTask extends ProcedureTask
                     m_txnState.getUndoLog());
         }
         m_txnState.setDone();
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (hostLog.isTraceEnabled()) {
+        if (EXEC_TRACE_ENABLED) {
+            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        }
+        if (HOST_TRACE_ENABLED) {
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 

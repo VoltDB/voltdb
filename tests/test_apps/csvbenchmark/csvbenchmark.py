@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -203,7 +203,7 @@ def run_csvloader(schema, data_file):
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
             # report duration in milliseconds for stats collector
-            print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
+            print >>sf, "%s,%f,%d,0,0,0,0,0,0,0,0,0,0" % (schema, avg*1000.0, rowcount)
     return (rowcount, avg, stddev)
 
 def get_table_row_count(table_name):

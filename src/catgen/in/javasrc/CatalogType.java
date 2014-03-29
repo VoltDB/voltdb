@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,6 +52,9 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     // Used by the compiler report generator for now
     Object m_annotation = null;
 
+    //Attachment to store expensive to materialize state
+    Object m_attachment = null;
+
     /**
      * Gets any annotation added to this instance.
      * @return Annotation object or null.
@@ -66,6 +69,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      */
     public void setAnnotation(Object annotation) {
         m_annotation = annotation;
+    }
+
+    public Object getAttachment() {
+        return m_attachment;
+    }
+
+    public void setAttachment(Object attachment) {
+        m_attachment = attachment;
     }
 
     /**

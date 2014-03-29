@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,9 +25,6 @@ import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-
 /**
  * A class for serializing and deserializing Volt's 16-byte fixed precision and scale decimal format. The decimal's
  * are converted to/from Java's {@link java.math.BigDecimal BigDecimal} class. <code>BigDecimal</code> stores values
@@ -39,7 +36,6 @@ import org.voltdb.messaging.FastSerializer;
  *
  */
 public class VoltDecimalHelper {
-
 
     /**
      * The scale of decimals in Volt
@@ -83,14 +79,6 @@ public class VoltDecimalHelper {
         BigInteger.TEN.pow(12)
     };
 
-    /**
-     * Serialize the null decimal sigil to a the provided {@link org.voltdb.messaging.FastSerializer FastSerializer}
-     * @param out <code>FastSerializer</code> to serialize the decimal into
-     */
-    static public void serializeNull(FastSerializer out) throws IOException {
-        out.write(NULL_INDICATOR);
-    }
-
     static public byte[] getUnscaledBytes(BigDecimal bd) throws IOException {
         if (bd == null) {
             return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
@@ -116,18 +104,6 @@ public class VoltDecimalHelper {
             throw new IOException("Precision of " + bd + " is >38 digits");
         }
         return expandToLength16(unscaledValue, isNegative);
-    }
-
-    /**
-     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
-     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
-     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
-     * @throws IOException Thrown if the precision or scale is out of range
-     */
-    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
-        throws IOException
-    {
-        out.write(getUnscaledBytes(bd));
     }
 
     /**
@@ -195,29 +171,6 @@ public class VoltDecimalHelper {
     }
 
     /**
-     * Deserialize a Volt fixed precision and scale 16-byte decimal and return
-     * it as a {@link java.math.BigDecimal BigDecimal} .
-     * @param in {@link org.voltdb.messaging.FastDeserializer FastDeserializer} to read from
-     * @throws IOException Thrown by <code>FastDeserializer</code>
-     */
-    public static BigDecimal deserializeBigDecimal(FastDeserializer in)
-        throws IOException
-    {
-        byte decimalBytes[] = new byte[16];
-        in.readFully(decimalBytes);
-        if (java.util.Arrays.equals(decimalBytes, NULL_INDICATOR)) {
-            return null;
-        }
-        final BigDecimal bd = new BigDecimal(new BigInteger(decimalBytes),
-                        kDefaultScale, context);
-        if (bd.precision() > 38) {
-            throw new IOException("Decimal " + bd + " has precision > 38.");
-
-        }
-        return bd;
-    }
-
-    /**
      * Deserialize a Volt fixed precision and scale 16-byte decimal from a String representation
      * @param decimal <code>String</code> representation of the decimal
      */
@@ -263,74 +216,6 @@ public class VoltDecimalHelper {
             throw new RuntimeException("Decimal " + bd + " has more than 38 digits of precision.");
         }
         return bd;
-    }
-
-    public static void main(String args[]) throws Exception {
-        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(16);
-        java.math.BigDecimal bd = new java.math.BigDecimal("-23325.23425");
-        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, buffer);
-        buffer.flip();
-        while (buffer.hasRemaining()) {
-            System.out.println(buffer.get());
-        }
-        buffer.flip();
-        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(buffer));
-        System.out.println("----");
-        org.voltdb.messaging.FastSerializer fs = new org.voltdb.messaging.FastSerializer();
-        bd = new java.math.BigDecimal("-23325.23425");
-        org.voltdb.types.VoltDecimalHelper.serializeBigDecimal(bd, fs);
-
-        buffer = fs.getBuffer();
-        while (buffer.hasRemaining()) {
-            System.out.println(buffer.get());
-        }
-        buffer.flip();
-
-        org.voltdb.messaging.FastDeserializer fds = new org.voltdb.messaging.FastDeserializer(buffer);
-        System.out.println(org.voltdb.types.VoltDecimalHelper.deserializeBigDecimal(fds));
-
-        System.out.println("---");
-        BigInteger bi = new BigInteger(
-                new byte[] {
-                        -128, 0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        82,
-                        -34,
-                        45,
-                        77,
-                        -58,
-                        38,
-                        -128 });
-        System.out.println(bi);
-        bi = new BigInteger(
-                new byte[] {
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -83,
-                        33,
-                        -46,
-                        -78,
-                        57,
-                        -39,
-                        -128 });
-        System.out.println(bi);
-        System.out.println(new BigDecimal(
-                bi,
-                        kDefaultScale, context));
-
-        System.out.println(deserializeBigDecimal(ByteBuffer.wrap(NULL_INDICATOR)));
     }
 
     public static BigDecimal setDefaultScale(BigDecimal bd) {

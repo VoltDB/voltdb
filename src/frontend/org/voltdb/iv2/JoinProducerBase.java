@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -137,8 +137,8 @@ public abstract class JoinProducerBase extends SiteTasker {
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
-                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e.getCause());
             } catch (Exception e) {
@@ -172,4 +172,6 @@ public abstract class JoinProducerBase extends SiteTasker {
     public abstract void deliver(RejoinMessage message);
 
     public abstract TaskLog constructTaskLog(String voltroot);
+
+    public abstract void notifyOfSnapshotNonce(String nonce);
 }

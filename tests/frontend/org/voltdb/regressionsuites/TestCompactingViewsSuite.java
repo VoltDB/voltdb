@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,10 +56,6 @@ public class TestCompactingViewsSuite extends RegressionSuite {
             public void clientCallback(ClientResponse clientResponse) throws Exception {
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                     System.err.println(clientResponse.getStatusString());
-                    if (clientResponse.getException() != null) {
-                        System.err.println(clientResponse.getException().getMessage());
-                        clientResponse.getException().printStackTrace();
-                    }
                 }
 
                 assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());

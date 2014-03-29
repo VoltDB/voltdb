@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,6 +36,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -88,7 +89,7 @@ public class ZKTestBase {
                 }
                 System.out.println(event);
             }},
-            ImmutableSet.<Long>of());
+            Sets.<Long>newHashSet());
         m_clients.add(keeper);
         permit.acquire();
         return keeper;

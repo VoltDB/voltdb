@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -199,4 +199,140 @@ public class SerializationHelper {
             throw new RuntimeException("SerializationHelper.readArray called with unhandled type: " + type.getName());
         }
     }
+
+    /**
+     * Write a string in the standard VoltDB way
+     */
+    public static void writeString(String value, ByteBuffer buf) {
+        if (value == null) {
+            buf.putInt(VoltType.NULL_STRING_LENGTH);
+            return;
+        }
+
+        byte[] strbytes = value.getBytes(Constants.UTF8ENCODING);
+        int len = strbytes.length;
+
+        buf.putInt(len);
+        buf.put(strbytes);
+    }
+
+    /**
+     * Write a set of bytes in the standard VoltDB way
+     */
+    public static void writeVarbinary(byte[] bytes, ByteBuffer buf) throws IOException {
+        if (bytes == null) {
+            buf.putInt(VoltType.NULL_STRING_LENGTH);
+            return;
+        }
+
+        buf.putInt(bytes.length);
+        buf.put(bytes);
+    }
+
+    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
+        buf.putInt(values.length);
+        buf.put(values);
+    }
+
+    public static void writeArray(short[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putShort(values[i]);
+        }
+    }
+
+    public static void writeArray(int[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putInt(values[i]);
+        }
+    }
+
+    public static void writeArray(long[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putLong(values[i]);
+        }
+    }
+
+    public static void writeArray(double[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putDouble(values[i]);
+        }
+    }
+
+    public static void writeArray(TimestampType[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) buf.putLong(Long.MIN_VALUE);
+            else buf.putLong(values[i].getTime());
+        }
+    }
+
+    public static void writeArray(BigDecimal[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                VoltDecimalHelper.serializeNull(buf);
+            }
+            else {
+                VoltDecimalHelper.serializeBigDecimal(values[i], buf);
+            }
+        }
+    }
+
+    public static void writeArray(VoltTable[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null)
+                throw new IOException("Array being fastserialized can't contain null values (position " + i + ")");
+            values[i].flattenToBuffer(buf);
+        }
+    }
+
+    public static void writeArray(byte[][] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putShort((short) values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                buf.putInt(VoltType.NULL_STRING_LENGTH);
+            }
+            else {
+                writeArray(values[i], buf);
+            }
+        }
+    }
+
 }

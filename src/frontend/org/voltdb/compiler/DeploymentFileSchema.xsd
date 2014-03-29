@@ -87,6 +87,18 @@
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
+  
+    <xs:simpleType name="elasticPauseType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+      <xs:simpleType name="elasticThroughputType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
@@ -101,6 +113,13 @@
                 <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
             </xs:complexType>
         </xs:element>
+            <xs:element name="elastic" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="duration" type="elasticPauseType" default="50"/>
+                <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
+            </xs:complexType>
+        </xs:element>
+        
     </xs:all>
   </xs:complexType>
 

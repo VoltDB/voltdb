@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETUPLEADDRESSXPRESSION_H
+#ifndef HSTORETUPLEADDRESSEXPRESSION_H
 #define HSTORETUPLEADDRESSEXPRESSION_H
 
 #include "common/common.h"
@@ -75,4 +75,4 @@ class TupleAddressExpression : public AbstractExpression {
 };
 
 }
-#endif
+#endif // HSTORETUPLEADDRESSEXPRESSION_H

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,17 +77,27 @@ public:
         return value.getObjectValue();
     }
 
-    static inline int32_t peekObjectLength(const NValue value) {
+    static inline void* peekObjectValue_withoutNull(const NValue value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        return value.getObjectLength();
+        return value.getObjectValue_withoutNull();
     }
 
-    static std::string peekStringCopy(const NValue value) {
+    static inline int32_t peekObjectLength_withoutNull(const NValue value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        std::string result(reinterpret_cast<const char*>(value.getObjectValue()),
-                                                         value.getObjectLength());
+        return value.getObjectLength_withoutNull();
+    }
+
+    /**
+     * This function is only used in 'nvalue_test.cpp', why test a function that
+     * is not used in source code? Get rid of it? -xin
+     */
+    static std::string peekStringCopy_withoutNull(const NValue value) {
+        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
+               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        std::string result(reinterpret_cast<const char*>(value.getObjectValue_withoutNull()),
+                                                         value.getObjectLength_withoutNull());
         return result;
     }
 

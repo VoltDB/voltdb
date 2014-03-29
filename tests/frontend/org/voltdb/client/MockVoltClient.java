@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,6 +50,8 @@
 
 package org.voltdb.client;
 
+import static org.mockito.Mockito.doReturn;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -61,8 +63,8 @@ import java.util.List;
 import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
-
-import static org.mockito.Mockito.doReturn;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
 public class MockVoltClient implements Client, ReplicaProcCaller{
@@ -104,12 +106,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             }
 
             @Override
-            public Exception getException() {
-                // TODO Auto-generated method stub
-                return null;
-            }
-
-            @Override
             public String getStatusString() {
                 return null;
             }
@@ -132,6 +128,12 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             @Override
             public String getAppStatusString() {
                 return null;
+            }
+
+            @Override
+            public long getClientRoundtripNanos() {
+                // TODO Auto-generated method stub
+                return 0;
             }
 
         };
@@ -328,4 +330,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         // TODO Auto-generated method stub
         return null;
     }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
+        return null;
+    }
+
 }

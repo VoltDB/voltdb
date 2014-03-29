@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 import java.util.List;
 
+import com.google_voltpatches.common.base.Supplier;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
@@ -58,6 +59,7 @@ public class SpTerm implements Term
             tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas));
+
             m_mailbox.updateReplicas(replicas, null);
         }
     };
@@ -103,10 +105,15 @@ public class SpTerm implements Term
     }
 
     @Override
-    public List<Long> getInterestingHSIds()
+    public Supplier<List<Long>> getInterestingHSIds()
     {
-        List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
-        return survivors;
+        return new Supplier<List<Long>>() {
+            @Override
+            public List<Long> get() {
+                List<String> survivorsNames = m_babySitter.lastSeenChildren();
+                List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
+                return survivors;
+            }
+        };
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -107,30 +107,6 @@ const vector<AbstractPlanNode*>&
 AbstractPlanNode::getChildren() const
 {
     return m_children;
-}
-
-void
-AbstractPlanNode::addParent(AbstractPlanNode* parent)
-{
-    m_parents.push_back(parent);
-}
-
-vector<AbstractPlanNode*>&
-AbstractPlanNode::getParents()
-{
-    return m_parents;
-}
-
-vector<int32_t>&
-AbstractPlanNode::getParentIds()
-{
-    return m_parentIds;
-}
-
-const vector<AbstractPlanNode*>&
-AbstractPlanNode::getParents() const
-{
-    return m_parents;
 }
 
 // ------------------------------------------------------------------
@@ -351,27 +327,25 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     node->m_planNodeId = obj.valueForKey("ID").asInt();
 
-    PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
-    for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
-        PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-        AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
+    if (obj.hasKey("INLINE_NODES")) {
+        PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
+        for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
+            PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
+            AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
-        // todo: if this throws, new Node can be leaked.
-        // As long as newNode is not NULL, this will not throw.
-        assert(newNode);
-        node->addInlinePlanNode(newNode);
+            // todo: if this throws, new Node can be leaked.
+            // As long as newNode is not NULL, this will not throw.
+            assert(newNode);
+            node->addInlinePlanNode(newNode);
+        }
     }
 
-    PlannerDomValue parentIdsArray = obj.valueForKey("PARENT_IDS");
-    for (int i = 0; i < parentIdsArray.arrayLen(); i++) {
-        int32_t parentNodeId = parentIdsArray.valueAtIndex(i).asInt();
-        node->m_parentIds.push_back(parentNodeId);
-    }
-
-    PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
-    for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
-        int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
-        node->m_childIds.push_back(childNodeId);
+    if (obj.hasKey("CHILDREN_IDS")) {
+        PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
+        for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
+            int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
+            node->m_childIds.push_back(childNodeId);
+        }
     }
 
     // Output schema are optional -- when they can be determined by a child's copy.
@@ -379,7 +353,7 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
             node->m_outputSchema.push_back(outputColumn);
         }
         node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());

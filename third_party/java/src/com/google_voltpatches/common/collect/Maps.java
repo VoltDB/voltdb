@@ -315,8 +315,8 @@ public final class Maps {
    * @param comparator the comparator to sort the keys with
    * @return a new, empty {@code TreeMap}
    */
-  public static <C, K extends C, V> TreeMap<K, V> newTreeMap(
-      @Nullable Comparator<C> comparator) {
+  public static <K, V> TreeMap<K, V> newTreeMap(
+      @Nullable Comparator<? super K> comparator) {
     // Ideally, the extra type parameter "C" shouldn't be necessary. It is a
     // work-around of a compiler type inference quirk that prevents the
     // following code from being compiled:

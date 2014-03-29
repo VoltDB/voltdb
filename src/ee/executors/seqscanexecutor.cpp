@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
@@ -91,9 +92,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     else
     {
         // Create output table based on output schema from the plan
-        const std::string& temp_name = (!node->isSubQuery()) ?
-            node->getTargetTable()->name() :
-            node->getChildren()[0]->getOutputTable()->name();
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
         setTempOutputTable(limits, temp_name);
     }
     return true;
@@ -114,11 +115,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     assert(output_table);
 
-    Table* input_table = (!node->isSubQuery()) ?
-        dynamic_cast<Table*>(node->getTargetTable()) :
-        node->getChildren()[0]->getOutputTable();
+    Table* input_table = (node->isSubQuery()) ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
 
     assert(input_table);
+
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
                input_table->debug().c_str());
@@ -177,16 +179,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        if (!node->isSubQuery()) {
-            // Input table is the target table in this case
-            m_engine->setLastAccessedTable(input_table);
-        }
+        TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
+
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());
-            m_engine->noteTuplesProcessedForProgressMonitoring(1);
+            pmp.countdownProgress();
             //
             // For each tuple we need to evaluate it against our predicate
             //
@@ -213,28 +214,16 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                           getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    if (!output_table->insertTuple(temp_tuple))
-                    {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   input_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
-                    }
+                    output_temp_table->insertTupleNonVirtual(temp_tuple);
                 }
                 else
                 {
                     //
                     // Insert the tuple into our output table
                     //
-                    if (!output_table->insertTuple(tuple)) {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   input_table->name().c_str(),
-                                   output_table->name().c_str());
-                        return false;
-                    }
+                    output_temp_table->insertTupleNonVirtual(tuple);
                 }
+                pmp.countdownProgress();
             }
         }
     }

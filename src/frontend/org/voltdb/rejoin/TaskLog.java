@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,14 +41,6 @@ public interface TaskLog {
     public TransactionInfoBaseMessage getNextMessage() throws IOException;
 
     /**
-     * Sets the earliest transaction ID so that any messages returned later will
-     * have a transaction ID larger than this.
-     *
-     * @param txnId
-     */
-    public void setEarliestTxnId(long txnId);
-
-    /**
      * If the queue is empty
      * @return
      */
@@ -59,4 +51,11 @@ public interface TaskLog {
      * @throws IOException
      */
     public void close() throws IOException;
+
+    /**
+     * Default policy at startup is to drop invocations until recording is necessary
+     * When used for live rejoin the first SnapshotSave plan fragment triggers the start
+     * of recording of transactions for the live rejoin
+     */
+    public void enableRecording();
 }

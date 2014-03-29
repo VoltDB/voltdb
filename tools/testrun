@@ -23,7 +23,7 @@ CONFIG="$PROG.cfg"
 TEMPLATE="$PROGPATH.cfg.template"
 
 if [ ! -f run.sh ]; then
-    echo "* Run from a test or example directory, e.g. one with a run.sh. *"
+    echo "* Run from a test or example directory, e.g. one with a run.sh. *" 1>&2
     exit 1
 fi
 
@@ -38,15 +38,29 @@ findroot()
 expand_config_template()
 {
     local template=$1
-    export APPNAME=$(awk 'match($0,/APPNAME="?([a-zA-Z0-9_]+)"?/,m){print m[1];}' < run.sh)
+    local config=$2
+    export APPNAME=$(awk '
+        /APPNAME\s*=/ {
+            split($0,a,"=");
+            s=a[2];
+            gsub(/"/,"",s);
+            gsub(/^\s*/,"",s);
+            gsub(/\s*$/,"",s);
+            print s
+        }' < run.sh)
     export VOLTDB_HOME=$(findroot)
     if [ -z "$VOLTDB_HOME" ]; then
-        echo "* Could not find source root directory. *"
+        echo "* Could not find source root directory. *" 1>&2
         exit 1
     fi
-    export VOLTDB_DIST="$VOLTDB_HOME/obj/release/dist"
-    if [ ! -d "$VOLTDB_DIST" ]; then
-        echo "* $VOLTDB_DIST does not exist. *"
+    unset VOLTDB_DIST 2> /dev/null
+    if [ -d "$VOLTDB_HOME/obj/debug/dist" ]; then
+        VOLTDB_DIST="$VOLTDB_HOME/obj/debug/dist"
+    elif [ -d "$VOLTDB_HOME/obj/release/dist" ]; then
+        VOLTDB_DIST="$VOLTDB_HOME/obj/release/dist"
+    fi
+    if [ -z "$VOLTDB_DIST" ]; then
+        echo "* No distribution was found under $VOLTDB_HOME/obj. *" 1>&2
         exit 1
     fi
     export CLASSPATH_BASE=$({ \
@@ -62,12 +76,12 @@ expand_config_template()
             var=substr($0,RSTART+2,RLENGTH -3)
             gsub("[$]{"var"}",ENVIRON[var])
         }
-    }1' < "$template"
+    }1' < "$template" > "$config"
 }
 
 if [ ! -f "$CONFIG" ]; then
     echo "Generating \"$CONFIG\" (edit before restarting)..."
-    expand_config_template "$TEMPLATE" > "$CONFIG"
+    expand_config_template "$TEMPLATE" "$CONFIG"
     exit 1
 fi
 
@@ -95,13 +109,13 @@ TEST_server()
 {
     buildcatalog
     initserver "$@"
-    $VOLTDB create catalog $CREATEJAR deployment $DEPFILE license $LICENSE host $LEADERHOST 2>&1 | tee output.txt
+    $VOLTDB create -d $DEPFILE -l $LICENSE -H $LEADERHOST $CREATEJAR 2>&1 | tee output.txt
 }
 
 TEST_replica()
 {
     initdir replica
-    $VOLTDB replica catalog $REPLICAJAR deployment $DEPFILE license $LICENSE host $REPLICAHOST 2>&1 | tee output.txt
+    $VOLTDB replica -d $DEPFILE -l $LICENSE -H $REPLICAHOST $REPLICAJAR 2>&1 | tee output.txt
 }
 
 TEST_client()
@@ -241,7 +255,7 @@ initdir()
 usedir()
 {
     if [ ! -d "$1" ]; then
-        echo "* Subdirectory \"$1\" does not exist. *"
+        echo "* Subdirectory \"$1\" does not exist. *" 1>&2
         exit 1
     fi
     cd $1

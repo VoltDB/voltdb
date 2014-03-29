@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -98,7 +98,8 @@ public class NodeSchema
         Integer index = m_columnsMapHelper.get(col);
         if (index != null) {
             return index.intValue();
-        }        return -1;
+        }
+        return -1;
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they
@@ -143,6 +144,23 @@ public class NodeSchema
         {
             copy.addColumn(m_columns.get(i).clone());
         }
+        return copy;
+    }
+
+    public NodeSchema replaceTableClone(String tableAlias) {
+        NodeSchema copy = new NodeSchema();
+        for (int i = 0; i < m_columns.size(); ++i)
+        {
+            SchemaColumn col = m_columns.get(i);
+            String colAlias = col.getColumnAlias();
+
+            TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
+            tve.setValueType(col.getType());
+            tve.setValueSize(col.getSize());
+            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve);
+            copy.addColumn(sc);
+        }
+
         return copy;
     }
 

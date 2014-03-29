@@ -33,10 +33,10 @@ package org.hsqldb_voltpatches.rights;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
@@ -883,7 +883,7 @@ public final class Right {
     }
 
     /**
-     * Used solely by org.hsqldb.dbinfo in existing system tables lacking column
+     * Used solely by org.hsqldb_voltpatches.dbinfo in existing system tables lacking column
      * level reporting.<p>
      *
      * Returns names of individual rights instead of ALL

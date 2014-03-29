@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,8 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
@@ -51,6 +53,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * all PlanNodes will have a unique id
      */
     private static int NEXT_PLAN_NODE_ID = 1;
+
+    // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
+    // using EXPLAIN output to validate plans.
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
+    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    public static boolean disableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = false;
+        return was;
+    }
+    public static void restoreVerboseExplainForDebugging(boolean was) { m_verboseExplainForDebugging = was; }
 
     /*
      * IDs only need to be unique for a single plan.
@@ -225,40 +239,46 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    /**
-     * Recursively build a set of table aliases read by the (sub)plan or (sub)plan fragment
-     * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, Collection, Collection)}
-     *
-     * @param tableAliasesRead Set of table aliases read potentially added to at each recursive level.
-     */
-    public final void getTablesReadByFragment(Collection<String> tableAliasesRead)
+    public boolean hasReplicatedResult()
     {
-        Collection<String> tablesRead = new ArrayList<String>();
-        getTablesAndIndexes(tablesRead, tableAliasesRead, null, null, null);
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
+        getTablesAndIndexes(tablesRead, null);
+        for (StmtTableScan tableScan : tablesRead.values()) {
+            if ( ! tableScan.getIsReplicated()) {
+                return false;
+            }
+        }
+        return true;
     }
+
     /**
-     * Recursively build sets of read and updated tables, their aliases, as well as used indexes.
+     * Recursively build sets of read tables read and index names used.
      *
-     * @param tablesRead Set of table names read potentially added to at each recursive level.
-     * @param tableAliasesRead Set of table aliases read potentially added to at each recursive level.
-     * @param tablesUpdated Set of table names updated/inserted into/deleted
-     * potentially added to at each recursive level.
-     * @param tableAliasesUpdated Set of table aliases updated/inserted into/deleted
-     * potentially added to at each recursive level.
-     * @param indexes Set of indexes potentially added to at each recursive level.
-     * so that the sets will reflect the plan's other fragment.
-     * Only the current fragment is of interest when called from the PlanAssembler.
+     * @param tablesRead Set of table aliases read potentially added to at each recursive level.
+     * @param indexes Set of index names used in the plan tree
+     * Only the current fragment is of interest.
      */
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableAliasesRead,
-                                    Collection<String> tablesUpdated, Collection<String> tableAliasesUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
         for (AbstractPlanNode node : m_inlineNodes.values()) {
-            node.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, indexes);
         }
         for (AbstractPlanNode node : m_children) {
-            node.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, indexes);
         }
+    }
+
+    /**
+     * Recursively find the target table name for a DML statement.
+     * The name will be attached to the AbstractOperationNode child
+     * of a Send Node, in all cases, so the "recursion" can be very limited.
+     * Most plan nodes can quickly stub out this recursion and return null.
+     * @return
+     */
+    @SuppressWarnings("static-method")
+    public String getUpdatedTable() {
+        return null;
     }
 
     /**
@@ -272,22 +292,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode child : m_children) {
             if (! child.isOrderDeterministic()) {
                 m_nondeterminismDetail = child.m_nondeterminismDetail;
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return
-     */
-    public boolean isContentDeterministic() {
-        // Leaf nodes need to re-implement this test.
-        assert(m_children != null);
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isContentDeterministic()) {
                 return false;
             }
         }
@@ -711,7 +715,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // id -> child_id;
 
         sb.append(m_id).append(" [label=\"").append(m_id).append(": ").append(getPlanNodeType()).append("\" ");
-        sb.append(getValueTypeDotString(this));
+        sb.append(getValueTypeDotString());
         sb.append("];\n");
         for (AbstractPlanNode node : m_inlineNodes.values()) {
             sb.append(m_id).append(" -> ").append(node.getPlanNodeId().intValue()).append(";\n");
@@ -725,9 +729,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     // maybe not worth polluting
-    private String getValueTypeDotString(AbstractPlanNode pn) {
-        PlanNodeType pnt = pn.getPlanNodeType();
-        if (pn.isInline()) {
+    private String getValueTypeDotString() {
+        PlanNodeType pnt = getPlanNodeType();
+        if (isInline()) {
             return "fontcolor=\"white\" style=\"filled\" fillcolor=\"red\"";
         }
         if (pnt == PlanNodeType.SEND || pnt == PlanNodeType.RECEIVE) {
@@ -756,40 +760,42 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.ID.name()).value(m_id);
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
-        stringer.key(Members.INLINE_NODES.name()).array();
 
+        if (m_inlineNodes.size() > 0) {
+            stringer.key(Members.INLINE_NODES.name()).array();
 
-        PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
-        int i = 0;
-        for (PlanNodeType type : m_inlineNodes.keySet()) {
-            types[i++] = type;
+            PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
+            int i = 0;
+            for (PlanNodeType type : m_inlineNodes.keySet()) {
+                types[i++] = type;
+            }
+            Arrays.sort(types);
+            for (PlanNodeType type : types) {
+                AbstractPlanNode node = m_inlineNodes.get(type);
+                assert(node != null);
+                assert(node instanceof JSONString);
+                stringer.value(node);
+            }
+            stringer.endArray();
         }
-        Arrays.sort(types);
-        for (PlanNodeType type : types) {
-            AbstractPlanNode node = m_inlineNodes.get(type);
-            assert(node != null);
-            assert(node instanceof JSONString);
-            stringer.value(node);
-        }
-        stringer.endArray();
 
-        stringer.key(Members.CHILDREN_IDS.name()).array();
-        for (AbstractPlanNode node : m_children) {
-            stringer.value(node.getPlanNodeId().intValue());
+        if (m_children.size() > 0) {
+            stringer.key(Members.CHILDREN_IDS.name()).array();
+            for (AbstractPlanNode node : m_children) {
+                stringer.value(node.getPlanNodeId().intValue());
+            }
+            stringer.endArray();
         }
-        stringer.endArray().key(Members.PARENT_IDS.name()).array();
 
-        for (AbstractPlanNode node : m_parents) {
-            stringer.value(node.getPlanNodeId().intValue());
-        }
-        stringer.endArray(); //end inlineNodes
+        outputSchemaToJSON(stringer);
+    }
 
+    private void outputSchemaToJSON(JSONStringer stringer) throws JSONException {
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
-                SchemaColumn column = m_outputSchema.getColumns().get(col);
-                column.toJSONString(stringer);
+            for (SchemaColumn column : m_outputSchema.getColumns()) {
+                column.toJSONString(stringer, true);
             }
             stringer.endArray();
         }
@@ -827,9 +833,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        // skip projection nodes basically (they're boring as all get out)
+        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
+            sb.append(indent + "Detailed Output Schema: ");
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                stringer.object();
+                outputSchemaToJSON(stringer);
+                stringer.endObject();
+                sb.append(stringer.toString());
+            }
+            catch (Exception e)
+            {
+                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
+                e.printStackTrace();
+            }
+            sb.append(indent + "from\n");
+        }
         String extraIndent = " ";
+        // Except when verbosely debugging,
+        // skip projection nodes basically (they're boring as all get out)
         if (getPlanNodeType() == PlanNodeType.PROJECTION) {
+            if (m_verboseExplainForDebugging) {
+                sb.append(indent + "PROJECTION\n");
+            }
             extraIndent = "";
         }
         else {
@@ -943,5 +970,4 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         return false;
     }
-
 }

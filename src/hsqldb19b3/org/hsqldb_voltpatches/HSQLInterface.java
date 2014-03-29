@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -120,8 +120,9 @@ public class HSQLInterface {
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
     }
 
     /**
@@ -177,8 +178,9 @@ public class HSQLInterface {
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
@@ -249,7 +251,9 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
-        if ((tableCount + rowCount + subqueryCount) > 0) {
+        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
+// ENG-451-MERGE may not needed
+                subqueryCount > 0) {
             assert rowCount == 1;
             assert tableCount + subqueryCount + valueCount == 1;
             return true;

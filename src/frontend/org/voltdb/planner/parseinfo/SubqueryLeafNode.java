@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,17 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.types.JoinType;
+import org.voltdb.expressions.ExpressionUtil;
 
 public class SubqueryLeafNode extends JoinNode{
+
+    private final StmtSubqueryScan m_subqueryScan;
 
     /**
      * Construct a subquery node
@@ -30,12 +37,12 @@ public class SubqueryLeafNode extends JoinNode{
      * @param whereExpr - filter expression
      * @param id - node id
      */
-    public SubqueryLeafNode(int id, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-        super(id, JoinType.INNER, NodeType.SUBQUERY);
-        m_tableAliasIndex = tableAliasIdx;
+    public SubqueryLeafNode(int id,
+            AbstractExpression joinExpr, AbstractExpression  whereExpr, StmtSubqueryScan scan) {
+        super(id);
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
-        assert(m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
+        m_subqueryScan = scan;
     }
 
     /**
@@ -47,14 +54,55 @@ public class SubqueryLeafNode extends JoinNode{
                 (AbstractExpression) m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new SubqueryLeafNode(m_id, m_tableAliasIndex, joinExpr, whereExpr);
+        JoinNode newNode = new SubqueryLeafNode(m_id, joinExpr, whereExpr, m_subqueryScan);
         return newNode;
     }
 
     @Override
-    public int getTableAliasIndex() {
-        assert (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-        return m_tableAliasIndex;
+    public JoinNode cloneWithoutFilters() {
+        JoinNode newNode = new SubqueryLeafNode(m_id, null, null, m_subqueryScan);
+        return newNode;
     }
 
+    @Override
+    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
+        subQueries.add(m_subqueryScan);
+    }
+
+    public StmtSubqueryScan getSubqueryScan() { return m_subqueryScan; }
+
+    @Override
+    public StmtTableScan getTableScan() { return m_subqueryScan; }
+
+    @Override
+    public String getTableAlias() { return m_subqueryScan.getTableAlias(); }
+
+    @Override
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+        m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
+        m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+    }
+
+    @Override
+    protected void collectEquivalenceFilters(HashMap<AbstractExpression,
+            Set<AbstractExpression>> equivalenceSet,
+            ArrayDeque<JoinNode> joinNodes) {
+        if ( ! m_whereInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
+                                                      equivalenceSet);
+        }
+        // HSQL sometimes tags single-table filters in inner joins as join clauses
+        // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+        // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+        // conditions that determine partitioning, so process them as where clauses.
+        if ( ! m_joinInnerList.isEmpty()) {
+            ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
+                                                      equivalenceSet);
+        }
+    }
+
+    @Override
+    public boolean containSubSelects() {
+        return true;
+    }
 }

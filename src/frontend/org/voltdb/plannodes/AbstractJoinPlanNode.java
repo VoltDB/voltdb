@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -159,7 +159,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
         for (AbstractExpression subquery : subqueries) {
             assert(subquery instanceof SubqueryExpression);
-            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBetsCostPlan();
+            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();
             newId = subqueryPlan.resetPlanNodeIds(newId);
         }
         return newId;
@@ -264,15 +264,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             ((AbstractJoinPlanNode)outerTable).resolveSortDirection();
             m_sortDirection = ((AbstractJoinPlanNode)outerTable).getSortDirection();
         }
-    }
-
-    @Override
-    public boolean isContentDeterministic() {
-        LimitPlanNode limit = (LimitPlanNode) getInlinePlanNode(PlanNodeType.LIMIT);
-        if (super.isContentDeterministic() && limit != null) {
-            return isOrderDeterministic();
-        }
-        return super.isContentDeterministic();
     }
 
     @Override

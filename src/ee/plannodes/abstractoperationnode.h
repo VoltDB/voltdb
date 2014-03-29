@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,6 +47,7 @@
 #define HSTOREOPERATIONNODE_H
 
 #include "abstractplannode.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 namespace voltdb {
 
@@ -59,7 +60,7 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
     public:
         virtual ~AbstractOperationPlanNode();
         Table* getTargetTable() const;
-        void setTargetTable(Table* val);
+        void setTargetTableDelegate(TableCatalogDelegate * tcd);
 
         std::string getTargetTableName() const;
         void setTargetTableName(std::string name);
@@ -69,11 +70,11 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
     protected:
         virtual void loadFromJSONObject(PlannerDomValue obj);
         AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
-            target_table = NULL;
+            m_tcd = NULL;
             target_table_name = "NOT_SPECIFIED";
         }
         AbstractOperationPlanNode() : AbstractPlanNode() {
-            target_table = NULL;
+            m_tcd = NULL;
             target_table_name = "NOT SPECIFIED";
         }
 
@@ -84,7 +85,7 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
         // The results of the operations will be written to the the output table
         //
         std::string target_table_name;
-        Table* target_table; // volatile
+        TableCatalogDelegate * m_tcd;
 };
 
 }

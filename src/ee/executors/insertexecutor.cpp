@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -81,14 +81,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    m_targetTable = m_node->getTargetTable();
-    assert(m_targetTable);
-    assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
-           (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
-
-    m_tuple = TableTuple(m_inputTable->schema());
-
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_targetTable);
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
@@ -110,7 +103,16 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
-    assert(m_targetTable);
+
+    // Target table can be StreamedTable or PersistentTable and must not be NULL
+    // Update target table reference from table delegate
+    Table* targetTable = m_node->getTargetTable();
+    assert(targetTable);
+    assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
+            (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
+
+    TableTuple tbTuple = TableTuple(m_inputTable->schema());
+
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 #ifdef DEBUG
     //
@@ -133,28 +135,28 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
-    // and insert any tuple that we find into our m_targetTable. It doesn't get any easier than that!
+    // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
-    assert (m_tuple.sizeInValues() == m_inputTable->columnCount());
+    assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
-    while (iterator.next(m_tuple)) {
+    while (iterator.next(tbTuple)) {
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
-                   m_tuple.debug(m_targetTable->name()).c_str(), m_targetTable->name().c_str(),
-                   m_targetTable->schema()->debug().c_str());
+                   tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
+                   targetTable->schema()->debug().c_str());
 
         // if there is a partition column for the target table
         if (m_partitionColumn != -1) {
 
             // get the value for the partition column
-            NValue value = m_tuple.getNValue(m_partitionColumn);
+            NValue value = tbTuple.getNValue(m_partitionColumn);
             bool isLocal = m_engine->isLocalSite(value);
 
             // if it doesn't map to this site
             if (!isLocal) {
                 if (!m_multiPartition) {
                     throw ConstraintFailureException(
-                            dynamic_cast<PersistentTable*>(m_targetTable),
-                            m_tuple,
+                            dynamic_cast<PersistentTable*>(targetTable),
+                            tbTuple,
                             "Mispartitioned tuple in single-partition insert statement.");
                 }
 
@@ -171,11 +173,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         }
 
         // try to put the tuple into the target table
-        if (!m_targetTable->insertTuple(m_tuple)) {
+        if (!targetTable->insertTuple(tbTuple)) {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                        " target table '%s'",
                        m_inputTable->name().c_str(),
-                       m_targetTable->name().c_str());
+                       targetTable->name().c_str());
             return false;
         }
 

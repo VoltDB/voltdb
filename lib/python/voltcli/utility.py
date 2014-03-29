@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -41,8 +41,10 @@ import re
 import pkgutil
 import binascii
 import stat
-
-__author__ = 'scooper'
+import daemon
+import signal
+import textwrap
+import string
 
 #===============================================================================
 class Global:
@@ -54,6 +56,7 @@ class Global:
     debug_enabled   = False
     dryrun_enabled  = False
     manifest_path   = 'MANIFEST'
+    state_directory = ''
 
 #===============================================================================
 def set_dryrun(dryrun):
@@ -82,6 +85,24 @@ def set_debug(debug):
         Global.verbose_enabled = True
 
 #===============================================================================
+def set_state_directory(directory):
+#===============================================================================
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+        except (OSError, IOError), e:
+            abort('Error creating state directory "%s".' % directory, e)
+    Global.state_directory = os.path.expandvars(os.path.expanduser(directory))
+
+#===============================================================================
+def get_state_directory():
+#===============================================================================
+    """
+    Return and create as needed a path for saving state.
+    """
+    return Global.state_directory
+
+#===============================================================================
 def is_dryrun():
 #===============================================================================
     """
@@ -106,13 +127,18 @@ def is_debug():
     return Global.debug_enabled
 
 #===============================================================================
+def get_state_directory():
+#===============================================================================
+    return Global.state_directory
+
+#===============================================================================
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
 #===============================================================================
     """
     Low level message display.
     """
     if tag:
-        stag = '%8s: ' % tag
+        stag = '%s: ' % tag
     else:
         stag = ''
     # Special case to allow a string instead of an iterable.
@@ -186,15 +212,20 @@ def error(*msgs):
     display_messages(msgs, tag = 'ERROR')
 
 #===============================================================================
-def abort(*msgs):
+def abort(*msgs, **kwargs):
 #===============================================================================
     """
     Display ERROR messages and then abort.
+    :Keywords:
+    return_code: integer result returned to the OS (default=1)
     """
+    keys = kwargs.keys()
+    bad_keywords = [k for k in kwargs.keys() if k != 'return_code']
+    if bad_keywords:
+        warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
+    return_code = kwargs.get('return_code', 1)
     error(*msgs)
-    sys.stderr.write('\n')
-    display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
-    sys.exit(1)
+    sys.exit(return_code)
 
 #===============================================================================
 def find_in_path(name):
@@ -207,6 +238,22 @@ def find_in_path(name):
         if os.path.exists(os.path.join(dir, name)):
             return os.path.join(dir, name)
     return None
+
+#===============================================================================
+def find_programs(*names):
+#===============================================================================
+    """
+    Check for required programs in the path.
+    """
+    missing = []
+    paths = {}
+    for name in names:
+        paths[name] = find_in_path(name)
+        if paths[name] is None:
+            missing.append(name)
+    if missing:
+        abort('Required program(s) are not in the path:', missing)
+    return paths
 
 #===============================================================================
 class PythonSourceFinder(object):
@@ -394,7 +441,7 @@ def run_cmd(cmd, *args):
             verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
-            abort('Command "%s ..." failed with return code %d.' % (cmd, retcode))
+            abort(return_code=retcode)
 
 #===============================================================================
 def pipe_cmd(*args):
@@ -410,6 +457,109 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+#===============================================================================
+class Daemonizer(daemon.Daemon):
+#===============================================================================
+    """
+    Class that supports daemonization (inherited from the daemon module). The
+    current process, i.e. the running Python script is completely replaced by
+    the executed program.
+    """
+
+    def __init__(self, name, description, output=None):
+        """
+        Constructor. The optional "output" keyword specifies an override to
+        the default ~/.command_name output directory.
+        """
+        self.name = name
+        self.description = description
+        self.output_dir = output
+        if self.output_dir is None:
+            self.output_dir = get_state_directory()
+        pid = os.path.join(self.output_dir, '%s.pid' % name)
+        out = os.path.join(self.output_dir, '%s.out' % name)
+        err = os.path.join(self.output_dir, '%s.err' % name)
+        self.output_files = [out, err]
+        daemon.Daemon.__init__(self, pid, stdout=out, stderr=err)
+        # Clean up PID files of defunct processes.
+        self.purge_defunct()
+
+    def start_daemon(self, *args):
+        """
+        Start a daemon process.
+        """
+        # Replace existing output files.
+        for path in self.output_files:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except (IOError, OSError), e:
+                    abort('Unable to remove the existing output file "%s".' % path, e)
+        try:
+            info('Starting %s in the background...' % (self.description), [
+                    'Output files are in "%s".' % self.output_dir
+                ])
+            self.start(*args)
+        except daemon.Daemon.AlreadyRunningException, e:
+            abort('A %s background process appears to be running.' % self.description, (
+                     'Process ID (PID): %d' % e.pid,
+                     'PID file: %s' % e.pidfile),
+                  'Please stop the process and try again.')
+        except (IOError, OSError), e:
+            abort('Unable to start the %s background process.' % self.description, e)
+
+    def stop_daemon(self, kill_signal=signal.SIGTERM):
+        """
+        Stop a daemon process.
+        """
+        try:
+            daemon.Daemon.stop(self, kill_signal=kill_signal)
+            info("%s (process ID %d) was stopped." % (self.description, self.pid))
+        except daemon.Daemon.NotRunningException, e:
+            if e.pid != -1:
+                addendum = ' as process ID %d' % e.pid
+            else:
+                addendum = ''
+            abort('%s is no longer running%s.' % (self.description, addendum))
+        except (IOError, OSError), e:
+            abort('Unable to stop the %s background process.' % self.description, e)
+
+    def on_started(self, *args_in):
+        """
+        Post-daemonization call-back.
+        """
+        # Strip out things requiring shell interpretation, e.g. quotes.
+        args = [arg.replace('"', '') for arg in args_in]
+        try:
+            os.execvp(args[0], args)
+        except (OSError, IOError), e:
+            abort('Failed to exec:', args, e)
+
+    def get_running(self):
+        """
+        Scan for PID files that have running processes.
+        Returns a list of the current running PIDs.
+        """
+        running = []
+        for path in glob.glob(os.path.join(self.output_dir, "*.pid")):
+            pid, alive = daemon.get_status(path)
+            if alive:
+                running.append(pid)
+        return running
+
+    def purge_defunct(self):
+        """
+        Purge PID files of defunct daemon processes.
+        """
+        for path in glob.glob(os.path.join(self.output_dir, "*.pid")):
+            pid, alive = daemon.get_status(path)
+            if not alive:
+                try:
+                    info('Deleting stale PID file "%s"...' % path)
+                    os.remove(path)
+                except (OSError, IOError), e:
+                    warning('Failed to delete PID file "%s".' % path, e)
 
 #===============================================================================
 def is_string(item):
@@ -775,20 +925,40 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
     return hosts
 
 #===============================================================================
+def paragraph(*lines):
+#===============================================================================
+    """
+    Strip leading and trailing whitespace and wrap text into a paragraph block.
+    The arguments can include arbitrarily nested sequences.
+    """
+    wlines = []
+    for line in flatten_to_list(lines):
+        wlines.extend(line.strip().split('\n'))
+    return textwrap.fill('\n'.join(wlines))
+
+#===============================================================================
 class File(object):
 #===============================================================================
     """
     File reader/writer object that aborts on any error. Must explicitly call
     close(). The main point is to standardize the error-handling.
     """
-    def __init__(self, path, mode = 'r'):
+    def __init__(self, path, mode = 'r', make_dirs=False):
         if mode not in ('r', 'w'):
             abort('Invalid file mode "%s".' % mode)
-        self.path = path
-        self.mode = mode
-        self.f    = None
+        self.path      = path
+        self.mode      = mode
+        self.make_dirs = make_dirs
+        self.f         = None
     def open(self):
         self.close()
+        if self.mode == 'w' and self.make_dirs:
+            dir = os.path.dirname(self.path)
+            if dir and not os.path.exists(dir):
+                try:
+                    os.makedirs(dir)
+                except (IOError, OSError), e:
+                    self._abort('Unable to create directory "%s".' % dir)
         self.f = self._open()
     def read(self):
         if self.mode != 'r':
@@ -833,6 +1003,57 @@ class File(object):
         abort(*msgs)
 
 #===============================================================================
+class FileGenerator(object):
+#===============================================================================
+    """
+    File generator.
+    """
+
+    def __init__(self, resource_finder, **symbols):
+        """
+        resource_finder must implement a find_resource(path) method.
+        """
+        self.resource_finder = resource_finder
+        self.symbols = copy.copy(symbols)
+        self.generated = []
+
+    def add_symbols(self, **symbols):
+        self.symbols.update(symbols)
+
+    def from_template(self, src, tgt=None, permissions=None):
+        if tgt is None:
+            tgt = src
+        info('Generating "%s"...' % tgt)
+        src_path = self.resource_finder.find_resource(src)
+        src_file = File(src_path)
+        src_file.open()
+        try:
+            template = string.Template(src_file.read())
+            s = template.safe_substitute(**self.symbols)
+        finally:
+            src_file.close()
+        tgt_file = File(tgt, mode='w', make_dirs=True)
+        tgt_file.open()
+        try:
+            tgt_file.write(s)
+            self.generated.append(tgt)
+        finally:
+            tgt_file.close()
+        if permissions is not None:
+            os.chmod(tgt, 0755)
+
+    def custom(self, tgt, callback):
+        info('Generating "%s"...' % tgt)
+        output_stream = File(tgt, 'w')
+        output_stream.open()
+        try:
+            callback(output_stream)
+            self.generated.append(tgt)
+        finally:
+            output_stream.close()
+
+
+#===============================================================================
 class INIConfigManager(object):
 #===============================================================================
     """
@@ -862,7 +1083,8 @@ class INIConfigManager(object):
                 parser.add_section(section)
                 cur_section = section
             parser.set(cur_section, name, d[key])
-        f = FileWriter(path)
+        f = File(path, 'w')
+        f.open()
         try:
             parser.write(f)
         finally:
@@ -876,31 +1098,38 @@ class PersistentConfig(object):
     files, one for permanent configuration and the other for local state.
     """
 
-    def __init__(self, format, permanent_path, local_path):
+    def __init__(self, format, path, local_path):
         """
         Construct persistent configuration based on specified format name, path
         to permanent config file, and path to local config file.
         """
-        self.permanent_path = permanent_path
-        self.local_path     = local_path
+        self.path = path
+        self.local_path = local_path
         if format.lower() == 'ini':
             self.config_manager = INIConfigManager()
         else:
             abort('Unsupported configuration format "%s".' % format)
-        self.permanent = self.config_manager.load(self.permanent_path)
-        self.local     = self.config_manager.load(self.local_path)
+        self.permanent = self.config_manager.load(self.path)
+        if self.local_path:
+            self.local = self.config_manager.load(self.local_path)
+        else:
+            self.local = {}
 
     def save_permanent(self):
         """
         Save the permanent configuration.
         """
-        self.config_manager.save(self.permanent_path, self.permanent)
+        self.config_manager.save(self.path, self.permanent)
 
     def save_local(self):
         """
         Save the local configuration (overrides and additions to permanent).
         """
-        self.config_manager.save(self.local_path, self.local)
+        if self.local:
+            self.config_manager.save(self.local_path, self.local)
+        else:
+            error('No local configuration was specified. (%s)' % tag,
+                  'For reference, the permanent configuration is "%s".' % self.path)
 
     def get(self, key):
         """
@@ -922,7 +1151,8 @@ class PersistentConfig(object):
         Set a key/value pair in the local configuration.
         """
         self.local[key] = value
-        self.save_local()
+        if self.local:
+            self.save_local()
 
     def query(self, filter = None):
         """
@@ -1021,3 +1251,86 @@ class VoltResponseWrapper(object):
         if self.table_count() > 0:
             output.append(self.format_tables())
         return '\n\n'.join(output)
+
+#===============================================================================
+class MessageDict(dict):
+#===============================================================================
+    """
+    Message dictionary provides message numbers as attributes or the messages
+    by looking up that message number in the underlying dictionary.
+        messages.MY_MESSAGE == <integer index>
+        messages[messages.MY_MESSAGE] == <string>
+    """
+    def __init__(self, **kwargs):
+        dict.__init__(self)
+        i = 0
+        for key in kwargs:
+            i += 1
+            self[i] = kwargs[key]
+            setattr(self, key, i)
+
+#===============================================================================
+class CodeFormatter(object):
+#===============================================================================
+    """
+    Useful for formatting generated code. It is currently geared for DDL, but
+    this isn't etched in stone.
+    """
+    def __init__(self, separator=',', vcomment_prefix='', indent_string='    '):
+        self.separator = separator
+        self.vcomment_prefix = vcomment_prefix
+        self.indent_string = indent_string
+        self.level = 0
+        self.lines = []
+        self.pending_separator = [-1]
+        self.block_start_index = [0]
+    def _line(self, needs_separator, *lines):
+        if needs_separator and self.separator and self.pending_separator[-1] >= 0:
+            self.lines[self.pending_separator[-1]] += self.separator
+        for line in lines:
+            self.lines.append('%s%s' % (self.indent_string * self.level, line))
+        if needs_separator:
+            self.pending_separator[-1] = len(self.lines) - 1
+    def _block_line(self, *lines):
+        if self.pending_separator[-1] >= self.block_start_index[-1]:
+            self.pending_separator[-1] += len(lines)
+        for line in lines:
+            self.lines.insert(self.block_start_index[-1], line)
+            self.block_start_index[-1] += 1
+    def block_start(self, *lines):
+        if self.level == 0:
+            self._line(False, '')
+        self.block_start_index.append(len(self.lines))
+        self._line(False, *lines)
+        self._line(False, '(')
+        self.level += 1
+        self.pending_separator.append(-1)
+    def block_end(self, *lines):
+        self.level -= 1
+        self.pending_separator.pop()
+        if self.level == 0:
+            self._line(False, ');')
+        else:
+            self._line(True, ')')
+        self.block_start_index.pop()
+    def code(self, *lines):
+        self._line(False, *lines)
+    def code_fragment(self, *lines):
+        self._line(True, *lines)
+    def comment(self, *lines):
+        for line in lines:
+            self._line(False, '-- %s' % line)
+    def vcomment(self, *lines):
+        for line in lines:
+            self._line(False, '--%s %s' % (self.vcomment_prefix, line))
+    def block_comment(self, *lines):
+        for line in lines:
+            self._block_line('-- %s' % line)
+    def block_vcomment(self, *lines):
+        for line in lines:
+            self._block_line('--%s %s' % (self.vcomment_prefix, line))
+    def blank(self, n=1):
+        for line in range(n):
+            self._line(False, '')
+    def __str__(self):
+        return '\n'.join(self.lines)

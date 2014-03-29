@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -40,6 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -105,6 +107,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_tableScanSchema = isp.m_tableScanSchema.clone();
 
         m_targetIndexName = isp.m_targetIndexName;
+
+        m_tableScan = isp.getTableScan();
 
         m_predicate = null;
         m_bindings = isp.getBindings();
@@ -176,7 +180,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -245,7 +249,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             indexSize = indexedColRefs.size();
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTableScan());
                 indexSize = indexedExprs.size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
@@ -321,13 +325,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead,
-                                    Collection<String> tableAliasesRead,
-                                    Collection<String> tableUpdated,
-                                    Collection<String> tableAliaseUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableAliasesRead, tableUpdated, tableAliaseUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
             indexes.add(m_targetIndexName);
@@ -418,11 +419,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
-                Members.ENDKEY_EXPRESSIONS.name());
+                Members.ENDKEY_EXPRESSIONS.name(), m_tableScan);
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name());
+                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
 
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     @Override
@@ -461,7 +462,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         else {
             try {
                 List<AbstractExpression> indexExpressions =
-                    AbstractExpression.fromJSONArrayString(jsonExpr);
+                    AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                 int ii = 0;
                 for (AbstractExpression ae : indexExpressions) {
                     asIndexed[ii++] = ae.explain(m_targetTableName);

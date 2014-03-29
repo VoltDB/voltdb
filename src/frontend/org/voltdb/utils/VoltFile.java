@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,6 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
+
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 import java.io.File;
 import java.io.IOException;
@@ -145,17 +148,22 @@ public class VoltFile extends File {
 
                     FileInputStream fis = new FileInputStream(f);
                     FileOutputStream fos = new FileOutputStream(fInOtherSubroot);
-                    ByteBuffer buf = ByteBuffer.allocateDirect(8192);
                     FileChannel inputChannel = fis.getChannel();
                     FileChannel outputChannel = fos.getChannel();
+                    BBContainer bufC = DBBPool.allocateDirect(8192);
+                    ByteBuffer buf = bufC.b();
 
-                    while (inputChannel.read(buf) != -1) {
-                        buf.flip();
-                        outputChannel.write(buf);
-                        buf.clear();
+                    try {
+                        while (inputChannel.read(buf) != -1) {
+                            buf.flip();
+                            outputChannel.write(buf);
+                            buf.clear();
+                        }
+                        inputChannel.close();
+                        outputChannel.close();
+                    } finally {
+                        bufC.discard();
                     }
-                    inputChannel.close();
-                    outputChannel.close();
                 } else {
                     throw new IOException(fInOtherSubroot + " already exists");
                 }

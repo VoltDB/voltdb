@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -35,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -55,6 +55,8 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -79,7 +81,9 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -106,6 +110,7 @@ import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -166,6 +171,93 @@ public abstract class CatalogUtil {
         }
 
         return serializedCatalog;
+    }
+
+    /**
+     * Load a catalog from the jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
+     * @throws IOException
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
+    {
+        // Throws IOException on load failure.
+        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        // I.e. jarfile may be modified.
+        VoltCompiler compiler = new VoltCompiler();
+        String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
+    }
+
+    /**
+     * Get the catalog build info from the jar bytes.
+     * Performs sanity checks on the build info and version strings.
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return build info lines
+     * @throws IOException If the catalog or the version string cannot be loaded.
+     */
+    public static String[] getBuildInfoFromJar(InMemoryJarfile jarfile)
+            throws IOException
+    {
+        // Read the raw build info bytes.
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+        }
+
+        // Convert the bytes to a string and split by lines.
+        String buildInfo;
+        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
+        String[] buildInfoLines = buildInfo.split("\n");
+
+        // Sanity check the number of lines and the version string.
+        if (buildInfoLines.length < 1) {
+            throw new IOException("Catalog build info has no version string.");
+        }
+        String versionFromCatalog = buildInfoLines[0].trim();
+        if (!CatalogUtil.isCatalogVersionValid(versionFromCatalog)) {
+            throw new IOException(String.format(
+                    "Catalog build info version (%s) is bad.", versionFromCatalog));
+        }
+
+        // Trim leading/trailing whitespace.
+        for (int i = 0; i < buildInfoLines.length; ++i) {
+            buildInfoLines[i] = buildInfoLines[i].trim();
+        }
+
+        return buildInfoLines;
+    }
+
+    /**
+     * Load an in-memory catalog jar file from jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The in-memory jar containing the loaded catalog.
+     * @throws IOException If the catalog cannot be loaded.
+     */
+    public static InMemoryJarfile loadInMemoryJarFile(byte[] catalogBytes)
+            throws IOException
+    {
+        assert(catalogBytes != null);
+
+        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
+        }
+
+        return jarfile;
     }
 
     /**
@@ -433,7 +525,8 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
+                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName(), 0));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -510,7 +603,7 @@ public abstract class CatalogUtil {
         }
 
         //Check that it is a properly formed verstion string
-        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
             throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
         }
@@ -519,6 +612,31 @@ public abstract class CatalogUtil {
             return false;
         }
 
+        return true;
+    }
+
+    /**
+     * Check if a catalog version string is valid.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's valid, false otherwise.
+     */
+
+    public static boolean isCatalogVersionValid(String catalogVersionStr)
+    {
+        // Do we have a version string?
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        //Check that it is a properly formed version string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        if (catalogVersion == null) {
+            return false;
+        }
+
+        // It's valid.
         return true;
     }
 
@@ -761,14 +879,7 @@ public abstract class CatalogUtil {
         }
 
         byte[] data = null;
-        try {
-            data = sb.toString().getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            hostLog.error("CRCing deployment file to determine" +
-                    " compatibility and determined deployment file is"+
-                    " not valid UTF-8. File must be UTF-8 encoded.");
-            data = new byte[]{0x0}; // should generate a CRC mismatch.
-        }
+        data = sb.toString().getBytes(Constants.UTF8ENCODING);
 
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(data);
@@ -817,12 +928,7 @@ public abstract class CatalogUtil {
      */
     public static DeploymentType parseDeploymentFromString(String deploymentString) {
         ByteArrayInputStream byteIS;
-        try {
-            byteIS = new ByteArrayInputStream(deploymentString.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            hostLog.warn("Unable to read deployment string: " + e.getMessage());
-            return null;
-        }
+        byteIS = new ByteArrayInputStream(deploymentString.getBytes(Constants.UTF8ENCODING));
         // get deployment info from xml file
         return getDeployment(byteIS);
     }
@@ -981,6 +1087,8 @@ public abstract class CatalogUtil {
             catDeployment.getSystemsettings().add("systemsettings");
         int maxtemptablesize = 100;
         int snapshotpriority = 6;
+        int elasticPauseTime = 50;
+        int elasticThroughput = 2;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
@@ -992,9 +1100,16 @@ public abstract class CatalogUtil {
             if (snapshot != null) {
                 snapshotpriority = snapshot.getPriority();
             }
+            SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
+            if (elastic != null) {
+                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
+                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+            }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);
         syssettings.setSnapshotpriority(snapshotpriority);
+        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setElasticthroughput(elasticThroughput);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
@@ -1510,40 +1625,51 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        Collection<String> tablesRead = new TreeSet<String>();
-        Collection<String> tableAliasesRead = new TreeSet<String>();
-        Collection<String> tablesUpdated = new TreeSet<String>();
-        Collection<String> tableAliasesUpdated = new TreeSet<String>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
         Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
-            topPlan.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
+            topPlan.getTablesAndIndexes(tablesRead, indexes);
         }
         if (bottomPlan != null) {
-            bottomPlan.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
+            bottomPlan.getTablesAndIndexes(tablesRead, indexes);
         }
 
-        // make useage only in either read or updated, not both
-        tablesRead.removeAll(tablesUpdated);
+        String updated = null;
+        if ( ! stmt.getReadonly()) {
+            updated = topPlan.getUpdatedTable();
+            if (updated == null) {
+                updated = bottomPlan.getUpdatedTable();
+            }
+            assert(updated != null);
+        }
+
+        Set<String> readTableNames = tablesRead.keySet();
 
         for (Table table : db.getTables()) {
-            for (String indexName : indexes) {
-                Index index = table.getIndexes().get(indexName);
-                if (index != null) {
-                    updateIndexUsageAnnotation(index, stmt);
+            if (readTableNames.contains(table.getTypeName())) {
+                readTableNames.remove(table.getTypeName());
+                for (String indexName : indexes) {
+                    Index index = table.getIndexes().get(indexName);
+                    if (index != null) {
+                        updateIndexUsageAnnotation(index, stmt);
+                    }
                 }
-            }
-            if (tablesRead.contains(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
-                tablesRead.remove(table.getTypeName());
-            }
-            if (tablesUpdated.contains(table.getTypeName())) {
+                if (updated != null && updated.equals(table.getTypeName())) {
+                    // make useage only in either read or updated, not both
+                    updateTableUsageAnnotation(table, stmt, true);
+                    updated = null;
+                    continue;
+                }
                 updateTableUsageAnnotation(table, stmt, false);
-                tablesUpdated.remove(table.getTypeName());
+            }
+            else if (updated != null && updated.equals(table.getTypeName())) {
+                updateTableUsageAnnotation(table, stmt, true);
+                updated = null;
             }
         }
 
         assert(tablesRead.size() == 0);
-        assert(tablesUpdated.size() == 0);
+        assert(updated == null);
     }
 
     private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
@@ -1671,7 +1797,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -1680,4 +1806,23 @@ public abstract class CatalogUtil {
 
         return indexSize;
     }
+
+    /**
+     * Return if given proc is durable if its a sysproc SystemProcedureCatalog is consulted. All non sys procs are all
+     * durable.
+     *
+     * @param procName
+     * @return true if proc is durable for non sys procs return true (durable)
+     */
+    public static boolean isDurableProc(String procName) {
+        //For sysprocs look at sysproc catalog.
+        if (procName.charAt(0) == '@') {
+            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+            if (sysProc != null) {
+                return sysProc.isDurable();
+            }
+        }
+        return true;
+    }
+
 }

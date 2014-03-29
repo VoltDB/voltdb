@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,4 +91,12 @@ public class SendPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
     }
+
+    @Override
+    public String getUpdatedTable() {
+        assert(m_children.size() == 1);
+        AbstractPlanNode child = m_children.get(0);
+        return child.getUpdatedTable();
+    }
+
 }

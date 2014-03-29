@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,8 @@
  */
 
 package org.voltdb.planner;
+
+import java.util.Arrays;
 
 
 /**
@@ -69,7 +71,7 @@ public class BoundPlan {
                 return false;
             }
         }
-        else if ( ! constants.equals(other.constants)) {
+        else if ( ! Arrays.equals(constants, other.constants)) {
             return false;
         }
         return true;

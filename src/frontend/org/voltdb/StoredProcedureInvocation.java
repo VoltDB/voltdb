@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -165,7 +165,7 @@ public class StoredProcedureInvocation implements JSONString {
             if (serializedParams != null) {
                 return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate());
             } else {
-                return params.get().toArray()[partitionIndex];
+                return params.get().getParam(partitionIndex);
             }
         }
         catch (Exception ex) {
@@ -195,7 +195,7 @@ public class StoredProcedureInvocation implements JSONString {
             ParameterSet pset = getParams();
             assert(pset != null);
             int serializedSize = pset.getSerializedSize();
-            if ((pset.toArray().length > 0) && (serializedSize <= 2)) {
+            if ((pset.size() > 0) && (serializedSize <= 2)) {
                 throw new IllegalStateException(String.format("Parameter set for invocation " +
                         "%s doesn't have the proper size (currently = %s)",
                         getProcName(), serializedSize));

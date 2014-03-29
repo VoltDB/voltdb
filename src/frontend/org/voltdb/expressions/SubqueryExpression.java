@@ -27,7 +27,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.parseinfo.TempTable;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -42,7 +42,7 @@ public class SubqueryExpression extends AbstractExpression {
         PARAM_IDX;
     }
 
-    private TempTable m_subquery;
+    private StmtSubqueryScan m_subquery;
     private int m_subqueryId;
     private int m_subqueryNodeId = -1;
     private AbstractPlanNode m_subqueryNode = null;
@@ -54,14 +54,14 @@ public class SubqueryExpression extends AbstractExpression {
      * Create a new SubqueryExpression
      * @param subquey The parsed statement
      */
-    public SubqueryExpression(TempTable subquery) {
+    public SubqueryExpression(StmtSubqueryScan subquery) {
         super(ExpressionType.SUBQUERY);
         assert(subquery != null);
         m_subquery = subquery;
-        assert(m_subquery.getSubQuery() != null);
-        m_subqueryId = m_subquery.getSubQuery().stmtId;
-        if (m_subquery.getBetsCostPlan() != null && m_subquery.getBetsCostPlan().rootPlanGraph != null) {
-            m_subqueryNode = m_subquery.getBetsCostPlan().rootPlanGraph;
+        assert(m_subquery.getSubquery() != null);
+        m_subqueryId = m_subquery.getSubquery().m_stmtId;
+        if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
+            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
         m_valueType = VoltType.BIGINT;
@@ -78,12 +78,12 @@ public class SubqueryExpression extends AbstractExpression {
         super(ExpressionType.SUBQUERY);
     }
 
-    public TempTable getTable() {
+    public StmtSubqueryScan getTable() {
         return m_subquery;
     }
 
     public AbstractParsedStmt getSubquery() {
-        return m_subquery.getSubQuery();
+        return m_subquery.getSubquery();
     }
 
     public int getSubqueryId() {
@@ -201,12 +201,12 @@ public class SubqueryExpression extends AbstractExpression {
          * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
          * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
          * and new PVE which will be required by the back-end executor*/
-        AbstractParsedStmt subqueryStmt = m_subquery.getSubQuery();
-        AbstractParsedStmt parentStmt = m_subquery.getSubQuery().m_parentStmt;
+        AbstractParsedStmt subqueryStmt = m_subquery.getSubquery();
+        AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
         // we must have a parent -it's a subquery statement
         assert(parentStmt != null);
         for (Map.Entry<Integer, TupleValueExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
-            if(entry.getValue().getOrigStmtId() == parentStmt.stmtId) {
+            if(entry.getValue().getOrigStmtId() == parentStmt.m_stmtId) {
                 // TVE originates from the statement where this SubqueryExpression belongs to
                 m_args.add(entry.getValue());
                 m_parameterIdxList.add(entry.getKey());

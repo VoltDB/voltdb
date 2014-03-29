@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -132,11 +132,13 @@ public class PlanNodeTree implements JSONString {
             stringer.endArray(); //end entries
         }
 
-        stringer.key(Members.PARAMETERS.name()).array();
-        for (Pair< Integer, VoltType > parameter : m_parameters) {
-            stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
+        if (m_parameters.size() > 0) {
+            stringer.key(Members.PARAMETERS.name()).array();
+            for (Pair< Integer, VoltType > parameter : m_parameters) {
+                stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
+            }
+            stringer.endArray();
         }
-        stringer.endArray();
     }
 
     public List<AbstractPlanNode> getNodeList() {
@@ -214,9 +216,11 @@ public class PlanNodeTree implements JSONString {
             for( int i = 0; i < size; i++ ) {
                 JSONObject jobj;
                 jobj = jArray.getJSONObject(i);
-                JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
-                for( int j = 0; j < children.length(); j++ ) {
-                    planNodes.get(i).addAndLinkChild( getNodeofId(children.getInt(j), planNodes) );
+                if (jobj.has("CHILDREN_IDS")) {
+                    JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
+                    for( int j = 0; j < children.length(); j++ ) {
+                        planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j), planNodes ) );
+                    }
                 }
             }
         }

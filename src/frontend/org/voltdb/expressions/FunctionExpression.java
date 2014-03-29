@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {
@@ -279,33 +277,8 @@ public class FunctionExpression extends AbstractExpression {
 
 
     @Override
-    public void resolveForDB(Database db) {
-        resolveChildrenForDB(db);
-        if (m_parameterArg == NOT_PARAMETERIZED) {
-            // Non-parameterized functions should have a fixed SPECIFIC type.
-            // Further refinement should be useless/un-possible.
-            return;
-        }
-        // resolving a child column has type implications for parameterized functions
-        negotiateInitialValueTypes();
-    }
-
-
-    @Override
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
-        if (m_parameterArg == NOT_PARAMETERIZED) {
-            // Non-parameterized functions should have a fixed SPECIFIC type.
-            // Further refinement should be useless/un-possible.
-            return;
-        }
-        // resolving a child column has type implications for parameterized functions
-        negotiateInitialValueTypes();
-    }
-
-    @Override
-    public void resolveForStmt(Database db, AbstractParsedStmt stmt) {
-        resolveChildrenForStmt(db, stmt);
         if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.

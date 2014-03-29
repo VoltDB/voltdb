@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -168,12 +168,6 @@ PlanNodeFragment::nodeListFromJSONObject(PlanNodeFragment *pnf, PlannerDomValue 
         for (int zz = 0; zz < childIds.size(); zz++) {
             children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
         }
-
-        const std::vector<CatalogId> parentIds = (*node)->getParentIds();
-        std::vector<AbstractPlanNode*> &parents = (*node)->getParents();
-        for (int zz = 0; zz < parentIds.size(); zz++) {
-            parents.push_back(pnf->m_idToNodeMap[parentIds[zz]]);
-        }
     }
 
     // EXECUTE_LIST
@@ -187,12 +181,28 @@ PlanNodeFragment::nodeListFromJSONObject(PlanNodeFragment *pnf, PlannerDomValue 
 void
 PlanNodeFragment::loadParamsFromJSONObject(PlanNodeFragment *pnf, PlannerDomValue obj)
 {
+<<<<<<< HEAD
     PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
     for (int i = 0; i < parametersArray.arrayLen(); i++) {
         PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
         int index = parameterArray.valueAtIndex(0).asInt();
         std::string typeString = parameterArray.valueAtIndex(1).asStr();
         pnf->m_parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+=======
+    PlannerDomValue executeListArray = obj.valueForKey("EXECUTE_LIST");
+    for (int i = 0; i < executeListArray.arrayLen(); i++) {
+        m_executionList.push_back(m_idToNodeMap[executeListArray.valueAtIndex(i).asInt()]);
+    }
+
+    if (obj.hasKey("PARAMETERS")) {
+        PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
+        for (int i = 0; i < parametersArray.arrayLen(); i++) {
+            PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
+            int index = parameterArray.valueAtIndex(0).asInt();
+            std::string typeString = parameterArray.valueAtIndex(1).asStr();
+            parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+        }
+>>>>>>> master
     }
 }
 

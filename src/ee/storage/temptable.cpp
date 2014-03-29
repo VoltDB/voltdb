@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -52,9 +52,11 @@ namespace voltdb {
 
 TempTable::TempTable()
   : Table(TABLE_BLOCKSIZE),
-    m_iter(this, m_data.begin()),
+    m_iter(this),
     m_limits(NULL)
 {
+    // this happens here because m_data might not be initialized above
+    m_iter.reset(m_data.begin());
 }
 
 TempTable::~TempTable() {}
@@ -62,8 +64,14 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) { deleteAllTuplesNonVirtual(freeAllocatedStrings); }
-bool TempTable::insertTuple(TableTuple &source) { insertTempTuple(source); return true; }
+void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
+    deleteAllTuplesNonVirtual(freeAllocatedStrings);
+}
+
+bool TempTable::insertTuple(TableTuple &source) {
+    insertTempTuple(source);
+    return true;
+}
 
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,

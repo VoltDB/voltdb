@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -89,7 +89,7 @@ public class IOStats extends StatsSource {
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         try {
-            m_ioStats = VoltDB.instance().getHostMessenger().getNetwork().getIOStats(interval);
+            m_ioStats = VoltDB.instance().getHostMessenger().getIOStats(interval);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

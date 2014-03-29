@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,9 +39,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     private void validatePlan(String sql, boolean expectIndexScan,
-            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
+            boolean expectSeqScan, boolean expectOrderBy)
     {
-        validatePlan(sql, expectIndexScan, expectSeqScan, expectOrderBy, expectHashAggregate, false);
+        validatePlan(sql, expectIndexScan, expectSeqScan, expectOrderBy, false, false);
     }
 
     private void validatePlan(String sql, boolean expectIndexScan,
@@ -50,7 +50,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
-        System.out.println(pn.getChild(0).toExplainPlanString());
+        //* to debug */ System.out.println(pn.getChild(0).toExplainPlanString());
         assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
@@ -62,14 +62,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
     /// -- that it uses an index scan but no seq scan, order by, or hash aggregate.
     private void validateOptimalPlan(String sql)
     {
-        validatePlan(sql, true, false, false, false);
+        validatePlan(sql, true, false, false);
     }
 
     /// Validate that a plan does not unintentionally use
     /// a completely inapplicable index scan for order.
     private void validateBruteForcePlan(String sql)
     {
-        validatePlan(sql, false, true, true, false);
+        validatePlan(sql, false, true, true);
     }
 
     /// Validate that a plan does not unintentionally use
@@ -79,7 +79,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     /// sort already confers determinism (yet it currently does)?.
     private void validateIndexedBruteForcePlan(String sql)
     {
-        validatePlan(sql, true, false, true, false);
+        validatePlan(sql, true, false, true);
     }
 
     public void testOrderByOneOfTwoIndexKeys()
@@ -163,7 +163,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     {
         validatePlan("SELECT Tnokey.T_D1, T.T_D0, T.T_D1 from Tnokey, T " +
                      "where Tnokey.T_D2 = 2 AND T.T_D0 = Tnokey.T_D0 " +
-                     "ORDER BY T.T_D0, T.T_D1", true, true, true, false);
+                     "ORDER BY T.T_D0, T.T_D1", true, true, true);
     }
 
     public void testTableAgg() {
@@ -176,11 +176,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
                 false, true, false, false, true);
     }
 
-    //TODO: This test actually validates that we generate a sub-optimal plan for this query
-    //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
     public void testOrderByCountStar() {
         validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, false, true);
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true, false);
     }
 
     public void testOrderByAggWithoutAlias() {

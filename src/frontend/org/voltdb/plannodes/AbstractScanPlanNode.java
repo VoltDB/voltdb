@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -35,6 +36,9 @@ import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -60,6 +64,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     // Flag marking the sub-query plan
     protected boolean m_isSubQuery = false;
+    protected StmtTableScan m_tableScan = null;
 
     protected AbstractScanPlanNode() {
         super();
@@ -73,20 +78,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead,
-                                    Collection<String> tableAliasesRead,
-                                    Collection<String> tableUpdated,
-                                    Collection<String> tableAliaseUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        assert(m_targetTableName != null);
-        assert(m_targetTableAlias != null);
-        tableAliasesRead.add(m_targetTableAlias);
-        if (!m_isSubQuery) {
-            tablesRead.add(m_targetTableName);
-        } else {
-            assert(m_children.size() == 1);
-            m_children.get(0).getTablesAndIndexes(tablesRead, tableAliasesRead, tableUpdated, tableAliaseUpdated, indexes);
+        if (m_tableScan != null && m_tableScan instanceof StmtTargetTableScan) {
+            tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
         }
     }
 
@@ -121,22 +117,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
-    /**
-     * Does the plan guarantee an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true unless the scan has an inline limit and no particular order.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        AbstractPlanNode limit = this.getInlinePlanNode(PlanNodeType.LIMIT);
-        if ((limit == null) || isOrderDeterministic()) {
-            return true;
-        } else {
-            m_nondeterminismDetail = "a limit on an unordered scan may return different rows";
-            return false;
-        }
-    }
-
     @Override
     public int overrideId(int newId) {
         m_id = newId++;
@@ -145,7 +125,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             List<AbstractExpression> subqueries = m_predicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
             for (AbstractExpression subquery : subqueries) {
                 assert(subquery instanceof SubqueryExpression);
-                CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBetsCostPlan();
+                CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();
                 newId = subqueryPlan.resetPlanNodeIds(newId);
             }
         }
@@ -164,7 +144,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @param name
      */
     public void setTargetTableName(String name) {
-        assert(name != null);
+        assert(m_isSubQuery || name != null);
         m_targetTableName = name;
     }
 
@@ -182,6 +162,21 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void setTargetTableAlias(String alias) {
         assert(alias != null);
         m_targetTableAlias = alias;
+    }
+
+    public void setTableScan(StmtTableScan tableScan) {
+        m_tableScan = tableScan;
+        setSubQuery(tableScan instanceof StmtSubqueryScan);
+        setTargetTableAlias(tableScan.getTableAlias());
+        setTargetTableName(tableScan.getTableName());
+        Collection<SchemaColumn> scanColumns = tableScan.getScanColumns();
+        if (scanColumns != null && ! scanColumns.isEmpty()) {
+            setScanColumns(scanColumns);
+        }
+    }
+
+    public StmtTableScan getTableScan() {
+        return m_tableScan;
     }
 
     /**
@@ -227,7 +222,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Set the sub-query flag
      * @param isSubQuery
      */
-
     public void setSubQuery(boolean isSubQuery) {
         m_isSubQuery = isSubQuery;
     }
@@ -244,9 +238,32 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void generateOutputSchema(Database db)
     {
         // fill in the table schema if we haven't already
-        if (m_tableSchema == null)
-        {
-            generateTableSchema(db);
+        if (m_tableSchema == null) {
+            if (isSubQuery()) {
+                assert(m_children.size() == 1);
+                m_children.get(0).generateOutputSchema(db);
+                m_tableSchema = m_children.get(0).getOutputSchema();
+                // step to transfer derived table schema to upper level
+                m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
+
+            } else {
+                m_tableSchema = new NodeSchema();
+                CatalogMap<Column> cols = db.getTables().getExact(m_targetTableName).getColumns();
+                // you don't strictly need to sort this, but it makes diff-ing easier
+                for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
+                {
+                    // must produce a tuple value expression for this column.
+                    TupleValueExpression tve = new TupleValueExpression(
+                            m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
+                    tve.setValueType(VoltType.get((byte)col.getType()));
+                    tve.setValueSize(col.getSize());
+                    m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                             m_targetTableAlias,
+                                                             col.getTypeName(),
+                                                             col.getTypeName(),
+                                                             tve));
+                }
+            }
         }
 
         // Until the scan has an implicit projection rather than an explicitly
@@ -277,6 +294,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
+
             if (m_tableScanSchema.size() != 0)
             {
                 // Order the scan columns according to the table schema
@@ -296,11 +314,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 }
                 m_tableScanSchema.sortByTveIndex();
                 // Create inline projection to map table outputs to scan outputs
-                ProjectionPlanNode map = new ProjectionPlanNode();
-                map.setOutputSchema(m_tableScanSchema);
-                addInlinePlanNode(map);
+                ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+                projectionNode.setOutputSchema(m_tableScanSchema);
+                addInlinePlanNode(projectionNode);
                 // a bit redundant but logically consistent
-                m_outputSchema = map.getOutputSchema().copyAndReplaceWithTVE();
+                m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
                 m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
             }
             else
@@ -372,13 +390,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     }
 
-    //TODO some members not in here
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
-        stringer.key(Members.PREDICATE.name());
-        stringer.value(m_predicate);
+        if (m_predicate != null) {
+            stringer.key(Members.PREDICATE.name());
+            stringer.value(m_predicate);
+        }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
         if (m_isSubQuery) {
@@ -389,7 +408,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
+        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name(), m_tableScan);
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
@@ -409,30 +428,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     protected String explainPredicate(String prefix) {
-        // TODO Auto-generated method stub
         if (m_predicate != null) {
             return prefix + m_predicate.explain(m_targetTableName);
         }
         return "";
-    }
-
-    protected void generateTableSchema(Database db) {
-        m_tableSchema = new NodeSchema();
-        CatalogMap<Column> cols =
-            db.getTables().getIgnoreCase(m_targetTableName).getColumns();
-        // you don't strictly need to sort this, but it makes diff-ing easier
-        for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
-        {
-            // must produce a tuple value expression for this column.
-            TupleValueExpression tve = new TupleValueExpression(
-                    m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
-            tve.setValueType(VoltType.get((byte)col.getType()));
-            tve.setValueSize(col.getSize());
-            m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                     m_targetTableAlias,
-                                                     col.getTypeName(),
-                                                     col.getTypeName(),
-                                                     tve));
-        }
     }
 }

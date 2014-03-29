@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -34,10 +34,14 @@ import os
 import glob
 import re
 import shlex
+import platform
 
 from voltcli import utility
 
-re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]jar$')
+re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]([\w]+\.)*jar$')
+
+config_name = 'volt.cfg'
+config_name_local = 'volt_local.cfg'
 
 # Filled in during startup.
 standalone   = None
@@ -46,6 +50,9 @@ command_dir  = None
 command_name = None
 voltdb_jar   = None
 classpath    = None
+
+# Location of third_party/python if available.
+third_party_python = None
 
 # Assume that we're in a subdirectory of the main volt Python library
 # directory.  Add the containing library directory to the Python module load
@@ -63,14 +70,51 @@ else:
 if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
 java_opts = []
+
+#If this is a large memory system commit the full heap
+specify_minimum_heap = False
+if platform.system() == "Linux":
+    memory = os.popen("free -m")
+    try:
+        totalMemory = int(memory.readlines()[1].split()[1])
+        specifyMinimumHeapSize = totalMemory > 1024 * 16
+    finally:
+        memory.close()
+
 if 'VOLTDB_HEAPMAX' in os.environ:
-    java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
+    try:
+        java_opts.append('-Xmx%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
+        if specifyMinimumHeapSize:
+            java_opts.append('-Xms%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
+    except ValueError:
+        java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
 if 'VOLTDB_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['VOLTDB_OPTS']))
 if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
-    java_opts.append('-Xmx1024m')
+    java_opts.append('-Xmx2048m')
+    if specify_minimum_heap:
+        java_opts.append('-Xms2048m')
+
+# Set common options now.
+java_opts.append('-server')
+java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600')
+java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
+java_opts.append('-XX:HeapDumpPath=/tmp')
+java_opts.append('-XX:+UseParNewGC')
+java_opts.append('-XX:+UseConcMarkSweepGC')
+java_opts.append('-XX:+CMSParallelRemarkEnabled')
+java_opts.append('-XX:+UseTLAB')
+java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
+java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
+java_opts.append('-XX:+UseCondCardMark')
+java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775808')
+java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775808')
+java_opts.append('-XX:CMSWaitDuration=120000')
+java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
+java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
+java_opts.append('-XX:+CMSScavengeBeforeRemark')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
@@ -135,6 +179,12 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
                             if not os.environ.get('VOLTDB_VOLTDB', ''):
                                 os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
                                 utility.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+
+            # Capture the base third_party python path?
+            third_party_python_chk = os.path.join(dir, 'third_party', 'python')
+            if os.path.isdir(third_party_python_chk):
+                global third_party_python
+                third_party_python = third_party_python_chk
 
             dir = os.path.dirname(dir)
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,14 +16,15 @@
  */
 package org.voltdb.client.exampleutils;
 
-import org.voltdb.client.ClientResponse;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.voltdb.client.ClientResponse;
 
 /**
  * Provides a Future wrapper around an execution task's ClientResponse response object.
@@ -126,7 +127,7 @@ public class ExecutionFuture implements Future<ClientResponse>
         else if (this.response.getStatus() != ClientResponse.SUCCESS)
         {
             status.compareAndSet(STATUS_RUNNING, STATUS_FAILURE);
-            throw new ExecutionException(response.getException());
+            throw new ExecutionException(new Exception(response.getStatusString()));
         }
         else
         {

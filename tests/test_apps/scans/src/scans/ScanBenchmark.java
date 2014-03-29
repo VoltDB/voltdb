@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -221,7 +221,7 @@ public class ScanBenchmark {
             try {
                 outputStream = new PrintWriter(new FileWriter(config.statsfile));
                 // for stats: duration in milliseconds, # iterations (# rows in this case)
-                outputStream.printf("0,%d,%d,0,0,0,0\n", Math.round(averageTimePerScan), config.rows);
+                outputStream.printf("0,%f,%d,0,0,0,0,0,0,0,0,0,0\n", averageTimePerScan, config.rows);
             } catch (Exception e) {
                 System.err.println("ERROR unable to write stats file");
                 System.err.println(e);

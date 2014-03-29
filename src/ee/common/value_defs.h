@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,5 +50,6 @@
 #define VALUE_COMPARE_LESSTHAN -1
 #define VALUE_COMPARE_EQUAL 0
 #define VALUE_COMPARE_GREATERTHAN 1
+#define VALUE_COMPARE_INVALID -2
 
 #endif

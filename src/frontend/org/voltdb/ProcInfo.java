@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,8 +23,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotates a stored procedure with information needed by the stored
- * procedure compiler.
+ * <p>Annotates a stored procedure with information needed by the stored
+ * procedure compiler.</p>
+ *
+ * <p>This is not Java deprecated, but this information is
+ * commonly provided in DDL rather than using this annotation. The compiler
+ * will complain if this annotation and DDL partitioning info is provided
+ * for the same procedure, even if it doesn't conflict.</p>
  *
  * @see VoltProcedure
  * @see ProcInfoData

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -334,7 +334,7 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals(4, result.getRowCount());
     }
 
-    private void compareTable(VoltTable vt, Object [][] expected) {
+    private static void compareTable(VoltTable vt, Object [][] expected) {
         int len = expected.length;
         assertEquals(len, vt.getRowCount());
         for (int i=0; i < len; i++) {
@@ -342,7 +342,7 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
-    private void compareRow(VoltTable vt, Object [] expected) {
+    private static void compareRow(VoltTable vt, Object [] expected) {
         assertTrue(vt.advanceRow());
         assertEquals( ((Integer)expected[0]).intValue(), vt.getLong(0));
         assertEquals( ((String)expected[1]), vt.getString(1));

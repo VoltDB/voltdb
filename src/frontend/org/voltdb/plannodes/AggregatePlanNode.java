@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -190,15 +190,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
         }
-        for (TupleValueExpression tve : output_tves)
-        {
+        for (TupleValueExpression tve : output_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            if (index == -1)
-            {
+            if (index == -1) {
                 // check to see if this TVE is the aggregate output
                 // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
-                if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
-                {
+                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
                     throw new RuntimeException("Unable to find index for column: " +
                                                tve.getColumnName());
                 }
@@ -330,25 +327,35 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
         sb.append("AGGREGATION ops: ");
+        int ii = 0;
         for (ExpressionType e : m_aggregateTypes) {
-            switch (e) {
-            case AGGREGATE_AVG: sb.append("avg, "); break;
-            case AGGREGATE_COUNT: sb.append("count, "); break;
-            case AGGREGATE_COUNT_STAR: sb.append("count(*), "); break;
-            case AGGREGATE_MAX: sb.append("max, "); break;
-            case AGGREGATE_MIN: sb.append("min, "); break;
-            case AGGREGATE_SUM: sb.append("sum, "); break;
-            default: assert(false);
+            sb.append(e.symbol());
+            if (e != ExpressionType.AGGREGATE_COUNT_STAR) {
+                if (m_aggregateDistinct.get(ii) == 1) {
+                    sb.append(" DISTINCT");
+                }
+                sb.append("(");
+                AbstractExpression ae = m_aggregateExpressions.get(ii);
+                if (ae != null) {
+                    sb.append(ae.explain(optionalTableName));
+                }
+                sb.append("), ");
             }
+            ++ii;
         }
         // trim the last ", " from the string
         sb.setLength(sb.length() - 2);
         if (m_prePredicate != null) {
-            sb.append(" (" + m_prePredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+            sb.append(" ONLY IF " + m_prePredicate.explain(optionalTableName));
         }
         if (m_postPredicate != null) {
-            sb.append(" (" + m_postPredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+            // HAVING is always defined WRT to the current outputSchema (NOT inputschema).
+            // This might be a little surprising to the user
+            // -- maybe we can find some better way to describe the TVEs, here.
+            sb.append(" HAVING " + m_postPredicate.explain("VOLT_TEMP_TABLE"));
         }
         return sb.toString();
     }
@@ -373,7 +380,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
         }
         AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
-                                                  Members.GROUPBY_EXPRESSIONS.name());
+                                                  Members.GROUPBY_EXPRESSIONS.name(), null);
         m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }

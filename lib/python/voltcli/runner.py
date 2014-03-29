@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -119,6 +119,12 @@ class JavaRunner(object):
     def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
         Run a Java command line with option overrides.
+        Supported keyword arguments:
+            classpath           Java classpath.
+            daemon              Run as background (daemon) process if True.
+            daemon_name         Daemon name.
+            daemon_description  Daemon description for messages.
+            daemon_output       Output directory for PID files and stdout/error capture.
         """
         self.initialize()
         classpath = self.classpath
@@ -135,7 +141,12 @@ class JavaRunner(object):
         for arg in args:
             if arg is not None:
                 java_args.append(arg)
-        return utility.run_cmd(*java_args)
+        daemonizer = utility.kwargs_get(kwargs, 'daemonizer')
+        if daemonizer:
+            # Does not return if successful.
+            daemonizer.start_daemon(*java_args)
+        else:
+            return utility.run_cmd(*java_args)
 
     def compile(self, outdir, *srcfiles):
         """
@@ -164,7 +175,6 @@ class VerbRunner(object):
         self.verbspace    = verbspace
         self.config       = config
         self.default_func = None
-        self.project_path = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
         # Create a Java runner.
@@ -392,17 +402,70 @@ class VerbRunner(object):
             args2 = [verb_name] + list(args[1:])
             self._run_command(verbspace, *args2, **kwargs)
 
-    def call_proc(self, sysproc_name, types, args, check_status = True):
+    def call_proc(self, sysproc_name, types, args, check_status=True, timeout=None):
         if self.client is None:
             utility.abort('Command is not set up as a client.',
                           'Add an appropriate admin or client bundle to @VOLT.Command().')
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
-        response = proc.call(params = args)
+        response = proc.call(params=args, timeout=timeout)
         if check_status and response.status != 1:
             utility.abort('"%s" procedure call failed.' % sysproc_name, (response,))
         utility.verbose_info(response)
         return utility.VoltResponseWrapper(response)
+
+    def java_execute(self, java_class, java_opts_override, *args, **kwargs):
+        """
+        Execute a Java program.
+        """
+        if utility.kwargs_get_boolean(kwargs, 'daemon', default=False):
+            kwargs['daemonizer'] = self._get_daemonizer(**kwargs)
+        self.java.execute(java_class, java_opts_override, *args, **kwargs)
+
+    def setup_daemon_kwargs(self, kwargs, name=None, description=None, output=None):
+        """
+        Initialize daemon keyword arguments.
+        """
+        # Build the name, using the host option if available.
+        names = []
+        if name:
+            names.append(name)
+        if hasattr(self.opts, 'host'):
+            names.append(self.opts.host.replace(':', '_'))
+        if not names:
+            names.append('server')
+        daemon_name = ''.join(names)
+        # Default daemon output directory to the state directory, which is
+        # frequently set to ~/.<command_name>.
+        daemon_output = output
+        if daemon_output is None:
+            daemon_output = utility.get_state_directory()
+        # Provide a generic description if one wasn't provided.
+        daemon_description = description
+        if daemon_description is None:
+            daemon_description = "server"
+        kwargs['daemon'] = True
+        kwargs['daemon_name'] = daemon_name
+        kwargs['daemon_description'] = daemon_description
+        kwargs['daemon_output'] = daemon_output
+
+    def create_daemonizer(self, name=None, description=None, output=None):
+        kwargs = {}
+        self.setup_daemon_kwargs(kwargs, name=name, description=description, output=output)
+        return self._get_daemonizer(**kwargs)
+
+    def find_resource(self, name, required=False):
+        """
+        Find a resource file.
+        """
+        if self.verbspace.scan_dirs:
+            for scan_dir in self.verbspace.scan_dirs:
+                path = os.path.join(scan_dir, name)
+                if os.path.exists(path):
+                    return path
+        if required:
+            utility.abort('Resource file "%s" is missing.' % name)
+        return None
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
@@ -455,6 +518,16 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
             if show_help:
                 self.help()
         sys.exit(1)
+
+    def _get_daemonizer(self, **kwargs):
+        """
+        Scan keyword arguments for daemon-related options (and strip them
+        out). Return a daemonizer.
+        """
+        name = utility.kwargs_get_string(kwargs, 'daemon_name', default=environment.command_name)
+        description = utility.kwargs_get_string(kwargs, 'daemon_description', default=False)
+        output = utility.kwargs_get_string(kwargs, 'daemon_output', default=environment.command_dir)
+        return utility.Daemonizer(name, description, output=output)
 
 #===============================================================================
 class VOLT(object):
@@ -518,8 +591,9 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     # script location and the location of this module. The executed modules
     # have decorator calls that populate the verbs dictionary.
     finder = utility.PythonSourceFinder()
-    for scan_dir in scan_base_dirs:
-        finder.add_path(os.path.join(scan_dir, verbs_subdir))
+    scan_dirs = [os.path.join(d, verbs_subdir) for d in scan_base_dirs]
+    for scan_dir in scan_dirs:
+        finder.add_path(scan_dir)
     # If running from a zip package add resource locations.
     if package:
         finder.add_resource('__main__', os.path.join('voltcli', verbs_subdir))
@@ -532,7 +606,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -558,7 +632,8 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
-        cli.CLIParser.__init__(self, verbspace.verbs,
+        cli.CLIParser.__init__(self, environment.command_name,
+                                     verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
@@ -578,6 +653,8 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)
     utility.set_debug(  command.opts.debug)
+    if hasattr(command.opts, 'dryrun'):
+        utility.set_dryrun( command.opts.dryrun)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".
@@ -591,9 +668,12 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     Called by running script to execute command with command line arguments.
     """
     # The "package" keyword flags when running from a package zip __main__.py.
-    package = utility.kwargs_get_boolean(kwargs, 'package', default = False)
+    package = utility.kwargs_get_boolean(kwargs, 'package', default=False)
     # The "standalone" keyword allows environment.py to skip the library search.
-    standalone = utility.kwargs_get_boolean(kwargs, 'standalone', default = False)
+    standalone = utility.kwargs_get_boolean(kwargs, 'standalone', default=False)
+    # The "state_directory" keyword overrides ~/.<command_name> as the
+    # directory used for runtime state files.
+    state_directory = utility.kwargs_get_string(kwargs, 'state_directory', default=None)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
@@ -602,12 +682,18 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
         utility.set_debug(opts.debug)
 
         # Load the configuration and state
-        permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
-        local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
+        permanent_path = os.path.join(os.getcwd(), environment.config_name)
+        local_path     = os.path.join(os.getcwd(), environment.config_name_local)
         config = VoltConfig(permanent_path, local_path)
 
         # Initialize the environment
         environment.initialize(standalone, command_name, command_dir, version)
+
+        # Initialize the state directory (for runtime state files).
+        if state_directory is None:
+            state_directory = '~/.%s' % environment.command_name
+        state_directory = os.path.expandvars(os.path.expanduser(state_directory))
+        utility.set_state_directory(state_directory)
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,

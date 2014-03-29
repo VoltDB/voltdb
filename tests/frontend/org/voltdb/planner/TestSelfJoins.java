@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,16 +23,25 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexLookupType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestSelfJoins  extends PlannerTestCase {
 
@@ -133,9 +142,217 @@ public class TestSelfJoins  extends PlannerTestCase {
                 "Not unique table/alias: A");
     }
 
+    public void testIndexedSelfJoin() {
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        IndexScanPlanNode c;
+        AbstractPlanNode apn;
+        AbstractPlanNode pn;
+        NestLoopIndexPlanNode nlij;
+        List<AbstractExpression> searchKeys;
+        // SELF JOIN using two different indexes on the same table
+        // sometimes with a surviving sort ordering that supports GROUP BY and/or ORDER BY.
+
+        apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 ORDER BY B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 ORDER BY B.A, B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 ORDER BY B.A, B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        apn = compile("select B.C, MAX(A.C) FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.C ORDER BY B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, B.C ORDER BY B.A, B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 GROUP BY B.A, B.C ORDER BY B.A, B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        // Here's a case that can't be optimized because it purposely uses the "wrong" alias
+        // in the GROUP BY and ORDER BY.
+        apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, A.C ORDER BY B.A, A.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        // This variant shows that the GROUP BY can be a permutation of the sort order
+        // without messing up the optimization
+        apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 GROUP BY B.C, B.A ORDER BY B.A, B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+   }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestJoinOrder.class.getResource("testself-joins-ddl.sql"), "testselfjoins", false);
     }
-
 }

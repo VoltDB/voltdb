@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,12 @@ public interface WriteStream {
      * Returns true when a drainTo invocation was unable to completely drain all queued bytes
      */
     public boolean hadBackPressure();
+
+    /**
+     * Only implemented for the client network, queues the callback
+     * without acquiring additional locks or doing more work
+     */
+    public void fastEnqueue(final DeferredSerialization ds);
 
     /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism

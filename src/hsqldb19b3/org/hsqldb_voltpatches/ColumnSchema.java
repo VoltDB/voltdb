@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
@@ -77,12 +76,10 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return columnName;
     }
 
-    @Override
     public String getNameString() {
         return columnName.name;
     }
 
-    @Override
     public String getTableNameString() {
         return columnName.parent == null ? null
                                          : columnName.parent.name;
@@ -92,7 +89,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return columnName.schema;
     }
 
-    @Override
     public String getSchemaNameString() {
         return columnName.schema == null ? null
                                          : columnName.schema.name;
@@ -103,7 +99,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
                                          : columnName.schema.schema;
     }
 
-    @Override
     public String getCatalogNameString() {
 
         return columnName.schema == null ? null
@@ -156,7 +151,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return sb.toString();
     }
 
-    @Override
     public void setType(Type type) {
         this.dataType = type;
     }
@@ -184,7 +178,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isNullable() {
 
         boolean isNullable = super.isNullable();
@@ -198,7 +191,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return isNullable;
     }
 
-    @Override
     public byte getNullability() {
         return isPrimaryKey ? SchemaObject.Nullability.NO_NULLS
                             : super.getNullability();
@@ -217,17 +209,14 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isWriteable() {
         return !isGenerated();
     }
 
-    @Override
     public void setWriteable(boolean value) {
         throw Error.runtimeError(ErrorCode.U_S0500, "");
     }
 
-    @Override
     public boolean isSearchable() {
         return Types.isSearchable(dataType.typeCode);
     }
@@ -325,7 +314,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return copy;
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -335,7 +324,8 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetColumnXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetColumnXML(Session session)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement column = new VoltXMLElement("column");
 
@@ -351,7 +341,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
             String msg = "VARCHAR column size for column ";
             msg += getTableNameString() + "." + columnName.name;
             msg += " is > 1048576 char maximum.";
-            throw new HSQLParseException(msg);
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
         }
 
         // see if there is a default value for the column
@@ -372,4 +362,5 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
 
         return column;
     }
+    /**********************************************************************/
 }

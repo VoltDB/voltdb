@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -82,6 +82,10 @@ class MpRoSitePool {
             return m_catalogContext.getCatalogCRC();
         }
 
+        long getCatalogVersion() {
+            return m_catalogContext.catalogVersion;
+        }
+
         void shutdown() {
             m_site.startShutdown();
             // Need to unblock the site's run() loop on the take() call on the queue
@@ -162,7 +166,8 @@ class MpRoSitePool {
         Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
         while (siterator.hasNext()) {
             MpRoSiteContext site = siterator.next();
-            if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()) {
+            if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()
+                    || site.getCatalogVersion() != m_catalogContext.catalogVersion) {
                 site.shutdown();
                 m_idleSites.remove(site);
             }
@@ -239,7 +244,8 @@ class MpRoSitePool {
         // check the catalog versions, only push back onto idle if the catalog hasn't changed
         // otherwise, just let it get garbage collected and let doWork() construct new ones for the
         // pool with the updated catalog.
-        if (site.getCatalogCRC() == m_catalogContext.getCatalogCRC()) {
+        if (site.getCatalogCRC() == m_catalogContext.getCatalogCRC()
+                && site.getCatalogVersion() == m_catalogContext.catalogVersion) {
             m_idleSites.push(site);
         }
         else {

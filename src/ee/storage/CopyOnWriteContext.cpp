@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -76,14 +76,14 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     }
 
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
             "COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
     }
 
     m_surgeon.activateSnapshot();
 
-    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks.begin(), m_blocks.end()));
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks));
 
     if (m_inserts != 0 || m_updates != 0 || m_deletes != 0) {
         char msg[1024];
@@ -280,38 +280,17 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
      * we are looking for is probably the previous entry. Then check if the address fits
      * in the previous entry. If it doesn't then the block is something new.
      */
-    char *address = tuple.address();
-    TBMapI i = m_blocks.lower_bound(address);
-    if (i == m_blocks.end() && m_blocks.empty()) {
+    TBPtr block = PersistentTable::findBlock(tuple.address(), m_blocks, getTable().getTableAllocationSize());
+    if (block.get() == NULL) {
+        // tuple not in snapshot region, don't care about this tuple
         return true;
     }
-    if (i == m_blocks.end()) {
-        i--;
-        if (i.key() + getTable().m_tableAllocationSize < address) {
-            return true;
-        }
-        //OK it is in the very last block
-    } else {
-        if (i.key() != address) {
-            i--;
-            if (i.key() + getTable().m_tableAllocationSize < address) {
-                return true;
-            }
-            //OK... this is in this particular block
-        }
-    }
-
-    const char *blockStartAddress = i.key();
 
     /**
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    bool d = !iter->needToDirtyTuple(blockStartAddress, address);
-    if (d) {
-        m_deletes++;
-    }
-    return d;
+    return !iter->needToDirtyTuple(block->address(), tuple.address());
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
@@ -344,38 +323,18 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     /**
      * Find out which block the address is contained in.
      */
-    char *address = tuple.address();
-    TBMapI i =
-                            m_blocks.lower_bound(address);
-    if (i == m_blocks.end() && m_blocks.empty()) {
+    TBPtr block = PersistentTable::findBlock(tuple.address(), m_blocks, getTable().getTableAllocationSize());
+    if (block.get() == NULL) {
+        // tuple not in snapshot region, don't care about this tuple, no need to dirty it
         tuple.setDirtyFalse();
         return;
     }
-    if (i == m_blocks.end()) {
-        i--;
-        if (i.key() + getTable().m_tableAllocationSize < address) {
-            tuple.setDirtyFalse();
-            return;
-        }
-        //OK it is in the very last block
-    } else {
-        if (i.key() != address) {
-            i--;
-            if (i.key() + getTable().m_tableAllocationSize < address) {
-                tuple.setDirtyFalse();
-                return;
-            }
-            //OK... this is in this particular block
-        }
-    }
-
-    const char *blockStartAddress = i.key();
 
     /**
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (iter->needToDirtyTuple(blockStartAddress, address)) {
+    if (iter->needToDirtyTuple(block->address(), tuple.address())) {
         tuple.setDirtyTrue();
         /**
          * Don't back up a newly introduced tuple, just mark it as dirty.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -837,7 +837,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             client.callProcedure("R6.delete", 0);
             fail();
         } catch (Exception exc) {
-            assertTrue(exc.toString().contains("Object exceeds specified size"));
+            assertTrue(exc.toString().contains("The size 2050 of the value"));
+            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR[\"2048\"] column"));
         }
     }
 

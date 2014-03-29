@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,7 @@ public class PartitionProjectionSnapshotFilter implements SnapshotDataFilter {
             @Override
             public BBContainer call() throws Exception {
                 final BBContainer cont = input.call();
-                final int partitionId = cont.b.getInt(m_partitionIdOffset);
+                final int partitionId = cont.b().getInt(m_partitionIdOffset);
                 boolean hasPartition = false;
 
                 for (int acceptedPartitionId : m_partitions) {

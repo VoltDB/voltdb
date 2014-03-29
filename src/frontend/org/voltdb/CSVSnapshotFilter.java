@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
@@ -45,7 +44,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
         }
         m_fullDelimiters = fullDelimiters;
         m_delimiter = delimiter;
-        m_schemaBytes = vt.getSchemaBytes();
+        m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
     }
 
     @Override
@@ -53,15 +52,15 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
         return new Callable<BBContainer>() {
             @Override
             public BBContainer call() throws Exception {
-                final BBContainer cont = input.call();
+                BBContainer cont = input.call();
                 if (cont == null) {
                     return null;
                 }
                 try {
-                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining() - 4);
+                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b().remaining() - 4);
                     buf.put(m_schemaBytes);
-                    cont.b.position(4);
-                    buf.put(cont.b);
+                    cont.b().position(4);
+                    buf.put(cont.b());
 
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
                     Pair<Integer, byte[]> p =
@@ -72,9 +71,19 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                                             m_fullDelimiters,
                                             m_lastNumCharacters);
                     m_lastNumCharacters = p.getFirst();
-                    return DBBPool.wrapBB(ByteBuffer.wrap(p.getSecond()));
+                    final BBContainer origin = cont;
+                    cont = null;
+                    return new BBContainer( ByteBuffer.wrap(p.getSecond())) {
+                        @Override
+                        public void discard() {
+                            checkDoubleFree();
+                            origin.discard();
+                        }
+                    };
                 } finally {
-                    cont.discard();
+                    if (cont != null) {
+                        cont.discard();
+                    }
                 }
             }
         };

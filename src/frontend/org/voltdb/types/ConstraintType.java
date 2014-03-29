@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,8 @@ public enum ConstraintType {
     CHECK        (3),
     PRIMARY_KEY  (4),
     NOT_NULL     (5),
-    PARTITIONING (6);
+    PARTITIONING (6),
+    LIMIT        (7);
 
     ConstraintType(int val) {
         assert (this.ordinal() == val) :

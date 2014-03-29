@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,12 +24,12 @@ import java.util.regex.Pattern;
 
 public enum StartAction {
 
-    CREATE("create"),
-    RECOVER("recover"),
-    SAFE_RECOVER("recover safemode"),
-    REJOIN("rejoin"),
-    LIVE_REJOIN("live rejoin"),
-    JOIN("join");
+    CREATE("create", false, null),
+    RECOVER("recover", true, "Command Log Recovery"),
+    SAFE_RECOVER("recover safemode", true, "Command Log Recovery"),
+    REJOIN("rejoin", true, "K-Safety / Node Rejoin"),
+    LIVE_REJOIN("live rejoin", true, "K-Safety / Node Rejoin"),
+    JOIN("add", true, "Elastic Cluster Sizing");
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
@@ -46,6 +46,8 @@ public enum StartAction {
             EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
 
     final String m_verb;
+    final boolean m_enterpriseOnly;
+    final String m_featureNameForErrorString;
 
     static {
         for (StartAction action: StartAction.values()) {
@@ -53,8 +55,10 @@ public enum StartAction {
         }
     }
 
-    StartAction(String verb) {
+    StartAction(String verb, boolean enterpriseOnly, String featureNameForErrorString) {
         m_verb = verb;
+        m_enterpriseOnly = enterpriseOnly;
+        m_featureNameForErrorString = featureNameForErrorString;
     }
 
     public static StartAction monickerFor(String verb) {
@@ -65,6 +69,14 @@ public enum StartAction {
 
     public String verb() {
         return m_verb;
+    }
+
+    public boolean isEnterpriseOnly() {
+        return m_enterpriseOnly;
+    }
+
+    public String featureNameForErrorString() {
+        return m_featureNameForErrorString;
     }
 
     public boolean doesRecover() {

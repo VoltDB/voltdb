@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,24 +22,19 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 /**
-*
-*/
+ *
+ */
 public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
-        TABLE_NAME,
-        TABLE_ALIAS,
-        COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
@@ -56,12 +51,12 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     /**
      * Create a new TupleValueExpression
-     * @param tableName The name of the table where this column originated,
-     * if any. Currently, internally created columns will be assigned
-     * the table name "VOLT_TEMP_TABLE" for disambiguation.
-     * @param tableAlias The alias assigned to this table, if any
-     * @param columnName The name of this column, if any
-     * @param columnAlias The alias assigned to this column, if any
+     * @param tableName  The name of the table where this column originated,
+     *        if any.  Currently, internally created columns will be assigned
+     *        the table name "VOLT_TEMP_TABLE" for disambiguation.
+     * @param tableAlias  The alias assigned to this table, if any
+     * @param columnName  The name of this column, if any
+     * @param columnAlias  The alias assigned to this column, if any
      * @param columnIndex. The column index in the table
      */
     public TupleValueExpression(String tableName,
@@ -132,14 +127,14 @@ public class TupleValueExpression extends AbstractValueExpression {
     /**
      * @return the column index
      */
-    public Integer getColumnIndex() {
+    public int getColumnIndex() {
         return m_columnIndex;
     }
 
     /**
      * @param columnIndex The index of the column to set
      */
-    public void setColumnIndex(Integer columnIndex) {
+    public void setColumnIndex(int columnIndex) {
         m_columnIndex = columnIndex;
     }
 
@@ -274,44 +269,23 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
-        stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
-        stringer.key(Members.TABLE_ALIAS.name()).value(m_tableAlias);
-        // Column name is not required in the EE but testing showed that it is
-        // needed to support type resolution of indexed expressions in the planner
-        // after they get round-tripped through the catalog's index definition.
-        stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
         if (m_tableIdx > 0) {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
-            //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
     {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
-        m_tableName = obj.getString(Members.TABLE_NAME.name());
-        m_tableAlias = obj.getString(Members.TABLE_ALIAS.name());
-        m_columnName = obj.getString(Members.COLUMN_NAME.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
-            //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
         }
-    }
-
-    @Override
-    public void resolveForDB(Database db) {
-        if (m_tableName == null && m_columnName == null) {
-            // This is a dummy TVE standing in for a simplecolumn
-            // -- the assumption has to be that it is not being used in a general expression,
-            // so the schema-dependent type implications don't matter
-            // and its "target" value is getting properly validated, so we can shortcut checking here.
-            assert(false);
-            return;
+        if (tableScan != null) {
+            m_tableAlias = tableScan.getTableAlias();
+            m_tableName = tableScan.getTableName();
+            m_columnName = tableScan.getColumnName(m_columnIndex);
         }
-        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
-        Table table = db.getTables().getIgnoreCase(m_tableName);
-        resolveForTable(table);
     }
 
     @Override
@@ -321,20 +295,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         // table name is not specified (and not missed?).
         // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
         // -- not bothering for now.
-        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        Column column = table.getColumns().getExact(m_columnName);
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
-    }
-
-    @Override
-    public void resolveForStmt(Database db, AbstractParsedStmt stmt) {
-        assert (m_tableAlias != null);
-        assert (stmt.tableAliasIndexMap.containsKey(m_tableAlias));
-        StmtTableScan tableCache = stmt.stmtCache.get(stmt.tableAliasIndexMap.get(m_tableAlias));
-        tableCache.resolveTVEForDB(db, this);
     }
 
     /**
@@ -386,11 +352,42 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        if (m_tableName.equals(impliedTableName)) {
-            return m_columnName;
-        } else {
-            return m_tableName + "." + m_columnName;
+        String tableName = m_tableName;
+        String columnName = m_columnName;
+        if (columnName == null || columnName.equals("")) {
+            columnName = "column#" + m_columnIndex;
         }
+        if (m_verboseExplainForDebugging) {
+            columnName += " (as JSON: ";
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                stringer.object();
+                toJSONString(stringer);
+                stringer.endObject();
+                columnName += stringer.toString();
+            }
+            catch (Exception e)
+            {
+                columnName += "CORRUPTED beyond the ability to format? " + e;
+                e.printStackTrace();
+            }
+            columnName += ")";
+        }
+        if (tableName == null) {
+            if (m_tableIdx != 0) {
+                assert(m_tableIdx == 1);
+                // This is join inner table
+                return "inner-table." + columnName;
+            }
+        }
+        else if ( ! tableName.equals(impliedTableName)) {
+            return tableName + "." + columnName;
+        } else if (m_verboseExplainForDebugging) {
+            // In verbose mode, always show an "implied' tableName that would normally be left off.
+            return "{" + tableName + "}." + columnName;
+        }
+        return columnName;
     }
 
 }

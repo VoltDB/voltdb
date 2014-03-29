@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -32,7 +33,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
@@ -40,6 +40,8 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
@@ -57,7 +59,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
-        DETERMINISM_ONLY,
+        PURPOSE,
         SORT_DIRECTION;
     }
 
@@ -87,9 +89,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     private AbstractExpression m_skip_null_predicate;
 
-    // ???
-    protected Boolean m_keyIterate = false;
-
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
 
@@ -102,15 +101,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
 
-    private boolean m_forDeterminismOnly = false;
+    private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
+    private static final int FOR_GROUPING = 2;
+    private static final int FOR_DETERMINISM = 3;
+
+    private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     public IndexScanPlanNode() {
         super();
     }
 
-    public IndexScanPlanNode(String tableName, String tableAlias) {
-        super(tableName, tableAlias);
-        assert(tableName != null && tableAlias != null);
+    public IndexScanPlanNode(StmtTableScan tableScan, Index index) {
+        super();
+        setTableScan(tableScan);
+        setCatalogIndex(index);
     }
 
     public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
@@ -128,6 +132,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
+        m_tableScan = srcNode.getTableScan();
     }
 
     public void setSkipNullPredicate() {
@@ -164,7 +169,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -191,13 +196,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead,
-                                    Collection<String> tableAliasesRead,
-                                    Collection<String> tableUpdated,
-                                    Collection<String> tableAliaseUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableAliasesRead, tableUpdated, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
@@ -248,30 +250,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return false;
     }
 
-    public void setCatalogIndex(Index index)
+    private void setCatalogIndex(Index index)
     {
         m_catalogIndex = index;
+        m_targetIndexName = index.getTypeName();
     }
 
     public Index getCatalogIndex()
     {
         return m_catalogIndex;
-    }
-
-    /**
-     *
-     * @param keyIterate
-     */
-    public void setKeyIterate(Boolean keyIterate) {
-        m_keyIterate = keyIterate;
-    }
-
-    /**
-     *
-     * @return Does this scan iterate over values in the index.
-     */
-    public Boolean getKeyIterate() {
-        return m_keyIterate;
     }
 
     /**
@@ -310,13 +297,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public String getTargetIndexName() {
         return m_targetIndexName;
-    }
-
-    /**
-     * @param targetIndexName the target_index_name to set
-     */
-    public void setTargetIndexName(String targetIndexName) {
-        m_targetIndexName = targetIndexName;
     }
 
     /**
@@ -450,9 +430,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
+        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
         // get the width of the index and number of columns used
         // need doubles for math
@@ -560,16 +538,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
-        if (m_forDeterminismOnly) {
-            stringer.key(Members.DETERMINISM_ONLY.name()).value(true);
+        if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
+            stringer.key(Members.PURPOSE.name()).value(m_purpose);
         }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
-
+        if (m_searchkeyExpressions.size() > 0) {
+            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
+            for (AbstractExpression ae : m_searchkeyExpressions) {
+                assert (ae instanceof JSONString);
+                stringer.value(ae);
+            }
+            stringer.endArray();
+        }
+        if (m_endExpression != null) {
+            stringer.key(Members.END_EXPRESSION.name());
+            stringer.value(m_endExpression);
+        }
         if (m_initialExpression != null) {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
@@ -577,40 +563,32 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
-
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
     }
 
     //all members loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
+        m_purpose = jobj.has(Members.PURPOSE.name()) ?
+                jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
-        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name());
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
+                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         // When there is no start key, count a range scan key for each ANDed end condition.
@@ -624,9 +602,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // The plan is easy to explain if it isn't using indexed expressions.
             // Just explain why an index scan was chosen
             // -- either for determinism or for an explicit ORDER BY requirement.
-            if (m_forDeterminismOnly) {
+            if (m_purpose == FOR_DETERMINISM) {
                 usageInfo = " (for deterministic order only)";
-            } else {
+            }
+            else if (m_purpose == FOR_GROUPING) {
+                usageInfo = " (for optimized grouping only)";
+            }
+            else {
                 usageInfo = " (for sort order only)";
             }
             // Introduce on its own indented line, any unrelated post-filter applied to the result.
@@ -634,6 +616,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             predicatePrefix = "\n" + indent + " filter by ";
         }
         else {
+            int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
             String[] asIndexed = new String[indexSize];
             // Not really expecting to need these fall-back labels,
             // but in the case of an unexpected error accessing the catalog data,
@@ -653,7 +636,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr);
+                        AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(m_targetTableName);
@@ -769,7 +752,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setForDeterminismOnly() {
-        m_forDeterminismOnly = true;
+        m_purpose = FOR_DETERMINISM;
+    }
+
+    public void setForGroupingOnly() {
+        m_purpose = FOR_GROUPING;
+    }
+
+    public boolean isForGroupingOnly() {
+        return m_purpose == FOR_GROUPING;
     }
 
     // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter

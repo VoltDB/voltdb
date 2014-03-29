@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -197,18 +197,20 @@ public class RepairLog
             return;
         }
 
-        Iterator<RepairLog.Item> it;
+        Deque<RepairLog.Item> deq = null;
         if (isSP) {
-            it = m_logSP.iterator();
+            deq = m_logSP;
         }
         else {
-            it = m_logMP.iterator();
+            deq = m_logMP;
         }
 
-        while (it.hasNext()) {
-            RepairLog.Item item = it.next();
+        RepairLog.Item item = null;
+        while ((item = deq.peek()) != null) {
             if (item.canTruncate(handle)) {
-                it.remove();
+                deq.poll();
+            } else {
+                break;
             }
         }
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,12 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.plannodes.SchemaColumn;
@@ -34,59 +35,69 @@ public abstract class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
 
-    public enum TABLE_SCAN_TYPE {
-        TARGET_TABLE_SCAN,
-        TEMP_TABLE_SCAN
-    }
+    // The statement id this table belongs to
+    protected int m_stmtId;
+
+    // table alias
+    protected String m_tableAlias = null;
+
+    // Store a unique list of scan columns.
+    protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    protected Set<String> m_scanColumnNameSet = new HashSet<>();
 
     protected StmtTableScan(String tableAlias, int stmtId) {
         m_tableAlias = tableAlias;
         m_stmtId = stmtId;
     }
 
-    abstract public TABLE_SCAN_TYPE getScanType();
-
-    abstract public String getTableName();
-
-    abstract public boolean getIsreplicated();
-
-    abstract public boolean isPartitioningColumn(String columnName);
-
-    abstract public String getPartitionColumnName();
-
-    abstract public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve);
-
     public String getTableAlias() {
         return m_tableAlias;
     }
+
+    public List<SchemaColumn> getScanColumns() {
+        return m_scanColumnsList;
+    }
+
+    abstract public String getTableName();
+
+    abstract public boolean getIsReplicated();
+
+    abstract public String getPartitionColumnName();
+
+    abstract public List<Index> getIndexes();
+
+    public void setPartitioning(PartitioningForStatement partitioning) {}
 
     public int getStatementId() {
         return m_stmtId;
     }
 
-    public Set<SchemaColumn> getScanColumns() {
-        return m_scanColumns;
+// ENG-451-MERGE
+//    public Set<SchemaColumn> getScanColumns() {
+//        return m_scanColumns;
+//    }
+
+    abstract public String getColumnName(int m_columnIndex);
+
+    abstract public void processTVE(TupleValueExpression expr, String columnName);
+
+//    public PartitioningForStatement getPartitioning() {
+//        return null;
+//    }
+
+//    // Store a unique list of the columns actually used by this table instance.
+//    protected Set<SchemaColumn> m_scanColumns = new  HashSet<SchemaColumn>();
+
+    public void resolveTVE(TupleValueExpression expr, String columnName) {
+
+        processTVE(expr, columnName);
+
+        if (!m_scanColumnNameSet.contains(columnName)) {
+            SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
+                    columnName, columnName, (TupleValueExpression) expr.clone());
+            m_scanColumnNameSet.add(columnName);
+            m_scanColumnsList.add(scol);
+        }
     }
 
-    public Table getTargetTable() {
-        return null;
-    }
-
-    public TempTable getTempTable() {
-        return null;
-    }
-
-    public PartitioningForStatement getPartitioning() {
-        return null;
-    }
-
-    public void setPartitioning(PartitioningForStatement partitioning) {
-    }
-
-    // The statement id this table belongs to
-    protected int m_stmtId;
-    // table alias
-    protected String m_tableAlias = null;
-    // Store a unique list of the columns actually used by this table instance.
-    protected Set<SchemaColumn> m_scanColumns = new  HashSet<SchemaColumn>();
 }

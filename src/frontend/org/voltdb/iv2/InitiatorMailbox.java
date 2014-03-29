@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import com.google_voltpatches.common.base.Supplier;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -50,7 +51,11 @@ import org.voltdb.messaging.RejoinMessage;
  */
 public class InitiatorMailbox implements Mailbox
 {
-    static boolean LOG_TX = false;
+    static final boolean LOG_TX = false;
+    private static final boolean SCHEDULE_IN_SITE_THREAD;
+    static {
+        SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
+    }
 
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
@@ -71,11 +76,6 @@ public class InitiatorMailbox implements Mailbox
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
 
-    synchronized public void setRepairAlgo(RepairAlgo algo)
-    {
-        setRepairAlgoInternal(algo);
-    }
-
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         setLeaderStateInternal(maxSeenTxnId);
@@ -92,6 +92,12 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public void enableWritingIv2FaultLog() {
         enableWritingIv2FaultLogInternal();
+    }
+
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
+        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+        setRepairAlgoInternal(ra);
+        return ra;
     }
 
     protected void setRepairAlgoInternal(RepairAlgo algo)
@@ -243,9 +249,22 @@ public class InitiatorMailbox implements Mailbox
     }
 
     @Override
-    public synchronized void deliver(VoltMessage message)
+    public void deliver(final VoltMessage message)
     {
-        deliverInternal(message);
+        if (SCHEDULE_IN_SITE_THREAD) {
+            this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+                @Override
+                void run() {
+                    synchronized (InitiatorMailbox.this) {
+                        deliverInternal(message);
+                    }
+                }
+            });
+        } else {
+            synchronized (this) {
+                deliverInternal(message);
+            }
+        }
     }
 
     protected void deliverInternal(VoltMessage message) {
@@ -400,5 +419,10 @@ public class InitiatorMailbox implements Mailbox
             hostLog.info("TX HSID: " + CoreUtils.hsIdToString(m_hsId) +
                     ": " + message);
         }
+    }
+
+    public void notifyOfSnapshotNonce(String nonce) {
+        if (m_joinProducer == null) return;
+        m_joinProducer.notifyOfSnapshotNonce(nonce);
     }
 }

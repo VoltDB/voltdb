@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,7 +70,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
-        tableList.clear();
+        m_tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
@@ -78,13 +78,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 m_children.add(childStmt);
 
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
                 childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
@@ -96,13 +96,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param sql
      * @param joinOrder
      */
+    @Override
     void postParse(String sql, String joinOrder) {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
         }
 
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        m_sql = sql;
+        m_joinOrder = joinOrder;
     }
 
     /**
@@ -134,5 +135,35 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
             }
         }
+    }
+
+    @Override
+    public boolean isOrderDeterministic() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministic()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean hasLimitOrOffset() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( childStmt.hasLimitOrOffset()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

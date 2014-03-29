@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -117,6 +117,7 @@ public class AdHocMayhemThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class AdHocCallback implements ProcedureCallback {

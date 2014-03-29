@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,19 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 
 public abstract class SiteTasker {
+
+    public static abstract class SiteTaskerRunnable extends SiteTasker {
+        abstract void run();
+
+        public void run(SiteProcedureConnection siteConnection) {
+            run();
+        }
+
+        public void runForRejoin(SiteProcedureConnection siteConnection,
+                TaskLog rejoinTaskLog) throws IOException {
+            run();
+        }
+    }
 
     /**
      * Run executes the task. Run is called on the ExecutionSite thread

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,14 +122,6 @@ public interface ClientResponse {
     public String getAppStatusString();
 
     /**
-     * Get the <code>Exception</code> that caused the stored procedure to fail and roll back.
-     * There is no guarantee that an <code>Exception</code> will be provided.
-     * @return The <code>Exception</code> that caused the procedure to fail if it is available or <code>null</code>
-     *         if none was provided in the response.
-     */
-    public Exception getException();
-
-    /**
      * Get an estimate of the amount of time it took for the database
      * to process the transaction from the time it was received at the initiating node to the time
      * the initiating node got the response and queued it for transmission to the client.
@@ -144,4 +136,11 @@ public interface ClientResponse {
      * @return Time in milliseconds the procedure took to roundtrip from the client to the server
      */
     public int getClientRoundtrip();
+
+    /**
+     * Get the amount of time it took to run the transaction through the Client API, database, and back to the
+     * callback.
+     * @return Time in nanoseconds the procedure took to roundtrip from the client to the server
+     */
+    public long getClientRoundtripNanos();
 }

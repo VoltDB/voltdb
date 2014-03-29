@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,7 @@ import org.voltdb.rejoin.TaskLog;
  */
 abstract public class Scheduler implements InitiatorMessageHandler
 {
-    protected VoltLogger hostLog = new VoltLogger("HOST");
+    protected static VoltLogger hostLog = new VoltLogger("HOST");
 
     // A null task that unblocks the site task queue, used during shutdown
     static final SiteTasker m_nullTask = new SiteTasker() {

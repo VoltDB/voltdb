@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -165,8 +165,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     @Override
     public String getCatalogSeparator() throws SQLException
     {
-        checkClosed();
-        throw SQLError.noSupport();
+        return ".";
     }
 
     // Retrieves the database vendor's preferred term for "catalog".
@@ -318,15 +317,40 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         return new String(getDriverMajorVersion() + "." + getDriverMinorVersion());
     }
 
-    // Retrieves a description of the foreign key columns that reference the given table's primary key columns (the foreign keys exported by a table).
+    /**
+     * Retrieves a description of the foreign key columns that reference the
+     * given table's primary key columns (the foreign keys exported by a table).
+     */
     @Override
     public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        VoltTable vtable = new VoltTable(
+                new ColumnInfo("PKTABLE_CAT", VoltType.STRING),
+                new ColumnInfo("PKTABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("PKTABLE_NAME", VoltType.STRING),
+                new ColumnInfo("PKCOLUMN_NAME", VoltType.STRING),
+                new ColumnInfo("FKTABLE_CAT", VoltType.STRING),
+                new ColumnInfo("FKTABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("FKTABLE_NAME", VoltType.STRING),
+                new ColumnInfo("FKCOLUMN_NAME", VoltType.STRING),
+                new ColumnInfo("KEY_SEQ", VoltType.SMALLINT),
+                new ColumnInfo("UPDATE_RULE", VoltType.SMALLINT),
+                new ColumnInfo("DELETE_RULE", VoltType.SMALLINT),
+                new ColumnInfo("FK_NAME", VoltType.STRING),
+                new ColumnInfo("PK_NAME", VoltType.STRING),
+                new ColumnInfo("DEFERRABILITY", VoltType.SMALLINT)
+        );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
+        JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
+        return res;
     }
 
-    // Retrieves all the "extra" characters that can be used in unquoted identifier names (those beyond a-z, A-Z, 0-9 and _).
+    /**
+     * Retrieves all the "extra" characters that can be used in unquoted identifier
+     * names (those beyond a-z, A-Z, 0-9 and _).
+     */
     @Override
     public String getExtraNameCharacters() throws SQLException
     {
@@ -363,7 +387,26 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        VoltTable vtable = new VoltTable(
+                new ColumnInfo("PKTABLE_CAT", VoltType.STRING),
+                new ColumnInfo("PKTABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("PKTABLE_NAME", VoltType.STRING),
+                new ColumnInfo("PKCOLUMN_NAME", VoltType.STRING),
+                new ColumnInfo("FKTABLE_CAT", VoltType.STRING),
+                new ColumnInfo("FKTABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("FKTABLE_NAME", VoltType.STRING),
+                new ColumnInfo("FKCOLUMN_NAME", VoltType.STRING),
+                new ColumnInfo("KEY_SEQ", VoltType.SMALLINT),
+                new ColumnInfo("UPDATE_RULE", VoltType.SMALLINT),
+                new ColumnInfo("DELETE_RULE", VoltType.SMALLINT),
+                new ColumnInfo("FK_NAME", VoltType.STRING),
+                new ColumnInfo("PK_NAME", VoltType.STRING),
+                new ColumnInfo("DEFERRABILITY", VoltType.SMALLINT)
+        );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
+        JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
+        return res;
     }
 
     // Retrieves a description of the given table's indices and statistics.
@@ -660,15 +703,18 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public ResultSet getSchemas() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        VoltTable vtable = new VoltTable(
+                new ColumnInfo("TABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("TABLE_CATALOG", VoltType.STRING));
+        JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
+        return res;
     }
 
     // Retrieves the schema names available in this database.
     @Override
     public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
     {
-        checkClosed();
-        throw SQLError.noSupport();
+        return getSchemas();    // empty
     }
 
     // Retrieves the database vendor's preferred term for "schema".
@@ -740,7 +786,19 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        VoltTable vtable = new VoltTable(
+                new ColumnInfo("TABLE_CAT", VoltType.STRING),
+                new ColumnInfo("TABLE_SCHEM", VoltType.STRING),
+                new ColumnInfo("TABLE_NAME", VoltType.STRING),
+                new ColumnInfo("GRANTOR", VoltType.STRING),
+                new ColumnInfo("GRANTEE", VoltType.STRING),
+                new ColumnInfo("PRIVILEGE", VoltType.STRING),
+                new ColumnInfo("IS_GRANTABLE", VoltType.STRING)
+        );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
+        JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
+        return res;
     }
 
     // Convert the users VoltDB SQL pattern into a regex pattern
@@ -903,7 +961,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public boolean nullPlusNonNullIsNull() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return true;
     }
 
     // Retrieves whether NULL values are sorted at the end regardless of sort order.

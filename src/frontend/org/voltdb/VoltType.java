@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -68,7 +69,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             0, // minimum scale
-            0), // maximum scale
+            0, // maximum scale
+            "java.lang.Byte"), // getObject return type
 
     /**
      * 2-byte signed 2s-compliment short.
@@ -83,7 +85,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             0, // minimum scale
-            0), // maximum scale
+            0, // maximum scale
+            "java.lang.Short"), // getObject return type
 
     /**
      * 4-byte signed 2s-compliment integer.
@@ -99,7 +102,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             0, // minimum scale
-            0), // maximum scale
+            0, // maximum scale
+            "java.lang.Integer"), // getObject return type
 
     /**
      * 8-byte signed 2s-compliment long.
@@ -115,7 +119,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             0, // minimum scale
-            0), // maximum scale
+            0, // maximum scale
+            "java.lang.Long"), // getObject return type
 
     /**
      * 8-bytes in IEEE 754 "double format".
@@ -131,7 +136,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             null, // minimum scale
-            null), // maximum scale
+            null, // maximum scale
+            "java.lang.Double"), // getObject return type
 
     /**
      * 8-byte long value representing microseconds after the epoch.
@@ -151,7 +157,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             null, // unsigned?
             null, // minimum scale
-            null), // maximum scale
+            null, // maximum scale
+            "java.sql.Timestamp"), // getObject return type
 
     /**
      * UTF-8 string with up to 32K chars.
@@ -167,7 +174,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typeSearchable, // where-clauses supported
             null, // unsigned?
             null, // minimum scale
-            null), // maximum scale
+            null, // maximum scale
+            "java.lang.String"), // getObject return type
 
     /**
      * VoltTable type for Procedure parameters
@@ -186,8 +194,8 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
             12, // minimum scale
-            12), // maximum scale
-
+            12, // maximum scale
+            "java.math.BigDecimal"), // getObject return type
 
     /**
      * Array of bytes of variable length
@@ -200,12 +208,12 @@ public enum VoltType {
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
             "max_length", // necessary params to create
-            true, // case-sensitive
+            false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
-            false, // unsigned?
+            null, // unsigned?
             null, // minimum scale
-            null); // maximum scale
-
+            null, // maximum scale
+            "java.lang.Byte[]"); // getObject return type
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -243,6 +251,12 @@ public enum VoltType {
     private final Boolean m_unsignedAttribute;
     private final Integer m_minimumScale;
     private final Integer m_maximumScale;
+    // I wanted to use the first entry in m_classes, but it doesn't match what
+    // VoltTable.get() returns in some cases, and I'm fearful of arbitrarily changing
+    // what classFromType() returns to various parts of the system
+    // This is the type that will be returned by ResultSet.getObject(), which
+    // boils down to VoltTable.get(), with a special case for timestamps
+    private final String m_jdbcClass;
 
     // Constructor for non-JDBC-visible types
     private VoltType(byte val, int lengthInBytes, String sqlString,
@@ -257,6 +271,7 @@ public enum VoltType {
                 java.sql.DatabaseMetaData.typeNullable,
                 false,
                 Integer.MIN_VALUE,
+                null,
                 null,
                 null,
                 null);
@@ -274,7 +289,8 @@ public enum VoltType {
                      int searchable,
                      Boolean unsignedAttribute,
                      Integer minimumScale,
-                     Integer maximumScale)
+                     Integer maximumScale,
+                     String jdbcClass)
     {
         this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 true,
@@ -287,7 +303,8 @@ public enum VoltType {
                 searchable,
                 unsignedAttribute,
                 minimumScale,
-                maximumScale);
+                maximumScale,
+                jdbcClass);
     }
 
     private VoltType(byte val, int lengthInBytes, String sqlString,
@@ -302,7 +319,8 @@ public enum VoltType {
                      int searchable,
                      Boolean unsignedAttribute,
                      Integer minimumScale,
-                     Integer maximumScale)
+                     Integer maximumScale,
+                     String jdbcClass)
     {
         m_val = val;
         m_lengthInBytes = lengthInBytes;
@@ -321,12 +339,17 @@ public enum VoltType {
         m_unsignedAttribute = unsignedAttribute;
         m_minimumScale = minimumScale;
         m_maximumScale = maximumScale;
+        m_jdbcClass = jdbcClass;
     }
 
-    private final static Map<Class<?>, VoltType> s_classes;
+    private final static ImmutableMap<Class<?>, VoltType> s_classes;
+    //Update this if you add a type.
+    private final static VoltType s_types[] = new VoltType[26];
     static {
-        s_classes = new HashMap<Class<?>, VoltType>();
+        ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
+        HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
         for (VoltType type : values()) {
+            s_types[type.m_val] = type;
             for (Class<?> cls : type.m_classes) {
                 // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
                 // so that the association of a java class with the earlier VoltType gets obliterated
@@ -337,13 +360,15 @@ public enum VoltType {
                 // Unfortunately, either response gets associated with the source lines of the first call to
                 // VoltType (like in DDLCompiler), rather than here.
                 // assert(s_classes.get(cls) == null);
-                if (s_classes.get(cls) != null) {
+                if (validation.get(cls) != null) {
                     // This message seems to just get buried by the java runtime.
                     throw new RuntimeException("Associate each java class with at most one VoltType.");
                 }
-                s_classes.put(cls, type);
+                validation.put(cls, type);
+                b.put(cls, type);
             }
         }
+        s_classes = b.build();
     }
 
     /**
@@ -388,10 +413,11 @@ public enum VoltType {
      * @return The appropriate enum value
      */
     public static VoltType get(byte val) {
-        for (VoltType type : VoltType.values()) {
-            if (type.m_val == val) return type;
+        VoltType type = (val < s_types.length) ? s_types[val] : null;
+        if (type == null) {
+            throw new AssertionError("Unknown type: " + String.valueOf(val));
         }
-        throw new AssertionError("Unknown type: " + String.valueOf(val));
+        return type;
     }
 
     private boolean matchesString(String str) {
@@ -481,6 +507,10 @@ public enum VoltType {
         return m_lengthInBytes;
     }
 
+    public int getLengthInBytesForFixedTypesWithoutCheck() {
+        return m_lengthInBytes;
+    }
+
     /**
      * Get the maximum number of bytes required to store the type
      * @return An integer value representing a number of bytes.
@@ -503,12 +533,19 @@ public enum VoltType {
         return m_sqlString;
     }
 
+    /**
+     * <p>Is this type visible to JDBC</p>
+     *
+     * @return JDBC visibility.
+     */
     public boolean isJdbcVisible() {
         return m_jdbcVisible;
     }
 
     /**
-     * Get the java.sql.Types type of this type.  Type.  Type you, typing typer.
+     * Get the java.sql.Types type of this type.
+     *
+     * @return int representing SQL type of the VoltDB type.
      */
     public int getJdbcSqlType() {
         return m_dataType;
@@ -548,6 +585,10 @@ public enum VoltType {
 
     public Integer getMaximumScale() {
         return m_maximumScale;
+    }
+
+    public String getJdbcClass() {
+        return m_jdbcClass;
     }
 
     // Really hacky cast overflow detection for primitive types

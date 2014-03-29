@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -121,7 +121,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
+                new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
@@ -144,7 +144,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
+                new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);

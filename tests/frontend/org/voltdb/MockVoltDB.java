@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -40,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -50,7 +50,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -63,7 +62,6 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
@@ -72,7 +70,7 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
-    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
@@ -101,6 +99,8 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("adminPort", adminPort);
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
+            obj.put("drInterface", "127.0.0.1");
+
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();
@@ -124,7 +124,6 @@ public class MockVoltDB implements VoltDBInterface
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL);
 
-            m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
             m_statsAgent = new StatsAgent();
             m_statsAgent.registerMailbox(m_hostMessenger,
                     m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
@@ -250,7 +249,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces()
+    public ClientInterface getClientInterface()
     {
         return null;
     }
@@ -268,17 +267,6 @@ public class MockVoltDB implements VoltDBInterface
             voltconfig = new VoltDB.Configuration();
         }
         return voltconfig;
-    }
-
-    public void setFaultDistributor(FaultDistributorInterface distributor)
-    {
-        m_faultDistributor = distributor;
-    }
-
-    @Override
-    public FaultDistributorInterface getFaultDistributor()
-    {
-        return m_faultDistributor;
     }
 
     public void setHostMessenger(HostMessenger msg) {
@@ -324,6 +312,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getEELibraryVersionString() {
+        return getVersionString();
+    }
+
+    @Override
+    public boolean isCompatibleVersionString(String versionString) {
+        return true;
+    }
+
+    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
@@ -349,9 +347,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException
     {
-        if (m_faultDistributor != null) {
-            m_faultDistributor.shutDown();
-        }
         VoltDB.wasCrashCalled = false;
         VoltDB.crashMessage = null;
         m_snapshotCompletionMonitor.shutdown();
@@ -483,7 +478,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void recoveryComplete(String requestId) {
-        // TODO Auto-generated method stub
     }
 
     @Override

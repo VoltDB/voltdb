@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -41,7 +42,7 @@ public class VoltDDLElementTracker {
             new HashMap<String, ProcedureDescriptor>();
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
-    String[] m_extraClassses = new String[0];
+    final Set<String> m_extraClassses = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -77,8 +78,8 @@ public class VoltDDLElementTracker {
     /**
      * Add additional non-procedure classes for the jar.
      */
-    void addExtraClasses(String[] classNames) {
-        m_extraClassses = classNames;
+    void addExtraClasses(Set<String> classNames) {
+        m_extraClassses.addAll(classNames);
     }
 
     /**
@@ -128,8 +129,9 @@ public class VoltDDLElementTracker {
             // the longer form costructor asserts on singleStatement
             descriptor = m_compiler.new ProcedureDescriptor(
                     descriptor.m_authGroups,
-                    descriptor.m_className,
-                    partitionInfo);
+                    descriptor.m_class,
+                    partitionInfo,
+                    descriptor.m_language);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -138,7 +140,9 @@ public class VoltDDLElementTracker {
                     descriptor.m_singleStmt,
                     descriptor.m_joinOrder,
                     partitionInfo,
-                    false);
+                    false,
+                    descriptor.m_language,
+                    descriptor.m_class);
         }
         m_procedureMap.put(procedureName, descriptor);
     }

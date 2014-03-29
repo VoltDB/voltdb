@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,8 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
@@ -41,12 +43,13 @@ public class DummyCommandLog implements CommandLog {
                               Map<Integer, Long> perPartitionTxnId) {}
 
     @Override
-    public boolean log(
+    public ListenableFuture<Object> log(
             Iv2InitiateTaskMessage message,
             long spHandle,
+            int[] involvedPartitions,
             DurabilityListener l,
             Object handle) {
-        return false;
+        return Futures.immediateFuture(null);
     }
 
     @Override

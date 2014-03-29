@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.utils;
 
 import java.io.File;
@@ -323,29 +324,46 @@ public class MiscUtils {
 
     /**
      * Parse a version string in the form of x.y.z. It doesn't require that
-     * there are exactly three parts in the version. Each part must be seperated
+     * there are exactly three parts in the version. Each part must be separated
      * by a dot.
      *
      * @param versionString
      * @return an array of each part as integer.
      */
-    public static int[] parseVersionString(String versionString) {
+    public static Object[] parseVersionString(String versionString) {
         if (versionString == null) {
             return null;
         }
 
+        // check for whitespace
+        if (versionString.matches("\\s")) {
+            return null;
+        }
+
+        // split on the dots
         String[] split = versionString.split("\\.");
-        int[] v = new int[split.length];
+        if (split.length == 0) {
+            return null;
+        }
+
+        Object[] v = new Object[split.length];
         int i = 0;
         for (String s : split) {
             try {
-                v[i++] = Integer.parseInt(s.trim());
+                v[i] = Integer.parseInt(s);
             } catch (NumberFormatException e) {
-                return null;
+                v[i] = s;
             }
+            i++;
         }
 
-        return v;
+        // check for a numeric beginning
+        if (v[0] instanceof Integer) {
+            return v;
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -357,31 +375,57 @@ public class MiscUtils {
      * @return -1 if left is smaller than right, 0 if they are equal, 1 if left
      *         is greater than right.
      */
-    public static int compareVersions(int[] left, int[] right) {
+    public static int compareVersions(Object[] left, Object[] right) {
         if (left == null || right == null) {
             throw new IllegalArgumentException("Invalid versions");
         }
 
-        int i = 0;
-        for (int part : right) {
-            // left is shorter than right and share the same prefix, must be smaller
-            if (left.length == i) {
-                return -1;
-            }
-
-            if (left[i] > part) {
+        for (int i = 0; i < left.length; i++) {
+            // right is shorter than left and share the same prefix => left must be larger
+            if (right.length == i) {
                 return 1;
-            } else if (left[i] < part) {
-                return -1;
             }
 
-            i++;
+            if (left[i] instanceof Integer) {
+                if (right[i] instanceof Integer) {
+                    // compare two numbers
+                    if (((Integer) left[i]) > ((Integer) right[i])) {
+                        return 1;
+                    } else if (((Integer) left[i]) < ((Integer) right[i])) {
+                        return -1;
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                else {
+                    // numbers always greater than alphanumeric tags
+                    return 1;
+                }
+            }
+            else if (right[i] instanceof Integer) {
+                // alphanumeric tags always less than numbers
+                return -1;
+            }
+            else {
+                // compare two alphanumeric tags lexicographically
+                int cmp = ((String) left[i]).compareTo((String) right[i]);
+                if (cmp != 0) {
+                    return cmp;
+                }
+                else {
+                    // two alphanumeric tags are the same... so keep comparing
+                    continue;
+                }
+            }
         }
 
-        // left is longer than right and share the same prefix, must be greater
-        if (left.length > i) {
-            return 1;
+        // left is shorter than right and share the same prefix, must be less
+        if (left.length < right.length) {
+            return -1;
         }
+
+        // samesies
         return 0;
     }
 
@@ -409,8 +453,14 @@ public class MiscUtils {
         return "";
     }
 
+    // cache whether we're running pro code
+    private static Boolean m_isPro = null;
+    // check if we're running pro code
     public static boolean isPro() {
-        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        if (m_isPro == null) {
+            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        }
+        return m_isPro.booleanValue();
     }
 
     /**
@@ -429,6 +479,15 @@ public class MiscUtils {
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
         return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return HostAndPort number.
+     */
+    public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort);
     }
 
     /**

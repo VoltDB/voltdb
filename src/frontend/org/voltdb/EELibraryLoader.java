@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,7 +48,13 @@ public class EELibraryLoader {
 
                 try {
                     final VoltLogger hostLog = new VoltLogger("HOST");
-                    final String libname = "voltdb-" + VoltDB.instance().getVersionString();
+                    String versionString = VoltDB.instance().getEELibraryVersionString();
+                    // this fallback is for test code only
+                    if (versionString == null) {
+                        versionString = VoltDB.instance().getVersionString();
+                    }
+                    assert(versionString != null);
+                    final String libname = "voltdb-" + versionString;
                     hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
                     System.loadLibrary(libname);
                     voltSharedLibraryLoaded = true;

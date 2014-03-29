@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,17 +18,14 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -38,14 +35,15 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -117,11 +115,10 @@ public abstract class SubPlanAssembler {
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(int tableAliasIdx,
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(StmtTableScan tableScan,
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -140,18 +137,9 @@ public abstract class SubPlanAssembler {
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
-        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
-            // This is a sub-query
-            return paths;
-        }
-        assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN);
-        Table table = tableCache.getTargetTable();
-
-        CatalogMap<Index> indexes = table.getIndexes();
-
+        Collection<Index> indexes = tableScan.getIndexes();
         for (Index index : indexes) {
-            AccessPath path = getRelevantAccessPathForIndex(table, allExprs, index);
+            AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
             if (path != null) {
                 if (postExprs != null) {
                     path.joinExprs.addAll(postExprs);
@@ -170,7 +158,7 @@ public abstract class SubPlanAssembler {
      * @param filterExprs filter expressions
      * @return Naive access path
      */
-    protected AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected static AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {
@@ -232,8 +220,12 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    protected AccessPath getRelevantAccessPathForIndex(Table table, List<AbstractExpression> exprs, Index index)
+    protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
     {
+        if (tableScan instanceof StmtTargetTableScan == false) {
+            return null;
+        }
+
         // Track the running list of filter expressions that remain as each is either cherry-picked
         // for optimized coverage via the index keys.
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
@@ -261,7 +253,7 @@ public abstract class SubPlanAssembler {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 keyComponentCount = indexedExprs.size();
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -282,7 +274,7 @@ public abstract class SubPlanAssembler {
         // provisional; it can be undone later in this function as new info comes to light.
         int orderSpoilers[] = new int[keyComponentCount];
         List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
-        int nSpoilers = determineIndexOrdering(table, keyComponentCount,
+        int nSpoilers = determineIndexOrdering(tableScan, keyComponentCount,
                                                indexedExprs, indexedColRefs,
                                                retval, orderSpoilers, bindingsForOrder);
 
@@ -315,7 +307,7 @@ public abstract class SubPlanAssembler {
         // the index scan.
         IndexableExpression inListExpr = null;
 
-        for ( ; coveredCount < keyComponentCount; ++coveredCount) {
+        for ( ; (coveredCount < keyComponentCount) && ! filtersToCover.isEmpty(); ++coveredCount) {
             if (indexedExprs == null) {
                 coveringColId = indexedColIds[coveredCount];
             } else {
@@ -325,7 +317,7 @@ public abstract class SubPlanAssembler {
             boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
             if (eqExpr == null) {
@@ -342,7 +334,7 @@ public abstract class SubPlanAssembler {
                     // tables' columns.
                     inListExpr = getIndexableExpressionFromFilters(
                         ExpressionType.COMPARE_IN, ExpressionType.COMPARE_IN,
-                        coveringExpr, coveringColId, table, filtersToCover,
+                        coveringExpr, coveringColId, tableScan, filtersToCover,
                         false, EXCLUDE_FROM_POST_FILTERS);
                     if (inListExpr != null) {
                         // Make sure all prior key component equality filters
@@ -434,7 +426,7 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> otherBindingsForOrder =
                 recoverOrderSpoilers(orderSpoilers, nSpoilers, nRecoveredSpoilers,
                                      indexedExprs, indexedColIds,
-                                     table, filtersToCover);
+                                     tableScan, filtersToCover);
             if (otherBindingsForOrder == null) {
                 // Some order spoiler didn't have an equality filter.
                 // Invalidate the provisional indexed ordering.
@@ -462,7 +454,7 @@ public abstract class SubPlanAssembler {
             // into separate upper and lower bound inequalities.
             IndexableExpression doubleBoundExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 false, EXCLUDE_FROM_POST_FILTERS);
 
             // For simplicity of implementation:
@@ -481,13 +473,13 @@ public abstract class SubPlanAssembler {
                 // Look for a lower bound.
                 startingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover,
+                    coveringExpr, coveringColId, tableScan, filtersToCover,
                     allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
                 // Look for an upper bound.
                 endingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover,
+                    coveringExpr, coveringColId, tableScan, filtersToCover,
                     allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
             }
         }
@@ -802,7 +794,7 @@ public abstract class SubPlanAssembler {
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
-    private int determineIndexOrdering(Table table, int keyComponentCount,
+    private int determineIndexOrdering(StmtTableScan tableScan, int keyComponentCount,
             List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
             AccessPath retval, int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
@@ -829,7 +821,7 @@ public abstract class SubPlanAssembler {
                         if (indexedExprs == null) {
                             ColumnRef nextColRef = indexedColRefs.get(jj);
                             if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableName.equals(table.getTypeName()) &&
+                                colInfo.tableName.equals(tableScan.getTableName()) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
                                 break;
                             }
@@ -881,13 +873,13 @@ public abstract class SubPlanAssembler {
      *                       orderSpoilers before this position are covered.
      * @param indexedExprs   the index key component expressions in the general case
      * @param colIds         the index key component columns in the simple case
-     * @param table          the index base table, used to validate column base tables
+     * @param tableScan      the index base table scan, used to validate column base tables
      * @param filtersToCover query conditions that may contain the desired equality filters
      */
-    private List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
+    private static List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
         int nRecoveredSpoilers,
         List<AbstractExpression> indexedExprs, int[] colIds,
-        Table table, List<AbstractExpression> filtersToCover)
+        StmtTableScan tableScan, List<AbstractExpression> filtersToCover)
     {
         // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
         // always risk adding a dependency on a particular parameterization, so be prepared to
@@ -918,7 +910,7 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> moreBindings = null;
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover,
+                coveringExpr, coveringColId, tableScan, filtersToCover,
                 alwaysAllowConstrainingJoinFilters, KEEP_IN_POST_FILTERS);
             if (eqExpr == null) {
                 return null;
@@ -953,7 +945,7 @@ public abstract class SubPlanAssembler {
      *                     that might match a query filter, possibly null.
      * @param coveringColId When coveringExpr is null,
      *                      the id of the indexed column might match a query filter.
-     * @param table The table on which the indexed expression is based
+     * @param tableScan The table scan on which the indexed expression is based
      * @param filtersToCover the query conditions that may contain the desired filter
      * @param allowIndexedJoinFilters Whether filters referencing other tables' columns are acceptable
      * @param filterAction the desired disposition of the matched filter,
@@ -964,9 +956,9 @@ public abstract class SubPlanAssembler {
      * index scan to be applicable.
      * -- or null if there is no filter that matches the indexed expression
      */
-    private IndexableExpression getIndexableExpressionFromFilters(
+    private static IndexableExpression getIndexableExpressionFromFilters(
         ExpressionType targetComparator, ExpressionType altTargetComparator,
-        AbstractExpression coveringExpr, int coveringColId, Table table,
+        AbstractExpression coveringExpr, int coveringColId, StmtTableScan tableScan,
         List<AbstractExpression> filtersToCover,
         boolean allowIndexedJoinFilters, boolean filterAction)
     {
@@ -982,7 +974,7 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = (ComparisonExpression) filter;
                 indexableExpr = filter.getLeft();
                 otherExpr = filter.getRight();
-                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                binding = bindingIfValidIndexedFilterOperand(tableScan, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
@@ -1081,7 +1073,7 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = normalizedExpr.reverseOperator();
                 indexableExpr = filter.getRight();
                 otherExpr = filter.getLeft();
-                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                binding = bindingIfValidIndexedFilterOperand(tableScan, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
@@ -1109,38 +1101,16 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
-    protected boolean hasReplicatedResult(AbstractPlanNode plan)
-    {
-        HashSet<String> tablesRead = new HashSet<String>();
-        plan.getTablesReadByFragment(tablesRead);
-        for (String tableAliasName : tablesRead) {
-            Integer tableIdx = m_parsedStmt.tableAliasIndexMap.get(tableAliasName);
-            // The table may belong to a child sub-query. In such a case, it won't be in the
-            // parent cache.
-            if (tableIdx != null) {
-                StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableIdx);
-                if ( ! tableCache.getIsreplicated()) {
-                    return false;
-                }
-            }
-
-        }
-        return true;
-    }
-
-    private boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+    private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (table.getTypeName().equals(tve.getTableName()))
-            {
+            if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
                 return true;
             }
         }
         return false;
     }
 
-    private List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
+    private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(StmtTableScan tableScan,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
         AbstractExpression coveringExpr, int coveringColId)
     {
@@ -1163,7 +1133,7 @@ public abstract class SubPlanAssembler {
         }
         // Left and right operands must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
-        if (isOperandDependentOnTable(otherExpr, table)) {
+        if (isOperandDependentOnTable(otherExpr, tableScan)) {
             return null;
         }
 
@@ -1175,9 +1145,7 @@ public abstract class SubPlanAssembler {
             TupleValueExpression tve = (TupleValueExpression) indexableExpr;
             // Handle a simple indexed column identified by its column id.
             if ((coveringColId == tve.getColumnIndex()) &&
-                //FIXME: This clumsy testing of table names regardless of table aliases is
-                // EXACTLY why we can't have nice things like self-joins.
-                (table.getTypeName().equals(tve.getTableName()))) {
+                (tableScan.getTableAlias().equals(tve.getTableAlias()))) {
                 // A column match never requires parameter binding. Return an empty list.
                 return s_reusableImmutableEmptyBinding;
             }
@@ -1194,8 +1162,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-    protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
-
+    protected static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);
 
@@ -1213,19 +1180,17 @@ public abstract class SubPlanAssembler {
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(int tableAliasIdx, AccessPath path) {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+    protected static AbstractPlanNode getAccessPlanForTable(JoinNode tableNode) {
+        StmtTableScan tableScan = tableNode.getTableScan();
+        AccessPath path = tableNode.m_currentAccessPath;
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
-        if (path.index == null)
-        {
-            scanNode = getScanAccessPlanForTable(tableAliasIdx, path.otherExprs);
-        }
-        else
-        {
-            scanNode = getIndexAccessPlanForTable(tableAliasIdx, path);
+        if (path.index == null) {
+            scanNode = getScanAccessPlanForTable(tableScan, path.otherExprs);
+        } else {
+            scanNode = getIndexAccessPlanForTable(tableScan, path);
         }
         return scanNode;
     }
@@ -1238,32 +1203,17 @@ public abstract class SubPlanAssembler {
      * @param exprs The predicate components.
      * @return A scan plan node
      */
-    protected AbstractScanPlanNode
-    getScanAccessPlanForTable(int tableAliasIdx, ArrayList<AbstractExpression> exprs)
+    private static AbstractScanPlanNode
+    getScanAccessPlanForTable(StmtTableScan tableScan, ArrayList<AbstractExpression> exprs)
     {
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
-        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
         // build the scan node
-        SeqScanPlanNode scanNode = new SeqScanPlanNode(tableCache.getTableName(), tableCache.getTableAlias());
-        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
-            scanNode.setSubQuery(true);
-        }
-        //TODO: push scan column identification into "setTargetTableName"
-        // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
-        if (scanColumns != null && scanColumns.isEmpty() == false) {
-            scanNode.setScanColumns(scanColumns);
-        }
-
+        SeqScanPlanNode scanNode = new SeqScanPlanNode(tableScan);
         // build the predicate
         AbstractExpression localWhere = null;
-        if ((exprs != null) && (exprs.isEmpty() == false))
-        {
+        if ((exprs != null) && ! exprs.isEmpty()){
             localWhere = ExpressionUtil.combine(exprs);
             scanNode.setPredicate(localWhere);
         }
-
         return scanNode;
     }
 
@@ -1276,15 +1226,11 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected AbstractPlanNode getIndexAccessPlanForTable(int tableAliasIdx, AccessPath path)
+    protected static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
-        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
-        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-
-        IndexScanPlanNode scanNode = new IndexScanPlanNode(tableCache.getTableName(), tableCache.getTableAlias());
+        IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
         AbstractPlanNode resultNode = scanNode;
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -1309,8 +1255,6 @@ public abstract class SubPlanAssembler {
             scanNode.addSearchKeyExpression(expr2);
         }
         // create the IndexScanNode with all its metadata
-        scanNode.setCatalogIndex(index);
-        scanNode.setKeyIterate(path.keyIterate);
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
@@ -1318,21 +1262,13 @@ public abstract class SubPlanAssembler {
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        //TODO: push scan column identification into "setTargetTableName"
-        // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
-        if (scanColumns != null && scanColumns.isEmpty() == false) {
-            scanNode.setScanColumns(scanColumns);
-        }
-        scanNode.setTargetIndexName(index.getTypeName());
-
         scanNode.setSkipNullPredicate();
         return resultNode;
     }
 
 
     // Generate a plan for an IN-LIST-driven index scan
-    private AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
+    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
                                                                    IndexScanPlanNode scanNode)
     {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
@@ -1352,7 +1288,7 @@ public abstract class SubPlanAssembler {
 
     // Replace the IN LIST condition in the end expression referencing the first given rhs
     // with an equality filter referencing the second given rhs.
-    private void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
+    private static void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
                                                        AbstractExpression inListRhs,
                                                        AbstractExpression equalityRhs)
     {

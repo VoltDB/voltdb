@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,9 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.Arrays;
-
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerAgent;
@@ -43,28 +40,18 @@ public class CatalogSpecificPlanner {
         m_catalogContext = context;
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql, boolean multipart,
-            ProcedureInvocationType type, long originalTxnId, long originalUniqueId) {
-        /*
-         * If this is multi-part, don't give the planner a partition param AND
-         * tell it not to infer whether the plan is single part. Those optimizations
-         * are fine for adhoc SQL planned outside a stored proc, but not when those
-         * factors have already been determined by the proc.
-         */
+    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql,
+            Object[] userParams, boolean singlePartition) {
         final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
-        AdHocPlannerWork work =
-            new AdHocPlannerWork(
-                    -1, false, 0, 0, "", false, null, //none of the params on this line are used
-                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart,
-                    type, originalTxnId, originalUniqueId,
-                    new AsyncCompilerWorkCompletionHandler() {
-
-                        @Override
-                        public void onCompletion(AsyncCompilerResult result) {
-                            retval.set((AdHocPlannedStmtBatch)result);
-                        }
-
-                    });
+        AsyncCompilerWorkCompletionHandler completionHandler = new AsyncCompilerWorkCompletionHandler()
+        {
+            @Override
+            public void onCompletion(AsyncCompilerResult result) {
+                retval.set((AdHocPlannedStmtBatch)result);
+            }
+        };
+        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql, userParams,
+                singlePartition, m_catalogContext, completionHandler);
         m_agent.compileAdHocPlanForProcedure(work);
         return retval;
     }

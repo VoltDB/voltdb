@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,10 +31,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -43,19 +48,22 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.Pair;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -67,6 +75,8 @@ import com.google_voltpatches.common.primitives.Longs;
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
 
     private static final VoltLogger logger = new VoltLogger("NETWORK");
+
+    public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -160,6 +170,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int SNAPSHOTSCAN_SITE_ID = -7;
     public static final int SNAPSHOTDELETE_SITE_ID = -8;
     public static final int REBALANCE_SITE_ID = -9;
+    public static final int SNAPSHOT_DAEMON_ID = -10;
+    public static final int SNAPSHOT_IO_AGENT_ID = -11;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
@@ -172,24 +184,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private volatile boolean m_localhostReady = false;
     // memoized InstanceId
     private InstanceId m_instanceId = null;
+    private boolean m_shuttingDown = false;
+
+    private final Object m_mapLock = new Object();
 
     /*
      * References to other hosts in the mesh.
      * Updates via COW
      */
-    final COWMap<Integer, ForeignHost> m_foreignHosts = new COWMap<Integer, ForeignHost>();
+    volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
 
     /*
      * References to all the local mailboxes
      * Updates via COW
      */
-    final COWMap<Long, Mailbox> m_siteMailboxes = new COWMap<Long, Mailbox>();
+    volatile ImmutableMap<Long, Mailbox> m_siteMailboxes = ImmutableMap.of();
 
     /*
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private final COWNavigableSet<Integer> m_knownFailedHosts = new COWNavigableSet<Integer>();
+    private volatile ImmutableSet<Integer> m_knownFailedHosts = ImmutableSet.of();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
@@ -217,6 +232,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_config.internalInterface,
                 m_config.internalPort,
                 this);
+
+        // Register a clean shutdown hook for the network threads.  This gets cranky
+        // when crashLocalVoltDB() is called because System.exit() can get called from
+        // a random network thread which is already shutting down and we'll get delicious
+        // deadlocks.  Take the coward's way out and just don't do this if we're already
+        // crashing (read as: I refuse to hunt for more shutdown deadlocks).
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, new Runnable() {
+            @Override
+            public void run()
+            {
+                for (ForeignHost host : m_foreignHosts.values())
+                {
+                    // null is OK. It means this host never saw this host id up
+                    if (host != null)
+                    {
+                        host.close();
+                    }
+                }
+            }
+        });
+
     }
 
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
@@ -224,13 +260,38 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public void disconnect(Set<Integer> failedHostIds) {
             synchronized(HostMessenger.this) {
                 for (int hostId: failedHostIds) {
-                    m_knownFailedHosts.add(hostId);
+                    addFailedHost(hostId);
                     removeForeignHost(hostId);
-                    logger.warn(String.format("Host %d failed", hostId));
+                    if (!m_shuttingDown) {
+                        logger.warn(String.format("Host %d failed", hostId));
+                    }
                 }
             }
         }
     };
+
+    private final void addFailedHost(int hostId) {
+        if (!m_knownFailedHosts.contains(hostId)) {
+            synchronized (m_mapLock) {
+                if (!m_knownFailedHosts.contains(hostId)) {
+                    ImmutableSet.Builder<Integer> b = ImmutableSet.builder();
+                    b.addAll(m_knownFailedHosts);
+                    b.add(hostId);
+                    m_knownFailedHosts = b.build();
+                }
+            }
+        }
+    }
+
+    public synchronized void prepareForShutdown()
+    {
+        m_shuttingDown = true;
+    }
+
+    public synchronized boolean isShuttingDown()
+    {
+        return m_shuttingDown;
+    }
 
     /**
      * Synchronization protects m_knownFailedHosts and ensures that every failed host is only reported
@@ -240,13 +301,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void reportForeignHostFailed(int hostId) {
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         m_agreementSite.reportFault(initiatorSiteId);
-        logger.warn(String.format("Host %d failed", hostId));
+        if (!m_shuttingDown) {
+            logger.warn(String.format("Host %d failed", hostId));
+        }
     }
 
     @Override
     public synchronized void relayForeignHostFailed(FaultMessage fm) {
         m_agreementSite.reportFault(fm);
-        m_logger.warn("Someone else claims a host failed: " + fm);
+        if (!m_shuttingDown) {
+            m_logger.warn("Someone else claims a host failed: " + fm);
+        }
     }
 
     /**
@@ -302,7 +367,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
-                    m_config.zkInterface, 60 * 1000, ImmutableSet.<Long>copyOf(m_network.getThreadIds()));
+                    m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
             if (m_zk == null) {
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
@@ -391,10 +456,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
-            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-            fhost.register(this);
+            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
             putForeignHost(hostId, fhost);
-            fhost.enableRead();
+            fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
@@ -405,8 +469,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void prepSocketChannel(SocketChannel sc) {
         try {
-            sc.socket().setSendBufferSize(1024*1024*2);
-            sc.socket().setReceiveBufferSize(1024*1024*2);
+            sc.socket().setSendBufferSize(1024 * 1024 * 2);
+            sc.socket().setReceiveBufferSize(1024 * 1024 * 2);
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -416,14 +480,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Convenience method for doing the verbose COW insert into the map
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
-        m_foreignHosts.put(hostId, fh);
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
+            b.putAll(m_foreignHosts);
+            b.put(hostId, fh);
+            m_foreignHosts = b.build();
+        }
     }
 
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(int hostId) {
-        ForeignHost fh = m_foreignHosts.remove(hostId);
+        ForeignHost fh = null;
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
+            for (Map.Entry<Integer, ForeignHost> e : m_foreignHosts.entrySet()) {
+                if (e.getKey().equals(hostId)) continue;
+                b.put(e.getKey(), e.getValue());
+            }
+            m_foreignHosts = b.build();
+        }
         if (fh != null) {
             fh.close();
         }
@@ -469,10 +546,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 /*
                  * Now add the host to the mailbox system
                  */
-                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-                fhost.register(this);
+                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
                 putForeignHost(hostId, fhost);
-                fhost.enableRead();
+                fhost.enableRead(VERBOTEN_THREADS);
             } catch (Exception e) {
                 logger.error("Error joining new node", e);
                 m_knownFailedHosts.add(hostId);
@@ -582,8 +658,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
             try {
-                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii]);
-                fhost.register(this);
+                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii], new PicoNetwork(sockets[ii]));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
@@ -613,7 +688,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * to enable read
          */
         for (ForeignHost fh : m_foreignHosts.values()) {
-            fh.enableRead();
+            fh.enableRead(VERBOTEN_THREADS);
         }
         m_agreementSite.start();
 
@@ -621,12 +696,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Do the usual thing of waiting for the agreement site
          * to join the cluster and creating the client
          */
-        ImmutableSet.Builder<Long> verbotenThreadBuilder = ImmutableSet.<Long>builder();
-        verbotenThreadBuilder.addAll(m_network.getThreadIds());
-        verbotenThreadBuilder.addAll(m_agreementSite.getThreadIds());
+        VERBOTEN_THREADS.addAll(m_network.getThreadIds());
+        VERBOTEN_THREADS.addAll(m_agreementSite.getThreadIds());
         m_agreementSite.waitForRecovery();
         m_zk = org.voltcore.zk.ZKUtil.getClient(
-                m_config.zkInterface, 60 * 1000, verbotenThreadBuilder.build());
+                m_config.zkInterface, 60 * 1000, VERBOTEN_THREADS);
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
@@ -756,13 +830,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (!fhost.isUp())
         {
-            //Throwable t = new Throwable();
-            //java.io.StringWriter sw = new java.io.StringWriter();
-            //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            //t.printStackTrace(pw);
-            //pw.flush();
-            m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
-            //m_logger.warn(sw.toString());
+            if (!m_shuttingDown) {
+                m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+            }
             return null;
         }
         return fhost;
@@ -772,7 +842,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (!m_siteMailboxes.containsKey(mailbox.getHSId())) {
                 throw new RuntimeException("Can only register a mailbox with an hsid alreadly generated");
         }
-        m_siteMailboxes.put(mailbox.getHSId(), mailbox);
+
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
+                if (e.getKey().equals(mailbox.getHSId())) {
+                    b.put(e.getKey(), mailbox);
+                } else {
+                    b.put(e.getKey(), e.getValue());
+                }
+            }
+            m_siteMailboxes = b.build();
+        }
     }
 
     /*
@@ -781,33 +862,62 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public long generateMailboxId(Long mailboxId) {
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
-        m_siteMailboxes.put(hsId, new Mailbox() {
+        addMailbox(hsId, new Mailbox() {
             @Override
-            public void send(long hsId, VoltMessage message) {}
+            public void send(long hsId, VoltMessage message) {
+            }
+
             @Override
-            public void send(long[] hsIds, VoltMessage message) {}
+            public void send(long[] hsIds, VoltMessage message) {
+            }
+
             @Override
             public void deliver(VoltMessage message) {
                 hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
+
             @Override
-            public void deliverFront(VoltMessage message) {}
+            public void deliverFront(VoltMessage message) {
+            }
+
             @Override
-            public VoltMessage recv() {return null;}
+            public VoltMessage recv() {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking() {return null;}
+            public VoltMessage recvBlocking() {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(long timeout) {return null;}
+            public VoltMessage recvBlocking(long timeout) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recv(Subject[] s) {return null;}
+            public VoltMessage recv(Subject[] s) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(Subject[] s) {return null;}
+            public VoltMessage recvBlocking(Subject[] s) {
+                return null;
+            }
+
             @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) { return null;}
+            public VoltMessage recvBlocking(Subject[] s, long timeout) {
+                return null;
+            }
+
             @Override
-            public long getHSId() {return 0L;}
+            public long getHSId() {
+                return 0L;
+            }
+
             @Override
-            public void setHSId(long hsId) {}
+            public void setHSId(long hsId) {
+            }
 
         });
         return hsId;
@@ -820,15 +930,31 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         final int siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
-        m_siteMailboxes.put(hsId, sm);
+        addMailbox(hsId, sm);
         return sm;
+    }
+
+    private void addMailbox(long hsId, Mailbox m) {
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            b.putAll(m_siteMailboxes);
+            b.put(hsId, m);
+            m_siteMailboxes = b.build();
+        }
     }
 
     /**
      * Discard a mailbox
      */
     public void removeMailbox(long hsId) {
-        m_siteMailboxes.remove(hsId);
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
+                if (e.getKey().equals(hsId)) continue;
+                b.put(e.getKey(), e.getValue());
+            }
+            m_siteMailboxes = b.build();
+        }
     }
 
     public void send(final long destinationHSId, final VoltMessage message)
@@ -891,7 +1017,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_localhostReady;
     }
 
-
     public void shutdown() throws InterruptedException
     {
         m_zk.close();
@@ -906,6 +1031,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         m_joiner.shutdown();
         m_network.shutdown();
+        VERBOTEN_THREADS.clear();
     }
 
     /*
@@ -925,7 +1051,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             mailbox.setHSId(hsId);
         }
 
-        m_siteMailboxes.put(hsId, mailbox);
+        addMailbox(hsId, mailbox);
     }
 
     /**
@@ -981,4 +1107,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             fh.updateDeadHostTimeout(timeout);
         }
     }
+
+    public Map<Long, Pair<String, long[]>>
+        getIOStats(final boolean interval) throws InterruptedException, ExecutionException {
+        final ImmutableMap<Integer, ForeignHost> fhosts = m_foreignHosts;
+        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>(fhosts.size());
+
+        for (ForeignHost fh : fhosts.values()) {
+            picoNetworks.add(fh.m_network);
+        }
+
+        return m_network.getIOStats(interval, picoNetworks);
+    }
+
 }

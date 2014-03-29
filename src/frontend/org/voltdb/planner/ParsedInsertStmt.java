@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 
 /**
  *
@@ -52,15 +51,17 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         // TODO: When INSERT ... SELECT is supported, it's unclear how the source and target tables will
         // be distinguished (positionally? in separate members?) and/or how soon thereafter the SELECT
         // clause will need to allow joins.
-        assert(tableList.isEmpty());
+        assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
-        int idx = addTableToStmtCache(tableName, tableName);
-        StmtTableScan tableCache = stmtCache.get(idx);
-        tableList.add(tableCache);
+        // Need to add the table to the cache. It may be required to resolve the
+        // correlated TVE in case of WHERE clause contains IN subquery
+        addTableToStmtCache(tableName, tableName, null);
 
-        Table table = tableCache.getTargetTable();
-        assert(table != null);
+        Table table = getTableFromDB(tableName);
+
+        m_tableList.add(table);
+
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
                 parseTargetColumns(node, table, columns);

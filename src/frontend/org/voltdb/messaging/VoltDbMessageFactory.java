@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,10 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte IV2_LOG_FAULT_ID = VOLTCORE_MESSAGE_ID_MAX + 16;
     final public static byte IV2_EOL_ID = VOLTCORE_MESSAGE_ID_MAX + 17;
     final public static byte DUMP = VOLTCORE_MESSAGE_ID_MAX + 18;
+    final public static byte MP_REPLAY_ID = VOLTCORE_MESSAGE_ID_MAX + 19;
+    final public static byte MP_REPLAY_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 20;
+    final public static byte SNAPSHOT_CHECK_REQUEST_ID = VOLTCORE_MESSAGE_ID_MAX + 21;
+    final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -108,6 +112,18 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case DUMP:
             message = new DumpMessage();
+            break;
+        case MP_REPLAY_ID:
+            message = new MpReplayMessage();
+            break;
+        case MP_REPLAY_ACK_ID:
+            message = new MpReplayAckMessage();
+            break;
+        case SNAPSHOT_CHECK_REQUEST_ID:
+            message = new SnapshotCheckRequestMessage();
+            break;
+        case SNAPSHOT_CHECK_RESPONSE_ID:
+            message = new SnapshotCheckResponseMessage();
             break;
         default:
             message = null;

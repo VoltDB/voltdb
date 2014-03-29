@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,8 +22,11 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
@@ -126,6 +129,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
+    // Partitions involved in this multipart, set in the first fragment
+    Set<Integer> m_involvedPartitions = ImmutableSet.of();
 
     // context for long running fragment status log messages
     byte[] m_procedureName = null;
@@ -183,6 +188,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_emptyForRestart = ftask.m_emptyForRestart;
         m_procedureName = ftask.m_procedureName;
         m_currentBatchIndex = ftask.m_currentBatchIndex;
+        m_involvedPartitions = ftask.m_involvedPartitions;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -405,6 +411,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_initiateTask;
     }
 
+    public void setInvolvedPartitions(Collection<Integer> involvedPartitions) {
+        m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
+    }
+
+    public Set<Integer> getInvolvedPartitions() { return m_involvedPartitions; }
+
     public byte[] getPlanHash(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
@@ -513,6 +525,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // int for which batch (4)
         msgsize += 4;
+
+        // Involved partitions
+        msgsize += 2 + m_involvedPartitions.size() * 4;
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -648,6 +663,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
+        buf.putShort((short) m_involvedPartitions.size());
+        for (int pid : m_involvedPartitions) {
+            buf.putInt(pid);
+        }
+
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
             buf.putInt(dup.remaining());
@@ -750,6 +770,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // ints for batch context
         m_currentBatchIndex = buf.getInt();
+
+        // Involved partition
+        short involvedPartitionCount = buf.getShort();
+        ImmutableSet.Builder<Integer> involvedPartitionsBuilder = ImmutableSet.builder();
+        for (int i = 0; i < involvedPartitionCount; i++) {
+            involvedPartitionsBuilder.add(buf.getInt());
+        }
+        m_involvedPartitions = involvedPartitionsBuilder.build();
 
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
