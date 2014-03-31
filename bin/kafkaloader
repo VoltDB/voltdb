@@ -46,7 +46,8 @@
 # limitations under the License.
 
 
-# The VoltDB CSV Loader script
+# The VoltDB Kafka Loader script (experimental)
+# This script is adapted from csvloader script.
 #
 # Environment Variables
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
@@ -121,6 +122,7 @@ done
 CLASSPATH=${CLASSPATH}
 
 # run it
+echo "Starting experimental Kafka bulk loader..."
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.utils.KafkaLoader"
 #echo $CMDVAL "$@"
