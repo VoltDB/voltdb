@@ -285,93 +285,121 @@ class VoltNetwork implements Runnable, IOStatsIntf
         m_selector.wakeup();
     }
 
+    protected void processTasksAndPendingChannels(int readyKeys, ThreadLocalRandom r) {
+        /*
+         * Run the task queue immediately after selection to catch
+         * any tasks that weren't a result of readiness selection
+         */
+        Runnable task = null;
+        while ((task = m_tasks.poll()) != null) {
+            task.run();
+        }
+
+        if (readyKeys > 0) {
+            invokeCallbacks(r);
+        }
+
+        /*
+         * Poll the task queue again in case new tasks were created
+         * by invoking callbacks.
+         */
+        task = null;
+        while ((task = m_tasks.poll()) != null) {
+            task.run();
+        }
+
+    }
+
+    protected void processOptimizedTasksAndPendingChannels(int readyKeys, ThreadLocalRandom r) {
+        /*
+         * Run the task queue immediately after selection to catch
+         * any tasks that weren't a result of readiness selection
+         */
+        Runnable task = null;
+        while ((task = m_tasks.poll()) != null) {
+            task.run();
+        }
+
+        if (readyKeys > 0) {
+            optimizedInvokeCallbacks(r);
+        }
+
+        /*
+         * Poll the task queue again in case new tasks were created
+         * by invoking callbacks.
+         */
+        task = null;
+        while ((task = m_tasks.poll()) != null) {
+            task.run();
+        }
+
+    }
+
+    protected void optimizedSelectNoTimerRunner(ThreadLocalRandom r) throws IOException {
+        while (m_shouldStop == false) {
+            int readyKeys = m_selector.select();
+            processOptimizedTasksAndPendingChannels(readyKeys, r);
+        }
+    }
+
+    protected void nonOptimizedSelectNoTimerRunner(ThreadLocalRandom r) throws IOException {
+        while (m_shouldStop == false) {
+            int readyKeys = m_selector.select();
+            processTasksAndPendingChannels(readyKeys, r);
+        }
+    }
+
+    protected void optimimzedSelectTimerRunner(ThreadLocalRandom r) throws IOException {
+        while (m_shouldStop == false) {
+            int readyKeys = m_selector.select(5);
+            processOptimizedTasksAndPendingChannels(readyKeys, r);
+            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+            if ( delta != null ) {
+                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
+            }
+        }
+    }
+
+    protected void nonOptimizedSelectTimerRunner(ThreadLocalRandom r) throws IOException {
+        while (m_shouldStop == false) {
+            int readyKeys = m_selector.select(5);
+            processTasksAndPendingChannels(readyKeys, r);
+            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+            if ( delta != null ) {
+                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
+            }
+        }
+    }
+
     @Override
     public void run() {
+        final ThreadLocalRandom r = ThreadLocalRandom.current();
         if (m_coreBindId != null) {
             // Remove Affinity for now to make this dependency dissapear from the client.
             // Goal is to remove client dependency on this class in the medium term.
             //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
-        final ThreadLocalRandom r = ThreadLocalRandom.current();
         try {
             while (m_shouldStop == false) {
                 try {
-                    if (m_selectedKeys != null) {
-                        while (m_shouldStop == false) {
-                            int readyKeys = 0;
-                            if (m_networkId == 0) {
-                                readyKeys = m_selector.select(5);
-                            } else {
-                                readyKeys = m_selector.select();
-                            }
-
-                            /*
-                             * Run the task queue immediately after selection to catch
-                             * any tasks that weren't a result of readiness selection
-                             */
-                            Runnable task = null;
-                            while ((task = m_tasks.poll()) != null) {
-                                task.run();
-                            }
-
-                            if (readyKeys > 0) {
-                                optimizedInvokeCallbacks(r);
-                            }
-
-                            /*
-                             * Poll the task queue again in case new tasks were created
-                             * by invoking callbacks.
-                             */
-                            task = null;
-                            while ((task = m_tasks.poll()) != null) {
-                                task.run();
-                            }
-
-                            if (m_networkId == 0) {
-                                Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-                                if ( delta != null ) {
-                                    m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
-                                }
-                            }
+                    if (m_selectedKeys == null) {
+                        // Can't use NinjaKeySet
+                        if (m_networkId == 0) {
+                            // Check for Hung Network
+                            nonOptimizedSelectTimerRunner(r);
+                        }
+                        else {
+                            nonOptimizedSelectNoTimerRunner(r);
                         }
                     }
                     else {
-                        while (m_shouldStop == false) {
-                            int readyKeys = 0;
-                            if (m_networkId == 0) {
-                                readyKeys = m_selector.select(5);
-                            } else {
-                                readyKeys = m_selector.select();
-                            }
-
-                            /*
-                             * Run the task queue immediately after selection to catch
-                             * any tasks that weren't a result of readiness selection
-                             */
-                            Runnable task = null;
-                            while ((task = m_tasks.poll()) != null) {
-                                task.run();
-                            }
-
-                            if (readyKeys > 0) {
-                                invokeCallbacks(r);
-                            }
-
-                            /*
-                             * Poll the task queue again in case new tasks were created
-                             * by invoking callbacks.
-                             */
-                            task = null;
-                            while ((task = m_tasks.poll()) != null) {
-                                task.run();
-                            }
-
-                            if (m_networkId == 0) {
-                                Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-                                if ( delta != null ) {
-                                    m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
-                                }
-                            }
+                        // Use NinjaKeySet
+                        if (m_networkId == 0) {
+                            // Check for Hung Network
+                            optimimzedSelectTimerRunner(r);
+                        }
+                        else {
+                            optimizedSelectNoTimerRunner(r);
                         }
                     }
                 } catch (Throwable ex) {
