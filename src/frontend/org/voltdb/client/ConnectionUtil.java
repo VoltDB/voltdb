@@ -304,7 +304,7 @@ public class ConnectionUtil {
                          */
                         final Oid krb5Oid = new Oid("1.2.840.113554.1.2.2");
                         /*
-                         * The standard type designation for principal 
+                         * The standard type designation for principal
                          */
                         final Oid krb5PrincipalNameType = new Oid("1.2.840.113554.1.2.2.1");
                         final GSSName serverName = m_gssManager.createName(serviceName, krb5PrincipalNameType);
