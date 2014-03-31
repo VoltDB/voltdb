@@ -214,7 +214,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
-                                            m_staticParams,
+                                            &m_staticParams,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);

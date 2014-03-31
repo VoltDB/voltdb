@@ -330,16 +330,18 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( EXISTS/IN (SELECT...) )
-        List<AbstractExpression> subqueryExprs = new ArrayList<AbstractExpression>();
         ParsedResultAccumulator exprSubqueryResult = null;
         if (parsedStmt.m_joinTree != null) {
             AbstractExpression treeExpr = parsedStmt.m_joinTree.getAllFilters();
-            subqueryExprs.addAll(treeExpr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
-            if ( ! subqueryExprs.isEmpty() ) {
-                exprSubqueryResult = getBestCostPlanForExistsSubQueries(subqueryExprs);
-                if (exprSubqueryResult == null) {
-                    // There was at least one sub-query and we should have a compiled plan for it
-                    return null;
+            if (treeExpr != null) {
+                List<AbstractExpression> subqueryExprs = new ArrayList<AbstractExpression>();
+                subqueryExprs.addAll(treeExpr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+                if ( ! subqueryExprs.isEmpty() ) {
+                    exprSubqueryResult = getBestCostPlanForExistsSubQueries(subqueryExprs);
+                    if (exprSubqueryResult == null) {
+                        // There was at least one sub-query and we should have a compiled plan for it
+                        return null;
+                    }
                 }
             }
         }
@@ -388,7 +390,7 @@ public class PlanAssembler {
                         parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
             }
             boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
-                    fromSubqueryResult.m_hasLimitOrOffset : true;
+                    fromSubqueryResult.m_hasLimitOrOffset : false;
             hasLimitOrOffset = (exprSubqueryResult != null) ?
                     hasLimitOrOffset && exprSubqueryResult.m_hasLimitOrOffset :
                         hasLimitOrOffset;

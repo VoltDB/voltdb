@@ -390,7 +390,7 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
+        StmtTableScan tableScan = getStmtTableScanByAlias(this, tableAlias);
         assert(tableScan != null);
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");

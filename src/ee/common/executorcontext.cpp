@@ -36,7 +36,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
                 Pool* tempStringPool,
-                NValueArray& params,
+                NValueArray* params,
                 bool exportEnabled,
                 std::string hostname,
                 CatalogId hostId) :

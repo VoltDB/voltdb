@@ -622,6 +622,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                     col.tableName, col.tableAlias, col.columnName, col.alias, ii);
             tve.setValueType(getValueType());
             tve.setValueSize(getValueSize());
+            if (this instanceof TupleValueExpression) {
+                tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
+            }
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);

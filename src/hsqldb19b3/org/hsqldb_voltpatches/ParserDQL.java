@@ -1364,13 +1364,14 @@ public class ParserDQL extends ParserBase {
         OrderedHashSet columnList       = null;
         BitMap         columnNameQuoted = null;
         SimpleName[]   columnNameList   = null;
-        Expression subqueryExpression = null; // For VoltDB
 
         if (token.tokenType == Tokens.OPENBRACKET) {
             Expression e = XreadTableSubqueryOrJoinedTable();
 
             table = e.subQuery.getTable();
-            subqueryExpression = e; // For VoltDB
+            if (table instanceof TableDerived) {
+                ((TableDerived)table).dataExpression = e;
+            }
         } else {
             table = readTableName();
 
@@ -1432,7 +1433,6 @@ public class ParserDQL extends ParserBase {
 
         RangeVariable range = new RangeVariable(table, alias, columnList,
             columnNameList, compileContext);
-        range.setSubqueryExpression(subqueryExpression); // For VoltDB
 
         return range;
     }

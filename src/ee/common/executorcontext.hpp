@@ -49,7 +49,7 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
-                    NValueArray& params,
+                    NValueArray* params,
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId);
@@ -105,7 +105,7 @@ class ExecutorContext {
     }
 
     NValueArray& getParameterContainer() {
-        return m_staticParams;
+        return *m_staticParams;
     }
 
     static UndoQuantum *currentUndoQuantum() {
@@ -155,7 +155,7 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
-    NValueArray& m_staticParams;
+    NValueArray* m_staticParams;
     boost::shared_array<std::vector<AbstractExecutor*> > m_executorLists;
     int64_t m_spHandle;
     int64_t m_uniqueId;
