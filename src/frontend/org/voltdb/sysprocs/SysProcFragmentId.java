@@ -93,6 +93,7 @@ public class SysProcFragmentId
         return (fragId == PF_prepBalancePartitions  ||
                 fragId == PF_balancePartitions ||
                 fragId == PF_balancePartitionsData ||
+                fragId == PF_balancePartitionsClearIndex ||
                 fragId == PF_distribute);
     }
 
