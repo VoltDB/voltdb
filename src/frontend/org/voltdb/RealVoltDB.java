@@ -56,7 +56,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -222,8 +221,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // m_safeMpTxnId to prevent the race. The m_safeMpTxnId is updated once in the
     // lifetime of the node to reflect the first MP txn that witnessed the flip of
     // m_rejoinDataPending.
-    private final AtomicLong m_lastSeenMpTxnId = new AtomicLong(Long.MIN_VALUE);
-    private volatile long m_safeMpTxnId = Long.MAX_VALUE;
+    private final Object m_safeMpTxnIdLock = new Object();
+    private long m_lastSeenMpTxnId = Long.MIN_VALUE;
+    private long m_safeMpTxnId = Long.MAX_VALUE;
     String m_rejoinTruncationReqId = null;
 
     // Are we adding the node to the cluster instead of rejoining?
@@ -276,13 +276,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public boolean isMpSysprocSafeToExecute(long txnId)
     {
-        synchronized (m_lastSeenMpTxnId) {
+        synchronized (m_safeMpTxnIdLock) {
             if (txnId >= m_safeMpTxnId) {
                 return true;
             }
 
-            if (txnId > m_lastSeenMpTxnId.get()) {
-                m_lastSeenMpTxnId.set(txnId);
+            if (txnId > m_lastSeenMpTxnId) {
+                m_lastSeenMpTxnId = txnId;
                 if (!rejoinDataPending() && m_safeMpTxnId == Long.MAX_VALUE) {
                     m_safeMpTxnId = txnId;
                 }
@@ -357,6 +357,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
+            m_safeMpTxnId = Long.MAX_VALUE;
+            m_lastSeenMpTxnId = Long.MIN_VALUE;
             m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
