@@ -332,6 +332,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SPACE:
             ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
             break;
+        case FUNC_FOLD_LOWER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_LOWER>((*arguments)[0]);
+            break;
+        case FUNC_FOLD_UPPER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_UPPER>((*arguments)[0]);
+            break;
         case FUNC_SQRT:
             ret = new UnaryFunctionExpression<FUNC_SQRT>((*arguments)[0]);
             break;
