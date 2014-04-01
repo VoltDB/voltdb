@@ -107,7 +107,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
     private final int m_networkId;
 
-    private NinjaKeySet m_selectedKeys;
+    private final NinjaKeySet m_ninjaSelectedKeys;
 
     /**
      * Start this VoltNetwork's thread;
@@ -133,7 +133,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             m_logger.fatal(null, ex);
             throw new RuntimeException(ex);
         }
-        m_selectedKeys = NinjaKeySet.instrumentSelector(m_selector);
+        m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
     }
 
     VoltNetwork( Selector s) {
@@ -142,6 +142,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
         m_selector = s;
         m_coreBindId = null;
         networkThreadName = new String("Test Selector Thread");
+        m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
     }
 
     /** Instruct the network to stop after the current loop */
@@ -285,92 +286,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         m_selector.wakeup();
     }
 
-    protected void processTasksAndPendingChannels(int readyKeys, ThreadLocalRandom r) {
-        /*
-         * Run the task queue immediately after selection to catch
-         * any tasks that weren't a result of readiness selection
-         */
-        Runnable task = null;
-        while ((task = m_tasks.poll()) != null) {
-            task.run();
-        }
-
-        if (readyKeys > 0) {
-            invokeCallbacks(r);
-        }
-
-        /*
-         * Poll the task queue again in case new tasks were created
-         * by invoking callbacks.
-         */
-        task = null;
-        while ((task = m_tasks.poll()) != null) {
-            task.run();
-        }
-
-    }
-
-    protected void processOptimizedTasksAndPendingChannels(int readyKeys, ThreadLocalRandom r) {
-        /*
-         * Run the task queue immediately after selection to catch
-         * any tasks that weren't a result of readiness selection
-         */
-        Runnable task = null;
-        while ((task = m_tasks.poll()) != null) {
-            task.run();
-        }
-
-        if (readyKeys > 0) {
-            optimizedInvokeCallbacks(r);
-        }
-
-        /*
-         * Poll the task queue again in case new tasks were created
-         * by invoking callbacks.
-         */
-        task = null;
-        while ((task = m_tasks.poll()) != null) {
-            task.run();
-        }
-
-    }
-
-    protected void optimizedSelectNoTimerRunner(ThreadLocalRandom r) throws IOException {
-        while (m_shouldStop == false) {
-            int readyKeys = m_selector.select();
-            processOptimizedTasksAndPendingChannels(readyKeys, r);
-        }
-    }
-
-    protected void nonOptimizedSelectNoTimerRunner(ThreadLocalRandom r) throws IOException {
-        while (m_shouldStop == false) {
-            int readyKeys = m_selector.select();
-            processTasksAndPendingChannels(readyKeys, r);
-        }
-    }
-
-    protected void optimimzedSelectTimerRunner(ThreadLocalRandom r) throws IOException {
-        while (m_shouldStop == false) {
-            int readyKeys = m_selector.select(5);
-            processOptimizedTasksAndPendingChannels(readyKeys, r);
-            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-            if ( delta != null ) {
-                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
-            }
-        }
-    }
-
-    protected void nonOptimizedSelectTimerRunner(ThreadLocalRandom r) throws IOException {
-        while (m_shouldStop == false) {
-            int readyKeys = m_selector.select(5);
-            processTasksAndPendingChannels(readyKeys, r);
-            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-            if ( delta != null ) {
-                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
-            }
-        }
-    }
-
     @Override
     public void run() {
         final ThreadLocalRandom r = ThreadLocalRandom.current();
@@ -382,24 +297,47 @@ class VoltNetwork implements Runnable, IOStatsIntf
         try {
             while (m_shouldStop == false) {
                 try {
-                    if (m_selectedKeys == null) {
-                        // Can't use NinjaKeySet
+                    while (m_shouldStop == false) {
+                        int readyKeys;
                         if (m_networkId == 0) {
-                            // Check for Hung Network
-                            nonOptimizedSelectTimerRunner(r);
+                            readyKeys = m_selector.select(5);
                         }
                         else {
-                            nonOptimizedSelectNoTimerRunner(r);
+                            readyKeys = m_selector.select();
                         }
-                    }
-                    else {
-                        // Use NinjaKeySet
+
+                        /*
+                         * Run the task queue immediately after selection to catch
+                         * any tasks that weren't a result of readiness selection
+                         */
+                        Runnable task = null;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
+                        }
+
+                        if (readyKeys > 0) {
+                            if (m_ninjaSelectedKeys == null) {
+                                invokeCallbacks(r);
+                            }
+                            else {
+                                optimizedInvokeCallbacks(r);
+                            }
+                        }
+
+                        /*
+                         * Poll the task queue again in case new tasks were created
+                         * by invoking callbacks.
+                         */
+                        task = null;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
+                        }
+
                         if (m_networkId == 0) {
-                            // Check for Hung Network
-                            optimimzedSelectTimerRunner(r);
-                        }
-                        else {
-                            optimizedSelectNoTimerRunner(r);
+                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                            if ( delta != null ) {
+                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
+                            }
                         }
                     }
                 } catch (Throwable ex) {
@@ -537,9 +475,9 @@ class VoltNetwork implements Runnable, IOStatsIntf
     }
 
     protected void optimizedInvokeCallbacks(ThreadLocalRandom r) {
-        final int numKeys = m_selectedKeys.size();
+        final int numKeys = m_ninjaSelectedKeys.size();
         final int startIndex = r.nextInt(numKeys);
-        final SelectionKey keys[] = m_selectedKeys.keys();
+        final SelectionKey keys[] = m_ninjaSelectedKeys.keys();
         for (int ii = startIndex; ii < numKeys; ii++) {
             final Object obj = keys[ii].attachment();
             if (obj == null) {
@@ -557,7 +495,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             final VoltPort port = (VoltPort)obj;
             callPort(port);
         }
-        m_selectedKeys.clear();
+        m_ninjaSelectedKeys.clear();
     }
 
     private Map<Long, Pair<String, long[]>> getIOStatsImpl(boolean interval) {
