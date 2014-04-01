@@ -111,7 +111,7 @@ public class SysprocFragmentTask extends TransactionTask
         // to take place.
         if (m_fragmentMsg.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
-            VoltDB.instance().rejoinDataPending()) {
+            !VoltDB.instance().isMpSysprocSafeToExecute(m_txnState.txnId)) {
             respondWithDummy();
             return;
         }
