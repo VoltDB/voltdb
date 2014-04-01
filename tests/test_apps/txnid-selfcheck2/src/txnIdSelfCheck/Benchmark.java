@@ -147,7 +147,7 @@ public class Benchmark {
         int progresstimeout = 120;
 
         @Option(desc = "Whether or not to disable adhoc writes.")
-        boolean disableadhoc = false;
+        boolean disableadhoc = true; // XXX/PSR TEMP false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
