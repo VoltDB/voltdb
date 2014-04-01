@@ -59,7 +59,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -97,7 +96,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     public interface DaemonInitiator {
         public void initiateSnapshotDaemonWork(final String procedureName, long clientData, Object params[]);
-    };
+    }
 
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
@@ -131,7 +130,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private String m_path;
     private String m_prefix;
     private String m_prefixAndSeparator;
-    private Future<?> m_snapshotTask;
 
     private SnapshotSchedule m_lastKnownSchedule = null;
 
@@ -722,11 +720,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 if (success) {
                     loggingLog.info("Snapshot initiation for log truncation was successful");
-                    /*
-                     * Race to create the completion node before deleting
-                     * the request node so that we can guarantee that the
-                     * completion node will have the correct information
-                     */
+
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                     try {
@@ -734,14 +728,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
-                    }
-
-                    SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
-                    int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
-                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(snapshotPath, nonce,
-                                                                      snapshotTxnId,
-                                                                      hostId, true, truncReqId)) {
-                        SnapshotSaveAPI.increaseParticipateHost(snapshotTxnId, hostId);
                     }
 
                     try {
@@ -1563,9 +1549,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     public void shutdown() throws InterruptedException {
-        if (m_snapshotTask != null) {
-            m_snapshotTask.cancel(false);
-        }
         if (m_truncationSnapshotScanTask != null) {
             m_truncationSnapshotScanTask.cancel(false);
         }
