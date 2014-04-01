@@ -58,7 +58,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant clean default dist")
+        run("ant -Djmemcheck=NO_MEMCHECK clean default dist")
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -69,7 +69,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
