@@ -62,7 +62,6 @@ public class LoadTableLoader extends Thread {
     final long targetCount;
     final String m_tableName;
     final int batchSize;
-    final Random r;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final boolean m_isMP;
     final Semaphore m_permits;
@@ -104,7 +103,6 @@ public class LoadTableLoader extends Thread {
         m_table = new VoltTable(m_colInfo);
         long curtmms = Calendar.getInstance().getTimeInMillis();
         m_random = new Random(curtmms);
-        r = new Random(curtmms + 1);
 
         System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
@@ -292,8 +290,8 @@ public class LoadTableLoader extends Thread {
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
-                    long p = Math.abs(r.nextLong());
-                    m_table.addRow(p, p, Calendar.getInstance().getTimeInMillis());
+                    long p = System.nanoTime();
+                    m_table.addRow(p, p, System.nanoTime());
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
@@ -311,6 +309,7 @@ public class LoadTableLoader extends Thread {
                             onlyDelQueue.add(p);
                         }
                     }
+                    Thread.sleep(0, 1);
                 }
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
