@@ -29,7 +29,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.PosixAdvise;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -93,26 +92,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                 while (m_bytesSinceLastSync.get() > 1024 * 1024 * 4) {
                     try {
                         final long syncStart = syncedBytes;
-                        //Don't start writeback on the currently appending page to avoid
-                        //issues with stables pages, hence we move the end back one page
-                        syncedBytes = ((m_fc.position() / Bits.pageSize()) - 1) * Bits.pageSize();
-
-                        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
-                            final long retval = PosixAdvise.sync_file_range(m_ras.getFD(),
-                                                                            syncStart,
-                                                                            syncedBytes - syncStart,
-                                                                            PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                            if (retval != 0) {
-                                SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
-                                SNAP_LOG.error(
-                                        "Params offset " + syncedBytes +
-                                        " length " + (syncedBytes - syncStart) +
-                                        " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                                m_fc.force(false);
-                            }
-                        } else {
-                            m_fc.force(false);
-                        }
+                        syncedBytes =  Bits.sync_file_range(SNAP_LOG, m_ras.getFD(), m_fc, syncStart, m_fc.position());
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);

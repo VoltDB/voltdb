@@ -264,25 +264,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         positionAtSync = m_channel.position();
                         final long syncStart = syncedBytes;
-                        //Don't start writeback on the currently appending page to avoid
-                        //issues with stables pages, hence we move the end back one page
-                        syncedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
-                        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
-                            final long retval = PosixAdvise.sync_file_range(m_fos.getFD(),
-                                                                            syncStart,
-                                                                            syncedBytes - syncStart,
-                                                                            PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                            if (retval != 0) {
-                                SNAP_LOG.error("Error sync_file_range snapshot data: " + retval);
-                                SNAP_LOG.error(
-                                        "Params offset " + syncedBytes +
-                                        " length " + (syncedBytes - syncStart) +
-                                        " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
-                                m_channel.force(false);
-                            }
-                        } else {
-                            m_channel.force(false);
-                        }
+                        syncedBytes = Bits.sync_file_range(SNAP_LOG, m_fos.getFD(), m_channel, syncStart, positionAtSync);
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);
