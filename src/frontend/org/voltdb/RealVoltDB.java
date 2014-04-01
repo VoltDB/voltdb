@@ -90,7 +90,6 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -1308,13 +1307,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Catalog catalog = new Catalog();
             Cluster cluster = catalog.getClusters().add("cluster");
             Database db = cluster.getDatabases().add("database");
-
-            // enable security if set on the deployment file
-            SecurityType security = m_deployment.getSecurity();
-            if (security != null) {
-                cluster.setSecurityenabled(security.isEnabled());
-            }
-
 
             // create groups as needed for users
             if (m_deployment.getUsers() != null) {
