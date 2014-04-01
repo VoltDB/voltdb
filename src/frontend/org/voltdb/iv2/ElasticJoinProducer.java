@@ -118,9 +118,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        String snapshotNonce = message.getSnapshotNonce();
-        SnapshotCompletionAction interest =
-                new SnapshotCompletionAction(snapshotNonce, m_snapshotCompletionMonitor);
+        m_snapshotNonce = message.getSnapshotNonce();
+        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_snapshotCompletionMonitor);
         interest.register();
 
         long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
@@ -222,7 +221,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public TaskLog constructTaskLog(String voltroot)
     {
         m_taskLog = initializeTaskLog(voltroot, m_partitionId);
-        m_taskLog.enableRecording();
         return this;
     }
 
@@ -285,7 +283,4 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public void enableRecording() {
         //Implemented by the nest task log, it is enabled immediately on construction
     }
-
-    @Override
-    public void notifyOfSnapshotNonce(String nonce) {}//don't need to do anything
 }

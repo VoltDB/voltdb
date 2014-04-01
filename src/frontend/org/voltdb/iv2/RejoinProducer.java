@@ -53,7 +53,6 @@ public class RejoinProducer extends JoinProducerBase {
     private StreamSnapshotSink m_rejoinSiteProcessor;
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait =
             SettableFuture.create();
-    private String m_snapshotNonce;
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -230,7 +229,7 @@ public class RejoinProducer extends JoinProducerBase {
                 + " and snapshot nonce is: "
                 + m_snapshotNonce);
 
-        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_snapshotNonce, m_completionMonitorAwait);
+        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_completionMonitorAwait);
         interest.register();
         // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
         RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
@@ -337,14 +336,6 @@ public class RejoinProducer extends JoinProducerBase {
             finishingTask.runForRejoin(siteConnection, null);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unexpected IOException in rejoin", true, e);
-        }
-    }
-
-    @Override
-    public void notifyOfSnapshotNonce(String nonce) {
-        if (nonce.equals(m_snapshotNonce)) {
-            REJOINLOG.debug("Started recording transactions after snapshot nonce " + nonce);
-            m_taskLog.enableRecording();
         }
     }
 }

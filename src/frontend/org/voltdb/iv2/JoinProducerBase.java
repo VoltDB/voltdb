@@ -20,17 +20,14 @@ package org.voltdb.iv2;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
@@ -50,6 +47,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
     protected TaskLog m_taskLog;
+    protected String m_snapshotNonce = null;
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -60,12 +58,10 @@ public abstract class JoinProducerBase extends SiteTasker {
      */
     protected class SnapshotCompletionAction implements SnapshotCompletionInterest
     {
-        private final String m_snapshotNonce;
         private final SettableFuture<SnapshotCompletionEvent> m_future;
 
-        protected SnapshotCompletionAction(String nonce, SettableFuture<SnapshotCompletionEvent> future)
+        protected SnapshotCompletionAction(SettableFuture<SnapshotCompletionEvent> future)
         {
-            m_snapshotNonce = nonce;
             m_future = future;
         }
 
@@ -173,5 +169,12 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     public abstract TaskLog constructTaskLog(String voltroot);
 
-    public abstract void notifyOfSnapshotNonce(String nonce);
+    public void notifyOfSnapshotNonce(String nonce) {
+        if (nonce.equals(m_snapshotNonce)) {
+            JOINLOG.debug("Started recording transactions after snapshot nonce " + nonce);
+            if (m_taskLog != null) {
+                m_taskLog.enableRecording();
+            }
+        }
+    }
 }
