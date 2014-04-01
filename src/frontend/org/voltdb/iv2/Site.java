@@ -594,6 +594,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
                 if (global_replay_mpTxn == null) {
+                    Preconditions.checkArgument(m.getInitiateTask() != null,
+                            "Missing InitiateTaskMessage in first fragment: " + m.toString());
                     global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
                 }
                 else if (global_replay_mpTxn.txnId != m.getTxnId()) {
@@ -621,6 +623,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
                             null, m, m_drGateway);
+                    if (global_replay_mpTxn.txnId != m.getTxnId()) {
+                        VoltDB.crashLocalVoltDB("Trying to finish MP transaction " +
+                                                TxnEgo.txnIdToString(m.getTxnId())+ " during " +
+                                                "replay before completing the previous one " +
+                                                TxnEgo.txnIdToString(global_replay_mpTxn.txnId));
+                    }
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
