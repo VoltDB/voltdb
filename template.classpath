@@ -48,6 +48,9 @@
     <classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/javaee-api-6.0.jar"/>
     <classpathentry kind="lib" path="lib/groovy-all-2.1.7-indy.jar"/>
+    <classpathentry kind="lib" path="lib/kafka_2.8.0-0.8.0.jar"/>
+    <classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
+    <classpathentry kind="lib" path="lib/scala-library.jar"/>
 
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
