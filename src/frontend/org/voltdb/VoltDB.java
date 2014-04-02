@@ -325,8 +325,15 @@ public class VoltDB {
                         m_httpPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.startsWith("zkport")) {
-                    m_zkInterface = "127.0.0.1:" + args[++i].trim();
-                }  else if (arg.equals("externalinterface")) {
+                    //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                    } else {
+                        m_zkInterface = "127.0.0.1:" + portStr.trim();
+                    }
+                } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
