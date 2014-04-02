@@ -837,7 +837,7 @@ public class VoltDB {
 
         try {
             // instruct the rest of the cluster to die
-            instance().getHostMessenger().sendPoisonPill(errMsg);
+            instance().getHostMessenger().sendPoisonPill(errMsg, -1);
             // give the pill a chance to make it through the network buffer
             Thread.sleep(500);
         } catch (Exception e) {

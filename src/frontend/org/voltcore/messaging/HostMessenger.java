@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,8 +50,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.COWMap;
-import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
@@ -1085,15 +1082,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_zk;
     }
 
-    public void sendPoisonPill(String err) {
-        sendPoisonPill(m_foreignHosts.keySet(), err);
+    public void sendPoisonPill(String err, int targetHostId) {
+        sendPoisonPill(m_foreignHosts.keySet(), err, targetHostId);
     }
 
-    public void sendPoisonPill(Collection<Integer> hostIds, String err) {
+    public void sendPoisonPill(Collection<Integer> hostIds, String err, int targetHostId) {
         for (int hostId : hostIds) {
             ForeignHost fh = m_foreignHosts.get(hostId);
             if (fh != null && fh.isUp()) {
-                fh.sendPoisonPill(err);
+                fh.sendPoisonPill(err, targetHostId);
             }
         }
     }

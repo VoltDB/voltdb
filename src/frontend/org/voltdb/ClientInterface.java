@@ -1695,6 +1695,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@GC")) {
                 return dispatchSystemGC(handler, task, user);
             }
+            if (task.procName.equals("@StopNode")) {
+                return dispatchStopNode(task);
+            }
         }
 
         Procedure catProc = catalogContext.procedures.get(task.procName);
@@ -2003,6 +2006,58 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
+    }
+
+    private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
+        VoltTable table = new VoltTable(
+                new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
+                        VoltSystemProcedure.CTYPE_ID),
+                new ColumnInfo("RESULT", VoltType.STRING),
+                new ColumnInfo("ERR_MSG", VoltType.STRING));
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "StopNode Must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "StopNode must have one Integer parameter specified. provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        try {
+            List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
+            if (!liveHids.contains(ihid)) {
+                table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
+                        "Invalid Host Id");
+            } else {
+                if (!VoltDB.instance().isSafeToSuicide()) {
+                    hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
+                            + " StopNode is will not stop node as stopping will violate k-safety.");
+                    table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
+                            "Server Node can not be stopped because stopping will violate k-safety.");
+                } else {
+                    table.addRow(ihid, "SUCCESS", "");
+                    int hid = VoltDB.instance().getHostMessenger().getHostId();
+                    if (hid == ihid) {
+                        //Killing myself no pill needs to be sent
+                        VoltDB.instance().suicide();
+                    } else {
+                        //Send poison pill with target to kill
+                        VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid);
+                    }
+                }
+            }
+        } catch (NumberFormatException nfe) {
+            table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
+                    "Failed to parse the hostId to Stop.");
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[]{table}, "", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)

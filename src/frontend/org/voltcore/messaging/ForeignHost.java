@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
@@ -34,7 +33,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.PicoNetwork;
-import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
@@ -318,7 +316,21 @@ public class ForeignHost {
         if (destCount == -1) {//This is a poison pill
             //Ignore poison pill during shutdown, in tests we receive crash messages from
             //leader appointer during shutdown
-            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) return;
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+                return;
+            }
+            //if poisin pill is for particular host treat it as a uthenesia
+            int targetHostId = in.getInt();
+            if (targetHostId != -1) {
+                int hid = VoltDB.instance().getHostMessenger().getHostId();
+                if (hid == targetHostId) {
+                    hostLog.info("Poision Pill with target Host Id: " + targetHostId);
+                    //Killing myself.
+                    VoltDB.instance().suicide();
+                }
+                return;
+            }
+            //Just a regular poision pill
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
@@ -356,7 +368,7 @@ public class ForeignHost {
 
     }
 
-    public void sendPoisonPill(String err) {
+    public void sendPoisonPill(String err, int targetHostId) {
         byte errBytes[];
         try {
             errBytes = err.getBytes("UTF-8");
@@ -364,10 +376,11 @@ public class ForeignHost {
             e.printStackTrace();
             return;
         }
-        ByteBuffer message = ByteBuffer.allocate( 20 + errBytes.length);
+        ByteBuffer message = ByteBuffer.allocate(24 + errBytes.length);
         message.putInt(message.capacity() - 4);
         message.putLong(-1);
         message.putInt(-1);
+        message.putInt(targetHostId);
         message.putInt(errBytes.length);
         message.put(errBytes);
         message.flip();
