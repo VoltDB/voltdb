@@ -833,11 +833,6 @@ public class LeaderAppointer implements Promotable
         return TheHashinator.getRanges(pid).isEmpty();
     }
 
-    private static boolean partitionOnHashRing(int pid) {
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
-        return !TheHashinator.getRanges(pid).isEmpty();
-    }
-
     /**
      * Gets the initial cluster partition count on startup. This can only be called during
      * initialization. Calling this after initialization throws, because the partition count may
@@ -885,22 +880,27 @@ public class LeaderAppointer implements Promotable
         }
     }
 
+    //Check partition replicas.
     public boolean isClusterSafeIfIDie() {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-                    return isViableKill();
+                    if (m_kfactor > 0) {
+                        return doPartitionsHaveReplicas();
+                    } else {
+                        return true;
+                    }
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
-            tmLog.error("ClusterWatcher: Error in isClusterKSafeAfterIDie returning cached value.", t);
+            tmLog.error("LeaderAppointer: Error in isClusterSafeIfIDie returning cached value.", t);
         }
         return false;
     }
 
-    private boolean isViableKill() {
-        tmLog.info("ClusterWatcher: Reloading partition information.");
+    private boolean doPartitionsHaveReplicas() {
+        tmLog.info("LeaderAppointer: Reloading partition information.");
         List<String> partitionDirs = null;
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
@@ -932,18 +932,16 @@ public class LeaderAppointer implements Promotable
             }
 
             try {
-                // The data of the partition dir indicates whether the partition has finished
-                // initializing or not. If not, the replicas may still be in the process of
-                // adding themselves to the dir. So don't check for k-safety if that's the case.
+                //Dont let anyone die if someone is in INITIALIZING state
                 byte[] partitionState = dataCallbacks.poll().getData();
-                byte state = 0;
                 if (partitionState != null && partitionState.length == 1) {
-                    state = partitionState[0];
+                    if (partitionState[0] == LeaderElector.INITIALIZING) {
+                        return false;
+                    }
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                //Record host ids for all partitions that are on the ring
-                //so they are considered for partition detection
+                //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
                 for (String replica : replicas) {
                     final String split[] = replica.split("/");

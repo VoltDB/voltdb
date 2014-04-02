@@ -319,7 +319,13 @@ public class ForeignHost {
             if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
                 return;
             }
-            //if poisin pill is for particular host treat it as a uthenesia
+            //Just a regular poision pill
+            byte messageBytes[] = new byte[in.getInt()];
+            in.get(messageBytes);
+            String message = new String(messageBytes, "UTF-8");
+            message = String.format("Fatal error from id,hostname(%d,%s): %s",
+                    m_hostId, hostnameAndIPAndPort(), message);
+            //if poisin pill is for particular host treat it as targeted kill
             int targetHostId = in.getInt();
             if (targetHostId != -1) {
                 int hid = VoltDB.instance().getHostMessenger().getHostId();
@@ -330,12 +336,6 @@ public class ForeignHost {
                 }
                 return;
             }
-            //Just a regular poision pill
-            byte messageBytes[] = new byte[in.getInt()];
-            in.get(messageBytes);
-            String message = new String(messageBytes, "UTF-8");
-            message = String.format("Fatal error from id,hostname(%d,%s): %s",
-                    m_hostId, hostnameAndIPAndPort(), message);
             org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
         }
 
@@ -380,9 +380,9 @@ public class ForeignHost {
         message.putInt(message.capacity() - 4);
         message.putLong(-1);
         message.putInt(-1);
-        message.putInt(targetHostId);
         message.putInt(errBytes.length);
         message.put(errBytes);
+        message.putInt(targetHostId);
         message.flip();
         m_network.enqueue(message);
     }
