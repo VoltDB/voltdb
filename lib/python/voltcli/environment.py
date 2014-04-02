@@ -115,6 +115,8 @@ java_opts.append('-XX:CMSWaitDuration=120000')
 java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
+java_opts.append('-XX:+CMSClassUnloadingEnabled')
+java_opts.append('-XX:PermSize=64m')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """

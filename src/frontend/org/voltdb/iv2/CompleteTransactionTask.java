@@ -147,6 +147,10 @@ public class CompleteTransactionTask extends TransactionTask
             FragmentTaskMessage fragment = (FragmentTaskMessage) m_txnState.getNotice();
             Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
             assert(initiateTask != null);
+            if (initiateTask.getStoredProcedureInvocation() == null) {
+                hostLog.error("Unable to log MP transaction to DR because of missing invocation, " +
+                              "fragment: " + fragment.toString() + ", initiate task: " + initiateTask);
+            }
             StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
             m_drGateway.onSuccessfulMPCall(m_txnState.m_spHandle,
                     m_txnState.txnId,

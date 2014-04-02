@@ -496,7 +496,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
             for (Map.Entry<Integer, ForeignHost> e : m_foreignHosts.entrySet()) {
-                if (e.getKey().equals(hostId)) continue;
+                if (e.getKey().equals(hostId)) {
+                    fh = e.getValue();
+                    continue;
+                }
                 b.put(e.getKey(), e.getValue());
             }
             m_foreignHosts = b.build();
