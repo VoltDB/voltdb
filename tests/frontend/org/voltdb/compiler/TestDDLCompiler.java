@@ -39,10 +39,6 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
 public class TestDDLCompiler extends TestCase {
 
-    public class find_class_with_underscore {
-
-    }
-
     public void testSimpleDDLCompiler() throws HSQLParseException {
         String ddl1 =
             "CREATE TABLE \"warehouse\" ( " +
