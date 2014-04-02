@@ -1858,8 +1858,8 @@ TEST CASES
     <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
     </condition>
-    <condition property="generate_only" value="-g" else="">
-        <isset property="generate_only"/>
+    <condition property="config_genonly" value="-g" else="">
+        <isset property="sql_coverage_genonly"/>
     </condition>
     <condition property="config_subversion" value="-S" else="">
         <isset property="sql_coverage_subversion"/>

@@ -102,4 +102,8 @@
                                   "ddl": "compoundex-DDL.sql",
                                   "template": "advanced-joins.sql",
                                   "normalizer": "normalizer.py"},
+    "advanced-matview-repl-subq-nonjoin": {"schema": "matview-repl-schema.py",
+                                 "ddl": "matview-repl-DDL.sql",
+                                 "template": "advanced-matview-repl-subq-nonjoin.sql",
+                                 "normalizer": "normalizer.py"},
 }

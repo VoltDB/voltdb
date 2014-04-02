@@ -1,14 +1,6 @@
 -- Eventually, this should evolve into a superset of the DDL for all the schema in all the configurations
 -- used with sqlcoverage. Then we could avoid bouncing the server between templates.
 
-CREATE TABLE R0 (
-  ID INTEGER NOT NULL,
-  DESC VARCHAR(300),
-  NUM INTEGER,
-  RATIO FLOAT,
-  PRIMARY KEY (ID)
-);
-
 CREATE TABLE R1 (
   ID INTEGER NOT NULL,
   DESC VARCHAR(300),
