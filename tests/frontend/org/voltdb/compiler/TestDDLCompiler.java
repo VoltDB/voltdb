@@ -39,6 +39,10 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
 public class TestDDLCompiler extends TestCase {
 
+    public class find_class_with_underscore {
+
+    }
+
     public void testSimpleDDLCompiler() throws HSQLParseException {
         String ddl1 =
             "CREATE TABLE \"warehouse\" ( " +
@@ -98,6 +102,7 @@ public class TestDDLCompiler extends TestCase {
             ddl1 += line + "\n";
         }
 
+        br.close();
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
         hsql.runDDLCommand(ddl1);
@@ -257,6 +262,10 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkImportValidity("org.**.RealVoltDB"));
         assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
         assertTrue(checkImportValidity("org.voltdb.RealVoltDB"));
+        assertFalse(checkImportValidity("org."));
+        assertFalse(checkImportValidity("org.."));
+        assertFalse(checkImportValidity("org.v_dt"));
+        assertTrue(checkImportValidity("org.voltdb.compiler.dummy_test_underscore"));
     }
 
     boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
