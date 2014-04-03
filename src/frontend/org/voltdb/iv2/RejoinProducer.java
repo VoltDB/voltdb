@@ -38,7 +38,6 @@ import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -51,8 +50,6 @@ public class RejoinProducer extends JoinProducerBase {
     private ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
-    private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait =
-            SettableFuture.create();
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -306,7 +303,7 @@ public class RejoinProducer extends JoinProducerBase {
 
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
-                if (!m_completionMonitorAwait.isDone()) {
+                if (!m_snapshotCompletionMonitor.isDone()) {
                     m_taskQueue.offer(this);
                     return;
                 }
@@ -314,7 +311,7 @@ public class RejoinProducer extends JoinProducerBase {
                 try {
                     REJOINLOG.debug(m_whoami
                             + "waiting on snapshot completion monitor.");
-                    event = m_completionMonitorAwait.get();
+                    event = m_snapshotCompletionMonitor.get();
                     m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
