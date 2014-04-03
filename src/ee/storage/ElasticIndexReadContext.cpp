@@ -58,6 +58,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.hasIndex()) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation failed because surgeon reports no index.");
         return ACTIVATION_FAILED;
     }
 
@@ -68,6 +69,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
 
     ElasticIndexHashRange range;
     if (!parseHashRange(m_predicateStrings, range)) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation failed because parsing the hash range showed a conflict.");
         return ACTIVATION_FAILED;
     }
 
@@ -214,6 +216,8 @@ bool ElasticIndexReadContext::parseHashRange(
                          predicateStrings.at(0).c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
             }
+        } else {
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Hash range did not have two entries");
         }
     }
     return success;
