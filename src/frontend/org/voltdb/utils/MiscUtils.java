@@ -247,7 +247,7 @@ public class MiscUtils {
             licenseApi = MiscUtils.licenseApiFactory(licensePath);
         }
         if (licenseApi != null) {
-            hostLog.warn("Searching for license file located " + licensePath);
+            hostLog.info("Searching for license file located " + licensePath);
         }
         return licenseApi;
     }
