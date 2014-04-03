@@ -24,17 +24,19 @@ boolean enable_cl_truncation = build.buildVariableResolver.resolve("enable_cl_tr
 boolean enable_supers = false //build.buildVariableResolver.resolve("enable_supers").toBoolean()
 boolean makenew = build.buildVariableResolver.resolve("makeNew").toBoolean() // true=delete existing jobs, false=keep existing jobs but change job enable/disable settings
 boolean deletejob = build.buildVariableResolver.resolve("deletejobs").toBoolean()
+boolean cloneDisabled = build.buildVariableResolver.resolve("cloneDisabled").toBoolean()
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
 def recipientlist = build.buildVariableResolver.resolve("email_list")
 
 AbstractProject kit = null
+AbstractProject kitperf = null
 downstream = ""
+downstream_perf = ""
 
 alljobs = []
 
 def view = Hudson.instance.getView(str_viewname)
-
 /*
 for (item in Hudson.instance.items) {
    if (! item.disabled && (item.getName().contains(str_search_1) ||
@@ -42,11 +44,15 @@ for (item in Hudson.instance.items) {
                            item.getName().contains(str_search_3))) {
 */
 for(item in view.getItems()) {
-    if (item.getName().contains("kit-"))
+    if (item.getName().startsWith("kit-system-test-"))
       alljobs.add(0, item)
-    else
+    else if (item.getName().startsWith("kit-performance-"))
+      alljobs.add(0, item)
+    else if ( ! item.getName().startsWith("batch-"))
       alljobs.add(item)
    }
+
+println alljobs
 
 for(item in alljobs)
 {
@@ -63,6 +69,11 @@ for(item in alljobs)
            continue
 
       if ( ! Hudson.instance.getJob(newName)) {
+
+         if (item.disabled)
+             if (!cloneDisabled)
+                 continue
+
             // copy the job, save it
             job = Hudson.instance.copy(item, newName)
             newjob = true
@@ -75,10 +86,13 @@ for(item in alljobs)
       AbstractProject project = job
 
       if (item.disabled)
-         project.disabled = true
+         if (cloneDisabled)
+             project.disabled = true
+         else
+             continue
       else if (project.getName().startsWith("branch-performance-"))
           project.disabled = !enable_performance
-      else if (project.getName().endsWith("-cl-truncation"))
+      else if (project.getName().startsWith("branch-system-test-cl-truncation"))
           project.disabled = !enable_cl_truncation
       else if (project.getName().startsWith("branch-system-test-"))
           project.disabled = !enable_systemtest
@@ -91,9 +105,11 @@ for(item in alljobs)
 
 
       // save the kit-build project ref
-      if (job.getName().startsWith("branch-kit-"))
+      if (job.getName().startsWith("branch-kit-system-test-build-"))
         kit = project
-      else if (kit == null) {
+      else if (job.getName().startsWith("branch-kit-performance-build-"))
+        kitperf = project
+      else if (kit == null || kitperf == null) {
         // kit-build job must be processed first
         assert(false)
       }
@@ -113,26 +129,32 @@ for(item in alljobs)
 
       // if the job has a cloned workspace, replace it with the new kitbuild workspace
       if (project.scm instanceof hudson.plugins.cloneworkspace.CloneWorkspaceSCM) {
-              project.scm = new hudson.plugins.cloneworkspace.CloneWorkspaceSCM(kit.getName(), "any") //"kit-"+workspace_name+"-build", "any")
+          if (project.getName().startsWith("branch-system-test") || project.getName().startsWith("branch-endurance"))
+              project.scm = new hudson.plugins.cloneworkspace.CloneWorkspaceSCM(kit.getName(), "any")
+          else if (project.getName().startsWith("branch-performance"))
+              project.scm = new hudson.plugins.cloneworkspace.CloneWorkspaceSCM(kitperf.getName(), "any")
       }
 
     // option to remove cron triggers and trigger everything from the kit build
     if (true) {
         println "getTrigger"
         try {
-            t = job.getTrigger(triggers.TimerTrigger)
+            t = job.getTrigger(triggers.TimerTrigger)  
             println t.getSpec() // crontab specification as string ie. "0 22 * * *"
             // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
             if (t != null)
                 job.removeTrigger(t.getDescriptor())
         } catch(e) { println "no timer trigger found" }
 
-        if (project != kit) {
-            if (project.getName().startsWith("performance-") && trigger_performance != "kit")
+        if (project != kit && project != kitperf) {
+            if (project.getName().startsWith("branch-performance-") && trigger_performance != "kit")
                 project.addTrigger(new triggers.TimerTrigger(trigger_performance))
             else
                 // make a list of all jobs for a BuildTrigger for the kit build job
-                downstream = downstream + "," + project.getName() // make a list of downstream projects
+                if (project.getName().startsWith("branch-system-test"))
+                    downstream = downstream + "," + project.getName() // make a list of downstream projects
+                if (project.getName().startsWith("branch-performance"))
+                    downstream_perf = downstream_perf + "," + project.getName()
         }
     }
 
@@ -169,4 +191,15 @@ if (!deletejob) {
      }
    }
    kit.save()
+
+ if (downstream_perf.length() > 0) {
+   // finally, set all projects to be downstream of/triggered-by the kit build job
+     bt = new tasks.BuildTrigger(downstream_perf.substring(1), false)
+     try {
+        kitperf.getPublishersList().replace(bt)
+     } catch(e) {
+        kitperf.getPublishersList().add(bt)
+     }
+   }
+   kitperf.save()
 }

@@ -130,6 +130,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
+        SNAP_LOG.info("Creating tasks for table " + table.getTypeName() + " id " + table.getRelativeIndex());
         // no work on this node
         if (pidToLocalHSIDs.isEmpty()) {
             return;
@@ -146,10 +147,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
 
         // go over all local sites, create a task for each source site
         for (IndexSnapshotRequestConfig.PartitionRanges partitionRange : partitionRanges) {
+            SNAP_LOG.info("Checking to see if we should create a task for partition " + partitionRange.partitionId + " ranges " + partitionRange.ranges.size());
             Long localHSId = pidToLocalHSIDs.get(partitionRange.partitionId);
 
             // The partition may not exist on this node. If so, keep calm and carry on
             if (localHSId != null) {
+                SNAP_LOG.info("Creating task for partition for partition " + partitionRange.partitionId);
                 // based on the source partition, the predicate is different
                 final SnapshotTableTask task =
                     new SnapshotTableTask(table,
