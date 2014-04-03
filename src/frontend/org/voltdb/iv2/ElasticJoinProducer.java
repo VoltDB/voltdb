@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -37,18 +38,14 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
+    private static final VoltLogger JOINLOG = new VoltLogger("JOIN");
+
     // true if the site has received the first fragment task message
     private boolean m_receivedFirstFragment = false;
     // true if the site has notified the coordinator about the receipt of the first fragment
     // message
     private boolean m_firstFragResponseSent = false;
-
-    // data transfer snapshot completion monitor
-    private final SettableFuture<SnapshotCompletionEvent> m_snapshotCompletionMonitor =
-            SettableFuture.create();
 
     // a snapshot sink used to stream table data from multiple sources
     private final StreamSnapshotSink m_dataSink;
@@ -118,9 +115,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        m_snapshotNonce = message.getSnapshotNonce();
-        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_snapshotCompletionMonitor);
-        interest.register();
+        registerSnapshotMonitor(message.getSnapshotNonce());
 
         long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
                                               message.getSnapshotBufferPool());
@@ -222,6 +217,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         m_taskLog = initializeTaskLog(voltroot, m_partitionId);
         return this;
+    }
+
+    @Override
+    protected VoltLogger getLogger() {
+        return JOINLOG;
     }
 
     @Override

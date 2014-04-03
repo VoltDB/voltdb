@@ -37,17 +37,18 @@ import org.voltdb.utils.MiscUtils;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public abstract class JoinProducerBase extends SiteTasker {
-    protected static final VoltLogger JOINLOG = new VoltLogger("JOIN");
-
     protected final int m_partitionId;
     protected final String m_whoami;
     protected final SiteTaskerQueue m_taskQueue;
     protected final CachedByteBufferAllocator m_snapshotBufferAllocator;
+    // data transfer snapshot completion monitor
+    protected final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent> m_snapshotCompletionMonitor =
+            SettableFuture.create();
     protected InitiatorMailbox m_mailbox = null;
     protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
     protected TaskLog m_taskLog;
-    protected String m_snapshotNonce = null;
+    private String m_snapshotNonce = null;
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -67,13 +68,13 @@ public abstract class JoinProducerBase extends SiteTasker {
 
         protected void register()
         {
-            JOINLOG.debug(m_whoami + "registering snapshot completion action");
+            getLogger().debug(m_whoami + "registering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
         }
 
         private void deregister()
         {
-            JOINLOG.debug(m_whoami + "deregistering snapshot completion action");
+            getLogger().debug(m_whoami + "deregistering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
         }
 
@@ -81,13 +82,13 @@ public abstract class JoinProducerBase extends SiteTasker {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
             if (event.nonce.equals(m_snapshotNonce)) {
-                JOINLOG.debug(m_whoami + "counting down snapshot monitor completion. "
+                getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
                         + "Snapshot txnId is: " + event.multipartTxnId);
                 deregister();
                 kickWatchdog(true);
                 m_future.set(event);
             } else {
-                JOINLOG.debug(m_whoami
+                getLogger().debug(m_whoami
                         + " observed completion of irrelevant snapshot nonce: "
                         + event.nonce);
             }
@@ -160,6 +161,12 @@ public abstract class JoinProducerBase extends SiteTasker {
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
+    protected void registerSnapshotMonitor(String nonce) {
+        m_snapshotNonce = nonce;
+        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_snapshotCompletionMonitor);
+        interest.register();
+    }
+
     // cancel and maybe rearm the snapshot data-segment watchdog.
     protected abstract void kickWatchdog(boolean rearm);
 
@@ -169,9 +176,11 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     public abstract TaskLog constructTaskLog(String voltroot);
 
+    protected abstract VoltLogger getLogger();
+
     public void notifyOfSnapshotNonce(String nonce) {
         if (nonce.equals(m_snapshotNonce)) {
-            JOINLOG.debug("Started recording transactions after snapshot nonce " + nonce);
+            getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
             if (m_taskLog != null) {
                 m_taskLog.enableRecording();
             }

@@ -188,6 +188,11 @@ public class RejoinProducer extends JoinProducerBase {
         return m_taskLog;
     }
 
+    @Override
+    protected VoltLogger getLogger() {
+        return REJOINLOG;
+    }
+
     // cancel and maybe rearm the snapshot data-segment watchdog.
     @Override
     protected void kickWatchdog(boolean rearm)
@@ -213,7 +218,6 @@ public class RejoinProducer extends JoinProducerBase {
         m_coordinatorHsId = message.m_sourceHSId;
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
         m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
-        m_snapshotNonce = message.getSnapshotNonce();
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -227,10 +231,9 @@ public class RejoinProducer extends JoinProducerBase {
                 + " and destination rejoin processor is: "
                 + CoreUtils.hsIdToString(hsId)
                 + " and snapshot nonce is: "
-                + m_snapshotNonce);
+                + message.getSnapshotNonce());
 
-        SnapshotCompletionAction interest = new SnapshotCompletionAction(m_completionMonitorAwait);
-        interest.register();
+        registerSnapshotMonitor(message.getSnapshotNonce());
         // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
         RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
         m_mailbox.send(m_coordinatorHsId, initResp);
