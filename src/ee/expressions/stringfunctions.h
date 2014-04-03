@@ -18,6 +18,8 @@
 #ifndef STRINGFUNCTIONS_H
 #define STRINGFUNCTIONS_H
 
+#include <boost/algorithm/string.hpp>
+
 namespace voltdb {
 
 static inline int32_t getCharLength(const char *valueChars, const size_t length) {
@@ -80,6 +82,40 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
 
     std::string spacesStr (count, ' ');
     return getTempStringValue(spacesStr.c_str(),count);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_FOLD_LOWER>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    int32_t objectLength = getObjectLength_withoutNull();
+
+    std::string inputStr = std::string(ptr, objectLength);
+    boost::algorithm::to_lower(inputStr);
+
+    return getTempStringValue(inputStr.c_str(),objectLength);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_FOLD_UPPER>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    int32_t objectLength = getObjectLength_withoutNull();
+
+    std::string inputStr = std::string(ptr, objectLength);
+    boost::algorithm::to_upper(inputStr);
+
+    return getTempStringValue(inputStr.c_str(),objectLength);
 }
 
 /** implement the 2-argument SQL REPEAT function */

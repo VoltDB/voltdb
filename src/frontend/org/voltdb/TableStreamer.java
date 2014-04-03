@@ -80,7 +80,7 @@ public class TableStreamer {
     {
         if (!context.activateTableStream(m_tableId, m_type, undo, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
-            log.debug("Attempted to activate a table stream of type " + m_type +
+            log.info("Attempted to activate a table stream of type " + m_type +
                       "for table " + tableName + " and failed");
             return false;
         }
