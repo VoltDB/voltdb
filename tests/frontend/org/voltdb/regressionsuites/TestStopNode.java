@@ -53,56 +53,39 @@ public class TestStopNode extends RegressionSuite
     }
 
     class StopCallBack implements ProcedureCallback {
-        final String m_expected;
-        final long m_hid;
+        final byte m_status;
+        final int m_hid;
         final CountDownLatch m_cdl;
 
-        public StopCallBack(CountDownLatch cdl, String expected, long hid) {
-            m_expected = expected;
+        public StopCallBack(CountDownLatch cdl, byte status, int hid) {
+            m_status = status;
             m_hid = hid;
             m_cdl = cdl;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             m_cdl.countDown();
-            boolean foundExpected = false;
-            String foundResult = "UNKNOWN";
-            String emsg = "";
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                VoltTable tab = clientResponse.getResults()[0];
-                while (tab.advanceRow()) {
-                    String status = tab.getString("RESULT");
-                    emsg = tab.getString("ERR_MSG");
-                    long hid = tab.getLong("HOST_ID");
-                    if (hid == m_hid) {
-                        foundExpected = true;
-                        foundResult = status;
-                        System.out.println("Host " + m_hid
-                                + " Matched Expected @StopNode Reslt of: " + m_expected + " ERR_MSG: " + emsg);
-                    }
-                }
-            }
-            if (!foundExpected) {
-                System.out.println("Host " + m_hid
-                        + " Failed Expected @StopNode Result of: " + foundResult + " ERR_MSG: " + emsg);
-            }
-            assertTrue(foundExpected);
+            System.out.println("Host " + m_hid
+                    + " Result : " + clientResponse.getStatusString() + " Status: " + clientResponse.getStatus());
+
+            assertEquals(m_status, clientResponse.getStatus());
         }
 
     }
+
     public void testStopNode() throws Exception {
         Client client = ClientFactory.createClient();
 
-        client.createConnection("localhost", m_config.port(4));
+        client.createConnection("localhost", m_config.port(0));
         Thread.sleep(1000);
 
         try {
             CountDownLatch cdl = new CountDownLatch(3);
-            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 2), "@StopNode", 2);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 4), "@StopNode", 4);
             client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 1), "@StopNode", 1);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 3), "@StopNode", 3);
             client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 0), "@StopNode", 0);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 2), "@StopNode", 2);
             client.callProcedure("@SystemInformation", "overview");
             cdl.await();
         } catch (Exception ex) {
@@ -111,11 +94,11 @@ public class TestStopNode extends RegressionSuite
         try {
             CountDownLatch cdl = new CountDownLatch(3);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, "FAILED", 3), "@StopNode", 3);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
             //Stop already stopped node.
-            client.callProcedure(new StopCallBack(cdl, "FAILED", 1), "@StopNode", 1);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, "FAILED", 4), "@StopNode", 4);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
             VoltTable tab = client.callProcedure("@SystemInformation", "overview").getResults()[0];
             cdl.await();
         } catch (Exception pce) {

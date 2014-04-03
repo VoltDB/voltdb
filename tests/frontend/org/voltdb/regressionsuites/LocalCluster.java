@@ -35,10 +35,11 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
@@ -964,26 +965,28 @@ public class LocalCluster implements VoltServerConfig {
 
     public void stopSingleHost(Client client, int hostNum)
             throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
+        stopSingleHost(client, new SyncCallback(), hostNum);
+    }
+
+    public void stopSingleHost(Client client, ProcedureCallback cb, int hostNum)
+            throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
         log.info("Stopping: " + hostNum);
-        VoltTable tab = client.callProcedure("@StopNode", hostNum).getResults()[0];
-        tab.advanceRow();
-        if (!tab.getString("RESULT").equals("SUCCESS")) {
-            System.out.println("Failed to Stop Server using @StopNode: " + tab.getString("ERR_MSG"));
-            return;
-        }
+        client.callProcedure("@StopNode", hostNum);
         Process proc = null;
-        //PipeToFile ptf = null;
         EEProcess eeProc = null;
-        PipeToFile ptf;
         synchronized (this) {
             proc = m_cluster.get(hostNum);
-            //ptf = m_pipes.get(hostNum);
             m_cluster.set(hostNum, null);
-            ptf = m_pipes.get(hostNum);
             m_pipes.set(hostNum, null);
             if (m_eeProcs.size() > hostNum) {
                 eeProc = m_eeProcs.get(hostNum);
             }
+        }
+        if (proc != null) {
+            proc.waitFor();
+        }
+        if (eeProc != null) {
+            eeProc.waitForShutdown();
         }
     }
 

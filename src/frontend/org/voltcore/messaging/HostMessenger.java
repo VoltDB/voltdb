@@ -1083,7 +1083,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void sendPoisonPill(String err, int targetHostId) {
-        sendPoisonPill(m_foreignHosts.keySet(), err, targetHostId);
+        if (targetHostId == -1) {
+            sendPoisonPill(m_foreignHosts.keySet(), err, targetHostId);
+        } else {
+            ForeignHost fh = m_foreignHosts.get(targetHostId);
+            if (fh != null && fh.isUp()) {
+                fh.sendPoisonPill(err, targetHostId);
+            }
+        }
     }
 
     public void sendPoisonPill(Collection<Integer> hostIds, String err, int targetHostId) {

@@ -52,6 +52,11 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.util.ArrayDeque;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -71,6 +76,10 @@ public class Cartographer extends StatsSource
 
     public static final String JSON_PARTITION_ID = "partitionId";
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
+    private final int m_configuredReplicationFactor;
+
+    private final ExecutorService m_es
+            = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
@@ -159,13 +168,13 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(HostMessenger hostMessenger)
-    {
+    public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor) {
         super(false);
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
+        m_configuredReplicationFactor = configuredReplicationFactor;
         try {
             m_iv2Masters.start(true);
             m_iv2Mpi.start(true);
@@ -467,5 +476,86 @@ public class Cartographer extends StatsSource
     {
         m_iv2Masters.shutdown();
         m_iv2Mpi.shutdown();
+        m_es.shutdown();
     }
+
+    //Check partition replicas.
+    public synchronized boolean isClusterSafeIfIDie(final int kfactor) {
+        try {
+            return m_es.submit(new Callable<Boolean>() {
+                @Override
+                public Boolean call() throws Exception {
+                    if (m_configuredReplicationFactor > 0) {
+                        return doPartitionsHaveReplicas();
+                    } else {
+                        return true;
+                    }
+                }
+            }).get();
+        } catch (InterruptedException | ExecutionException t) {
+            hostLog.debug("LeaderAppointer: Error in isClusterSafeIfIDie.", t);
+        }
+        return false;
+    }
+
+    private boolean doPartitionsHaveReplicas() {
+        hostLog.debug("Cartographer: Reloading partition information.");
+        List<String> partitionDirs = null;
+        try {
+            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
+        } catch (KeeperException | InterruptedException e) {
+            return false;
+        }
+
+        //Don't fetch the values serially do it asynchronously
+        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<>();
+        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<>();
+        for (String partitionDir : partitionDirs) {
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            try {
+                ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
+                m_zk.getData(dir, false, callback, null);
+                dataCallbacks.offer(callback);
+                ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
+                m_zk.getChildren(dir, false, childrenCallback, null);
+                childrenCallbacks.offer(childrenCallback);
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        //Assume that we are ksafe
+        for (String partitionDir : partitionDirs) {
+            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) {
+                continue;
+            }
+            try {
+                //Dont let anyone die if someone is in INITIALIZING state
+                byte[] partitionState = dataCallbacks.poll().getData();
+                if (partitionState != null && partitionState.length == 1) {
+                    if (partitionState[0] == LeaderElector.INITIALIZING) {
+                        return false;
+                    }
+                }
+
+                List<String> replicas = childrenCallbacks.poll().getChildren();
+                //Get Hosts for replicas
+                final List<Integer> replicaHost = new ArrayList<>();
+                for (String replica : replicas) {
+                    final String split[] = replica.split("/");
+                    final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
+                    final int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                    replicaHost.add(hostId);
+                }
+                hostLog.debug("Replica Host for Partition " + pid + " " + replicaHost);
+                if (replicaHost.size() <= 1) {
+                    return false;
+                }
+            } catch (InterruptedException | KeeperException | NumberFormatException e) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }

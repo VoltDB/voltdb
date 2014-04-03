@@ -115,8 +115,10 @@ public interface VoltDBInterface
      */
     public boolean isRunning();
 
-    public boolean isSafeToSuicide();
-    public void suicide();
+    /**
+     * Halt a node used by @StopNode which checks if its ok to halt.
+     */
+    public void halt();
 
     /**
      * @return The number of milliseconds the cluster has been up

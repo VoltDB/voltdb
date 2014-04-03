@@ -2010,54 +2010,51 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         VoltTable table = new VoltTable(
-                new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
-                        VoltSystemProcedure.CTYPE_ID),
-                new ColumnInfo("RESULT", VoltType.STRING),
-                new ColumnInfo("ERR_MSG", VoltType.STRING));
+                new ColumnInfo("RESULT", VoltType.STRING));
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "StopNode Must provide hostId",
+                    "@StopNode must provide hostId",
                     task.clientHandle);
         }
         if (!(params[0] instanceof Integer)) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "StopNode must have one Integer parameter specified. provided type was " + params[0].getClass().getName(),
+                    "@StopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
                     task.clientHandle);
         }
         int ihid = (Integer) params[0];
-        try {
-            List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
-            if (!liveHids.contains(ihid)) {
-                table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
-                        "Invalid Host Id");
-            } else {
-                if (!VoltDB.instance().isSafeToSuicide()) {
-                    hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
-                            + " StopNode is will not stop node as stopping will violate k-safety.");
-                    table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
-                            "Server Node can not be stopped because stopping will violate k-safety.");
-                } else {
-                    table.addRow(ihid, "SUCCESS", "");
-                    int hid = VoltDB.instance().getHostMessenger().getHostId();
-                    if (hid == ihid) {
-                        //Killing myself no pill needs to be sent
-                        VoltDB.instance().suicide();
-                    } else {
-                        //Send poison pill with target to kill
-                        VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid);
-                    }
-                }
-            }
-        } catch (NumberFormatException nfe) {
-            table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
-                    "Failed to parse the hostId to Stop.");
+        List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
+        if (!liveHids.contains(ihid)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Invalid Host Id: " + ihid,
+                    task.clientHandle);
         }
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[]{table}, "", task.clientHandle);
+
+        if (!m_cartographer.isClusterSafeIfIDie(ihid)) {
+            hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
+                    + " @StopNode will not proceed because doing so would cause the cluster to crash.");
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "@StopNode will not proceed because doing so would cause the cluster to crash.",
+                    task.clientHandle);
+        }
+
+        int hid = VoltDB.instance().getHostMessenger().getHostId();
+        if (hid == ihid) {
+            //Killing myself no pill needs to be sent
+            VoltDB.instance().halt();
+        } else {
+            //Send poison pill with target to kill
+            VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid);
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
