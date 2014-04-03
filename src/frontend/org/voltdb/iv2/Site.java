@@ -580,8 +580,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
-        OnDemandBinaryLogger.log("polltasklog_site_" + m_siteId + ".blog", tibm.getTxnId());
         if (tibm != null) {
+            OnDemandBinaryLogger.log("polltasklog_site_" + m_siteId + ".blog", tibm.getTxnId());
             mrm.didUnrestricted();
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
