@@ -46,8 +46,11 @@ public class OnDemandBinaryLogger {
         for (Stuff s : m_files.values()) {
             synchronized (s) {
                 try {
-                    s.dos.flush();
-                    s.count = null;
+                    if (s.count != null) {
+                        s.dos.flush();
+                        s.count = null;
+                        s.dos = null;
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -76,9 +79,11 @@ public class OnDemandBinaryLogger {
     public static void log(final String name, long value) {
         try {
             Stuff s = getStream(name);
-            synchronized (s.dos) {
+            synchronized (s) {
+                if (s.count != null) {
                     s.dos.writeLong(value);
                     s.count.putLong(0, s.count.getLong(0) + 1);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
