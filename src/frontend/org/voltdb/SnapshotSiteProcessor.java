@@ -664,19 +664,28 @@ public class SnapshotSiteProcessor {
                                 }
                             }
                         } finally {
-                            /**
-                             * Remove this last site from the set here after the terminator has run
-                             * so that new snapshots won't start until
-                             * everything is on disk for the previous snapshot. This prevents a really long
-                             * snapshot initiation procedure from occurring because it has to contend for
-                             * filesystem resources
-                             *
-                             * Do this before logSnapshotCompleteToZK() because the ZK operations are slow,
-                             * and they can trigger snapshot completion interests to fire before this site
-                             * removes itself from the set. The next snapshot request may come in and see
-                             * this snapshot is still in progress.
-                             */
-                            ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
+                            try {
+                                VoltDB.instance().getHostMessenger().getZK().delete(
+                                        VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+                            } catch (NoNodeException e) {
+                                SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                            } finally {
+                                /**
+                                 * Remove this last site from the set here after the terminator has run
+                                 * so that new snapshots won't start until
+                                 * everything is on disk for the previous snapshot. This prevents a really long
+                                 * snapshot initiation procedure from occurring because it has to contend for
+                                 * filesystem resources
+                                 *
+                                 * Do this before logSnapshotCompleteToZK() because the ZK operations are slow,
+                                 * and they can trigger snapshot completion interests to fire before this site
+                                 * removes itself from the set. The next snapshot request may come in and see
+                                 * this snapshot is still in progress.
+                                 */
+                                ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
+                            }
 
                             logSnapshotCompleteToZK(txnId, m_lastSnapshotSucceded, exportSequenceNumbers);
                         }
@@ -768,15 +777,6 @@ public class SnapshotSiteProcessor {
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Retrieving list of completed snapshots from ZK should never fail", true, e);
-        }
-
-        try {
-            VoltDB.instance().getHostMessenger().getZK().delete(
-                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
-        } catch (NoNodeException e) {
-            SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 
