@@ -73,22 +73,54 @@ public class TestStopNode extends RegressionSuite
 
     }
 
+    public void waitForHostToBeGone(Client client, int hid) {
+        while (true) {
+            VoltTable table = null;
+            try {
+                Thread.sleep(1000);
+                table = client.callProcedure("@SystemInformation", "overview").getResults()[0];
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                continue;
+            }
+            boolean done = true;
+            while (table.advanceRow()) {
+                long hc = table.getLong("HOST_ID");
+                if (hc == hid) {
+                    done = false;
+                    break;
+                }
+            }
+            System.out.println("Host " + hid + " Still there");
+            if (done) {
+                return;
+            }
+        }
+    }
+
     public void testStopNode() throws Exception {
         Client client = ClientFactory.createClient();
 
         client.createConnection("localhost", m_config.port(0));
-        Thread.sleep(1000);
 
         try {
-            CountDownLatch cdl = new CountDownLatch(3);
+            CountDownLatch cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 4), "@StopNode", 4);
-            client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 3), "@StopNode", 3);
-            client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 2), "@StopNode", 2);
-            client.callProcedure("@SystemInformation", "overview");
             cdl.await();
+            waitForHostToBeGone(client, 4);
+            cdl = new CountDownLatch(1);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 3), "@StopNode", 3);
+            cdl.await();
+            waitForHostToBeGone(client, 3);
+            cdl = new CountDownLatch(1);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 2), "@StopNode", 2);
+            cdl.await();
+            waitForHostToBeGone(client, 2);
+            client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
+            //We should not get here
+            fail();
+            ex.printStackTrace();
         }
         boolean lostConnect = false;
         try {
@@ -105,6 +137,7 @@ public class TestStopNode extends RegressionSuite
             pce.printStackTrace();
             lostConnect = pce.getMessage().contains("was lost before a response was received");
         }
+        //We should never lose contact.
         assertFalse(lostConnect);
     }
 
@@ -123,7 +156,6 @@ public class TestStopNode extends RegressionSuite
         //Lets tolerate 3 node failures.
         m_config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
-        m_config.setExpectedToCrash(true);
         success = m_config.compile(project);
         assertTrue(success);
 
