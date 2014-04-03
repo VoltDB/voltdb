@@ -2085,6 +2085,81 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(2));
     }
 
+    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Space");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_SPACE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("VoltDB   ", result.getString(2));
+        assertEquals("  VoltDB",  result.getString(3));
+        assertEquals("  VoltDB",  result.getString(4));
+        assertEquals("VoltDB",  result.getString(5));
+
+
+        cr = client.callProcedure("TRIM_ANY", " ", " ", " ", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("  VoltDB",  result.getString(2));
+        assertEquals("VoltDB",  result.getString(3));
+
+
+        // Test TRIM with other character
+        cr = client.callProcedure("P1.insert", 2, "vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "v", "B", "B", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDBBB", result.getString(1));
+        assertEquals("vVoltD", result.getString(2));
+        assertEquals("vVoltD", result.getString(3));
+
+
+        cr = client.callProcedure("P1.insert", 3, "贾vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "v", "贾", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB", result.getString(1));
+        assertEquals("贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        // HSQL back end does not support TRIM with multiple characters.
+        // ORACLE does support: http://docs.oracle.com/html/A95915_01/sqfunc.htm#i1007071
+        if (isHSQL()) return;
+        // TRIM with multiple characters.
+        // Maybe should check the size of input character, which should be 1 character exactly.
+        cr = client.callProcedure("P1.insert", 4, "vVoltDBDBDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "vVo", "DB", "BDB", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("ltDBDBDB", result.getString(1));
+        assertEquals("vVolt", result.getString(2));
+        assertEquals("vVolt", result.getString(3));
+    }
+
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
@@ -2725,6 +2800,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
         project.addStmtProcedure("LOWER_UPPER", "select id, LOWER(DESC), UPPER(DESC) from P1 where id = ?");
+
+        project.addStmtProcedure("TRIM_SPACE", "select id, LTRIM(DESC), TRIM(LEADING ' ' FROM DESC), " +
+                "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
+        project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM DESC), TRIM(TRAILING ? FROM DESC), " +
+                "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
+
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");

@@ -1517,6 +1517,11 @@ public class FunctionSQL extends Expression {
                     if (nodes[1] == null) {
                         nodes[1] = new ExpressionValue(" ", Type.SQL_CHAR);
                     }
+                    // A VoltDB extension to customize the SQL function set support
+                    else if (nodes[1].dataType != Type.SQL_CHAR) {
+                        nodes[1].dataType = Type.SQL_CHAR;
+                    }
+                    // End of VoltDB extension
                 } else if (dataType.isBinaryType()) {
                     funcType = FUNC_TRIM_BINARY;
 
