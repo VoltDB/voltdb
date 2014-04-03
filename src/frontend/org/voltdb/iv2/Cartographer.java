@@ -527,9 +527,6 @@ public class Cartographer extends StatsSource
         //Assume that we are ksafe
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) {
-                continue;
-            }
             try {
                 //Dont let anyone die if someone is in INITIALIZING state
                 byte[] partitionState = dataCallbacks.poll().getData();
@@ -540,6 +537,10 @@ public class Cartographer extends StatsSource
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
+                //This is here just so callback is polled.
+                if (pid == MpInitiator.MP_INIT_PID) {
+                    continue;
+                }
                 //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
                 for (String replica : replicas) {

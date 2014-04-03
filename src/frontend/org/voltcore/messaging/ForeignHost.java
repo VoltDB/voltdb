@@ -378,7 +378,7 @@ public class ForeignHost {
 
     }
 
-    public void sendPoisonPill(String err, int targetHostId) {
+    public void sendPoisonPill(String err, int cause) {
         byte errBytes[];
         try {
             errBytes = err.getBytes("UTF-8");
@@ -392,7 +392,7 @@ public class ForeignHost {
         message.putInt(-1);
         message.putInt(errBytes.length);
         message.put(errBytes);
-        message.putInt(targetHostId);
+        message.putInt(cause);
         message.flip();
         m_network.enqueue(message);
     }
