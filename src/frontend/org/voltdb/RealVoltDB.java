@@ -2098,7 +2098,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 boolean die = false;
                 try {
                     hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
-                    System.exit(0);
                     die = VoltDB.instance().shutdown(this);
                 } catch (InterruptedException e) {
                     hostLog.error("Exception while attempting to shutdown VoltDB node by @StopNode", e);
