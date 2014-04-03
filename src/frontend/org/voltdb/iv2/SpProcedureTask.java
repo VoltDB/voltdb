@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
@@ -93,6 +94,7 @@ public class SpProcedureTask extends ProcedureTask
     throws IOException
     {
         if (!m_txnState.isReadOnly()) {
+            OnDemandBinaryLogger.log("spproceduretasklog_site_" + siteConnection.getCorrespondingSiteId() + ".blog", m_txnState.txnId);
             taskLog.logTask(m_txnState.getNotice());
         }
 
@@ -117,6 +119,7 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        OnDemandBinaryLogger.log("runspproceduretasklog_site_" + siteConnection.getCorrespondingSiteId() + ".blog", m_txnState.txnId);
         if (HOST_TRACE_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }

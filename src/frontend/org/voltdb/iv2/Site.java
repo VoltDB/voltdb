@@ -34,6 +34,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -579,6 +580,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+        OnDemandBinaryLogger.log("polltasklog_site_" + m_siteId + ".blog", tibm.getTxnId());
         if (tibm != null) {
             mrm.didUnrestricted();
             if (tibm instanceof Iv2InitiateTaskMessage) {
