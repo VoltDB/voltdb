@@ -116,7 +116,7 @@ public interface VoltDBInterface
     public boolean isRunning();
 
     /**
-     * Halt a node used by @StopNode which checks if its ok to halt.
+     * Halt a node used by @StopNode
      */
     public void halt();
 

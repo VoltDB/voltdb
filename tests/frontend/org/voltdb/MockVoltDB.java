@@ -546,6 +546,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void halt() {
-        System.exit(0);
+        assert (true);
     }
 }

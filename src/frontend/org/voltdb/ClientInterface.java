@@ -111,6 +111,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -2032,11 +2033,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "Invalid Host Id: " + ihid,
+                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
 
-        if (!m_cartographer.isClusterSafeIfIDie(ihid)) {
+        if (!m_cartographer.isClusterSafeIfNodeDies(ihid)) {
             hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
                     + " @StopNode will not proceed because doing so would cause the cluster to crash.");
             return new ClientResponseImpl(
@@ -2052,7 +2053,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.instance().halt();
         } else {
             //Send poison pill with target to kill
-            VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid);
+            VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }

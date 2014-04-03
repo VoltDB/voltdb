@@ -65,6 +65,10 @@ public class ForeignHost {
 
     private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
 
+    public static final int CRASH_ALL = 0;
+    public static final int CRASH_ME = 1;
+    public static final int CRASH_SPECIFIED = 2;
+
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
 
@@ -327,19 +331,21 @@ public class ForeignHost {
                     m_hostId, hostnameAndIPAndPort(), message);
             //if poison pill is for particular host treat it as targeted kill
             if (in.remaining() > 0) {
-                int targetHostId = in.getInt();
-                if (targetHostId != -1) {
+                int cause = in.getInt();
+                if (cause == ForeignHost.CRASH_ME) {
                     int hid = VoltDB.instance().getHostMessenger().getHostId();
-                    if (hid == targetHostId) {
-                        hostLog.debug("Poision Pill with target Host Id: " + targetHostId);
-                        //Killing myself.
-                        VoltDB.instance().halt();
-                    } else {
-                        hostLog.warn("Poision Pill with wrong target Host Id will be ignored. hostId: " + targetHostId);
-                    }
-                    return;
+                    hostLog.debug("Poison Pill with target me was sent.: " + hid);
+                    //Killing myself.
+                    VoltDB.instance().halt();
+                } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
+                    org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+                } else {
+                    //Should never come here.
+                    hostLog.error("Invalid Cause in poison pill: " + cause);
                 }
+                return;
             }
+            //Its a regular backward compatible pill.
             org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
         }
 

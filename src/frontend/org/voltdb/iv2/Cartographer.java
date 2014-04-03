@@ -480,7 +480,7 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfIDie(final int kfactor) {
+    public synchronized boolean isClusterSafeIfNodeDies(final int kfactor) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
@@ -488,7 +488,8 @@ public class Cartographer extends StatsSource
                     if (m_configuredReplicationFactor > 0) {
                         return doPartitionsHaveReplicas();
                     } else {
-                        return true;
+                        //Dont die in k=0 cluster.
+                        return false;
                     }
                 }
             }).get();
