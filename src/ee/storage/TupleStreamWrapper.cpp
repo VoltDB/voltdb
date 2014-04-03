@@ -316,26 +316,8 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
             m_lastFlush = timeInMillis;
         }
 
-        // ENG-866
-        //
-        // Due to tryToSneakInASinglePartitionProcedure (and probable
-        // speculative execution in the future), the EE is not
-        // guaranteed to see all transactions in transaction ID order.
-        // periodicFlush is handed whatever the most recent SpHandle
-        // executed is, whether or not that SpHandle is relevant to this
-        // export stream.  commit() is enforcing the invariants that
-        // the TupleStreamWrapper needs to see for relevant
-        // transaction IDs; we choose whichever of currentSpHandle or
-        // m_openSpHandle here will allow commit() to continue
-        // operating correctly.
-        int64_t spHandle = currentSpHandle;
-        if (m_openSpHandle > currentSpHandle)
-        {
-            spHandle = m_openSpHandle;
-        }
-
         extendBufferChain(0);
-        commit(lastCommittedSpHandle, spHandle, timeInMillis < 0 ? true : false);
+        commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
     }
 }
 
@@ -361,7 +343,10 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle)
     {
-        throwFatalException("Active transactions moving backwards");
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %ld, while the append spHandle is %ld",
+                m_openSpHandle, spHandle
+                );
     }
 
     commit(lastCommittedSpHandle, spHandle);
