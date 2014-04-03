@@ -35,6 +35,7 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.HashSet;
 import java.util.Set;
 
+import jsr166y.ThreadLocalRandom;
 import junit.framework.TestCase;
 
 public class TestVoltNetwork extends TestCase {
@@ -236,7 +237,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterests() throws Exception {
         new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0, null);
+        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;
@@ -276,14 +277,14 @@ public class TestVoltNetwork extends TestCase {
 
         // invoke call backs and see that the volt port has the expected
         // selected operations.
-        vn.invokeCallbacks();
+        vn.invokeCallbacks(ThreadLocalRandom.current());
         assertEquals(SelectionKey.OP_WRITE, vp.readyOps());
 
         // and another time through, should have the new interests selected
         vp.setInterests(SelectionKey.OP_ACCEPT, 0);
         selectionKey.readyOps(SelectionKey.OP_ACCEPT);
         vn.installInterests(vp);
-        vn.invokeCallbacks();
+        vn.invokeCallbacks(ThreadLocalRandom.current());
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }

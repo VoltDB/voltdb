@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,8 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -51,8 +48,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.COWMap;
-import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
@@ -64,6 +59,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -226,7 +223,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetworkPool( m_config.networkThreads, m_config.coreBindIds);
+        m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
