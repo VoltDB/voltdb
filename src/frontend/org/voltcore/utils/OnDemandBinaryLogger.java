@@ -29,6 +29,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.voltdb.utils.VoltFile;
 import org.xerial.snappy.SnappyInputStream;
 import org.xerial.snappy.SnappyOutputStream;
 
@@ -39,7 +40,7 @@ public class OnDemandBinaryLogger {
     }
 
     public static ConcurrentHashMap<String, Stuff> m_files = new ConcurrentHashMap<String, Stuff>();
-    public static final String path = System.getProperty("BINARY_LOG_PATH", "./");
+    public static String path;
 
     public static void flush() {
         for (Stuff s : m_files.values()) {
@@ -57,7 +58,7 @@ public class OnDemandBinaryLogger {
     private static Stuff getStream(final String name) throws IOException {
         Stuff s = m_files.get(name);
         if (s == null) {
-            File f = new File(path, name);
+            File f = new VoltFile(path, name);
             f.delete();
             RandomAccessFile ras = new RandomAccessFile(f, "rw");
             ras.seek(8);

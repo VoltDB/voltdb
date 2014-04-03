@@ -58,7 +58,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
@@ -78,6 +77,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
@@ -124,6 +124,7 @@ import org.voltdb.utils.VoltSampler;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -552,7 +553,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
                     }
                 }
-
+                OnDemandBinaryLogger.path = m_catalogContext.cluster.getVoltroot();
                 if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
@@ -2555,6 +2556,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return baseRqt + tableRqt + rejoinRqt;
     }
 
+    @Override
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
     {
         assert m_snapshotIOAgent != null;
