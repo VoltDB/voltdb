@@ -62,6 +62,8 @@ public interface VoltDBInterface
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
+    boolean isMpSysprocSafeToExecute(long txnId);
+
     public void startSampler();
 
     public VoltDB.Configuration getConfig();
