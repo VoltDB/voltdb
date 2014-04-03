@@ -310,6 +310,55 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
 }
 
 /** implement the 3-argument SQL SUBSTRING function */
+template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 3);
+
+    const NValue& opt = arguments[0];
+    int32_t optArg = static_cast<int32_t>(opt.castAsBigIntAndGetValue());
+
+    char* ptr;
+    const NValue& trimChar = arguments[1];
+    if (trimChar.isNull()) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
+    }
+    if (trimChar.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    ptr = reinterpret_cast<char*>(trimChar.getObjectValue_withoutNull());
+    std::string trimArg = std::string(ptr, trimChar.getObjectLength_withoutNull());
+
+
+    const NValue& strVal = arguments[2];
+    if (strVal.isNull()) {
+        return getNullStringValue();
+    }
+    if (strVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    ptr = reinterpret_cast<char*>(strVal.getObjectValue_withoutNull());
+    int32_t objectLength = strVal.getObjectLength_withoutNull();
+    std::string inputStr = std::string(ptr, objectLength);
+
+    switch (optArg) {
+    case SQL_TRIM_BOTH:
+        boost::trim_if(inputStr, boost::is_any_of(trimArg));
+        break;
+    case SQL_TRIM_LEADING:
+        boost::trim_left_if(inputStr, boost::is_any_of(trimArg));
+        break;
+    case SQL_TRIM_TRAILING:
+        boost::trim_right_if(inputStr, boost::is_any_of(trimArg));
+        break;
+    default:
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
+    }
+
+    return getTempStringValue(inputStr.c_str(), inputStr.length());
+}
+
+/** implement the 3-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
     const NValue& strValue = arguments[0];

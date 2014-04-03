@@ -378,9 +378,6 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_OVERLAY_CHAR :

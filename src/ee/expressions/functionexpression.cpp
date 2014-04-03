@@ -378,6 +378,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
             break;
+        case FUNC_TRIM_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_CHAR>(*arguments);
+            break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
