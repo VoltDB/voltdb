@@ -2036,8 +2036,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     "Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
-
-        if (!m_cartographer.isClusterSafeIfNodeDies(ihid)) {
+        if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
             hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
                     + " @StopNode will not proceed because doing so would cause the cluster to crash.");
             return new ClientResponseImpl(

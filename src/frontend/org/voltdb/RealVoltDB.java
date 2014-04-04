@@ -506,7 +506,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
-                m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor);
+                m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
+                        m_catalogContext.cluster.getNetworkpartition());
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();

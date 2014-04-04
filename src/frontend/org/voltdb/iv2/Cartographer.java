@@ -77,6 +77,7 @@ public class Cartographer extends StatsSource
     public static final String JSON_PARTITION_ID = "partitionId";
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
     private final int m_configuredReplicationFactor;
+    private final boolean m_partitionDetectionEnabled;
 
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
@@ -168,13 +169,14 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor) {
+    public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor, boolean partitionDetectionEnabled) {
         super(false);
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
         m_configuredReplicationFactor = configuredReplicationFactor;
+        m_partitionDetectionEnabled = partitionDetectionEnabled;
         try {
             m_iv2Masters.start(true);
             m_iv2Mpi.start(true);
@@ -480,17 +482,18 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfNodeDies(final int hid) {
+    public synchronized boolean isClusterSafeIfNodeDies(final List<Integer> liveHids, final int hid) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-                    if (m_configuredReplicationFactor > 0) {
-                        return doPartitionsHaveReplicas(hid);
-                    } else {
-                        //Dont die in k=0 cluster.
+                    if (m_configuredReplicationFactor == 0
+                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2)) {
+                        //Dont die in k=0 cluster or 2node k1
                         return false;
                     }
+                    //Otherwise we do check replicas for host
+                    return doPartitionsHaveReplicas(hid);
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
