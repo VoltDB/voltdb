@@ -2095,23 +2095,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
-                boolean die = false;
-                try {
-                    hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
-                    die = VoltDB.instance().shutdown(this);
-                } catch (InterruptedException e) {
-                    hostLog.error("Exception while attempting to shutdown VoltDB node by @StopNode", e);
-                }
-                if (die) {
-                    System.exit(0);
-                } else {
-                    try {
-                        Thread.sleep(10000);
-                    } catch (InterruptedException e) {
-                    } finally {
-                        System.exit(0);
-                    }
-                }
+                hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
+                System.exit(0);
             }
         };
         shutdownThread.start();
