@@ -73,12 +73,18 @@ public class TestStopNode extends RegressionSuite
 
     }
 
-    public void waitForHostToBeGone(Client client, int hid) {
+    public void waitForHostToBeGone(int hid) {
         while (true) {
+            Client client = null;
             VoltTable table = null;
             try {
                 Thread.sleep(1000);
+                client = ClientFactory.createClient();
+
+                client.createConnection("localhost", m_config.port(0));
                 table = client.callProcedure("@SystemInformation", "overview").getResults()[0];
+                client.close();
+                client = null;
             } catch (Exception ex) {
                 ex.printStackTrace();
                 continue;
@@ -93,6 +99,12 @@ public class TestStopNode extends RegressionSuite
             }
             System.out.println("Host " + hid + " Still there");
             if (done) {
+                if (client != null) {
+                    try {
+                        client.close();
+                    } catch (InterruptedException ex) {
+                    }
+                }
                 return;
             }
         }
@@ -107,15 +119,15 @@ public class TestStopNode extends RegressionSuite
             CountDownLatch cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 4), "@StopNode", 4);
             cdl.await();
-            waitForHostToBeGone(client, 4);
+            waitForHostToBeGone(4);
             cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 3), "@StopNode", 3);
             cdl.await();
-            waitForHostToBeGone(client, 3);
+            waitForHostToBeGone(3);
             cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 2), "@StopNode", 2);
             cdl.await();
-            waitForHostToBeGone(client, 2);
+            waitForHostToBeGone(2);
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
             //We should not get here

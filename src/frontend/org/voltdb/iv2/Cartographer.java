@@ -480,13 +480,13 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfNodeDies(final int kfactor) {
+    public synchronized boolean isClusterSafeIfNodeDies(final int hid) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
                     if (m_configuredReplicationFactor > 0) {
-                        return doPartitionsHaveReplicas();
+                        return doPartitionsHaveReplicas(hid);
                     } else {
                         //Dont die in k=0 cluster.
                         return false;
@@ -499,7 +499,7 @@ public class Cartographer extends StatsSource
         return false;
     }
 
-    private boolean doPartitionsHaveReplicas() {
+    private boolean doPartitionsHaveReplicas(int hid) {
         hostLog.debug("Cartographer: Reloading partition information.");
         List<String> partitionDirs = null;
         try {
@@ -543,14 +543,18 @@ public class Cartographer extends StatsSource
                 }
                 //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
+                boolean hostHasReplicas = false;
                 for (String replica : replicas) {
                     final String split[] = replica.split("/");
                     final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                     final int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                    if (hostId == hid) {
+                        hostHasReplicas = true;
+                    }
                     replicaHost.add(hostId);
                 }
                 hostLog.debug("Replica Host for Partition " + pid + " " + replicaHost);
-                if (replicaHost.size() <= 1) {
+                if (hostHasReplicas && replicaHost.size() <= 1) {
                     return false;
                 }
             } catch (InterruptedException | KeeperException | NumberFormatException e) {
