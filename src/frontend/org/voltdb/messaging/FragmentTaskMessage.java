@@ -395,8 +395,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     /*
      * The first fragment contains the initiate task for a multi-part txn for command logging
      */
-    public void setInitiateTask(Iv2InitiateTaskMessage initiateTask) {
+    public void setStateForDurability(Iv2InitiateTaskMessage initiateTask,
+                                      Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
+        m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
         m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
@@ -409,10 +411,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public Iv2InitiateTaskMessage getInitiateTask() {
         return m_initiateTask;
-    }
-
-    public void setInvolvedPartitions(Collection<Integer> involvedPartitions) {
-        m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
     }
 
     public Set<Integer> getInvolvedPartitions() { return m_involvedPartitions; }

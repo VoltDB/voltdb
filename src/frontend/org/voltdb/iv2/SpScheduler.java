@@ -745,7 +745,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
-                msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
+                //Trigger reserialization so the new handle is used
+                msg.setStateForDurability(msg.getInitiateTask(), msg.getInvolvedPartitions());
             }
 
             /*
