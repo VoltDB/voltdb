@@ -500,9 +500,9 @@ public class SnapshotSaveAPI
                 SNAP_LOG.info("Node had no snapshot work to do.  Creating a null task to drive completion.");
                 m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
             }
-            SNAP_LOG.info("Planned tasks: " +
+            SNAP_LOG.debug("Planned tasks: " +
                            CoreUtils.hsIdCollectionToString(plan.getTaskListsForHSIds().keySet()));
-            SNAP_LOG.info("Created tasks for HSIds: " +
+            SNAP_LOG.debug("Created tasks for HSIds: " +
                            CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
         }
     }
