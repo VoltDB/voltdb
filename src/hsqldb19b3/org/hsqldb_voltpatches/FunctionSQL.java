@@ -2280,7 +2280,6 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
-
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);

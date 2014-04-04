@@ -2094,6 +2094,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
+        result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(0));
+
         cr = client.callProcedure("TRIM_SPACE", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -2104,6 +2108,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("  VoltDB",  result.getString(3));
         assertEquals("  VoltDB",  result.getString(4));
         assertEquals("VoltDB",  result.getString(5));
+        assertEquals("VoltDB",  result.getString(6));
 
 
         cr = client.callProcedure("TRIM_ANY", " ", " ", " ", 1);
@@ -2129,7 +2134,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("vVoltD", result.getString(2));
         assertEquals("vVoltD", result.getString(3));
 
+        // Test null trim character
+        cr = client.callProcedure("TRIM_ANY", null, null, null, 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+        assertEquals(null, result.getString(2));
+        assertEquals(null, result.getString(3));
 
+
+        // Test non-ASCII trim_char
         cr = client.callProcedure("P1.insert", 3, "贾vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -2142,22 +2158,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾vVoltDBBB", result.getString(2));
         assertEquals("vVoltDBBB", result.getString(3));
 
-        // HSQL back end does not support TRIM with multiple characters.
-        // ORACLE does support: http://docs.oracle.com/html/A95915_01/sqfunc.htm#i1007071
         if (isHSQL()) return;
         // TRIM with multiple characters.
         // Maybe should check the size of input character, which should be 1 character exactly.
         cr = client.callProcedure("P1.insert", 4, "vVoltDBDBDB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("TRIM_ANY", "vVo", "DB", "BDB", 4);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("ltDBDBDB", result.getString(1));
-        assertEquals("vVolt", result.getString(2));
-        assertEquals("vVolt", result.getString(3));
+        try {
+            cr = client.callProcedure("TRIM_ANY", "d", "DB", "B", 4);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("SQL TRIM exception"));
+            assertTrue(ex.getMessage().contains("unsupported multiple TRIM characters."));
+        }
+
     }
 
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2802,7 +2816,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("LOWER_UPPER", "select id, LOWER(DESC), UPPER(DESC) from P1 where id = ?");
 
         project.addStmtProcedure("TRIM_SPACE", "select id, LTRIM(DESC), TRIM(LEADING ' ' FROM DESC), " +
-                "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
+                "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
         project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM DESC), TRIM(TRAILING ? FROM DESC), " +
                 "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
 

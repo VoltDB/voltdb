@@ -309,7 +309,22 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
     return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
 }
 
-/** implement the 3-argument SQL SUBSTRING function */
+static inline bool checkCharLengthNumber(const char *valueChars, const int32_t length, const int32_t expectLength) {
+    int32_t j = 0;
+    int32_t i = length;
+    while (i-- > 0) {
+        if ((valueChars[i] & 0xc0) != 0x80) {
+            j++;
+            if (j > expectLength) {
+                return false;
+            }
+        }
+    }
+    if (j != expectLength) return false;
+    return true;
+}
+
+/** implement the 3-argument SQL TRIM function */
 template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
 
@@ -319,15 +334,20 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     char* ptr;
     const NValue& trimChar = arguments[1];
     if (trimChar.isNull()) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
+        return getNullStringValue();
     }
     if (trimChar.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
     ptr = reinterpret_cast<char*>(trimChar.getObjectValue_withoutNull());
-    std::string trimArg = std::string(ptr, trimChar.getObjectLength_withoutNull());
+    int32_t length = trimChar.getObjectLength_withoutNull();
 
+    if (!checkCharLengthNumber(ptr, length, 1)) {
+        throw SQLException(SQLException::dynamic_sql_error, "SQL TRIM exception:  "
+                "unsupported multiple TRIM characters.");
+    }
+    std::string trimArg = std::string(ptr, length);
 
     const NValue& strVal = arguments[2];
     if (strVal.isNull()) {
