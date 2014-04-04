@@ -476,34 +476,6 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-//    /**
-//     * Collect unique columns used in the plan for a given table.
-//     *
-//     * @param tveColumn - scan column to add
-//     */
-//    private void addScanColumn(TupleValueExpression tveColumn)
-//    {
-//        // The sub-query temp table should be already registered
-//        // during the parseTable and/or setTable calls
-//        String tableAlias = tveColumn.getTableAlias();
-//        StmtTableScan tableCache = getStmtTableScanByAlias(this, tableAlias);
-//        assert(tableCache != null);
-//        // Set the statement ID this TVE refers to.
-//        tveColumn.setOrigStmtId(tableCache.getStatementId());
-//        // For the subqueries replace table name with its alias.
-//        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
-//            tveColumn.setTableName(tableAlias);
-//        }
-//        // Resolve the tve before adding it to the cache
-//        tableCache.resolveTVEForDB(m_db, tveColumn);
-//        SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
-//                tveColumn.getTableAlias(),
-//                tveColumn.getColumnName(),
-//                tveColumn.getColumnAlias(),
-//                tveColumn);
-//        tableCache.getScanColumns().add(col);
-//    }
-
     /**
      * Add a table or a sub-query to the statement cache. If the subQuery is not NULL,
      * the table name and the alias specify the sub-query

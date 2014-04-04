@@ -908,6 +908,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     expr, (AbstractExpression) colInfo.expression.clone());
             // Check if this column contains aggregate expression
             if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
+                List<AbstractExpression> agrExprssions = colInfo.expression.findAllSubexpressionsOfClass(AggregateExpression.class);
+                if (selectStmt.m_aggregationList == null) {
+                    selectStmt.m_aggregationList = new ArrayList<AbstractExpression>();
+                }
+                selectStmt.m_aggregationList.addAll(agrExprssions);
                 havingList.add(equalityExpr);
             } else {
                 whereList.add(equalityExpr);
@@ -927,17 +932,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             selectStmt.having = ExpressionUtil.combine(havingList);
         }
+
         // clear DISPLAY, ORDER BY, GROUP BY columns, remove DISTINCT
         // The more efficient approach would be to recognize that this SELECT statement
         // is part of the IN expression (HSQL) and skip the above elements
         // during the initial parsing
+        selectStmt.distinct = false;
+        selectStmt.hasComplexAgg = false;
+        selectStmt.hasComplexGroupby = false;
+        selectStmt.hasAggregateExpression = false;
+        selectStmt.hasAverage = false;
         selectStmt.displayColumns.clear();
+        selectStmt.aggResultColumns.clear();
         selectStmt.orderColumns.clear();
         selectStmt.groupByColumns.clear();
 
         selectStmt.projectSchema = null;
 
-        selectStmt.aggResultColumns.clear();
         selectStmt.groupByExpressions = null;
 
         selectStmt.avgPushdownDisplayColumns = null;
@@ -946,13 +957,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         selectStmt.avgPushdownHaving = null;
         selectStmt.avgPushdownNewAggSchema = null;
 
-        selectStmt.distinct = false;
-        selectStmt.hasComplexAgg = false;
-        selectStmt.hasComplexGroupby = false;
-        selectStmt.hasAggregateExpression = false;
-        selectStmt.hasAverage = false;
-
+        // re-parse having expressions
         selectStmt.m_aggregationList = new ArrayList<AbstractExpression>();
+        selectStmt.parseHavingExpression(false);
+        selectStmt.placeTVEsinColumns();
+
 
         // add a single dummy output column
         ParsedColInfo col = new ParsedColInfo();
