@@ -79,14 +79,12 @@ public class TestStopNode extends RegressionSuite
             VoltTable table = null;
             try {
                 Thread.sleep(1000);
-                client = ClientFactory.createClient();
-
-                client.createConnection("localhost", m_config.port(0));
+                client = getFullyConnectedClient();
                 table = client.callProcedure("@SystemInformation", "overview").getResults()[0];
                 client.close();
                 client = null;
             } catch (Exception ex) {
-                ex.printStackTrace();
+                System.out.println("Failed to get SystemInformation overview: " + ex.getMessage());
                 continue;
             }
             boolean done = true;
@@ -167,7 +165,7 @@ public class TestStopNode extends RegressionSuite
         boolean success;
         //Lets tolerate 3 node failures.
         m_config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(false);
+        m_config.setHasLocalServer(true);
         success = m_config.compile(project);
         assertTrue(success);
 
