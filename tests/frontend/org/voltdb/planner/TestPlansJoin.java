@@ -1110,7 +1110,25 @@ public class TestPlansJoin extends PlannerTestCase {
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopPlanNode);
        assertEquals(((NestLoopPlanNode) n).getJoinType(), JoinType.LEFT);
-   }
+
+       pn = compile("select b.A, a.* FROM R1 a LEFT OUTER JOIN R4 b ON b.A = a.A AND b.C = a.C AND a.D = b.D WHERE b.A IS NULL");
+       System.out.println(pn.toExplainPlanString());
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+
+       pn = compile("select b.A, a.* FROM R1 a LEFT OUTER JOIN R4 b ON b.A = a.A AND b.C = a.C AND a.D = b.D WHERE b.B + b.A IS NULL");
+       System.out.println(pn.toExplainPlanString());
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+
+       pn = compile("select a.* FROM R1 a LEFT OUTER JOIN R5 b ON b.A = a.A WHERE b.A IS NULL");
+       System.out.println(pn.toExplainPlanString());
+       n = pn.getChild(0).getChild(0);
+       assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+
+}
 
     @Override
     protected void setUp() throws Exception {
