@@ -393,7 +393,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     /*
-     * The first fragment contains the initiate task for a multi-part txn for command logging
+     * The first fragment contains the initiate task and the involved partitions set
+     * for a multi-part txn for command logging.
+     *
+     * Involved partitions set is a set of partition IDs that are involved in this
+     * multi-part txn.
      */
     public void setStateForDurability(Iv2InitiateTaskMessage initiateTask,
                                       Collection<Integer> involvedPartitions) {
