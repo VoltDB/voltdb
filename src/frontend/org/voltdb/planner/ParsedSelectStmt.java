@@ -932,27 +932,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             selectStmt.having = ExpressionUtil.combine(havingList);
         }
-        // re-parse having expressions
-      selectStmt.distinct = false;
-      selectStmt.hasComplexAgg = false;
-      selectStmt.hasComplexGroupby = false;
-      selectStmt.hasAggregateExpression = false;
-      selectStmt.hasAverage = false;
-        selectStmt.displayColumns.clear();
-
-        selectStmt.parseHavingExpression(false);
-//        selectStmt.placeTVEsinColumns();
 
         // clear DISPLAY, ORDER BY, GROUP BY columns, remove DISTINCT
         // The more efficient approach would be to recognize that this SELECT statement
         // is part of the IN expression (HSQL) and skip the above elements
         // during the initial parsing
+        selectStmt.distinct = false;
+        selectStmt.hasComplexAgg = false;
+        selectStmt.hasComplexGroupby = false;
+        selectStmt.hasAggregateExpression = false;
+        selectStmt.hasAverage = false;
+        selectStmt.displayColumns.clear();
+        selectStmt.aggResultColumns.clear();
         selectStmt.orderColumns.clear();
         selectStmt.groupByColumns.clear();
 
         selectStmt.projectSchema = null;
 
-        selectStmt.aggResultColumns.clear();
         selectStmt.groupByExpressions = null;
 
         selectStmt.avgPushdownDisplayColumns = null;
@@ -960,12 +956,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         selectStmt.avgPushdownOrderColumns = null;
         selectStmt.avgPushdownHaving = null;
         selectStmt.avgPushdownNewAggSchema = null;
-
-//        selectStmt.distinct = false;
-//        selectStmt.hasComplexAgg = false;
-//        selectStmt.hasComplexGroupby = false;
-//        selectStmt.hasAggregateExpression = selectStmt.having != null;
-//        selectStmt.hasAverage = false;
 
         // add a single dummy output column
         ParsedColInfo col = new ParsedColInfo();

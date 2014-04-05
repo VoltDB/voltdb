@@ -50,6 +50,8 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select l.id from l where l.id = ? or exists (select a from t where l.a = t.a)");
         testLoadQueryPlanTree("select l.id from l join t on l.id=t.a and exists (select a from t where l.a = t.a)");
         testLoadQueryPlanTree("select 1 from l, t where exists (select 1 from t t1 where l.b = t1.a and t1.b = t.b)");
+        testLoadQueryPlanTree("select a, sum(id) as sc1 from l where (a, id) in ( SELECT a, count(id) as sc2 from  l  GROUP BY a ORDER BY a DESC) GROUP BY a");
+
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {

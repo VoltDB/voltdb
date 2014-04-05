@@ -32,6 +32,7 @@ import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -103,34 +104,52 @@ public class TestInExistsSubQueries extends PlannerTestCase {
       assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
-    public void testDeleteWhereIn() {
-        List<AbstractPlanNode> lpn = compileToFragments("delete from r1 where a in (select a from r2 where r1.c = r2.c)");
-        assertTrue(lpn.size() == 2);
-        AbstractPlanNode n = lpn.get(1).getChild(0);
-        assertTrue(n instanceof DeletePlanNode);
-        n = n.getChild(0);
-        assertTrue(n instanceof AbstractScanPlanNode);
-        AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
-        AbstractExpression e = spn.getPredicate();
-        assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
-    }
+    public void testInAggeregated() {
+//        AbstractPlanNode pn = compile("select * from R1 where A in " +
+//                "(select max(C) from r2)");
+        AbstractPlanNode pn = compile("select a, sum(c) as sc1 from r1 where (a, c) in " +
+                "( SELECT a, count(c) as sc2 " +
+                "from  r1  GROUP BY a ORDER BY a DESC) GROUP BY A;");
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression e = ((AbstractScanPlanNode)pn).getPredicate();
+        SubqueryExpression subExpr = (SubqueryExpression) e;
+        AbstractPlanNode sn = subExpr.getSubqueryNode();
+        sn = sn.getChild(0);
+        assertTrue(sn instanceof AggregatePlanNode);
+        AbstractExpression expr = ((AggregatePlanNode)sn).getPostPredicate();
+        assertTrue(expr != null);
+      }
 
-    public void testUpdateWhereIn() {
-      List<AbstractPlanNode> lpn = compileToFragments("update r1 set c = 1 where a in (select a from r2 where r1.c = r2.c)");
-      assertTrue(lpn.size() == 2);
-      AbstractPlanNode n = lpn.get(1).getChild(0);
-      assertTrue(n instanceof UpdatePlanNode);
-      n = n.getChild(0);
-      assertTrue(n instanceof AbstractScanPlanNode);
-      AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
-      AbstractExpression e = spn.getPredicate();
-      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
-    }
+    // Disabled for now
+//    public void testDeleteWhereIn() {
+//        List<AbstractPlanNode> lpn = compileToFragments("delete from r1 where a in (select a from r2 where r1.c = r2.c)");
+//        assertTrue(lpn.size() == 2);
+//        AbstractPlanNode n = lpn.get(1).getChild(0);
+//        assertTrue(n instanceof DeletePlanNode);
+//        n = n.getChild(0);
+//        assertTrue(n instanceof AbstractScanPlanNode);
+//        AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
+//        AbstractExpression e = spn.getPredicate();
+//        assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
+//    }
+
+    // Disabled for now
+//    public void testUpdateWhereIn() {
+//      List<AbstractPlanNode> lpn = compileToFragments("update r1 set c = 1 where a in (select a from r2 where r1.c = r2.c)");
+//      assertTrue(lpn.size() == 2);
+//      AbstractPlanNode n = lpn.get(1).getChild(0);
+//      assertTrue(n instanceof UpdatePlanNode);
+//      n = n.getChild(0);
+//      assertTrue(n instanceof AbstractScanPlanNode);
+//      AbstractScanPlanNode spn = (AbstractScanPlanNode) n;
+//      AbstractExpression e = spn.getPredicate();
+//      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
+//    }
 
     public void testSendReceiveInSubquery() {
       failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
-              "This special case join between an outer replicated table and " +
-              "an inner partitioned table is too complex and is not supported.");
+              "Subqueries on partitioned data are only supported in single partition stored procedures.");
     }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {

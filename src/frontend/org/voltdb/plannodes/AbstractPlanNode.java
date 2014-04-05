@@ -40,6 +40,8 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -192,6 +194,26 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Generate the output schemas for the subquery expression nodes
+     * @param expr
+     * @param db
+     */
+    protected void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
+        if (subqueryExpressions.isEmpty()) {
+            return;
+        }
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof SubqueryExpression);
+            AbstractPlanNode subqueryPlan = ((SubqueryExpression) subqueryExpression).getSubqueryNode();
+            subqueryPlan.generateOutputSchema(db);
+        }
+    }
+
+    /**
      * Recursively iterate through the plan and resolve the column_idx value for
      * every TupleValueExpression in every AbstractExpression in every PlanNode.
      * Few enough common cases so we force every AbstractPlanNode subclass to
@@ -205,6 +227,26 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
+
+    /**
+     * Recursively iterate through the subquery expression plan and resolve the column indexes
+     * @param expr
+     * @param db
+     */
+    protected void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
+        if (subqueryExpressions.isEmpty()) {
+            return;
+        }
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof SubqueryExpression);
+            AbstractPlanNode subqueryPlan = ((SubqueryExpression) subqueryExpression).getSubqueryNode();
+            subqueryPlan.resolveColumnIndexes();
+        }
+    }
 
     public void validate() throws Exception {
         //

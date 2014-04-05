@@ -194,6 +194,76 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
+    /**
+     * Simple sub-query expression
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testSubExpressions_Simple() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" where ID in " +
+                    " (select ID from " + tb + " WHERE ID > 3);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {4,2}, {5,2}});
+
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" T1 where ID in " +
+                    " (select ID from " + tb + " WHERE ID > 4) " +
+                    "and exists (select 1 from " + tb + " where ID * T1.DEPT  = 10);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {5, 2}});
+
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" T1 where " +
+                    "not exists (select 1 from " + tb + " where ID * T1.DEPT  = 10) " +
+                    "and T1.ID < 3 order by ID;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {1, 1}, {2, 1} });
+
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" T1 where " +
+                    "(ID, DEPT) IN (select DEPT, WAGE/10 from " + tb + ") ").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {1, 1}});
+
+        }
+
+        // Nested
+        vt = client.callProcedure("@AdHoc",
+                "select ID from " + tbs[0] + " T1 where exists " +
+                        "(SELECT 1 FROM " + tbs[1] + " T2 where exists " +
+                            "(SELECT ID FROM "+ tbs[1] +" T3 WHERE T1.ID * T3.ID  = 9))").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3}});
+
+    }
+
+  /**
+  * SELECT FROM SELECT FROM SELECT
+  * @throws NoConnectionsException
+  * @throws IOException
+  * @throws ProcCallException
+  */
+ public void testSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
+ {
+     Client client = getClient();
+     loadData(client);
+     VoltTable vt;
+
+     for (String tb: procs) {
+         client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+         client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
+     }
+
+     // Test group by queries, order by, limit
+     for (String tb: tbs) {
+         vt = client.callProcedure("@AdHoc",
+                 "select dept, sum(wage) as sw1 from " + tb + " where (id, dept) in " +
+                 "( SELECT dept, count(dept) " +
+                 "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
+         System.out.println(vt.toString());
+         System.out.println(vt.toString());
+     }
+
+ }
 
     static public junit.framework.Test suite()
     {

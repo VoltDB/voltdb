@@ -253,8 +253,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key: '%s'", m_searchKey.debugNoHeader().c_str());
 
     //
     // END EXPRESSION

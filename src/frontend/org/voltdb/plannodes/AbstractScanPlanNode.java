@@ -328,6 +328,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
+        // Generate the output schema for subqueries
+        generateSubqueryExpressionOutputSchema(m_predicate, db);
     }
 
     @Override
@@ -387,7 +389,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_outputSchema = m_outputSchema.clone();
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
-
+        // Resolve subquery expression indexes
+        resolveSubqueryExpressionColumnIndexes(m_predicate);
     }
 
     @Override

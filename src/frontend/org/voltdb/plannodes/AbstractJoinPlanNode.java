@@ -185,6 +185,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             m_children.get(0).getOutputSchema().
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
+
+        // Generate the output schema for subqueries
+        generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
+
     }
 
     // Given any non-inlined type of join, this method will resolve the column
@@ -246,6 +252,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
+
+        // Resolve subquery expression indexes
+        resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
+        resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
+        resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
+
     }
 
     public SortDirectionType getSortDirection() {

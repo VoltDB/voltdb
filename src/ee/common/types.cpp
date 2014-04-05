@@ -470,9 +470,6 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
     }
-    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
-        return "OPERATOR_EXISTS";
-    }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
     }
