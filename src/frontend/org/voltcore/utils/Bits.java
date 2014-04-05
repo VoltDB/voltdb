@@ -89,7 +89,7 @@ public final class Bits {
         byte checksum = 0;
         for (int ii = 0; ii < numPages; ii++) {
             checksum ^= Bits.unsafe.getByte(address);
-            address += checksum;
+            address += PAGE_SIZE;
         }
         //This store will never actually occur, but the compiler doesn't care
         //for the purposes of dead code elimination
