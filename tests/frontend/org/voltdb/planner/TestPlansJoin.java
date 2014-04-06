@@ -1048,6 +1048,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
    public void testOuterJoinSimplification() {
        AbstractPlanNode pn, n;
+       AbstractExpression ex;
 
        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.C = R2.C WHERE R2.C IS NOT NULL");
        n = pn.getChild(0).getChild(0);
@@ -1115,7 +1116,6 @@ public class TestPlansJoin extends PlannerTestCase {
        assertEquals(((NestLoopPlanNode) n).getJoinType(), JoinType.LEFT);
 
        // Test with seqscan with different filers.
-       AbstractExpression ex;
        pn = compile("select R2.A, R1.* FROM R1 LEFT OUTER JOIN R2 ON R2.A = R1.A WHERE R2.A > 3");
        System.out.println(pn.toExplainPlanString());
        n = pn.getChild(0).getChild(0);
@@ -1145,13 +1145,31 @@ public class TestPlansJoin extends PlannerTestCase {
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopIndexPlanNode);
        assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+       ex = ((NestLoopIndexPlanNode) n).getWherePredicate();
+       assertEquals(ex instanceof OperatorExpression, true);
+       assertEquals(ex.getLeft() instanceof OperatorExpression, true);
 
        pn = compile("select a.* FROM R1 a LEFT OUTER JOIN R5 b ON b.A = a.A WHERE b.A IS NULL");
        System.out.println(pn.toExplainPlanString());
        n = pn.getChild(0).getChild(0);
        assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+       ex = ((NestLoopIndexPlanNode) n).getWherePredicate();
+       assertEquals(ex instanceof OperatorExpression, true);
+   }
 
-}
+   public void testTry() {
+       AbstractPlanNode pn, n;
+       AbstractExpression ex;
+
+       pn = compile("select b.A, a.* FROM R3 a RIGHT OUTER JOIN R3 b ON b.A = a.A AND b.C = a.C WHERE a.C IS NULL");
+//       pn = compile("select b.A, a.* FROM R1 a LEFT OUTER JOIN R4 b ON b.A = a.A AND b.C = a.C AND a.D = b.D WHERE b.A IS NULL");
+       System.out.println(pn.toExplainPlanString());
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
+       ex = ((NestLoopIndexPlanNode) n).getWherePredicate();
+       assertEquals(ex instanceof OperatorExpression, true);
+   }
 
     @Override
     protected void setUp() throws Exception {
