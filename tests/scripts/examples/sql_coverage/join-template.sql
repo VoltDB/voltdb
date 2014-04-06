@@ -30,7 +30,8 @@ SELECT @idcol, @numcol FROM @fromtables LHS39 @jointype JOIN @fromtables RHS USI
 
 --- Outer join with NULL padding.
 SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol = RHS.@idcol AND LHS39.@numcol = RHS.@numcol  WHERE  RHS.@numcol IS NULL
-SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol = RHS.@idcol AND LHS39.@numcol = RHS.@numcol  WHERE  LHS39.@numcol IS NULL
+-- ENG-6113: Hsql has wrong answers on this templates.
+-- SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol = RHS.@idcol AND LHS39.@numcol = RHS.@numcol  WHERE  LHS39.@numcol IS NULL
 
 --- Three or more table outer join test
 SELECT *               FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
