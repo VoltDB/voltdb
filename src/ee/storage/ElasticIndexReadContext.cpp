@@ -47,6 +47,12 @@ ElasticIndexReadContext::ElasticIndexReadContext(
 ElasticIndexReadContext::~ElasticIndexReadContext()
 {}
 
+TableStreamerContext* ElasticIndexReadContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+{
+    return new ElasticIndexReadContext(surgeon.getTable(), surgeon,
+        getPartitionId(), getSerializer(), m_predicateStrings);
+}
+
 /**
  * Activation handler.
  */
