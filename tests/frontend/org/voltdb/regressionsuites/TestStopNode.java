@@ -36,11 +36,13 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestStopNode extends RegressionSuite
 {
 
     static LocalCluster m_config;
+    static int kfactor = 3;
 
     public TestStopNode(String name) {
         super(name);
@@ -115,17 +117,24 @@ public class TestStopNode extends RegressionSuite
 
         try {
             CountDownLatch cdl = new CountDownLatch(1);
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 4), "@StopNode", 4);
+            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
             cdl.await();
-            waitForHostToBeGone(4);
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                waitForHostToBeGone(4);
+            }
             cdl = new CountDownLatch(1);
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 3), "@StopNode", 3);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
             cdl.await();
-            waitForHostToBeGone(3);
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                waitForHostToBeGone(3);
+            }
             cdl = new CountDownLatch(1);
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 2), "@StopNode", 2);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
             cdl.await();
-            waitForHostToBeGone(2);
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                waitForHostToBeGone(2);
+            }
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
             //We should not get here
@@ -141,7 +150,8 @@ public class TestStopNode extends RegressionSuite
             client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
             //Stop a node that should stay up
             client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            VoltTable tab = client.callProcedure("@SystemInformation", "overview").getResults()[0];
+            client.callProcedure("@SystemInformation", "overview");
+            client.drain();
             cdl.await();
         } catch (Exception pce) {
             pce.printStackTrace();
@@ -164,7 +174,10 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
+        if (!MiscUtils.isPro()) {
+            kfactor = 0;
+        }
+        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(true);
         success = m_config.compile(project);
         assertTrue(success);
