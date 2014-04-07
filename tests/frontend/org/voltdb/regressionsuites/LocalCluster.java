@@ -929,7 +929,7 @@ public class LocalCluster implements VoltServerConfig {
         } else {
             log.info("Recovering process exited before recovery completed");
             try {
-                silentShutdownSingleHost(hostId, true);
+                silentKillSingleHost(hostId, true);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -957,20 +957,20 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal();
     }
 
-    public void shutDownSingleHost(int hostNum) throws InterruptedException
+    public void killSingleHost(int hostNum) throws InterruptedException
     {
-        log.info("Shutting down " + hostNum);
-        silentShutdownSingleHost(hostNum, false);
+        log.info("Killing " + hostNum);
+        silentKillSingleHost(hostNum, false);
     }
 
-    public void stopSingleHost(Client client, int hostNum)
+    public void stopSingleHostUsingSysproc(Client client, int hostNum)
             throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
-        stopSingleHost(client, new SyncCallback(), hostNum);
+        stopSingleHostUsingSysproc(client, new SyncCallback(), hostNum);
     }
 
-    public void stopSingleHost(Client client, ProcedureCallback cb, int hostNum)
+    public void stopSingleHostUsingSysproc(Client client, ProcedureCallback cb, int hostNum)
             throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
-        log.info("Stopping: " + hostNum);
+        log.info("Stopping Using @StopNode: " + hostNum);
         client.callProcedure("@StopNode", hostNum);
         Process proc = null;
         EEProcess eeProc = null;
@@ -990,7 +990,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
+    private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
         //PipeToFile ptf = null;
         EEProcess eeProc = null;

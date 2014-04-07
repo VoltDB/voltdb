@@ -323,30 +323,25 @@ public class ForeignHost {
             if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
                 return;
             }
-            //Just a regular poison pill
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
                     m_hostId, hostnameAndIPAndPort(), message);
-            //if poison pill is for particular host treat it as targeted kill
-            if (in.remaining() > 0) {
-                int cause = in.getInt();
-                if (cause == ForeignHost.CRASH_ME) {
-                    int hid = VoltDB.instance().getHostMessenger().getHostId();
-                    hostLog.debug("Poison Pill with target me was sent.: " + hid);
-                    //Killing myself.
-                    VoltDB.instance().halt();
-                } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
-                    org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
-                } else {
-                    //Should never come here.
-                    hostLog.error("Invalid Cause in poison pill: " + cause);
-                }
-                return;
+            //if poison pill with particular cause handle it.
+            int cause = in.getInt();
+            if (cause == ForeignHost.CRASH_ME) {
+                int hid = VoltDB.instance().getHostMessenger().getHostId();
+                hostLog.debug("Poison Pill with target me was sent.: " + hid);
+                //Killing myself.
+                VoltDB.instance().halt();
+            } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
+                org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            } else {
+                //Should never come here.
+                hostLog.error("Invalid Cause in poison pill: " + cause);
             }
-            //Its a regular backward compatible pill.
-            org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            return;
         }
 
         recvDests = new long[destCount];

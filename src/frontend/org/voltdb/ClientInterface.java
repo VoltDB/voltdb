@@ -2038,12 +2038,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
             hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
-                    + " @StopNode will not proceed because doing so would cause the cluster to crash.");
+                    + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                    + " Use shutdown to stop the cluster.");
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "@StopNode will not proceed because doing so would cause the cluster to crash.",
-                    task.clientHandle);
+                    "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                            + " Use shutdown to stop the cluster.", task.clientHandle);
         }
 
         int hid = VoltDB.instance().getHostMessenger().getHostId();
