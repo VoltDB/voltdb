@@ -1595,6 +1595,11 @@ public:
         m_test.m_shuffles.insert(*reinterpret_cast<int64_t*>(sourceTuple.address() + 1));
     }
 
+    virtual TableStreamerInterface* cloneForTruncatedTable(voltdb::PersistentTableSurgeon&) {
+        return NULL;
+    }
+
+
     CopyOnWriteTest &m_test;
     int32_t m_partitionId;
     TableStreamType m_type;
