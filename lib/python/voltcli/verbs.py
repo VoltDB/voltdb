@@ -368,7 +368,7 @@ class JavaBundle(object):
            cli.StringOption('-l', '--license', 'license', 'specify the location of the license file'),
            cli.StringOption(None, '--client', 'clientport', 'specify the client port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internal', 'internalport', 'specify the internal port as [ipaddress:]port-number used to communicate between cluster nodes'),
-           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port'),
+           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port as [ipaddress:]port-number'),
            cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port as [ipaddress:]port-number (1st of 3 sequential ports)'),
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),

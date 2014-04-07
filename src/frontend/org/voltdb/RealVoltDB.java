@@ -450,8 +450,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
+            if (m_config.m_pathToLicense == null) {
+                m_licenseApi = MiscUtils.licenseApiFactory();
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in default directories");
+                }
+            }
+            else {
+                m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in provided path: " + m_config.m_pathToLicense);
+                }
+
+            }
+
             if (m_licenseApi == null) {
+                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
                 VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
                         "See previous log message for details.", false, null);
             }
@@ -1114,7 +1128,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return topo;
     }
 
-    private List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
+    private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
     /**
      * Schedule all the periodic works
      */

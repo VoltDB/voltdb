@@ -16,7 +16,6 @@
  */
 
 #include "storage/ElasticContext.h"
-#include "storage/ElasticIndex.h"
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
@@ -35,6 +34,7 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                const std::vector<std::string> &predicateStrings,
                                size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    m_predicateStrings(predicateStrings), // retained for cloning here, not in TableStreamerContext.
     m_nTuplesPerCall(nTuplesPerCall),
     m_indexActive(false)
 {
@@ -45,6 +45,12 @@ ElasticContext::ElasticContext(PersistentTable &table,
 
 ElasticContext::~ElasticContext()
 {}
+
+TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+{
+    return new ElasticContext(surgeon.getTable(), surgeon,
+        getPartitionId(), getSerializer(), m_predicateStrings, m_nTuplesPerCall);
+}
 
 /**
  * Activation handler.
@@ -252,6 +258,7 @@ void ElasticContext::updatePredicates(const std::vector<std::string> &predicateS
             }
         }
     }
+    m_predicateStrings = predicateStrings; // retain for possible clone after TRUNCATE TABLE
     TableStreamerContext::updatePredicates(predicateStrings);
 }
 
