@@ -825,10 +825,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
-        if (getPlanNodeType() == PlanNodeType.PROJECTION) {
-            if (m_verboseExplainForDebugging) {
-                sb.append(indent + "PROJECTION\n");
-            }
+        if (( ! m_verboseExplainForDebugging) && (getPlanNodeType() == PlanNodeType.PROJECTION)) {
             extraIndent = "";
         }
         else {
@@ -838,8 +835,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
             // don't bother with inlined projections
-            if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
+            if (( ! m_verboseExplainForDebugging) &&
+                (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
                 continue;
+            }
             sb.append(indent + "inline ");
             sb.append(inlineNode.explainPlanForNode(indent));
             sb.append("\n");

@@ -68,9 +68,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
     assert(node);
-    assert(node->isSubQuery() || node->getTargetTable());
-    assert((node->isSubQuery() && node->getChildren().size() == 1) ||
-        !node->isSubQuery());
+    bool isSubquery = node->isSubQuery();
+    assert(isSubquery || node->getTargetTable());
+    assert((! isSubquery) || (node->getChildren().size() == 1));
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -80,22 +80,22 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (!this->needsOutputTableClear())
-    {
-        node->setOutputTable(node->getTargetTable());
+    if (needsOutputTableClear()) {
+        // Create output table based on output schema from the plan
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
+        setTempOutputTable(limits, temp_name);
     }
     //
     // Otherwise create a new temp table that mirrors the
     // output schema specified in the plan (which should mirror
     // the output schema for any inlined projection)
     //
-    else
-    {
-        // Create output table based on output schema from the plan
-        const std::string& temp_name = (node->isSubQuery()) ?
-                node->getChildren()[0]->getOutputTable()->name():
-                node->getTargetTable()->name();
-        setTempOutputTable(limits, temp_name);
+    else {
+        node->setOutputTable(isSubquery ?
+                             node->getChildren()[0]->getOutputTable() :
+                             node->getTargetTable());
     }
     return true;
 }
@@ -121,7 +121,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     assert(input_table);
 
-    //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
+    //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
+    //* for debug */    " input table " << (void*)input_table <<
+    //* for debug */    " has " << input_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
                input_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
@@ -237,6 +239,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             }
         }
     }
+    //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
+    //* for debug */    " output table " << (void*)output_table <<
+    //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 

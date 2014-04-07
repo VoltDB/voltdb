@@ -190,8 +190,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
                         {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
             }
-        }
 
+            vt = client.callProcedure("@AdHoc",
+                    "select T2.id " +
+                    "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
+                    "ORDER BY T2.id").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
+                    {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
+        }
     }
 
 
