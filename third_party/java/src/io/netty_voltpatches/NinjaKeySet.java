@@ -98,7 +98,7 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
 
             // Ensure the current selector implementation is what we can instrument.
             if (!selectorImplClass.isAssignableFrom(selector.getClass())) {
-                return selectedKeySet;
+                return null;
             }
 
             Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
