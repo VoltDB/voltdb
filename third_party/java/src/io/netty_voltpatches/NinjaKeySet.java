@@ -121,8 +121,12 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
         boolean supportedTemp = false;
         try {
             Selector s = Selector.open();
-            if (instrumentSelector(s) != null) {
-                supportedTemp = true;
+            try {
+                if (instrumentSelector(s) != null) {
+                    supportedTemp = true;
+                }
+            } finally {
+                s.close();
             }
         } catch (Throwable t){}
         supported = supportedTemp;
