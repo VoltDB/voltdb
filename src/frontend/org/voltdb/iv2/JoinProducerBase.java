@@ -85,7 +85,7 @@ public abstract class JoinProducerBase extends SiteTasker {
                 getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
                         + "Snapshot txnId is: " + event.multipartTxnId);
                 deregister();
-                kickWatchdog(true);
+                kickWatchdog(false);
                 m_future.set(event);
             } else {
                 getLogger().debug(m_whoami
