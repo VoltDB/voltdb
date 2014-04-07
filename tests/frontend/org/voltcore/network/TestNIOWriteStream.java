@@ -342,36 +342,42 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testLastWriteDelta() throws Exception {
-        final MockChannel channel = new MockChannel(MockChannel.SINK);
-        MockPort port = new MockPort();
-        NIOWriteStream wstream = new NIOWriteStream(port);
+        EstTimeUpdater.pause = true;
+        Thread.sleep(10);
+        try {
+            final MockChannel channel = new MockChannel(MockChannel.SINK);
+            MockPort port = new MockPort();
+            NIOWriteStream wstream = new NIOWriteStream(port);
 
-        assertEquals( 0, wstream.calculatePendingWriteDelta(999));
+            assertEquals( 0, wstream.calculatePendingWriteDelta(999));
 
-        EstTimeUpdater.update(System.currentTimeMillis());
+            EstTimeUpdater.update(System.currentTimeMillis());
 
-        /**
-         * Test the basic write and drain
-         */
-        final ByteBuffer b = ByteBuffer.allocate(5);
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        wstream.swapAndSerializeQueuedWrites(pool);
-        wstream.drainTo( channel);
-        assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            /**
+             * Test the basic write and drain
+             */
+            final ByteBuffer b = ByteBuffer.allocate(5);
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.swapAndSerializeQueuedWrites(pool);
+            wstream.drainTo( channel);
+            assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
 
-        Thread.sleep(20);
-        EstTimeUpdater.update(System.currentTimeMillis());
+            Thread.sleep(20);
+            EstTimeUpdater.update(System.currentTimeMillis());
 
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        wstream.enqueue(b.duplicate());
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        channel.m_behavior = MockChannel.PARTIAL;
-        wstream.swapAndSerializeQueuedWrites(pool);
-        wstream.drainTo( channel );
-        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        wstream.shutdown();
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.enqueue(b.duplicate());
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            channel.m_behavior = MockChannel.PARTIAL;
+            wstream.swapAndSerializeQueuedWrites(pool);
+            wstream.drainTo( channel );
+            assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
+            wstream.shutdown();
+        } finally {
+            EstTimeUpdater.pause = false;
+        }
     }
 
     public void testQueueMonitor() throws Exception {

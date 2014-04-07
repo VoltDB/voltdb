@@ -87,7 +87,6 @@ import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
@@ -298,13 +297,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        int readyKeys;
-                        if (m_networkId == 0) {
-                            readyKeys = m_selector.select(5);
-                        }
-                        else {
-                            readyKeys = m_selector.select();
-                        }
+                        final int readyKeys = m_selector.select();
 
                         /*
                          * Run the task queue immediately after selection to catch
@@ -316,7 +309,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                         }
 
                         if (readyKeys > 0) {
-                            if (m_ninjaSelectedKeys == null) {
+                            if (NinjaKeySet.supported == false) {
                                 invokeCallbacks(r);
                             }
                             else {
@@ -331,15 +324,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
                         task = null;
                         while ((task = m_tasks.poll()) != null) {
                             task.run();
-                        }
-
-                        if (m_networkId == 0) {
-                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-                            if ( delta != null ) {
-                                m_logger.warn("A VoltDB thread has not run for more than " + delta +
-                                        " milliseconds. System resource contention could be" +
-                                        " impacting VoltDB operations.");
-                            }
                         }
                     }
                 } catch (Throwable ex) {

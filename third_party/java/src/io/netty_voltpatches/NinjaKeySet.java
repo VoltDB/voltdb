@@ -115,4 +115,16 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
             return null;
         }
     }
+
+    public static final boolean supported;
+    static {
+        boolean supportedTemp = false;
+        try {
+            Selector s = Selector.open();
+            if (instrumentSelector(s) != null) {
+                supportedTemp = true;
+            }
+        } catch (Throwable t){}
+        supported = supportedTemp;
+    }
 }

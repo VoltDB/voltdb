@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import org.voltcore.utils.EstTime;
 import org.voltdb.common.Constants;
 
 /**
@@ -105,7 +104,7 @@ public class AuthenticatedConnectionCache {
         boolean retval = false;
         if (m_lastRejectTime != null)
         {
-            if ((EstTime.currentTimeMillis() - m_lastRejectTime) < (REJECT_TIMEOUT_S * 1000))
+            if ((System.currentTimeMillis() - m_lastRejectTime) < (REJECT_TIMEOUT_S * 1000))
             {
                 retval = true;
             }
@@ -119,7 +118,7 @@ public class AuthenticatedConnectionCache {
 
     private void setRejectHold()
     {
-        m_lastRejectTime = EstTime.currentTimeMillis();
+        m_lastRejectTime = System.currentTimeMillis();
     }
 
     public AuthenticatedConnectionCache(int targetSize) {
