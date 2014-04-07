@@ -121,7 +121,7 @@ public class VoltDB {
         public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
-        public String m_pathToLicense = "license.xml";
+        public String m_pathToLicense = null;
 
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
