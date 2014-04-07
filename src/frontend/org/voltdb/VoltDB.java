@@ -702,7 +702,10 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        OnDemandBinaryLogger.flush();
+        try {
+            OnDemandBinaryLogger.flush();
+        } catch (Throwable e) {}
+
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
          * we get to the root cause

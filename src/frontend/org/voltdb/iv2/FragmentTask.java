@@ -24,7 +24,6 @@ import java.util.Map;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
@@ -120,7 +119,6 @@ public class FragmentTask extends TransactionTask
     throws IOException
     {
         if (!m_txnState.isReadOnly()) {
-            OnDemandBinaryLogger.log("fragmenttasklog_site_" + siteConnection.getCorrespondingSiteId() + ".blog", m_fragmentMsg.getTxnId());
             taskLog.logTask(m_fragmentMsg);
         }
 
@@ -149,7 +147,6 @@ public class FragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        OnDemandBinaryLogger.log("runfragmenttasklog_site_" + siteConnection.getCorrespondingSiteId() + ".blog", m_fragmentMsg.getTxnId());
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
