@@ -30,8 +30,6 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.primitives.Ints;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -58,7 +56,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
+import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -542,6 +542,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!msg.isReadOnly()) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
+            //Durability future is always null for sync command logging
+            //the transaction will be delivered again by the CL for execution once durable
+            //Async command logging has to offer the task immediately with a Future for backpressure
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
@@ -742,7 +745,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
-                msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
+                //Trigger reserialization so the new handle is used
+                msg.setStateForDurability(msg.getInitiateTask(), msg.getInvolvedPartitions());
             }
 
             /*
@@ -831,6 +835,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);
+            //Durability future is always null for sync command logging
+            //the transaction will be delivered again by the CL for execution once durable
+            //Async command logging has to offer the task immediately with a Future for backpressure
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
