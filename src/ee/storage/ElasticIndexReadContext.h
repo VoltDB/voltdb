@@ -17,13 +17,14 @@
 #ifndef ELASTIC_INDEX_READ_CONTEXT_H_
 #define ELASTIC_INDEX_READ_CONTEXT_H_
 
-#include "storage/TableStreamerContext.h"
-#include "storage/ElasticIndex.h"
-
 #include <string>
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include "common/types.h"
+#include "storage/ElasticIndex.h"
+#include "storage/TableStreamer.h"
+#include "storage/TableStreamerContext.h"
+#include "storage/TupleBlock.h"
 
 namespace voltdb
 {
@@ -38,7 +39,8 @@ class TableTuple;
 class ElasticIndexReadContext : public TableStreamerContext
 {
 
-    friend class TableStreamer;
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+                                              TableStreamType, const std::vector<std::string>&);
 
 public:
 
@@ -77,11 +79,6 @@ private:
                             const std::vector<std::string> &predicateStrings);
 
     /**
-     * Clone to perpetuate streaming after a TRUNCATE TABLE.
-     */
-    virtual TableStreamerContext* cloneForTruncatedTable(PersistentTableSurgeon &surgeon);
-
-    /**
      * Parse and validate the hash range.
      * Checks that only one predicate string is provided.
      * Update rangeOut with parsed hash range.
@@ -95,12 +92,8 @@ private:
      */
     void deleteStreamedTuples();
 
-    /// Predicate strings parsed in handleActivation() and retained for cloning post-TRUNCATE TABLE.
-    /// Note that these are hash range predicates in the terse "%d:%d" format
-    /// NOT to be confused with the JSON format predicate strings parsed by TableStreamerContext
-    /// for its OTHER derived classes.
-    /// ElasticIndexReadContext does not use TableStreamerContext's predicate handling.
-    const std::vector<std::string> m_predicateStrings;
+    /// Predicate strings (parsed in handleActivation()/handleReactivation()).
+    const std::vector<std::string> &m_predicateStrings;
 
     /// Elastic index iterator
     boost::shared_ptr<ElasticIndexTupleRangeIterator> m_iter;
