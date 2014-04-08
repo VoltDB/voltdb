@@ -57,11 +57,13 @@ public class EstTimeUpdater {
      * @return
      */
     public static Long update(final long now) {
-        final long estNow = EstTime.m_now.get();
+        final long estNow = EstTime.m_now;
         if (estNow == now) {
             return null;
         }
-        EstTime.m_now.lazySet(now);
+
+        EstTime.m_now = now;
+
         /*
          * Check if updating the estimated time was especially tardy.
          * I am concerned that the thread responsible for updating the estimated
