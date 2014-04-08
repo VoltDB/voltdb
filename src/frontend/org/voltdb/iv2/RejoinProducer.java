@@ -49,7 +49,7 @@ public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private final AtomicBoolean m_currentlyRejoining;
-    private ScheduledFuture<?> m_timeFuture;
+    private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
 
@@ -203,7 +203,7 @@ public class RejoinProducer extends JoinProducerBase {
     @Override
     public void kickWatchdog(boolean rearm)
     {
-        if (m_rejoinSiteProcessor.isEOF()) {
+        /*if (m_rejoinSiteProcessor.isEOF()) {
             synchronized (m_activeRejoinSites) {
                 System.out.println("EOF stream for " + m_whoami);
                 for (Integer i : m_activeRejoinSites) {
@@ -218,9 +218,9 @@ public class RejoinProducer extends JoinProducerBase {
                     System.out.flush();
                 }
             }
-        }
+        }*/
 
-        synchronized (this) {
+        synchronized (RejoinProducer.class) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;

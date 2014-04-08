@@ -109,6 +109,9 @@ public class StreamSnapshotSink {
         public void restore(SiteProcedureConnection connection) {
             VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
 
+            //System.out.println("Loading VoltTable with rowcount = " + String.valueOf(table.getRowCount()));
+            //System.out.flush();
+
             // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
             // doesn't yet care about export, just use Long.MIN_VALUE.
 
@@ -253,7 +256,7 @@ public class StreamSnapshotSink {
                     m_EOF = true;
                     System.out.println("Got END message for site");
                     System.out.flush();
-                    m_joinProducer.kickWatchdog(true);
+                    //m_joinProducer.kickWatchdog(true);
                 }
             }
             else if (type == StreamSnapshotMessageType.SCHEMA) {
