@@ -231,7 +231,10 @@ public abstract class CatalogSizing {
             VoltType ctype = VoltType.get((byte)column.getType());
             switch(ctype) {
             case STRING: {
+                boolean inBytes = column.getInbytes();
                 int capacity = column.getSize();
+                if (!inBytes) capacity *= 4;
+
                 csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
                 csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
                 break;
