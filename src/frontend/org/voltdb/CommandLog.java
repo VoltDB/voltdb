@@ -20,8 +20,9 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public interface CommandLog {
     /**
@@ -53,7 +54,6 @@ public interface CommandLog {
     public abstract boolean needsInitialization();
 
     /*
-     * Returns a boolean indicating whether synchronous command logging is enabled.
      *
      * The listener is will be provided with the handle once the message is durable.
      *
