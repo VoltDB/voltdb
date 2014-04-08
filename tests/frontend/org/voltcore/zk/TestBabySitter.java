@@ -54,7 +54,7 @@ public class TestBabySitter extends ZKTestBase {
     @After
     public void tearDown() throws Exception
     {
-        // tearDownZK();
+        tearDownZK();
     }
 
     @Test

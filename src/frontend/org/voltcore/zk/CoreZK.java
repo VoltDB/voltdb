@@ -74,7 +74,7 @@ public class CoreZK {
     /**
      * Given a ZK node name of the form PREFIX_SUFFIX (for example, the
      * format used by the LeaderElector which is HSID_SEQUENCENUM), return
-     * the prefix.
+     * the prefix. The prefix cannot have any underscores in it.
      */
     public static String getPrefixFromChildName(String childName) {
         return childName.split("_")[0];
@@ -83,9 +83,10 @@ public class CoreZK {
     /**
      * Given a ZK node name of the form PREFIX_SUFFIX (for example, the
      * format used by the LeaderElector which is HSID_SEQUENCENUM), return
-     * the suffix.
+     * the suffix. The suffix cannot have any underscores in it.
      */
     public static String getSuffixFromChildName(String childName) {
-        return childName.split("_")[1];
+        final String[] parts = childName.split("_");
+        return parts[parts.length - 1];
     }
 }
