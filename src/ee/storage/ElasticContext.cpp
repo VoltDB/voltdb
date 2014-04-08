@@ -48,8 +48,13 @@ ElasticContext::~ElasticContext()
 
 TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
 {
-    return new ElasticContext(surgeon.getTable(), surgeon,
+    if ( ! m_indexActive) {
+        return NULL;
+    }
+    ElasticContext *cloned = new ElasticContext(surgeon.getTable(), surgeon,
         getPartitionId(), getSerializer(), m_predicateStrings, m_nTuplesPerCall);
+    cloned->handleActivation(TABLE_STREAM_ELASTIC_INDEX);
+    return cloned;
 }
 
 /**
