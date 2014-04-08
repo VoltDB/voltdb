@@ -106,6 +106,7 @@ class PersistentTableSurgeon {
 public:
 
     TBMap &getData();
+    PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -539,6 +540,10 @@ inline PersistentTableSurgeon::~PersistentTableSurgeon()
 
 inline TBMap &PersistentTableSurgeon::getData() {
     return m_table.m_data;
+}
+
+inline PersistentTable& PersistentTableSurgeon::getTable() {
+    return m_table;
 }
 
 inline void PersistentTableSurgeon::insertTupleForUndo(char *tuple) {

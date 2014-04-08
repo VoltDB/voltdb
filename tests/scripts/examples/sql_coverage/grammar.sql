@@ -78,7 +78,21 @@
 {_instrings |= "_inpairofstrings"}
 --{_instrings |= "_insomefixedstrings"}
 
+
+{_integervalue |= "_value[int]"}
+
 {_numericvalue |= "_value[int]"}
+
+{_integercolumnpredicate |= "_variable[numeric] _cmp _numericvalue"}
+--{_integercolumnpredicate |= "_inints"}
+
+{_integercolumnpredicatepair |= "( (_maybe _integercolumnpredicate) _logicop (_maybe _integercolumnpredicate) )"}
+
+{_integercolumnpredicatepairorless |= "_integercolumnpredicate"}
+{_integercolumnpredicatepairorless |= "_integercolumnpredicatepair"}
+
+{_integercolumnpredicatetriple |= "( _integercolumnpredicatepair )  _logicop (_maybe _integercolumnpredicate) )"}
+
 --HSQL and VoltDB disagree about how to make mixed types agree when comparing int columns
 -- to float/decimal constants.
 --{_numericvalue |= "_value[float]"}

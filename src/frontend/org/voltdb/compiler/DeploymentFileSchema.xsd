@@ -87,13 +87,13 @@
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
     <xs:simpleType name="elasticPauseType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
       <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
@@ -119,13 +119,14 @@
                 <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
             </xs:complexType>
         </xs:element>
-        
+
     </xs:all>
   </xs:complexType>
 
   <!-- <security> -->
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
   </xs:complexType>
 
   <!-- <admin-mode> (always enabled.) -->
@@ -294,5 +295,13 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+
+  <!--  Security provider enumeration -->
+  <xs:simpleType name="SecurityProviderString">
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="hash"/>
+        <xs:enumeration value="kerberos"/>
+    </xs:restriction>
+  </xs:simpleType>
 
 </xs:schema>
