@@ -742,7 +742,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
 
         // Construct a snapshot stream receiver
-        m_rejoinSnapshotProcessor = new StreamSnapshotSink(VoltDB.instance().getHostMessenger().createMailbox());
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink(VoltDB.instance().getHostMessenger().createMailbox(), null);
 
         long hsId = m_rejoinSnapshotProcessor.initialize(1, null);
 

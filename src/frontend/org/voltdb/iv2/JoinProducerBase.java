@@ -82,8 +82,16 @@ public abstract class JoinProducerBase extends SiteTasker {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
             if (event.nonce.equals(m_snapshotNonce)) {
-                getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
-                        + "Snapshot txnId is: " + event.multipartTxnId);
+                try {
+                    getLogger().info(m_whoami + "counting down snapshot monitor completion. "
+                            + "Snapshot txnId is: " + event.multipartTxnId);
+                    System.out.println(m_whoami + "counting down snapshot monitor completion. "
+                            + "Snapshot txnId is: " + event.multipartTxnId);
+                    System.out.flush();
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
                 deregister();
                 kickWatchdog(false);
                 m_future.set(event);
@@ -157,6 +165,14 @@ public abstract class JoinProducerBase extends SiteTasker {
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
+        try {
+            getLogger().info(m_whoami + " setJoinComplete.");
+            System.out.println(m_whoami + " setJoinComplete.");
+            System.out.flush();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
@@ -167,7 +183,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
-    protected abstract void kickWatchdog(boolean rearm);
+    public abstract void kickWatchdog(boolean rearm);
 
     public abstract boolean acceptPromotion();
 

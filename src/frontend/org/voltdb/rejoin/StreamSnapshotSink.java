@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -33,8 +32,11 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Takes the decompressed snapshot blocks and pass them to EE. Once constructed,
@@ -57,6 +59,7 @@ public class StreamSnapshotSink {
     // Schemas of the tables
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     private long m_bytesReceived = 0;
+    private final JoinProducerBase m_joinProducer;
 
     /**
      * A piece of work that can be restored on the site receiving the data.
@@ -113,10 +116,11 @@ public class StreamSnapshotSink {
         }
     }
 
-    public StreamSnapshotSink(Mailbox mb)
+    public StreamSnapshotSink(Mailbox mb, JoinProducerBase joinProducer)
     {
         Preconditions.checkArgument(mb != null);
         m_mb = mb;
+        m_joinProducer = joinProducer;
     }
 
     public long initialize(int sourceCount, FixedDBBPool bufferPool) {
@@ -247,6 +251,9 @@ public class StreamSnapshotSink {
                 // End of stream, no need to ack this buffer
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
+                    System.out.println("Got END message for site");
+                    System.out.flush();
+                    m_joinProducer.kickWatchdog(true);
                 }
             }
             else if (type == StreamSnapshotMessageType.SCHEMA) {

@@ -201,13 +201,21 @@ public class RejoinProducer extends JoinProducerBase {
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
     @Override
-    protected void kickWatchdog(boolean rearm)
+    public void kickWatchdog(boolean rearm)
     {
         if (m_rejoinSiteProcessor.isEOF()) {
             synchronized (m_activeRejoinSites) {
+                System.out.println("EOF stream for " + m_whoami);
+                for (Integer i : m_activeRejoinSites) {
+                    System.out.println("  remaining: " + String.valueOf(i));
+                }
+                System.out.flush();
+
                 boolean removed = m_activeRejoinSites.remove(m_partitionId);
-                if (removed && m_activeRejoinSites.size() == 0) {
+                if (removed && m_activeRejoinSites.size() > 0) {
                     rearm = false;
+                    System.out.println("Canceling a rearm for " + m_whoami);
+                    System.out.flush();
                 }
             }
         }
@@ -232,7 +240,7 @@ public class RejoinProducer extends JoinProducerBase {
     {
         m_coordinatorHsId = message.m_sourceHSId;
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb, this);
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
