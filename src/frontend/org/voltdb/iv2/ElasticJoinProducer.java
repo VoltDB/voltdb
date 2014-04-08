@@ -66,7 +66,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         super(partitionId, "Elastic join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
+        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb, this);
     }
 
     /*
@@ -193,7 +193,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    protected void kickWatchdog(boolean rearm)
+    public void kickWatchdog(boolean rearm)
     {
 
     }
