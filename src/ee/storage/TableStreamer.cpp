@@ -50,6 +50,21 @@ TableStreamer::TableStreamer(int32_t partitionId, PersistentTable &table, Catalo
 TableStreamer::~TableStreamer()
 {}
 
+TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+{
+    TableStreamer* the_clone = new TableStreamer(m_partitionId, surgeon.getTable(), m_tableId);
+    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        assert(streamPtr != NULL);
+        boost::shared_ptr<TableStreamerContext> cloned_context;
+        cloned_context.reset(streamPtr->m_context->cloneForTruncatedTable(surgeon));
+        if (cloned_context != NULL) {
+            the_clone->m_streams.push_back(StreamPtr(new Stream(streamPtr->m_streamType,
+                                                                cloned_context)));
+        }
+    }
+    return the_clone;
+}
+
 /**
  * activateStream() knows how to create streams based on type.
  * Context classes determine whether or not reactivation is allowed.
