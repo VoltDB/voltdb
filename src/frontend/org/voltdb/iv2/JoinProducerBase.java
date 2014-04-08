@@ -157,7 +157,6 @@ public abstract class JoinProducerBase extends SiteTasker {
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
-        kickWatchdog(false);
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 

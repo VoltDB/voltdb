@@ -18,6 +18,8 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +52,10 @@ public class RejoinProducer extends JoinProducerBase {
     private ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
+
+    // number of instances of this class in the process... increment for each instance
+    // last one alive sets the timeout
+    private static final Set<Integer> m_activeRejoinSites = new HashSet<>();
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -137,6 +143,9 @@ public class RejoinProducer extends JoinProducerBase {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
+        synchronized (m_activeRejoinSites) {
+            m_activeRejoinSites.add(partitionId);
+        }
         REJOINLOG.debug(m_whoami + "created.");
     }
 
@@ -194,6 +203,15 @@ public class RejoinProducer extends JoinProducerBase {
     @Override
     protected void kickWatchdog(boolean rearm)
     {
+        if (m_rejoinSiteProcessor.isEOF()) {
+            synchronized (m_activeRejoinSites) {
+                boolean removed = m_activeRejoinSites.remove(m_partitionId);
+                if (removed && m_activeRejoinSites.size() == 0) {
+                    rearm = false;
+                }
+            }
+        }
+
         synchronized (this) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
