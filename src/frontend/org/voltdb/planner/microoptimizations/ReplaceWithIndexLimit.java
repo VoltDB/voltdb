@@ -32,6 +32,7 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -136,6 +137,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 return plan;
             }
 
+            if (((AbstractScanPlanNode)child).isSubQuery()) {
+                return plan;
+            }
+
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
             Index ret = findQualifiedIndex(((SeqScanPlanNode)child), aggExpr, bindings);
@@ -176,6 +181,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // we added for reverse scan purpose only
         if (((IndexScanPlanNode)child).getPredicate() != null &&
                 !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+            return plan;
+        }
+
+        // Guard against (possible future?) cases of indexable subquery.
+        if (((AbstractScanPlanNode)child).isSubQuery()) {
             return plan;
         }
 

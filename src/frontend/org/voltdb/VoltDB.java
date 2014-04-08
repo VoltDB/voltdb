@@ -32,6 +32,7 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.types.TimestampType;
@@ -121,7 +122,7 @@ public class VoltDB {
         public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
-        public String m_pathToLicense = "license.xml";
+        public String m_pathToLicense = null;
 
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
@@ -701,6 +702,9 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        try {
+            OnDemandBinaryLogger.flush();
+        } catch (Throwable e) {}
 
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until

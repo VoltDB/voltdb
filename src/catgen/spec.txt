@@ -42,6 +42,7 @@ begin Database          "A set of schema, procedures and other metadata that tog
   Procedure* procedures "The set of stored procedures/transactions for this database"
   Connector* connectors  "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  string securityprovider "The security provider used to authenticate users"
 end
 
 begin CommandLog "Configuration for a command log"

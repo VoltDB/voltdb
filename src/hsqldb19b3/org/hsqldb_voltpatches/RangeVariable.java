@@ -500,7 +500,14 @@ final class RangeVariable {
      */
     void addIndexCondition(Expression[] exprList, Index index, int colCount,
                            boolean isJoin) {
-
+// VoltDB extension
+        if (rangeIndex == index && isJoinIndex && (!isJoin) &&
+                (multiColumnCount > 0) && (colCount == 0)) {
+            // This is one particular set of conditions which broke the classification of
+            // ON and WHERE clauses.
+            return;
+        }
+// End of VoltDB extension
         rangeIndex  = index;
         isJoinIndex = isJoin;
 

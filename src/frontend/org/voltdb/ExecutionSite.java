@@ -25,6 +25,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1121,22 +1122,26 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId,
+        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, txnId,
                                         exportSequenceNumbers);
     }
 
     /*
-     * Do snapshot work exclusively until there is no more. Also blocks
-     * until the syncing and closing of snapshot data targets has completed.
-     */
+         * Do snapshot work exclusively until there is no more. Also blocks
+         * until the syncing and closing of snapshot data targets has completed.
+         */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(m_systemProcedureContext);
     }
 
+    @Override
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets)
+    {
+
+    }
 
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
