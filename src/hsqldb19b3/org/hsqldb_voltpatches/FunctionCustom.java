@@ -533,9 +533,6 @@ public class FunctionCustom extends FunctionSQL {
 
             case FUNC_REPLACE :
                 parseList = tripleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             default :

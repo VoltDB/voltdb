@@ -2205,6 +2205,47 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("foofoofoo", result.getString(1));
     }
 
+    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Replace");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("REPLACE", "o", "XX", 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("fXXXX", result.getString(1));
+
+        result = client.callProcedure("REPLACE", "o", null, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("f", result.getString(1));
+
+        result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("foo", result.getString(1));
+
+        result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("Vo", result.getString(1));
+
+
+        // UTF-8 String
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("REPLACE", "鑫", "XX", 2).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("贾XX@VoltDB", result.getString(1));
+    }
+
+
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
@@ -2821,6 +2862,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
 
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
