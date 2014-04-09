@@ -69,6 +69,7 @@ TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurg
             char errMsg[1024];
             snprintf(errMsg, 1024, "Received an unrecognized return value %jd from handleStreamMore()", retCode);
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+            break;
         }
     }
 
