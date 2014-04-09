@@ -378,6 +378,47 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     return getTempStringValue(inputStr.c_str(), inputStr.length());
 }
 
+/** implement the 3-argument SQL REPLACE function */
+template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 3);
+
+    char* ptr;
+    const NValue& str0 = arguments[0];
+    if (str0.isNull()) {
+        return getNullStringValue();
+    }
+    if (str0.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (str0.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    ptr = reinterpret_cast<char*>(str0.getObjectValue_withoutNull());
+    int32_t length = str0.getObjectLength_withoutNull();
+    std::string targetStr = std::string(ptr, length);
+
+
+    const NValue& str1 = arguments[1];
+    if (str1.isNull()) {
+        return getTempStringValue(targetStr.c_str(), targetStr.length());
+    }
+    if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    ptr = reinterpret_cast<char*>(str1.getObjectValue_withoutNull());
+    std::string matchStr = std::string(ptr, str1.getObjectLength_withoutNull());
+
+    std::string replaceStr = "";
+    const NValue& str2 = arguments[2];
+    if (!str2.isNull()) {
+        if (str2.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (str2.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        ptr = reinterpret_cast<char*>(str2.getObjectValue_withoutNull());
+        replaceStr = std::string(ptr, str2.getObjectLength_withoutNull());
+    }
+
+    boost::algorithm::replace_all(targetStr, matchStr, replaceStr);
+    return getTempStringValue(targetStr.c_str(), targetStr.length());
+}
+
 /** implement the 3-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
