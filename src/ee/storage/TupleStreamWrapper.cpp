@@ -344,8 +344,8 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
     if (spHandle < m_openSpHandle)
     {
         throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %ld, while the append spHandle is %ld",
-                m_openSpHandle, spHandle
+                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle
                 );
     }
 
