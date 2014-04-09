@@ -88,6 +88,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <logger name="kafka">
+        <level value="FATAL"/>
+    </logger>
+
     <!-- Always let dragent to write to the console. -->
     <logger name="DRAGENT">
         <level value="INFO"/>

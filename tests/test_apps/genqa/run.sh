@@ -33,7 +33,9 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 EXPORTDATA="exportdata"
 EXPORTDATAREMOTE="localhost:${PWD}/${EXPORTDATA}"
+KAFKATOPIC="voltdbexportEXPORT_PARTITIONED_TABLE"
 CLIENTLOG="clientlog"
+KAFKALIBS="`pwd`/kafkazk/zkclient-0.3.jar:`pwd`/kafkazk/zookeeper-3.3.4.jar"
 
 # remove build artifacts
 function clean() {
@@ -90,6 +92,13 @@ function server-pg() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function server-kafka() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -169,7 +178,7 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=900 \
+        --duration=90 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
@@ -224,6 +233,12 @@ function export-on-server-verify() {
         $EXPORTDATAREMOTE \
         4 \
         $CLIENTLOG
+}
+
+function export-kafka-verify() {
+    cp="obj:$CLASSPATH:$KAFKALIBS"
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath $cp genqa.ExportKafkaOnServerVerifier \
+        localhost:9092 localhost:7181 $KAFKATOPIC true
 }
 
 function help() {

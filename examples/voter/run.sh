@@ -82,6 +82,18 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
+# run server with export kafka on.
+function server-kafka() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "$VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo
+    $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
 # run the voltdb server locally
 function rejoin() {
     # if a catalog doesn't exist, build one
