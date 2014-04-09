@@ -48,6 +48,7 @@ public class EstTimeUpdater {
     };
 
     static {
+        updater.setDaemon(true);
         updater.start();
     }
 
