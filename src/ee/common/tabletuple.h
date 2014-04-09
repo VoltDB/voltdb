@@ -538,9 +538,10 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
         throwFatalException( "%s", message.str().c_str());
     }
 #endif
+    // copy the data AND the isActive flag
+    ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
     if (uninlineableObjectColumnCount > 0) {
-        // copy the data AND the isActive flag
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+
         /*
          * Copy each uninlined string column doing an allocation for string copies.
          */
@@ -552,9 +553,6 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
                     pool);
         }
         m_data[0] = source.m_data[0];
-    } else {
-        // copy the data AND the isActive flag
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
     }
 }
 

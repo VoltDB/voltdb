@@ -1338,11 +1338,6 @@ public class DDLCompiler {
         String defaultvalue = null;
         String defaulttype = null;
 
-        boolean inBytes = false;
-        if (node.attributes.containsKey("bytes")) {
-            inBytes = Boolean.valueOf(node.attributes.get("bytes"));
-        }
-
         int defaultFuncID = -1;
 
         // Default Value
@@ -1396,6 +1391,11 @@ public class DDLCompiler {
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
+
+        boolean inBytes = false;
+        if (node.attributes.containsKey("bytes")) {
+            inBytes = Boolean.valueOf(node.attributes.get("bytes"));
+        }
         column.setInbytes(inBytes);
 
         column.setType(type.getValue());

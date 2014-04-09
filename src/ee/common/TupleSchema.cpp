@@ -304,7 +304,7 @@ uint16_t TupleSchema::countUninlineableObjectColumns(
     for (int ii = 0; ii < numColumns; ii++) {
         ValueType vt = columnTypes[ii];
         if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
-            if (columnInBytes[ii] || columnTypes[ii] == VALUE_TYPE_VARBINARY) {
+            if (columnInBytes[ii] || vt == VALUE_TYPE_VARBINARY) {
                 if (columnSizes[ii] >= UNINLINEABLE_OBJECT_LENGTH) {
                     numUninlineableObjects++;
                 }

@@ -477,7 +477,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
             }
 
-            if (m_valueType == VoltType.STRING && m_inBytes) {
+            if (m_inBytes) {
+                assert(m_valueType == VoltType.STRING);
                 stringer.key(Members.IN_BYTES.name()).value(true);
             }
         }

@@ -1540,7 +1540,7 @@ class NValue {
         return &valueChars[i];
     }
 
-    static inline bool validVarcharSize (const char *valueChars, const size_t length, const int32_t maxLength) {
+    static inline bool validVarcharSize(const char *valueChars, const size_t length, const int32_t maxLength) {
         int32_t min_continuation_bytes = static_cast<int32_t>(length - maxLength);
         if (min_continuation_bytes <= 0) {
             return true;
@@ -2710,14 +2710,14 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
-            if (!isNull()) {
-                int objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
-            }
-
             if (m_sourceInlined) {
                 throwDynamicSQLException(
                         "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
+            }
+
+            if (!isNull()) {
+                int objLength = getObjectLength_withoutNull();
+                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
             }
 
             // copy the StringRef pointers, even for NULL case.

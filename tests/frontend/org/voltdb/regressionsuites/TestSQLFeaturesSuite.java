@@ -638,6 +638,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         var = "贾鑫";
         try {
+            // assert here that this two-character string decodes via UTF8 to a bytebuffer longer than 2 bytes.
+            assertEquals(2, var.length());
+            assertEquals(6, var.getBytes("UTF-8").length);
             client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
             fail();
         } catch(Exception ex) {

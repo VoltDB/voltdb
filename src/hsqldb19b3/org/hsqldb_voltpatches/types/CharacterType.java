@@ -60,7 +60,7 @@ public class CharacterType extends Type {
     boolean           isEqualIdentical;
     final static int  sqlDefaultCharPrecision = 1;
     static final long maxCharacterPrecision   = Integer.MAX_VALUE;
-    // A VoltDB extension to support the character in bytes.
+    // A VoltDB extension to support character columns sized in bytes
     public boolean           inBytes = false;
     // End of VoltDB extension
 
