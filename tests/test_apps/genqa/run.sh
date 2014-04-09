@@ -177,7 +177,7 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=90 \
+        --duration=900 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
