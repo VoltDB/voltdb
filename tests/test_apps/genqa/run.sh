@@ -35,7 +35,6 @@ EXPORTDATA="exportdata"
 EXPORTDATAREMOTE="localhost:${PWD}/${EXPORTDATA}"
 KAFKATOPIC="voltdbexportEXPORT_PARTITIONED_TABLE"
 CLIENTLOG="clientlog"
-KAFKALIBS="`pwd`/kafkazk/zkclient-0.3.jar:`pwd`/kafkazk/zookeeper-3.3.4.jar"
 
 # remove build artifacts
 function clean() {
@@ -236,7 +235,7 @@ function export-on-server-verify() {
 }
 
 function export-kafka-verify() {
-    cp="obj:$CLASSPATH:$KAFKALIBS"
+    cp="obj:$CLASSPATH"
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath $cp genqa.ExportKafkaOnServerVerifier \
         localhost:9092 localhost:7181 $KAFKATOPIC true
 }
