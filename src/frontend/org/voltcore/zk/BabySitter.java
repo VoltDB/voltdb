@@ -17,8 +17,8 @@
 
 package org.voltcore.zk;
 
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -175,7 +175,14 @@ public class BabySitter
     {
         Stat stat = new Stat();
         List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
-        Collections.sort(zkchildren);
+        // Sort on the ephemeral sequential part, the prefix is not padded, so string sort doesn't work
+        Collections.sort(zkchildren, new Comparator<String>() {
+            @Override
+            public int compare(String left, String right)
+            {
+                return CoreZK.getSuffixFromChildName(left).compareTo(CoreZK.getSuffixFromChildName(right));
+            }
+        });
         m_children = ImmutableList.copyOf(zkchildren);
         return m_children;
     }
