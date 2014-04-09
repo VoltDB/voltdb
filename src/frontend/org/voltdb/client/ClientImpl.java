@@ -97,9 +97,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
-                config.m_useClientAffinity);
+                config.m_useClientAffinity,
+                config.m_subject);
         m_distributer.addClientStatusListener(new CSL());
-        m_username = config.m_username;
+        String username = config.m_username;
+        if (config.m_subject != null) {
+            username = config.m_subject.getPrincipals().iterator().next().getName();
+        }
+        m_username = username;
 
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);

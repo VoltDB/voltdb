@@ -29,10 +29,12 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
@@ -531,6 +533,12 @@ public class MockVoltDB implements VoltDBInterface
                 return true;
             }
         };
+    }
+
+    @Override
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
+    {
+        return null;
     }
 
     @Override

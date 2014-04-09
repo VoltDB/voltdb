@@ -131,6 +131,7 @@ public:
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
+    void initTableStreamer(TableStreamerInterface* streamer);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
     ElasticIndex::iterator indexIteratorLowerBound(int32_t lowerBound);
@@ -518,7 +519,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
-  private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
@@ -686,7 +686,13 @@ inline uint32_t PersistentTableSurgeon::getTupleCount() const {
     return m_table.m_tupleCount;
 }
 
+inline void PersistentTableSurgeon::initTableStreamer(TableStreamerInterface* streamer) {
+    assert(m_table.m_tableStreamer == NULL);
+    m_table.m_tableStreamer.reset(streamer);
+}
+
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
+    assert(m_table.m_tableStreamer != NULL);
     return m_table.m_tableStreamer->hasStreamType(streamType);
 }
 

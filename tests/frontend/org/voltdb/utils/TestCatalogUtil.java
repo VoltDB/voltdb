@@ -397,6 +397,40 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(cluster.getSecurityenabled());
     }
 
+    public void testSecurityProvider() throws Exception
+    {
+        final String secOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
+            "</deployment>";
+
+        final String secOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\" provider=\"kerberos\"/>" +
+            "</deployment>";
+
+        final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOff.getPath(), true, false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        Database db = cluster.getDatabases().get("database");
+        assertTrue(cluster.getSecurityenabled());
+        assertEquals("hash", db.getSecurityprovider());
+
+        setUp();
+        final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOn.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        db = cluster.getDatabases().get("database");
+        assertTrue(cluster.getSecurityenabled());
+        assertEquals("kerberos", db.getSecurityprovider());
+    }
+
     public void testUserRoles() throws Exception {
         final String depRole = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
