@@ -186,9 +186,9 @@ public class SnapshotSaveAPI
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
                 synchronized (m_createLock) {
-                    SNAP_LOG.info("Found tasks for HSIds: " +
+                    SNAP_LOG.debug("Found tasks for HSIds: " +
                             CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
-                    SNAP_LOG.info("Looking for local HSID: " +
+                    SNAP_LOG.debug("Looking for local HSID: " +
                             CoreUtils.hsIdToString(context.getSiteId()));
                     Deque<SnapshotTableTask> taskList = m_taskListsForHSIds.remove(context.getSiteId());
                     // If createSetup failed, then the first site to reach here is going
@@ -211,7 +211,7 @@ public class SnapshotSaveAPI
                         }
                     }
                     else if (taskList == null) {
-                        SNAP_LOG.info("No task for this site, block " + block);
+                        SNAP_LOG.debug("No task for this site, block " + block);
                         // This node is participating in the snapshot but this site has nothing to do.
                         // Send back an appropriate empty table based on the block flag
                         if (block != 0) {
@@ -497,7 +497,7 @@ public class SnapshotSaveAPI
             // this snapshot.  We're going to create an empty list of tasks for one of the sites to do
             // so that we'll have a SnapshotSiteProcessor which will do the logSnapshotCompleteToZK.
             if (m_taskListsForHSIds.isEmpty()) {
-                SNAP_LOG.info("Node had no snapshot work to do.  Creating a null task to drive completion.");
+                SNAP_LOG.debug("Node had no snapshot work to do.  Creating a null task to drive completion.");
                 m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
             }
             SNAP_LOG.debug("Planned tasks: " +
