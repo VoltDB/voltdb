@@ -32,7 +32,6 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.UndoAction;
-import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
 
@@ -59,7 +58,6 @@ public class StreamSnapshotSink {
     // Schemas of the tables
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     private long m_bytesReceived = 0;
-    private final JoinProducerBase m_joinProducer;
 
     /**
      * A piece of work that can be restored on the site receiving the data.
@@ -119,11 +117,10 @@ public class StreamSnapshotSink {
         }
     }
 
-    public StreamSnapshotSink(Mailbox mb, JoinProducerBase joinProducer)
+    public StreamSnapshotSink(Mailbox mb)
     {
         Preconditions.checkArgument(mb != null);
         m_mb = mb;
-        m_joinProducer = joinProducer;
     }
 
     public long initialize(int sourceCount, FixedDBBPool bufferPool) {

@@ -18,8 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
@@ -35,6 +32,7 @@ import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
@@ -52,10 +50,6 @@ public class RejoinProducer extends JoinProducerBase {
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
-
-    // number of instances of this class in the process... increment for each instance
-    // last one alive sets the timeout
-    private static final Set<Integer> m_activeRejoinSites = new HashSet<>();
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -119,18 +113,14 @@ public class RejoinProducer extends JoinProducerBase {
     // Run if the watchdog isn't cancelled within the timeout period
     private static class TimerCallback implements Runnable
     {
-        private final String m_whoami;
-
-        TimerCallback(String whoami)
-        {
-            m_whoami = whoami;
-        }
-
         @Override
         public void run()
         {
-            VoltDB.crashLocalVoltDB(m_whoami
-                    + " timed out. Terminating rejoin.", false, null);
+            VoltDB.crashLocalVoltDB(String.format(
+                    "Rejoin process timed out due to no data sent from active nodes for %d seconds  Terminating rejoin.",
+                    StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS / 1000),
+                    false,
+                    null);
         }
     }
 
@@ -143,26 +133,7 @@ public class RejoinProducer extends JoinProducerBase {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
-        synchronized (m_activeRejoinSites) {
-            m_activeRejoinSites.add(partitionId);
-        }
         REJOINLOG.debug(m_whoami + "created.");
-    }
-
-    private static TaskLog initializeForCommunityRejoin()
-    {
-        return new TaskLog() {
-            @Override
-            public void logTask(TransactionInfoBaseMessage message) throws IOException {}
-            @Override
-            public TransactionInfoBaseMessage getNextMessage() throws IOException {return null;}
-            @Override
-            public boolean isEmpty() throws IOException {return true;}
-            @Override
-            public void close() throws IOException {}
-            @Override
-            public void enableRecording() {}
-        };
     }
 
     @Override
@@ -199,27 +170,10 @@ public class RejoinProducer extends JoinProducerBase {
         return REJOINLOG;
     }
 
-    // cancel and maybe rearm the snapshot data-segment watchdog.
+    // cancel and maybe rearm the node-global snapshot data-segment watchdog.
     @Override
-    public void kickWatchdog(boolean rearm)
+    protected void kickWatchdog(boolean rearm)
     {
-        /*if (m_rejoinSiteProcessor.isEOF()) {
-            synchronized (m_activeRejoinSites) {
-                System.out.println("EOF stream for " + m_whoami);
-                for (Integer i : m_activeRejoinSites) {
-                    System.out.println("  remaining: " + String.valueOf(i));
-                }
-                System.out.flush();
-
-                boolean removed = m_activeRejoinSites.remove(m_partitionId);
-                if (removed && m_activeRejoinSites.size() > 0) {
-                    rearm = false;
-                    System.out.println("Canceling a rearm for " + m_whoami);
-                    System.out.flush();
-                }
-            }
-        }*/
-
         synchronized (RejoinProducer.class) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
@@ -227,7 +181,10 @@ public class RejoinProducer extends JoinProducerBase {
             }
             if (rearm) {
                 m_timeFuture = VoltDB.instance().scheduleWork(
-                        new TimerCallback(m_whoami), 60, 0, TimeUnit.SECONDS);
+                        new TimerCallback(),
+                        StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
+                        0,
+                        TimeUnit.MILLISECONDS);
             }
         }
     }
@@ -240,7 +197,7 @@ public class RejoinProducer extends JoinProducerBase {
     {
         m_coordinatorHsId = message.m_sourceHSId;
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb, this);
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);

@@ -82,18 +82,16 @@ public abstract class JoinProducerBase extends SiteTasker {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
             if (event.nonce.equals(m_snapshotNonce)) {
-                try {
-                    getLogger().info(m_whoami + "counting down snapshot monitor completion. "
+                getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
                             + "Snapshot txnId is: " + event.multipartTxnId);
-                    System.out.println(m_whoami + "counting down snapshot monitor completion. "
-                            + "Snapshot txnId is: " + event.multipartTxnId);
-                    System.out.flush();
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                }
                 deregister();
+
+                // Do not re-arm the watchdog.
+                // Once all partitions are done, all watchdogs will be canceled.
+                // In live rejoin, there may be a window between two partitions
+                //  streaming where there is no active watchdog. #TODO
                 kickWatchdog(false);
+
                 m_future.set(event);
             } else {
                 getLogger().debug(m_whoami
@@ -165,14 +163,6 @@ public abstract class JoinProducerBase extends SiteTasker {
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
-        try {
-            getLogger().info(m_whoami + " setJoinComplete.");
-            System.out.println(m_whoami + " setJoinComplete.");
-            System.out.flush();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
@@ -183,7 +173,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
-    public abstract void kickWatchdog(boolean rearm);
+    protected abstract void kickWatchdog(boolean rearm);
 
     public abstract boolean acceptPromotion();
 
