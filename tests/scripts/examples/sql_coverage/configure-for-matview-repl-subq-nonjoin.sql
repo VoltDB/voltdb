@@ -10,7 +10,7 @@
 
 {@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
-{@columnpredicate = "_variable[@comparabletype] _cmp _value[int16]"}
+{@columnpredicate = "_variable[#arg int16] _cmp _value[int16]"}
 {@columntype = "int"}
 {@comparableconstant = "42"}
 {@comparabletype = "numeric"}
