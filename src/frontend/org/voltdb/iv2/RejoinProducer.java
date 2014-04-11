@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
@@ -33,6 +32,7 @@ import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
@@ -47,7 +47,7 @@ public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private final AtomicBoolean m_currentlyRejoining;
-    private ScheduledFuture<?> m_timeFuture;
+    private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
 
@@ -113,18 +113,14 @@ public class RejoinProducer extends JoinProducerBase {
     // Run if the watchdog isn't cancelled within the timeout period
     private static class TimerCallback implements Runnable
     {
-        private final String m_whoami;
-
-        TimerCallback(String whoami)
-        {
-            m_whoami = whoami;
-        }
-
         @Override
         public void run()
         {
-            VoltDB.crashLocalVoltDB(m_whoami
-                    + " timed out. Terminating rejoin.", false, null);
+            VoltDB.crashLocalVoltDB(String.format(
+                    "Rejoin process timed out due to no data sent from active nodes for %d seconds  Terminating rejoin.",
+                    StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS / 1000),
+                    false,
+                    null);
         }
     }
 
@@ -138,22 +134,6 @@ public class RejoinProducer extends JoinProducerBase {
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
         REJOINLOG.debug(m_whoami + "created.");
-    }
-
-    private static TaskLog initializeForCommunityRejoin()
-    {
-        return new TaskLog() {
-            @Override
-            public void logTask(TransactionInfoBaseMessage message) throws IOException {}
-            @Override
-            public TransactionInfoBaseMessage getNextMessage() throws IOException {return null;}
-            @Override
-            public boolean isEmpty() throws IOException {return true;}
-            @Override
-            public void close() throws IOException {}
-            @Override
-            public void enableRecording() {}
-        };
     }
 
     @Override
@@ -190,18 +170,21 @@ public class RejoinProducer extends JoinProducerBase {
         return REJOINLOG;
     }
 
-    // cancel and maybe rearm the snapshot data-segment watchdog.
+    // cancel and maybe rearm the node-global snapshot data-segment watchdog.
     @Override
     protected void kickWatchdog(boolean rearm)
     {
-        synchronized (this) {
+        synchronized (RejoinProducer.class) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
             }
             if (rearm) {
                 m_timeFuture = VoltDB.instance().scheduleWork(
-                        new TimerCallback(m_whoami), 60, 0, TimeUnit.SECONDS);
+                        new TimerCallback(),
+                        StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
+                        0,
+                        TimeUnit.MILLISECONDS);
             }
         }
     }
