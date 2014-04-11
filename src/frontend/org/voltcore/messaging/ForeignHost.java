@@ -57,13 +57,14 @@ public class ForeignHost {
 
     // hold onto the socket so we can kill it
     private final Socket m_socket;
-    private final SocketChannel m_sc;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
-    private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+    private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+
+    public static final int POISON_PILL = -1;
 
     public static final int CRASH_ALL = 0;
     public static final int CRASH_ME = 1;
@@ -128,7 +129,6 @@ public class ForeignHost {
         m_hostId = hostId;
         m_closing = false;
         m_isUp = true;
-        m_sc = socket;
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
@@ -317,7 +317,7 @@ public class ForeignHost {
 
         final long sourceHSId = in.getLong();
         final int destCount = in.getInt();
-        if (destCount == -1) {//This is a poison pill
+        if (destCount == POISON_PILL) {//This is a poison pill
             //Ignore poison pill during shutdown, in tests we receive crash messages from
             //leader appointer during shutdown
             if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
@@ -384,7 +384,7 @@ public class ForeignHost {
         ByteBuffer message = ByteBuffer.allocate(24 + errBytes.length);
         message.putInt(message.capacity() - 4);
         message.putLong(-1);
-        message.putInt(-1);
+        message.putInt(POISON_PILL);
         message.putInt(errBytes.length);
         message.put(errBytes);
         message.putInt(cause);
