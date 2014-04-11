@@ -551,4 +551,9 @@ public class MockVoltDB implements VoltDBInterface
     public long getClusterUptime() {
         return 0;
     }
+
+    @Override
+    public void halt() {
+        assert (true);
+    }
 }

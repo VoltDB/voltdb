@@ -118,6 +118,11 @@ public interface VoltDBInterface
     public boolean isRunning();
 
     /**
+     * Halt a node used by @StopNode
+     */
+    public void halt();
+
+    /**
      * @return The number of milliseconds the cluster has been up
      */
     public long getClusterUptime();
