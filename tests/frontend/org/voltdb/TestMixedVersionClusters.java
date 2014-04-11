@@ -72,7 +72,7 @@ public class TestMixedVersionClusters {
 
         boolean killAndRejoin(String version, String regexMatcher) {
             try {
-                m_cluster.shutDownSingleHost(2);
+                m_cluster.killSingleHost(2);
                 // just set the override for the last host
                 m_cluster.setOverridesForHotfix(new String[] {"", "", version},
                                                 new String[] {"", "", regexMatcher});

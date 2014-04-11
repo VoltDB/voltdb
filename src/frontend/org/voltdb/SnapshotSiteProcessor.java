@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -156,7 +157,7 @@ public class SnapshotSiteProcessor {
      * of targets in case this EE ends up being the one that needs
      * to close each target.
      */
-    private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
+    private volatile ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
     /**
      * Map of tasks for tables that still need to be snapshotted.
@@ -353,7 +354,6 @@ public class SnapshotSiteProcessor {
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
     {
@@ -364,16 +364,8 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotTxnId = txnId;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
-        m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-
-        for (final SnapshotDataTarget target : targets) {
-            if (target.needsFinalClose()) {
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(target);
-            }
-        }
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -402,14 +394,23 @@ public class SnapshotSiteProcessor {
         for (Collection<SnapshotTableTask> perTableTasks : m_snapshotTableTasks.asMap().values()) {
             maxTableTaskSize = Math.max(maxTableTaskSize, perTableTasks.size());
         }
-
-        // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
-        // the snapshot will never finish.
-        queueInitialSnapshotTasks(now);
     }
 
-    private void queueInitialSnapshotTasks(long now)
+    /**
+     * This is called from the snapshot IO thread when the deferred setup is finished. It sets
+     * the data targets and queues a snapshot task onto the site thread.
+     */
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
+        for (final SnapshotDataTarget target : targets) {
+            if (target.needsFinalClose()) {
+                targetsToClose.add(target);
+            }
+        }
+        m_snapshotTargets = targetsToClose;
+
+        // Queue the first snapshot task
         VoltDB.instance().schedulePriorityWork(
                 new Runnable() {
                     @Override
@@ -524,6 +525,10 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks == null) {
             return retval;
+        }
+
+        if (m_snapshotTargets == null) {
+            return null;
         }
 
         /*
@@ -660,10 +665,12 @@ public class SnapshotSiteProcessor {
                             }
                         } finally {
                             try {
-                                logSnapshotCompleteToZK(
-                                        txnId,
-                                        m_lastSnapshotSucceded,
-                                        exportSequenceNumbers);
+                                VoltDB.instance().getHostMessenger().getZK().delete(
+                                        VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+                            } catch (NoNodeException e) {
+                                SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                             } finally {
                                 /**
                                  * Remove this last site from the set here after the terminator has run
@@ -671,9 +678,16 @@ public class SnapshotSiteProcessor {
                                  * everything is on disk for the previous snapshot. This prevents a really long
                                  * snapshot initiation procedure from occurring because it has to contend for
                                  * filesystem resources
+                                 *
+                                 * Do this before logSnapshotCompleteToZK() because the ZK operations are slow,
+                                 * and they can trigger snapshot completion interests to fire before this site
+                                 * removes itself from the set. The next snapshot request may come in and see
+                                 * this snapshot is still in progress.
                                  */
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
+
+                            logSnapshotCompleteToZK(txnId, m_lastSnapshotSucceded, exportSequenceNumbers);
                         }
                     }
                 };
@@ -700,13 +714,23 @@ public class SnapshotSiteProcessor {
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
+        // Timeout after 10 minutes
+        final long endTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
+            if (System.currentTimeMillis() > endTime) {
+                VoltDB.crashLocalVoltDB("Timed out logging snapshot completion to ZK");
+            }
+
             Stat stat = new Stat();
             byte data[] = null;
             try {
                 data = zk.getData(snapshotPath, false, stat);
+            } catch (NoNodeException e) {
+                // The MPI creates the snapshot completion node asynchronously,
+                // if the node doesn't exist yet, retry
+                continue;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
             }
@@ -753,15 +777,6 @@ public class SnapshotSiteProcessor {
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Retrieving list of completed snapshots from ZK should never fail", true, e);
-        }
-
-        try {
-            VoltDB.instance().getHostMessenger().getZK().delete(
-                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
-        } catch (NoNodeException e) {
-            SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 

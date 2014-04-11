@@ -28,6 +28,11 @@ SELECT * FROM @fromtables LHS37 @jointype JOIN @fromtables RHS USING(      @idco
 SELECT @idcol, @numcol FROM @fromtables LHS38 @jointype JOIN @fromtables RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
 SELECT @idcol, @numcol FROM @fromtables LHS39 @jointype JOIN @fromtables RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
 
+--- Outer join with NULL padding.
+SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol = RHS.@idcol AND LHS39.@numcol = RHS.@numcol  WHERE  RHS.@numcol IS NULL
+-- ENG-6113: Hsql has wrong answers on this templates.
+-- SELECT * FROM @fromtables LHS39 @jointype JOIN @fromtables RHS ON  LHS39.@idcol = RHS.@idcol AND LHS39.@numcol = RHS.@numcol  WHERE  LHS39.@numcol IS NULL
+
 --- Three or more table outer join test
 SELECT *               FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
 SELECT @idcol, @numcol FROM @fromtables LHS41 @jointype JOIN @fromtables MHS ON  LHS41.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS41.@numcol = RHS.@numcol
