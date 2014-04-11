@@ -329,6 +329,7 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     assert(arguments.size() == 3);
 
     const NValue& opt = arguments[0];
+    assert(opt.isNull() == false);
     int32_t optArg = static_cast<int32_t>(opt.castAsBigIntAndGetValue());
 
     char* ptr;
@@ -452,6 +453,67 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     const char* startChar = iter.skipCodePoints(start-1);
     const char* endChar = iter.skipCodePoints(length);
     return getTempStringValue(startChar, endChar - startChar);
+}
+
+/** implement the 4-argument SQL OVERLAY function */
+template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 4);
+
+    char* ptr;
+    const NValue& str0 = arguments[0];
+    if (str0.isNull()) {
+        return getNullStringValue();
+    }
+    if (str0.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (str0.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    ptr = reinterpret_cast<char*>(str0.getObjectValue_withoutNull());
+    std::string sourceStr = std::string(ptr, str0.getObjectLength_withoutNull());
+
+    const NValue& str1 = arguments[1];
+    if (str1.isNull()) {
+        return getTempStringValue(sourceStr.c_str(), sourceStr.length());
+    }
+    if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    ptr = reinterpret_cast<char*>(str1.getObjectValue_withoutNull());
+    std::string insertStr = std::string(ptr, str1.getObjectLength_withoutNull());
+
+    const NValue& startArg = arguments[2];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+    int64_t start;
+    if (startArg.getValueType() == VALUE_TYPE_DOUBLE) {
+        start = static_cast<int64_t>(std::floor(startArg.castAsDoubleAndGetValue()));
+    } else {
+        start = startArg.castAsBigIntAndGetValue();
+    }
+    start -= 1;
+    if (start < 0 || start > sourceStr.length()) {
+        throw SQLException(SQLException::dynamic_sql_error, "SQL OVERLAY exception:  "
+                        "start position at " + std::to_string(start) + " is out of range.");
+    }
+
+    const NValue& lengthArg = arguments[3];
+    if (lengthArg.isNull()) {
+        return getNullStringValue();
+    }
+    int64_t length;
+    if (lengthArg.getValueType() == VALUE_TYPE_DOUBLE) {
+        length = static_cast<int64_t>(std::floor(lengthArg.castAsDoubleAndGetValue()));
+    } else {
+        length = lengthArg.castAsBigIntAndGetValue();
+    }
+    if (length < 0) {
+        throw SQLException(SQLException::dynamic_sql_error, "SQL OVERLAY exception:  "
+                        "unsupported negative length " + std::to_string(length));
+    }
+
+    sourceStr.erase(start, length);
+    sourceStr.insert(start, insertStr);
+    return getTempStringValue(sourceStr.c_str(), sourceStr.length());
 }
 
 }

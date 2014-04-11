@@ -2086,7 +2086,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING test Space");
+        System.out.println("STARTING test Trim");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
@@ -2245,6 +2245,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
+    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Overlay");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "Jia", 4, 7, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+    }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
@@ -2863,6 +2878,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 

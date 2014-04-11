@@ -384,6 +384,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_REPLACE:
             ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
             break;
+        case FUNC_OVERLAY_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
+            break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
