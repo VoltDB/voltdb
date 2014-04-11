@@ -245,7 +245,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         std::string str = message.str();
         LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
 
-        m_tableStreamer.reset(originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon));
+        originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
     }
 
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
@@ -1029,16 +1029,7 @@ bool PersistentTable::activateStream(
      */
     assert(m_tableStreamer == NULL || partitionId == m_tableStreamer->getPartitionID());
     if (m_tableStreamer == NULL) {
-        std::stringstream message;
-        message << "Activating table stream for table " << tableId << " partition " << partitionId << std::endl;
-        std::string str = message.str();
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
         m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
-    } else {
-        std::stringstream message;
-        message << "Table streamer already existed for table " << tableId << " partition " << partitionId << std::endl;
-        std::string str = message.str();
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
     }
 
     std::vector<std::string> predicateStrings;

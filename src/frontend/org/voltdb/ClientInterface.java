@@ -71,6 +71,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -84,6 +85,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
@@ -100,10 +102,12 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
@@ -127,12 +131,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
 
     // reasons a connection can fail
-    public static final byte AUTHENTICATION_FAILURE = -1;
-    public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
-    public static final byte WIRE_PROTOCOL_TIMEOUT_ERROR = 2;
-    public static final byte WIRE_PROTOCOL_FORMAT_ERROR = 3;
-    public static final byte AUTHENTICATION_FAILURE_DUE_TO_REJOIN = 4;
-    public static final byte EXPORT_DISABLED_REJECTION = 5;
+    public static final byte AUTHENTICATION_FAILURE = Constants.AUTHENTICATION_FAILURE;
+    public static final byte MAX_CONNECTIONS_LIMIT_ERROR = Constants.MAX_CONNECTIONS_LIMIT_ERROR;
+    public static final byte WIRE_PROTOCOL_TIMEOUT_ERROR = Constants.WIRE_PROTOCOL_TIMEOUT_ERROR;
+    public static final byte WIRE_PROTOCOL_FORMAT_ERROR = Constants.WIRE_PROTOCOL_FORMAT_ERROR;
+    public static final byte AUTHENTICATION_FAILURE_DUE_TO_REJOIN = Constants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN;
+    public static final byte EXPORT_DISABLED_REJECTION = Constants.EXPORT_DISABLED_REJECTION;
+
+    // authentication handshake codes
+    public static final byte AUTH_HANDSHAKE_VERSION = Constants.AUTH_HANDSHAKE_VERSION;
+    public static final byte AUTH_SERVICE_NAME = Constants.AUTH_SERVICE_NAME;
+    public static final byte AUTH_HANDSHAKE = Constants.AUTH_HANDSHAKE;
 
     // connection IDs used by internal adapters
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
@@ -621,22 +630,61 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             CatalogContext context = m_catalogContext.get();
 
+            AuthProvider ap = null;
+            try {
+                ap = AuthProvider.fromService(service);
+            } catch (IllegalArgumentException unkownProvider) {
+                // handle it bellow
+            }
+
+            if (ap == null) {
+                //Send negative response
+                responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                authLog.warn("Rejected user " + username +
+                        " attempting to use disabled or unconfigured service " +
+                        service + ".");
+                authLog.warn("VoltDB Export services are no longer available through clients.");
+                return null;
+            }
+
             /*
              * Don't use the auth system during recovery. Not safe to use
              * the node to initiate multi-partition txns during recovery
              */
             if (!VoltDB.instance().rejoining()) {
+                AuthenticationRequest arq;
+                if (ap == AuthProvider.KERBEROS) {
+                    arq = context.authSystem.new KerberosAuthenticationRequest(socket);
+                } else {
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
+                }
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = context.authSystem.authenticate(username, password);
+                boolean authenticated = arq.authenticate();
 
                 if (!authenticated) {
-                    authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                 "): user " + username + " failed authentication.");
+                    Exception faex = arq.getAuthenticationFailureException();
+
+                    boolean isItIo = false;
+                    for (Throwable cause = faex; faex != null && !isItIo; cause = cause.getCause()) {
+                        isItIo = cause instanceof IOException;
+                    }
+
+                    if (faex != null) {
+                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                 "):", faex);
+                    } else {
+                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                     "): user " + username + " failed authentication.");
+                    }
                     //Send negative response
-                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                    socket.write(responseBuffer);
+                    if (!isItIo) {
+                        responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                        socket.write(responseBuffer);
+                    }
                     socket.close();
                     return null;
                 }
@@ -653,26 +701,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = null;
-            if (service.equalsIgnoreCase("database")) {
-                handler =
-                    new ClientInputHandler(
-                            username,
-                            m_isAdmin);
-            }
-            else {
-                //Send negative response
-                responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                authLog.warn("Rejected user " + username +
-                        " attempting to use disabled or unconfigured service " +
-                        service + ".");
-                authLog.warn("VoltDB Export services are no longer available through clients.");
-                return null;
-            }
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
 
-            byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
+            byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
             responseBuffer.putInt(30 + buildString.length);//message length
             responseBuffer.put((byte)0);//version

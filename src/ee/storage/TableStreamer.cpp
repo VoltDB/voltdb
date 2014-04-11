@@ -53,6 +53,7 @@ TableStreamer::~TableStreamer()
 TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
 {
     TableStreamer* the_clone = new TableStreamer(m_partitionId, surgeon.getTable(), m_tableId);
+    surgeon.initTableStreamer(the_clone);
     BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
         assert(streamPtr != NULL);
         boost::shared_ptr<TableStreamerContext> cloned_context;
