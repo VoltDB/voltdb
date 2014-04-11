@@ -83,9 +83,15 @@ public abstract class JoinProducerBase extends SiteTasker {
         {
             if (event.nonce.equals(m_snapshotNonce)) {
                 getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
-                        + "Snapshot txnId is: " + event.multipartTxnId);
+                            + "Snapshot txnId is: " + event.multipartTxnId);
                 deregister();
-                kickWatchdog(true);
+
+                // Do not re-arm the watchdog.
+                // Once all partitions are done, all watchdogs will be canceled.
+                // In live rejoin, there may be a window between two partitions
+                //  streaming where there is no active watchdog. #TODO
+                kickWatchdog(false);
+
                 m_future.set(event);
             } else {
                 getLogger().debug(m_whoami
@@ -157,7 +163,6 @@ public abstract class JoinProducerBase extends SiteTasker {
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
-        kickWatchdog(false);
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
