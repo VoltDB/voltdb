@@ -871,19 +871,23 @@ class NValue {
         assert(isNull() == false);
 
         const ValueType type = getValueType();
+        assert(type != VALUE_TYPE_NULL);
         switch (type) {
-        case VALUE_TYPE_BIGINT:
-            return getBigInt();
-        case VALUE_TYPE_INTEGER:
-            return static_cast<int64_t>(getInteger());
         case VALUE_TYPE_TINYINT:
             return static_cast<int64_t>(getTinyInt());
         case VALUE_TYPE_SMALLINT:
             return static_cast<int64_t>(getSmallInt());
-        case VALUE_TYPE_ADDRESS:
+        case VALUE_TYPE_INTEGER:
+            return static_cast<int64_t>(getInteger());
+        case VALUE_TYPE_BIGINT:
             return getBigInt();
         case VALUE_TYPE_TIMESTAMP:
             return getTimestamp();
+        case VALUE_TYPE_DOUBLE:
+            assert(getDouble() <= (double)INT64_MAX  && getDouble() >= (double)VOLT_INT64_MIN);
+            return static_cast<int64_t>(getDouble());
+        case VALUE_TYPE_ADDRESS:
+            return getBigInt();
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
             return 0; // NOT REACHED

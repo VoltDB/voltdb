@@ -2259,6 +2259,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("XinJia", result.getString(1));
 
+        result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4.9, 7, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        // Test NULL results
+        result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", null, 7, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2879,6 +2899,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
+
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 

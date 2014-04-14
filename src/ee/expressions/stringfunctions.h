@@ -484,35 +484,19 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     if (startArg.isNull()) {
         return getNullStringValue();
     }
-    int64_t start;
-    if (startArg.getValueType() == VALUE_TYPE_DOUBLE) {
-        start = static_cast<int64_t>(std::floor(startArg.castAsDoubleAndGetValue()));
-    } else {
-        start = startArg.castAsBigIntAndGetValue();
-    }
+    int64_t start = startArg.castAsBigIntAndGetValue();
     start -= 1;
     if (start < 0 || start > sourceStr.length()) {
-        char message[128];
-        snprintf(message, 128, "data exception -- OVERLAY error, invalid length argument %ld",
-                (long)start);
-        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        return getNullStringValue();
     }
 
     const NValue& lengthArg = arguments[3];
     if (lengthArg.isNull()) {
         return getNullStringValue();
     }
-    int64_t length;
-    if (lengthArg.getValueType() == VALUE_TYPE_DOUBLE) {
-        length = static_cast<int64_t>(std::floor(lengthArg.castAsDoubleAndGetValue()));
-    } else {
-        length = lengthArg.castAsBigIntAndGetValue();
-    }
+    int64_t length = lengthArg.castAsBigIntAndGetValue();
     if (length < 0) {
-        char message[128];
-        snprintf(message, 128, "data exception -- OVERLAY error, negative length argument %ld",
-                (long)length);
-        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        return getNullStringValue();
     }
 
     sourceStr.erase(start, length);
