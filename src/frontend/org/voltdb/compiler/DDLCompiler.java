@@ -1391,16 +1391,14 @@ public class DDLCompiler {
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
-
         boolean inBytes = false;
+        column.setType(type.getValue());
+        column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        int size = type.getMaxLengthInBytes();
         if (node.attributes.containsKey("bytes")) {
             inBytes = Boolean.valueOf(node.attributes.get("bytes"));
         }
         column.setInbytes(inBytes);
-
-        column.setType(type.getValue());
-        column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
-        int size = type.getMaxLengthInBytes();
         // Require a valid length if variable length is supported for a type
         if (type == VoltType.STRING || type == VoltType.VARBINARY) {
             if (sizeString == null) {
@@ -1416,11 +1414,23 @@ public class DDLCompiler {
                 size = MAX_ROW_SIZE / MAX_COLUMNS;
             } else {
                 int userSpecifiedSize = Integer.parseInt(sizeString);
-                if (userSpecifiedSize < 0 || userSpecifiedSize > VoltType.MAX_VALUE_LENGTH) {
+                if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw m_compiler.new VoltCompilerException(msg);
                 }
+                if (node.attributes.containsKey("bytes_changed")) {
+                    assert(inBytes);
+                    assert(Boolean.valueOf(node.attributes.get("bytes_changed")));
+                    if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+                        String msg = "VARCHAR sizes greater than " + VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS +
+                                " will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(" + userSpecifiedSize + " BYTES)";
+                        m_compiler.addWarn(msg);
+                        column.setInbytes(true);
+                    }
+                }
+
                 if (userSpecifiedSize > 0) {
                     size = userSpecifiedSize;
                 } else {
@@ -1434,6 +1444,7 @@ public class DDLCompiler {
             }
         }
         column.setSize(size);
+
 
         column.setDefaultvalue(defaultvalue);
         if (defaulttype != null)

@@ -259,8 +259,8 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(declaredLength);
-            // TODO(xin): VARCHAR expression should have MAX length in CHARACTERs? Discussion?
-            keyColumnInBytes.push_back(false);
+            // Use MAX VARCHAR IN BYTES
+            keyColumnInBytes.push_back(true);
         }
     } else {
         valueCount = scheme.columnIndices.size();

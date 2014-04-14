@@ -40,9 +40,11 @@ import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
@@ -764,6 +766,44 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertFalse(success);
+    }
+
+    public void testDDLWithLongStringInCharacters() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
+        final String simpleSchema1 =
+            "create table books (cash integer default 23, " +
+            "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        assertTrue(warningMsg.contains("VARCHAR sizes greater than "+ VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS +
+                " will be enforced as byte counts rather than UTF8 character counts." +
+                " To eliminate this warning, specify \"VARCHAR("+length+" BYTES)"));
+        Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+        Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
+        assertTrue(var.getInbytes());
     }
 
     public void testNullablePartitionColumn() throws IOException {
