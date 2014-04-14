@@ -1914,17 +1914,10 @@ class NValue {
     }
 
     NValue opAddDecimals(const NValue lhs, const NValue rhs) const {
-        if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
-            (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-        {
-            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal adder.");
-        }
-
-        if (lhs.isNull() || rhs.isNull()) {
-            TTInt retval;
-            retval.SetMin();
-            return getDecimalValue(retval);
-        }
+        assert(lhs.isNull() == false);
+        assert(rhs.isNull() == false);
+        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -1939,8 +1932,10 @@ class NValue {
     }
 
     NValue opSubtractDecimals(const NValue lhs, const NValue rhs) const {
-        assert(lhs.getValueType() != VALUE_TYPE_DECIMAL);
-        assert(rhs.getValueType() != VALUE_TYPE_DECIMAL);
+        assert(lhs.isNull() == false);
+        assert(rhs.isNull() == false);
+        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
         TTInt retval(lhs.getDecimal());
         if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
@@ -3302,7 +3297,8 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
             retval.SetMin();
             return getDecimalValue( retval );
         }
-        return opMultiplyDecimals(*this, rhs);
+        return opMultiplyDecimals(castAsDecimal(),
+                rhs.castAsDecimal());
 
     default:
         break;

@@ -297,41 +297,22 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
     assert(lhs.isNull() == false);
     assert(rhs.isNull() == false);
     assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+    assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
-    if (rhs.getValueType() == VALUE_TYPE_DECIMAL)
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.getDecimal();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
+    TTLInt calc;
+    calc.FromInt(lhs.getDecimal());
+    calc *= rhs.getDecimal();
+    calc /= NValue::kMaxScaleFactor;
+    TTInt retval;
+    if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
+        char message[4096];
+        snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+                lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
+                calc.ToString(10).c_str());
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                           message);
     }
-    else
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.castAsDecimalAndGetValue();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-   }
+    return getDecimalValue(retval);
 }
 
 
@@ -348,6 +329,8 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
  */
 
 NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
+    assert(lhs.isNull() == false);
+    assert(rhs.isNull() == false);
     assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
     assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
 
