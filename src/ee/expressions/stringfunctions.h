@@ -492,8 +492,10 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     }
     start -= 1;
     if (start < 0 || start > sourceStr.length()) {
-        throw SQLException(SQLException::dynamic_sql_error, "SQL OVERLAY exception:  "
-                        "start position at " + std::to_string(start) + " is out of range.");
+        char message[128];
+        snprintf(message, 128, "data exception -- OVERLAY error, invalid length argument %ld",
+                (long)start);
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
     }
 
     const NValue& lengthArg = arguments[3];
@@ -507,8 +509,10 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         length = lengthArg.castAsBigIntAndGetValue();
     }
     if (length < 0) {
-        throw SQLException(SQLException::dynamic_sql_error, "SQL OVERLAY exception:  "
-                        "unsupported negative length " + std::to_string(length));
+        char message[128];
+        snprintf(message, 128, "data exception -- OVERLAY error, negative length argument %ld",
+                (long)length);
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
     }
 
     sourceStr.erase(start, length);
