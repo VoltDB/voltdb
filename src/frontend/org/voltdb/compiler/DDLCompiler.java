@@ -1391,10 +1391,11 @@ public class DDLCompiler {
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
-        boolean inBytes = false;
         column.setType(type.getValue());
-        column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        column.setNullable(Boolean.valueOf(nullable));
         int size = type.getMaxLengthInBytes();
+
+        boolean inBytes = false;
         if (node.attributes.containsKey("bytes")) {
             inBytes = Boolean.valueOf(node.attributes.get("bytes"));
         }
@@ -1419,13 +1420,13 @@ public class DDLCompiler {
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw m_compiler.new VoltCompilerException(msg);
                 }
-                if (node.attributes.containsKey("bytes_changed")) {
-                    assert(inBytes);
-                    assert(Boolean.valueOf(node.attributes.get("bytes_changed")));
+                if (!inBytes) {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
-                        String msg = "VARCHAR sizes greater than " + VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS +
-                                " will be enforced as byte counts rather than UTF8 character counts. " +
-                                "To eliminate this warning, specify \"VARCHAR(" + userSpecifiedSize + " BYTES)";
+                        String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
+                                "will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)",
+                                name, table.getTypeName(),
+                                VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
                         m_compiler.addWarn(msg);
                         column.setInbytes(true);
                     }

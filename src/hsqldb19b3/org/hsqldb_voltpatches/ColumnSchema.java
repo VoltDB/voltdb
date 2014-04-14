@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -337,28 +336,12 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         column.attributes.put("nullable", String.valueOf(isNullable()));
         column.attributes.put("size", String.valueOf(dataType.precision));
 
-        if (typestring.compareTo("VARCHAR") == 0) {
-            int maxLengthInBytes = 1048576;
-            int maxLengthInChars = maxLengthInBytes / 4;
-
-            assert(dataType instanceof CharacterType);
-            CharacterType ct = (CharacterType)dataType;
-            boolean inBytes = ct.inBytes;
-            if (inBytes) {
-                if (dataType.precision > maxLengthInBytes) {
-                    String msg = "VARCHAR column size for column ";
-                    msg += getTableNameString() + "." + columnName.name;
-                    msg += " is > " + maxLengthInBytes + " char in bytes maximum.";
-                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
-                }
-            } else {
-                if (dataType.precision > maxLengthInChars) {
-                    // Give a warning instead in DDLCompiler
-                    inBytes = true;
-                    column.attributes.put("bytes_changed", String.valueOf(true));
-                }
-            }
-            column.attributes.put("bytes", String.valueOf(inBytes));
+        if ((typestring.compareTo("VARCHAR") == 0) &&
+            (dataType.precision > 1048576)) {
+            String msg = "VARCHAR column size for column ";
+            msg += getTableNameString() + "." + columnName.name;
+            msg += " is > 1048576 char maximum.";
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
         }
 
         // see if there is a default value for the column

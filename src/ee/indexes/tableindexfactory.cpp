@@ -238,6 +238,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             if ( ! isIntegralType(exprType)) {
                 isIntsOnly = false;
             }
+            bool inBytes = false;
             uint32_t declaredLength;
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
                 // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
@@ -254,13 +255,14 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 // to reliably determine that the result value is always small enough to "inline".
                 declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
                 isInlinesOrColumnsOnly = false;
+                inBytes = true;
             } else {
                 declaredLength = NValue::getTupleStorageSize(exprType);
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(declaredLength);
             // Use MAX VARCHAR IN BYTES
-            keyColumnInBytes.push_back(true);
+            keyColumnInBytes.push_back(inBytes);
         }
     } else {
         valueCount = scheme.columnIndices.size();

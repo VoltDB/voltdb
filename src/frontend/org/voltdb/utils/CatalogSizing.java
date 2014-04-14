@@ -37,7 +37,7 @@ import org.voltdb.types.IndexType;
  *
  */
 public abstract class CatalogSizing {
-    public static int MAX_BYTES_PER_UTF8_CHARACTER = 4;
+    public final static int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     /**
      * Base class for raw catalog sizes.
