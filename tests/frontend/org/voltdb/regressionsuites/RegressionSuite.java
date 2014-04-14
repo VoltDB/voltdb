@@ -352,46 +352,48 @@ public class RegressionSuite extends TestCase {
     }
 
     static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
-        long start = System.currentTimeMillis();
-        while (true) {
-            Thread.sleep(1000);
-            if (System.currentTimeMillis() - start > 10000) fail("Took too long");
-
-            VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
-            for (VoltTable t: results) { System.out.println(t.toString()); }
-            if (results[0].getRowCount() == 0) continue;
-
-            for (VoltTable vt: results) {
-                while(vt.advanceRow()) {
-                    String name = vt.getString("TABLE_NAME");
-                    if (tableName.equals(name)) {
-                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
-                        return;
-                    }
-                }
-            }
-        }
+        validStatisticsForTableLimitAndPercentage(client, tableName, limit, -1);
     }
 
     static public void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage) throws Exception {
         long start = System.currentTimeMillis();
         while (true) {
+            long lastLimit =-1, lastPercentage = -1;
             Thread.sleep(1000);
-            if (System.currentTimeMillis() - start > 10000) fail("Took too long");
+            if (System.currentTimeMillis() - start > 10000) {
+                String percentageStr = "";
+                if (percentage >= 0) {
+                    percentageStr = ", last seen percentage: " + lastPercentage;
+                }
+                fail("Took too long or have wrong answers: last seen limit: " + lastLimit + percentageStr);
+            }
 
             VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
             for (VoltTable t: results) { System.out.println(t.toString()); }
             if (results[0].getRowCount() == 0) continue;
 
+            boolean foundTargetTuple = false;
+            boolean limitExpected = false;
+            boolean percentageExpected = percentage < 0 ? true: false;
+
             for (VoltTable vt: results) {
                 while(vt.advanceRow()) {
                     String name = vt.getString("TABLE_NAME");
                     if (tableName.equals(name)) {
-                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
-                        assertEquals(percentage, vt.getLong("PERCENT_FULL"));
-                        return;
+                        foundTargetTuple = true;
+                        lastLimit = vt.getLong("TUPLE_LIMIT");
+                        if (limit == lastLimit) {
+                            limitExpected = true;
+                        }
+                        if (percentageExpected || percentage == (lastPercentage = vt.getLong("PERCENT_FULL")) ) {
+                            percentageExpected = true;
+                        }
+
+                        if (limitExpected && percentageExpected) return;
+                        break;
                     }
                 }
+                if (foundTargetTuple) break;
             }
         }
     }
