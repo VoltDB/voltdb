@@ -591,8 +591,6 @@ class NValue {
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
     std::string createStringFromDecimal() const;
-    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
-    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
 
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
@@ -1946,6 +1944,75 @@ class NValue {
                                message);
         }
 
+        return getDecimalValue(retval);
+    }
+
+    /*
+     * Avoid scaling both sides if possible. E.g, don't turn dec * 2 into
+     * (dec * 2*kMaxScale*E-12). Then the result of simple multiplication
+     * is a*b*E-24 and have to further multiply to get back to the assumed
+     * E-12, which can overflow unnecessarily at the middle step.
+     */
+    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
+        assert(lhs.isNull() == false);
+        assert(rhs.isNull() == false);
+        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+
+        TTLInt calc;
+        calc.FromInt(lhs.getDecimal());
+        calc *= rhs.getDecimal();
+        calc /= NValue::kMaxScaleFactor;
+        TTInt retval;
+        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
+            char message[4096];
+            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
+                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
+                    calc.ToString(10).c_str());
+            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                               message);
+        }
+        return getDecimalValue(retval);
+    }
+
+
+    /*
+     * Divide two decimals and return a correctly scaled decimal.
+     * A little cumbersome. Better algorithms welcome.
+     *   (1) calculate the quotient and the remainder.
+     *   (2) temporarily scale the remainder to 19 digits
+     *   (3) divide out remainder to calculate digits after the radix point.
+     *   (4) scale remainder to 12 digits (that's the default scale)
+     *   (5) scale the quotient back to 19,12.
+     *   (6) sum the scaled quotient and remainder.
+     *   (7) construct the final decimal.
+     */
+
+    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const {
+        assert(lhs.isNull() == false);
+        assert(rhs.isNull() == false);
+        assert(lhs.getValueType() == VALUE_TYPE_DECIMAL);
+        assert(rhs.getValueType() == VALUE_TYPE_DECIMAL);
+
+        TTLInt calc;
+        calc.FromInt(lhs.getDecimal());
+        calc *= NValue::kMaxScaleFactor;
+        if (calc.Div(rhs.getDecimal())) {
+            char message[4096];
+            snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
+                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
+            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                               message);
+        }
+        TTInt retval;
+        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
+            char message[4096];
+            snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
+                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
+                    calc.ToString(10).c_str());
+            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                               message);
+        }
         return getDecimalValue(retval);
     }
 
@@ -3333,6 +3400,11 @@ inline NValue NValue::op_divide(const NValue rhs) const {
                 rhs.castAsDoubleAndGetValue());
 
     case VALUE_TYPE_DECIMAL:
+        if (lnull || rnull) {
+            TTInt retval;
+            retval.SetMin();
+            return getDecimalValue( retval );
+        }
         return opDivideDecimals(castAsDecimal(),
                 rhs.castAsDecimal());
 
