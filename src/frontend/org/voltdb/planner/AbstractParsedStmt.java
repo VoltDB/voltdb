@@ -66,10 +66,10 @@ public abstract class AbstractParsedStmt {
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
-    // The parameter TVEs from the correlated expressions. The key is the parameter index.
+    // The parameter expression from the correlated expressions. The key is the parameter index.
     // This map acts as an intermediate storage for the parameter TVE until they are
     // distributed to an appropriate subquery expression where they are originated
-    public Map<Integer, TupleValueExpression> m_parameterTveMap = new HashMap<Integer, TupleValueExpression>();
+    public Map<Integer, AbstractExpression> m_parameterTveMap = new HashMap<Integer, AbstractExpression>();
 
     public ArrayList<Table> m_tableList = new ArrayList<Table>();
 
@@ -294,8 +294,6 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("row")) {
             retval = parseRowExpression(root);
-// ENG-451-MERGE
-//            throw new PlanningErrorException("Unsupported subquery syntax within an expression.");
         }
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
@@ -492,8 +490,6 @@ public abstract class AbstractParsedStmt {
                 tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias, m_stmtId);
             } else {
                 // Temp table always have name SYSTEM_SUBQUERY + hashCode.
-// ENG-451-MERGE
-//                tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias, stmtId);
                 tableScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
             }
             m_tableAliasMap.put(tableAlias, tableScan);
@@ -749,9 +745,6 @@ public abstract class AbstractParsedStmt {
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
-// ENG-451-MERGE
-//        m_tableList.add(tableScan);
-
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
         int nodeId = (m_joinTree == null) ? 0 : m_joinTree.getId() + 1;
@@ -759,7 +752,6 @@ public abstract class AbstractParsedStmt {
         JoinNode leafNode;
         if (tableScan instanceof StmtTargetTableScan) {
             Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
-// ENG-451-MERGE
             m_tableList.add(table);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {

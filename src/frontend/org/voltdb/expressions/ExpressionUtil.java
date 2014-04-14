@@ -248,9 +248,8 @@ public abstract class ExpressionUtil {
             return tves;
         } else if (input instanceof SubqueryExpression) {
             SubqueryExpression subqueryExpr = (SubqueryExpression) input;
-            for(AbstractExpression tve : subqueryExpr.m_args) {
-                assert(tve instanceof TupleValueExpression);
-                tves.add((TupleValueExpression) tve);
+            for(AbstractExpression arg : subqueryExpr.m_args) {
+                tves.addAll(getTupleValueExpressions(arg));
             }
             return tves;
         }

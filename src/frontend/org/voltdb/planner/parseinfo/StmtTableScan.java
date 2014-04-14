@@ -72,21 +72,9 @@ public abstract class StmtTableScan {
         return m_stmtId;
     }
 
-// ENG-451-MERGE
-//    public Set<SchemaColumn> getScanColumns() {
-//        return m_scanColumns;
-//    }
-
     abstract public String getColumnName(int m_columnIndex);
 
     abstract public void processTVE(TupleValueExpression expr, String columnName);
-
-//    public PartitioningForStatement getPartitioning() {
-//        return null;
-//    }
-
-//    // Store a unique list of the columns actually used by this table instance.
-//    protected Set<SchemaColumn> m_scanColumns = new  HashSet<SchemaColumn>();
 
     public void resolveTVE(TupleValueExpression expr, String columnName) {
 

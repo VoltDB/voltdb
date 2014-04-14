@@ -331,18 +331,22 @@ public class PlanAssembler {
 
         // Get the best plans for the expression subqueries ( EXISTS/IN (SELECT...) )
         ParsedResultAccumulator exprSubqueryResult = null;
+        List<AbstractExpression> subqueryExprs = new ArrayList<AbstractExpression>();
         if (parsedStmt.m_joinTree != null) {
             AbstractExpression treeExpr = parsedStmt.m_joinTree.getAllFilters();
             if (treeExpr != null) {
-                List<AbstractExpression> subqueryExprs = new ArrayList<AbstractExpression>();
                 subqueryExprs.addAll(treeExpr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
-                if ( ! subqueryExprs.isEmpty() ) {
-                    exprSubqueryResult = getBestCostPlanForExistsSubQueries(subqueryExprs);
-                    if (exprSubqueryResult == null) {
-                        // There was at least one sub-query and we should have a compiled plan for it
-                        return null;
-                    }
-                }
+            }
+        }
+        if (parsedStmt instanceof ParsedSelectStmt && ((ParsedSelectStmt)parsedStmt).having != null) {
+            subqueryExprs.addAll(
+                    ((ParsedSelectStmt)parsedStmt).having.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+        }
+        if ( ! subqueryExprs.isEmpty() ) {
+            exprSubqueryResult = getBestCostPlanForExistsSubQueries(subqueryExprs);
+            if (exprSubqueryResult == null) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
             }
         }
         boolean hasSubquery = fromSubqueryResult != null || exprSubqueryResult != null;
@@ -470,10 +474,8 @@ public class PlanAssembler {
             hasSignificantOffsetOrLimit |=
                     (( ! parsedResult.m_orderIsDeterministic) && parsedResult.m_hasLimitOrOffset);
 
-            // Remove the coordinator send/receive pair. It will be added later
-            // for the whole plan
             CompiledPlan bestPlan = subqueryExpr.getTable().getBestCostPlan();
-            bestPlan.rootPlanGraph = removeCoordinatorSendReceivePair(bestPlan.rootPlanGraph);
+            subqueryExpr.setSubqueryNode(bestPlan.rootPlanGraph);
             // The subquery plan must not contain Receive/Send nodes because it will be executed
             // multiple times during the parent statement execution.
             if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {

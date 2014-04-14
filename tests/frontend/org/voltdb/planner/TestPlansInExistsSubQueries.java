@@ -37,10 +37,11 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 
-public class TestInExistsSubQueries extends PlannerTestCase {
+public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testExistsWithUserParams() {
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
@@ -104,9 +105,19 @@ public class TestInExistsSubQueries extends PlannerTestCase {
       assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
+    public void testExistsJoin() {
+        AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
+                "exists ( select 1 from r3 where r2.a = r3.a)");
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        pn = pn.getChild(1);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
+        assertTrue(pred != null);
+        assertTrue(pred instanceof SubqueryExpression);
+    }
+
     public void testInAggeregated() {
-//        AbstractPlanNode pn = compile("select * from R1 where A in " +
-//                "(select max(C) from r2)");
         AbstractPlanNode pn = compile("select a, sum(c) as sc1 from r1 where (a, c) in " +
                 "( SELECT a, count(c) as sc2 " +
                 "from  r1  GROUP BY a ORDER BY a DESC) GROUP BY A;");
@@ -120,6 +131,61 @@ public class TestInExistsSubQueries extends PlannerTestCase {
         AbstractExpression expr = ((AggregatePlanNode)sn).getPostPredicate();
         assertTrue(expr != null);
       }
+
+    public void testInHaving() {
+        AbstractPlanNode pn = compile("select a from r1 " +
+                    " group by a having max(c) in (select c from r2 )");
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof AggregatePlanNode);
+        AggregatePlanNode aggpn = (AggregatePlanNode) pn;
+        NodeSchema ns = aggpn.getOutputSchema();
+        assertEquals(2, ns.size());
+        SchemaColumn aggColumn = ns.getColumns().get(1);
+        assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
+        AbstractExpression having = aggpn.getPostPredicate();
+        assertTrue(having instanceof SubqueryExpression);
+        assertEquals(1, having.getArgs().size());
+        assertTrue(having.getArgs().get(0) instanceof TupleValueExpression);
+        TupleValueExpression argTve = (TupleValueExpression) having.getArgs().get(0);
+        assertEquals(1, argTve.getColumnIndex());
+        assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
+
+    }
+
+    public void testHavingInSubqueryHaving() {
+        AbstractPlanNode pn = compile("select a from r1 where c in " +
+                " (select max(c) from r2 group by c having min(a) > 0) ");
+      pn = pn.getChild(0);
+      assertTrue(pn instanceof SeqScanPlanNode);
+      AbstractExpression subquery = ((SeqScanPlanNode)pn).getPredicate();
+      assertEquals(ExpressionType.SUBQUERY, subquery.getExpressionType());
+      pn = ((SubqueryExpression)subquery).getSubqueryNode();
+      pn = pn.getChild(0);
+      assertTrue(pn instanceof AggregatePlanNode);
+      assertEquals(3, ((AggregatePlanNode)pn).getOutputSchema().size());
+      AbstractExpression aggrExpr = ((AggregatePlanNode)pn).getPostPredicate();
+      assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
+    }
+
+
+    // HSQL failed to parse  these statement
+    // commented out for now
+//    public void testHSQLFailed() {
+//        {
+//            AbstractPlanNode pn = compile("select a from r1,r2 where exists (" +
+//                "select 1 from r3 where r1.a = r3.a and r2.a = r3.a)");
+//        }
+//        {
+//            AbstractPlanNode pn = compile("select a from r1 where exists (" +
+//                "select 1 from r2 having max(r1.a + r2.a) in (" +
+//                " select a from r3))");
+//        }
+//        {
+//            AbstractPlanNode pn = compile("select a from r1 group by a " +
+//                " having exists (select c from r2 where r2.c = max(r1.a))");
+//        }
+//    }
+
 
     // Disabled for now
 //    public void testDeleteWhereIn() {
@@ -147,10 +213,10 @@ public class TestInExistsSubQueries extends PlannerTestCase {
 //      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
 //    }
 
-    public void testSendReceiveInSubquery() {
-      failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
-              "Subqueries on partitioned data are only supported in single partition stored procedures.");
-    }
+//    public void testSendReceiveInSubquery() {
+//      failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
+//              "Subqueries on partitioned data are only supported in single partition stored procedures.");
+//    }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();

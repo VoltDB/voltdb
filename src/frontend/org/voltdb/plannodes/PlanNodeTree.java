@@ -294,6 +294,9 @@ public class PlanNodeTree implements JSONString {
                 assert(inlineScan instanceof AbstractScanPlanNode);
                 extractSubqueriesFromExpression(((AbstractScanPlanNode)inlineScan).getPredicate());
             }
+        } else if (node instanceof AggregatePlanNode) {
+            AggregatePlanNode aggNode = (AggregatePlanNode) node;
+            extractSubqueriesFromExpression(aggNode.getPostPredicate());
         }
     }
     private void extractSubqueriesFromExpression(AbstractExpression expr)  throws Exception {

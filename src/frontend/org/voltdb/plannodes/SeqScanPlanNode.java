@@ -106,38 +106,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         super.resolveColumnIndexes();
     }
 
-// ENG-451-MERGE
-//    @Override
-//    protected void generateTableSchema(Database db) {
-//        if (m_isSubQuery == false) {
-//            super.generateTableSchema(db);
-//        } else {
-//            assert(m_children.size() == 1);
-//            // Generate the sub-query table schema
-//            m_children.get(0).generateOutputSchema(db);
-//
-//            m_tableSchema = new NodeSchema();
-//            NodeSchema subQuerySchema = m_children.get(0).getOutputSchema();
-//            for (SchemaColumn col : subQuerySchema.getColumns()) {
-//                // get the column from the sub-query schema and replace the table name and alias
-//                // with the derived table name and alias.
-//                String columnAlias = col.getColumnAlias();
-//                String columnName = col.getColumnName();
-//                if (columnAlias != null) {
-//                    columnName = columnAlias;
-//                }
-//                assert(col.getExpression() instanceof TupleValueExpression);
-//                // Replace the current TVE with the new one.
-//                TupleValueExpression colExpr = new TupleValueExpression(m_targetTableName, m_targetTableAlias, columnName, columnAlias);
-//                SchemaColumn newCol = new SchemaColumn(m_targetTableName,
-//                        m_targetTableAlias,
-//                        columnName,
-//                        columnAlias,
-//                        colExpr);
-//                m_tableSchema.addColumn(newCol);
-//            }
-//        }
-
     @Override
     protected String explainPlanForNode(String indent) {
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;

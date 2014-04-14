@@ -252,7 +252,6 @@ public class HSQLInterface {
             }
         }
         if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
-// ENG-451-MERGE may not needed
                 subqueryCount > 0) {
             assert rowCount == 1;
             assert tableCount + subqueryCount + valueCount == 1;

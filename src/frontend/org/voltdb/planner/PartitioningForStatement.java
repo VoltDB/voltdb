@@ -356,34 +356,11 @@ public class PartitioningForStatement implements Cloneable{
                 eqSets.add(valueEquivalence.get(candidatePartitionKey));
             }
 
-// ENG-451-MERGE
-//            // In case of sub queries, the partitioning column may be covered within the sub-query
-//            if(unfiltered && tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
-//                PartitioningForStatement tempPartitioning = tableCache.getPartitioning();
-//                assert(tempPartitioning != null);
-//                Collection<String> partitionColumns = tempPartitioning.getPartitionColumns();
-//                if (partitionColumns.contains(columnNeedingCoverage) &&
-//                        tempPartitioning.inferredPartitioningValue() != null) {
-//                    unfiltered = false;
-//                    tempPartitioningValues.add(tempPartitioning.inferredPartitioningValue());
-//                }
-//            }
-
             if (unfiltered) {
                 ++unfilteredPartitionKeyCount;
             }
         }
 
-// ENG-451-MERGE
-//        // Calculate the number of the independently partitioned sub queries.
-//        // The partitioning values for the sub-queries and the parent query may match.
-//        int countOfIndependentlyPartitionedSubqueries = tempPartitioningValues.size();
-//        Object partitioningObject = null;
-//        AbstractExpression constPartitioningExpr = null;
-//        for (Set<AbstractExpression> partitioningValues : eqSets) {
-//            for (AbstractExpression constExpr : partitioningValues) {
-//                if (constExpr instanceof TupleValueExpression) {
-//                    continue;
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
             for (Set<AbstractExpression> partitioningValues : eqSets) {
@@ -397,30 +374,8 @@ public class PartitioningForStatement implements Cloneable{
                     // Only need one constant value.
                     break;
                 }
-// ENG-451-MERGE
-//                constPartitioningExpr = constExpr;
-//                partitioningObject = ConstantValueExpression.extractPartitioningValue(tokenPartitionKey.getValueType(), constExpr);
-//                if(tempPartitioningValues.contains(partitioningObject)) {
-//                    --countOfIndependentlyPartitionedSubqueries;
-//                }
             }
         }
-
-// ENG-451-MERGE
-//        m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount +
-//                countOfIndependentlyPartitionedSubqueries;
-//        if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
-//            if (constPartitioningExpr != null) {
-//                addPartitioningExpression(tokenPartitionKey.getTableName() + '.' + tokenPartitionKey.getColumnName(), constPartitioningExpr);
-//                setInferredValue(partitioningObject);
-//            }
-//        } else if (unfilteredPartitionKeyCount == 0 && countOfIndependentlyPartitionedSubqueries == 1) {
-//            assert(!tempPartitioningValues.isEmpty());
-//            for (Object partitioningValue : tempPartitioningValues) {
-//                setInferredValue(partitioningValue);
-//                break;
-//            }
-//        }
 
         return m_countOfIndependentlyPartitionedTables;
     }

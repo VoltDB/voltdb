@@ -171,6 +171,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
     {
         assert(m_children.size() == 1);
         m_children.get(0).generateOutputSchema(db);
+        // Possible subquery expressions
+        generateSubqueryExpressionOutputSchema(m_postPredicate, db);
+        generateSubqueryExpressionOutputSchema(m_prePredicate, db);
         // aggregate's output schema is pre-determined, don't touch
         return;
     }
@@ -242,6 +245,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             int index = m_outputSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+
+        // Possible subquery expressions
+        resolveSubqueryExpressionColumnIndexes(m_prePredicate);
+        resolveSubqueryExpressionColumnIndexes(m_postPredicate);
     }
 
     /**

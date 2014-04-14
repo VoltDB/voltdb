@@ -205,14 +205,26 @@ public class SubqueryExpression extends AbstractExpression {
         AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
         // we must have a parent -it's a subquery statement
         assert(parentStmt != null);
-        for (Map.Entry<Integer, TupleValueExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
-            if(entry.getValue().getOrigStmtId() == parentStmt.m_stmtId) {
-                // TVE originates from the statement where this SubqueryExpression belongs to
-                m_args.add(entry.getValue());
-                m_parameterIdxList.add(entry.getKey());
+        for (Map.Entry<Integer, AbstractExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
+            Integer paramIdx = entry.getKey();
+            AbstractExpression expr = entry.getValue();
+            if (expr instanceof AggregateExpression) {
+                // Aggregate expression is always from THIS statement
+                m_args.add(expr);
+                m_parameterIdxList.add(paramIdx);
+            } else if (expr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) expr;
+                if(tve.getOrigStmtId() == parentStmt.m_stmtId) {
+                    // TVE originates from the statement where this SubqueryExpression belongs to
+                    m_args.add(expr);
+                    m_parameterIdxList.add(paramIdx);
+                } else {
+                    // TVE originates from the parent. Move it up
+                    parentStmt.m_parameterTveMap.put(paramIdx, expr);
+                }
             } else {
-                  // TVE originates from the parent. Move it up
-                parentStmt.m_parameterTveMap.put(entry.getKey(), entry.getValue());
+                // so far it should be either AggregateExpression or TupleValueExpression types
+                assert(false);
             }
         }
         subqueryStmt.m_parameterTveMap.clear();
