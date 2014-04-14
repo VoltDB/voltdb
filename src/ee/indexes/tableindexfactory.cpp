@@ -221,6 +221,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     bool isInlinesOrColumnsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
+    std::vector<bool> keyColumnInBytes;
     size_t valueCount = 0;
     size_t exprCount = scheme.indexedExpressions.size();
     if (exprCount != 0) {
@@ -258,6 +259,8 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(declaredLength);
+            // TODO(xin): VARCHAR expression should have MAX length in CHARACTERs? Discussion?
+            keyColumnInBytes.push_back(false);
         }
     } else {
         valueCount = scheme.columnIndices.size();
@@ -269,10 +272,12 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(columnInfo->length);
+            keyColumnInBytes.push_back(columnInfo->inBytes);
         }
     }
     std::vector<bool> keyColumnAllowNull(valueCount, true);
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
+    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths,
+            keyColumnAllowNull, keyColumnInBytes);
     assert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);

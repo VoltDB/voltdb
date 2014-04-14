@@ -112,7 +112,7 @@ public:
         }
 
         TupleSchema* schema =
-            TupleSchema::createTupleSchema(columnTypes,
+            TupleSchema::createTupleSchemaForTest(columnTypes,
                                            columnLengths,
                                            columnAllowNull);
 
@@ -292,7 +292,7 @@ public:
             columnNames[ctr] = buffer;
         }
         TupleSchema* schema =
-            TupleSchema::createTupleSchema(columnTypes,
+            TupleSchema::createTupleSchemaForTest(columnTypes,
                                            columnLengths,
                                            columnAllowNull);
 
@@ -450,7 +450,7 @@ TEST_F(IndexTest, IntsUnique) {
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
-        TupleSchema::createTupleSchema(keyColumnTypes,
+        TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
                                        keyColumnAllowNull);
     TableTuple searchkey(keySchema);
@@ -611,7 +611,7 @@ TEST_F(IndexTest, IntsMulti) {
         keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
-        TupleSchema::createTupleSchema(keyColumnTypes,
+        TupleSchema::createTupleSchemaForTest(keyColumnTypes,
                                        keyColumnLengths,
                                        keyColumnAllowNull);
     TableTuple searchkey(keySchema);
@@ -748,7 +748,7 @@ TEST_F(IndexTest, TupleKeyUnique) {
     vector<bool> keyColumnAllowNull(indexWidth, true);
     vector<ValueType> keyColumnTypes(indexWidth, VALUE_TYPE_BIGINT);
     vector<int32_t> keyColumnLengths(indexWidth, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
+    TupleSchema *keySchema = TupleSchema::createTupleSchemaForTest(keyColumnTypes, keyColumnLengths, keyColumnAllowNull);
     TableTuple searchkey(keySchema);
     // provide storage for search key tuple
     searchkey.move(new char[searchkey.tupleLength()]);

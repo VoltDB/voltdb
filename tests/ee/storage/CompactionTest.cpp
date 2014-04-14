@@ -121,7 +121,7 @@ public:
     }
 
     void initTable() {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
+        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
                                                                m_tableSchemaAllowNull);
 

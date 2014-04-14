@@ -288,15 +288,7 @@ public class ParserDQL extends ParserBase {
 
                 // A VoltDB extension to support the character in bytes.
                 if (typeNumber == Types.SQL_VARCHAR) {
-                    Exception ex = null;
-                    try {
-                        readThis(Tokens.BYTES);
-                    } catch(Exception e) {
-                        ex = e;
-                    }
-                    if (ex == null) {
-                        inBytes = true;
-                    }
+                    inBytes = readIfThis(Tokens.BYTES);
                 }
                 // End of VoltDB extension
 

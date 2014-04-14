@@ -77,7 +77,7 @@ public:
     }
 
     void initTable() {
-        m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes,
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                        m_tableSchemaColumnSizes,
                                                        m_tableSchemaAllowNull);
 

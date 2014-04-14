@@ -116,7 +116,7 @@ public:
             columnAllowNull.push_back(false);
         }
         m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
+          TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
                                          columnAllowNull);
 

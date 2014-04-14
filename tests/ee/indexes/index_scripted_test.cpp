@@ -191,7 +191,7 @@ void setNewCurrent(const char *testName,
     currentColumnLengths = columnLengths;
     currentColumnAllowNull = columnAllowNull;
 
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
     schemaCache.push_back(schema);
     // just pack the indices tightly
     vector<int> columnIndices;
@@ -510,7 +510,7 @@ int main(int argc, char **argv)
                 cerr << "Operation code parse error on line: " << line << endl;
                 exit(-1);
             }
-            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchema(currentColumnTypes,
+            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchemaForTest(currentColumnTypes,
                                                                                       currentColumnLengths,
                                                                                       currentColumnAllowNull);
             schemaCache.push_back(tupleSchema);

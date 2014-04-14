@@ -47,7 +47,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH/MAX_BYTES_PER_UTF8_CHARACTER - 1);
     TupleSchema* all_inline_schema =
-        TupleSchema::createTupleSchema(all_types,
+        TupleSchema::createTupleSchemaForTest(all_types,
                                        all_inline_lengths,
                                        column_allow_null);
 
@@ -68,7 +68,7 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
                                  getTupleStorageSize(VALUE_TYPE_BIGINT));
     non_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH + 10000);
     TupleSchema* non_inline_schema =
-        TupleSchema::createTupleSchema(all_types,
+        TupleSchema::createTupleSchemaForTest(all_types,
                                        non_inline_lengths,
                                        column_allow_null);
 

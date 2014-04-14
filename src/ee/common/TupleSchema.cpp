@@ -22,8 +22,7 @@
 
 namespace voltdb {
 
-
-TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnTypes,
+TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
                                             const std::vector<int32_t> columnSizes,
                                             const std::vector<bool> allowNull)
 {

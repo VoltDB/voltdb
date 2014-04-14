@@ -60,7 +60,7 @@ public:
 
     /** Static factory method to create a TupleSchema object with a fixed number of columns */
 
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
+    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
             const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
 
     static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
