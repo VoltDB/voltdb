@@ -806,6 +806,25 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(var.getInbytes());
     }
 
+    public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH + 10;
+        String simpleSchema1 =
+                "create table books (cash integer default 23, " +
+                        "title varbinary("+length+") , PRIMARY KEY(cash));";
+
+        String error1 = "VARBINARY column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema1, error1);
+
+        String simpleSchema2 =
+                "create table books (cash integer default 23, " +
+                        "title varchar("+length+") , PRIMARY KEY(cash));";
+
+        String error2 = "VARCHAR column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema2, error2);
+    }
+
     public void testNullablePartitionColumn() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +

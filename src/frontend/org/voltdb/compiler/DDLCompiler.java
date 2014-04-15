@@ -1399,7 +1399,7 @@ public class DDLCompiler {
         if (node.attributes.containsKey("bytes")) {
             inBytes = Boolean.valueOf(node.attributes.get("bytes"));
         }
-        column.setInbytes(inBytes);
+
         // Require a valid length if variable length is supported for a type
         if (type == VoltType.STRING || type == VoltType.VARBINARY) {
             if (sizeString == null) {
@@ -1428,7 +1428,7 @@ public class DDLCompiler {
                                 name, table.getTypeName(),
                                 VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
                         m_compiler.addWarn(msg);
-                        column.setInbytes(true);
+                        inBytes = true;
                     }
                 }
 
@@ -1444,6 +1444,7 @@ public class DDLCompiler {
                 }
             }
         }
+        column.setInbytes(inBytes);
         column.setSize(size);
 
 
