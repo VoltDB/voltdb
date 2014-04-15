@@ -455,9 +455,9 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     return getTempStringValue(startChar, endChar - startChar);
 }
 
-/** implement the 4-argument SQL OVERLAY function */
+/** implement the 3 or4 argument SQL OVERLAY function */
 template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 4);
+    assert(arguments.size() == 3 || arguments.size() == 4);
 
     char* ptr;
     const NValue& str0 = arguments[0];
@@ -490,11 +490,15 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         return getNullStringValue();
     }
 
-    const NValue& lengthArg = arguments[3];
-    if (lengthArg.isNull()) {
-        return getNullStringValue();
+    int64_t length = sourceStr.length() - start;
+    if (arguments.size() == 4) {
+        const NValue& lengthArg = arguments[3];
+        if (lengthArg.isNull()) {
+            return getNullStringValue();
+        }
+        length = lengthArg.castAsBigIntAndGetValue();
     }
-    int64_t length = lengthArg.castAsBigIntAndGetValue();
+
     if (length < 0) {
         return getNullStringValue();
     }
