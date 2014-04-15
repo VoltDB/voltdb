@@ -165,6 +165,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                         col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
+                tve.setInBytes(col.getInbytes());
                 indexedExprs.add(tve);
             }
         } else {

@@ -120,11 +120,10 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
+    void initTable() {
+        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+                                                               m_tableSchemaAllowNull);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -279,7 +278,7 @@ public:
 };
 
 TEST_F(CompactionTest, BasicCompaction) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -365,7 +364,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 }
 
 TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -516,7 +515,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
  */
 #ifndef MEMCHECK
 TEST_F(CompactionTest, TestENG897) {
-    initTable(true);
+    initTable();
     addRandomUniqueTuples( m_table, 32263 * 5);
 
     //Delete stuff to put everything in a bucket

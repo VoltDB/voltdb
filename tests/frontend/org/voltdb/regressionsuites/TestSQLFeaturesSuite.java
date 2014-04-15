@@ -63,6 +63,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         TruncateTable.class
     };
 
+    int VARCHAR_VARBINARY_THRESHOLD = 100;
+
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -610,6 +612,61 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
+    public void testVarcharByBytes() throws IOException, ProcCallException {
+        System.out.println("STARTING testing varchar by BYTES ......");
+
+        Client client = getClient();
+        VoltTable vt = null;
+        String var;
+
+        var = "VO";
+        client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (0,'" + var + "')");
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharBYTES where id = 0").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+
+        if (isHSQL()) return;
+        var = "VOLT";
+        try {
+            client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            var.length(), var, 2)));
+        }
+
+        var = "贾鑫";
+        try {
+            // assert here that this two-character string decodes via UTF8 to a bytebuffer longer than 2 bytes.
+            assertEquals(2, var.length());
+            assertEquals(6, var.getBytes("UTF-8").length);
+            client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            6, var, 2)));
+        }
+
+        var = "Voltdb is great | Voltdb is great " +
+                "| Voltdb is great | Voltdb is great| Voltdb is great | Voltdb is great" +
+                "| Voltdb is great | Voltdb is great| Voltdb is great | Voltdb is great";
+        try {
+            client.callProcedure("VARCHARBYTES.insert", 2, null, var);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            var.length(), var.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
+        }
+
+        var = var.substring(0, 70);
+        client.callProcedure("VARCHARBYTES.insert", 2, null, var);
+        vt = client.callProcedure("@AdHoc", "select var80 from VarcharBYTES where id = 2").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+    }
+
     public void testVarcharByCharacter() throws IOException, ProcCallException {
         System.out.println("STARTING testing varchar by character ......");
 
@@ -679,7 +736,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             return;
         }
         Client client = getClient();
-        int THRESHOLD = 100;
         // Test Varchar
 
         // Test AdHoc
@@ -721,7 +777,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
-                            174, var2.substring(0, THRESHOLD), 80)));
+                            174, var2.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
         // Test non-inlined varchar with stored procedure

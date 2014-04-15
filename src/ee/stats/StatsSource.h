@@ -55,7 +55,8 @@ public:
      */
     static void populateBaseSchema(std::vector<voltdb::ValueType>& types,
                                    std::vector<int32_t>& columnLengths,
-                                   std::vector<bool>& allowNull);
+                                   std::vector<bool>& allowNull,
+                                   std::vector<bool>& inBytes);
 
     /*
      * Do nothing constructor that initializes statTable_ and schema_ to NULL.
@@ -128,7 +129,8 @@ protected:
      * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
      * end of a list.
      */
-    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths, std::vector<bool> &allowNull);
+    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths,
+            std::vector<bool> &allowNull, std::vector<bool> &inBytes);
 
     /**
      * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the
