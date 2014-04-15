@@ -1043,12 +1043,6 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
-//        for (Table table: tables) {
-//            // Rebuild DDL from processed table
-//            String viewQuery = ((TableAnnotation)table.getAnnotation()).ddl;
-//            ((TableAnnotation)table.getAnnotation()).ddl = CatalogSchemaTools.toSchema(table, viewQuery, CatalogUtil.isTableExportOnly(db, table));
-//        }
-
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
