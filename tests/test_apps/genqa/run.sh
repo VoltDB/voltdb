@@ -33,7 +33,6 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 EXPORTDATA="exportdata"
 EXPORTDATAREMOTE="localhost:${PWD}/${EXPORTDATA}"
-KAFKATOPIC="voltdbexportEXPORT_PARTITIONED_TABLE"
 CLIENTLOG="clientlog"
 
 # remove build artifacts
@@ -91,13 +90,6 @@ function server-pg() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
-}
-
-function server-kafka() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -232,12 +224,6 @@ function export-on-server-verify() {
         $EXPORTDATAREMOTE \
         4 \
         $CLIENTLOG
-}
-
-function export-kafka-verify() {
-    cp="obj:$CLASSPATH"
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath $cp genqa.ExportKafkaOnServerVerifier \
-        localhost:9092 localhost:7181 $KAFKATOPIC true
 }
 
 function help() {
