@@ -186,6 +186,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
 
     ExpressionType peek_type = EXPRESSION_TYPE_INVALID;
     ValueType value_type = VALUE_TYPE_INVALID;
+    bool inBytes = false;
     AbstractExpression *left_child = NULL;
     AbstractExpression *right_child = NULL;
     std::vector<AbstractExpression*>* argsVector = NULL;
@@ -198,6 +199,10 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         int32_t value_type_int = obj.valueForKey("VALUE_TYPE").asInt();
         value_type = static_cast<ValueType>(value_type_int);
         assert(value_type != VALUE_TYPE_INVALID);
+
+        if (obj.hasNonNullKey("IN_BYTES")) {
+            inBytes = true;
+        }
     }
 
     // add the value size
@@ -237,8 +242,12 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         // pass it the serialization stream in case a subclass has more
         // to read. yes, the per-class data really does follow the
         // child serializations.
-        return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
-                                                 left_child, right_child, argsVector);
+        AbstractExpression* finalExpr = ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
+                left_child, right_child, argsVector);
+
+        finalExpr->setInBytes(inBytes);
+
+        return finalExpr;
     }
     catch (const SerializableEEException &ex) {
         delete left_child;

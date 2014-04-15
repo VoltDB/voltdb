@@ -123,10 +123,9 @@ public:
             columnAllowNull.push_back(false);
         }
         m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
+          TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // allocate a new buffer and wrap it
         m_wrapper = new TupleStreamWrapper(1, 1);

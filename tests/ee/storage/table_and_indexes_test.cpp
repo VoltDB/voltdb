@@ -64,7 +64,7 @@ class TableAndIndexTest : public Test {
             districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-            districtTupleSchema = TupleSchema::createTupleSchema(districtColumnTypes, districtColumnLengths, districtColumnAllowNull, true);
+            districtTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
 
             districtIndex1ColumnIndices.push_back(1);
             districtIndex1ColumnIndices.push_back(0);
@@ -88,7 +88,7 @@ class TableAndIndexTest : public Test {
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
 
-            warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull, true);
+            warehouseTupleSchema = TupleSchema::createTupleSchemaForTest(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
 
             warehouseIndex1ColumnIndices.push_back(0);
 
@@ -125,7 +125,7 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(500);
 
-            customerTupleSchema = TupleSchema::createTupleSchema(customerColumnTypes, customerColumnLengths, customerColumnAllowNull, true);
+            customerTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
 
             customerIndex1ColumnIndices.push_back(2);
             customerIndex1ColumnIndices.push_back(1);

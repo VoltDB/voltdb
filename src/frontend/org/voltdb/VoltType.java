@@ -18,15 +18,15 @@
 package org.voltdb;
 import java.math.BigDecimal;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 
 /**
@@ -220,6 +220,7 @@ public enum VoltType {
      * <code>STRING</code> or <code>VARBINARY</code>
      */
     public static final int MAX_VALUE_LENGTH = 1048576;
+    public static final int MAX_VALUE_LENGTH_IN_CHARACTERS = MAX_VALUE_LENGTH / 4;
     /**
      * String representation of <code>MAX_VALUE_LENGTH</code>.
      */
