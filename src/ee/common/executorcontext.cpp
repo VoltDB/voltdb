@@ -42,7 +42,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId hostId) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum), m_staticParams(params),
-    m_executorLists(), m_spHandle(0),
+    m_executorsMap(), m_spHandle(0),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),

@@ -480,19 +480,21 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                            int64_t logThreshold,
                            int64_t memoryLimit,
                            PlanNodeFragment *fragment) :
-                           fragId(fragmentId), planFragment(fragment), limits(), arrayListsSize(0)
+                           fragId(fragmentId), planFragment(fragment), executorListMap(), limits()
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
+
+            ~ExecutorVector();
 
             int64_t getFragId() const { return fragId; }
 
             // Get the executors list for a given sub statement. The default statement id = 0
             // represents the parent statement
             std::vector<AbstractExecutor*>& getExecutorList(int stmtId = 0) {
-                assert(stmtId < arrayListsSize);
-                return lists[stmtId];
+                assert(executorListMap.find(stmtId) != executorListMap.end());
+                return *executorListMap.find(stmtId)->second;
             }
 
             // Initialize executors
@@ -500,9 +502,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
             const int64_t fragId;
             boost::shared_ptr<PlanNodeFragment> planFragment;
-            boost::shared_array<std::vector<AbstractExecutor*> > lists;
+            std::map<int, std::vector<AbstractExecutor*>* > executorListMap;
             TempTableLimits limits;
-            size_t arrayListsSize;
         };
 
         /**

@@ -936,10 +936,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             selectStmt.having = ExpressionUtil.combine(havingList);
         }
-
+        // TODO ENG-451-inexists. If the subselect does not have HAVING expression
+        // it looks safe to remove DISPLAY, ORDER BY, GROUP BY columns, DISTINCT clauses
+        // simply because all we care is whether the result set is empty or nor.
+        // More careful evaluation what can be dropped in the presence of the HAVING
+        // expression is required.
         if (!hasPriorHaving) {
             // clear DISPLAY, ORDER BY, GROUP BY columns, remove DISTINCT
-            // The more efficient approach would be to recognize that this SELECT statement
+            // The better approach seems to recognize that this SELECT statement
             // is part of the IN expression (HSQL) and skip the above elements
             // during the initial parsing
             selectStmt.distinct = false;

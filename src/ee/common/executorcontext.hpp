@@ -19,7 +19,7 @@
 #define _EXECUTORCONTEXT_HPP_
 
 #include <vector>
-#include <boost/shared_array.hpp>
+#include <map>
 
 #include "Topend.h"
 #include "common/UndoQuantum.h"
@@ -96,8 +96,9 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
-    void setupForExecutors(boost::shared_array<std::vector<AbstractExecutor*> > executorLists) {
-        m_executorLists = executorLists;
+    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
+        assert(executorsMap != NULL);
+        m_executorsMap = executorsMap;
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
@@ -138,7 +139,8 @@ class ExecutorContext {
 
     /** Executor List for a given sub statement id */
     std::vector<AbstractExecutor*>& getExecutorLists(int stmtId = 0) {
-        return m_executorLists[stmtId];
+        assert(m_executorsMap->find(stmtId) != m_executorsMap->end());
+        return *m_executorsMap->find(stmtId)->second;
     }
 
 
@@ -156,7 +158,7 @@ class ExecutorContext {
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     NValueArray* m_staticParams;
-    boost::shared_array<std::vector<AbstractExecutor*> > m_executorLists;
+    std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
