@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
@@ -34,7 +33,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.PicoNetwork;
-import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
@@ -59,13 +57,18 @@ public class ForeignHost {
 
     // hold onto the socket so we can kill it
     private final Socket m_socket;
-    private final SocketChannel m_sc;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
-    private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+    private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+
+    public static final int POISON_PILL = -1;
+
+    public static final int CRASH_ALL = 0;
+    public static final int CRASH_ME = 1;
+    public static final int CRASH_SPECIFIED = 2;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -126,7 +129,6 @@ public class ForeignHost {
         m_hostId = hostId;
         m_closing = false;
         m_isUp = true;
-        m_sc = socket;
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
@@ -315,16 +317,31 @@ public class ForeignHost {
 
         final long sourceHSId = in.getLong();
         final int destCount = in.getInt();
-        if (destCount == -1) {//This is a poison pill
+        if (destCount == POISON_PILL) {//This is a poison pill
             //Ignore poison pill during shutdown, in tests we receive crash messages from
             //leader appointer during shutdown
-            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) return;
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+                return;
+            }
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
                     m_hostId, hostnameAndIPAndPort(), message);
-            org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            //if poison pill with particular cause handle it.
+            int cause = in.getInt();
+            if (cause == ForeignHost.CRASH_ME) {
+                int hid = VoltDB.instance().getHostMessenger().getHostId();
+                hostLog.debug("Poison Pill with target me was sent.: " + hid);
+                //Killing myself.
+                VoltDB.instance().halt();
+            } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
+                org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            } else {
+                //Should never come here.
+                hostLog.error("Invalid Cause in poison pill: " + cause);
+            }
+            return;
         }
 
         recvDests = new long[destCount];
@@ -356,7 +373,7 @@ public class ForeignHost {
 
     }
 
-    public void sendPoisonPill(String err) {
+    public void sendPoisonPill(String err, int cause) {
         byte errBytes[];
         try {
             errBytes = err.getBytes("UTF-8");
@@ -364,12 +381,13 @@ public class ForeignHost {
             e.printStackTrace();
             return;
         }
-        ByteBuffer message = ByteBuffer.allocate( 20 + errBytes.length);
+        ByteBuffer message = ByteBuffer.allocate(24 + errBytes.length);
         message.putInt(message.capacity() - 4);
         message.putLong(-1);
-        message.putInt(-1);
+        message.putInt(POISON_PILL);
         message.putInt(errBytes.length);
         message.put(errBytes);
+        message.putInt(cause);
         message.flip();
         m_network.enqueue(message);
     }

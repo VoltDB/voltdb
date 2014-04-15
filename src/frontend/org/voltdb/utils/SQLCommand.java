@@ -768,6 +768,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@Shutdown",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@StopNode",
+                ImmutableMap.<Integer, List<String>>builder().put(1, Arrays.asList("int")).build());
         Procedures.put("@SnapshotDelete",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build()
                 );

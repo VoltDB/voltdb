@@ -41,7 +41,7 @@ public class TestFailureDetectSuite extends RegressionSuite
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
         LocalCluster config = (LocalCluster) m_config;
-        config.shutDownSingleHost(0);
+        config.killSingleHost(0);
         for (int i = 0; i < 100; i++)
         {
             results = client.callProcedure("SelectMultiPart").getResults();
@@ -60,7 +60,7 @@ public class TestFailureDetectSuite extends RegressionSuite
         System.out.println(results[0].toString());
         assertEquals(1, results[0].getRowCount());
         LocalCluster config = (LocalCluster) m_config;
-        config.shutDownSingleHost(0);
+        config.killSingleHost(0);
         // It takes a few transactions for the external volt process to actually
         // die, so we'll just try to do a bunch of transactions, and this will
         // be roughly like pulling the plug
