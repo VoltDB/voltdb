@@ -255,7 +255,9 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 // to reliably determine that the result value is always small enough to "inline".
                 declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
                 isInlinesOrColumnsOnly = false;
-                inBytes = true;
+                if (exprType == VALUE_TYPE_VARCHAR) {
+                    inBytes = true;
+                }
             } else {
                 declaredLength = NValue::getTupleStorageSize(exprType);
             }
