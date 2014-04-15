@@ -1317,7 +1317,7 @@ public class DDLCompiler {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
-        // Temporarily assign the view Query to the annotation so we can use when when we build the full DDL statements
+        // Temporarily assign the view Query to the annotation so we can use when we build the DDL statement for the VIEW
         annotation.ddl = query;
 
         if (maxRowSize > MAX_ROW_SIZE) {

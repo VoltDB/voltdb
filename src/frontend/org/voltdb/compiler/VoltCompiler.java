@@ -830,14 +830,6 @@ public class VoltCompiler {
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, null, whichProcs, jarOutput);
         CatalogMap<Procedure> procedures = db.getProcedures();
-        String out  = new String();
-        for (Procedure nextProc : procedures) {
-            CatalogMap<Statement> statements = nextProc.getStatements();
-            for (Statement stmt : statements) {
-                String explain =  stmt.getExplainplan();
-                out += explain;
-            }
-        }
 
         return m_catalog;
     }
