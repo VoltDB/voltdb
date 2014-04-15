@@ -51,6 +51,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -62,7 +63,8 @@ import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -274,20 +276,6 @@ public class DDLCompiler {
             );
 
     /**
-     * Check that the classname pattern from import class is valid.
-     */
-    static final Pattern validClassMatcherWildcardPattern = Pattern.compile(
-            "\\A" +                                 // (start statement)
-            "[\\p{L}\\*]+" +                        // (first part starts with char or *)
-            "[\\p{L}\\d\\*]*" +                     // (followed by any number of word chars or *)
-            "(\\." +                                // (optionally repeat with . separators)
-            "[\\p{L}\\*]+" +                        //  (first part starts with char or *)
-            "[\\p{L}\\d\\*]*" +                     //  (followed by any number of word chars or *)
-            ")*" +                                  // (end repeat)
-            "\\z"                                   // (end statement)
-            );
-
-    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -427,7 +415,7 @@ public class DDLCompiler {
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
 
-    private Set<String> tableLimitConstraintCounter = new HashSet<>();
+    private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     private class DDLStatement {
         public DDLStatement() {
@@ -465,7 +453,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db, whichProcs);
+                processed = processVoltDBStatement(stmt, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -539,6 +527,55 @@ public class DDLCompiler {
     }
 
     /**
+     * Checks whether or not the start of the given identifier is java (and
+     * thus DDL) compliant. An identifier may start with: _ [a-zA-Z] $ *
+     * and contain subsequent characters including: _ [0-9a-zA-Z] $ *
+     * @param identifier the identifier to check
+     * @param statement the statement where the identifier is
+     * @return the given identifier unmodified
+     * @throws VoltCompilerException when it is not compliant
+     */
+    private String checkIdentifierWithWildcard(
+            final String identifier, final String statement
+            ) throws VoltCompilerException {
+
+        assert identifier != null && ! identifier.trim().isEmpty();
+        assert statement != null && ! statement.trim().isEmpty();
+
+        int loc = 0;
+        do {
+            if ( ! Character.isJavaIdentifierStart(identifier.charAt(loc)) && identifier.charAt(loc)!= '*') {
+                String msg = "Unknown indentifier in DDL: \"" +
+                        statement.substring(0,statement.length()-1) +
+                        "\" contains invalid identifier \"" + identifier + "\"";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+            loc++;
+            while (loc < identifier.length() && identifier.charAt(loc) != '.') {
+                if (! Character.isJavaIdentifierPart(identifier.charAt(loc)) && identifier.charAt(loc)!= '*') {
+                    String msg = "Unknown indentifier in DDL: \"" +
+                            statement.substring(0,statement.length()-1) +
+                            "\" contains invalid identifier \"" + identifier + "\"";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                loc++;
+            }
+            if (loc < identifier.length() && identifier.charAt(loc) == '.') {
+                loc++;
+                if (loc >= identifier.length()) {
+                    String msg = "Unknown indentifier in DDL: \"" +
+                            statement.substring(0,statement.length()-1) +
+                            "\" contains invalid identifier \"" + identifier + "\"";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+            }
+        }
+        while( loc > 0 && loc < identifier.length());
+
+        return identifier;
+    }
+
+    /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
@@ -547,10 +584,11 @@ public class DDLCompiler {
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement, Database db,
+    private boolean processVoltDBStatement(DDLStatement ddlStatement, Database db,
                                            DdlProceduresToLoad whichProcs)
             throws VoltCompilerException
     {
+        String statement = ddlStatement.statement;
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -745,17 +783,26 @@ public class DDLCompiler {
         // match IMPORT CLASS statements
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
-            String classNameStr = statementMatcher.group(1);
+            if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                // Only process the statement if this is not for the StatementPlanner
+                String classNameStr = statementMatcher.group(1);
 
-            // check that the match pattern is a valid match pattern
-            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
-            if (!wildcardMatcher.matches()) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid IMPORT CLASS match expression: '%s'",
-                        classNameStr)); // remove trailing semicolon
+                // check that the match pattern is a valid match pattern
+                checkIdentifierWithWildcard(classNameStr, statement);
+
+                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "IMPORT CLASS not found: '%s'",
+                            classNameStr)); // remove trailing semicolon
+                }
+                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                    m_compiler.addWarn(String.format(
+                            "IMPORT CLASS no match for wildcarded class: '%s'",
+                            classNameStr), ddlStatement.lineNo);
+                }
             }
 
-            m_classMatcher.addPattern(classNameStr);
             return true;
         }
 
@@ -1788,7 +1835,7 @@ public class DDLCompiler {
             }
 
             // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.tableList.get(0);
+            Table srcTable = stmt.m_tableList.get(0);
             if (viewTableNames.contains(srcTable.getTypeName())) {
                 String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
                         viewName, srcTable.getTypeName());
@@ -1988,7 +2035,7 @@ public class DDLCompiler {
                     continue;
                 }
                 List<AbstractExpression> indexedExprs = null;
-                StmtTableScan tableScan = StmtTableScan.getStmtTableScan(srcTable);
+                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
@@ -2029,8 +2076,8 @@ public class DDLCompiler {
         int displayColCount = stmt.displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
-        if (stmt.tableList.size() != 1) {
-            msg += "has " + String.valueOf(stmt.tableList.size()) + " sources. " +
+        if (stmt.m_tableList.size() != 1) {
+            msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
             "Only one source view or source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }

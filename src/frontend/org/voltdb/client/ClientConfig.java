@@ -17,12 +17,17 @@
 
 package org.voltdb.client;
 
+import javax.security.auth.Subject;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
 
-    static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
     final String m_username;
@@ -34,9 +39,10 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
+    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
+    Subject m_subject = null;
 
     /**
      * <p>Configuration for a client with no authentication credentials that will
@@ -130,7 +136,7 @@ public class ClientConfig {
         if (ms < 0) ms = 0;
         // 0 implies infinite, but use LONG_MAX to reduce branches to test
         if (ms == 0) ms = Long.MAX_VALUE;
-        m_procedureCallTimeoutMS = ms;
+        m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(ms);
     }
 
     /**
@@ -257,5 +263,31 @@ public class ClientConfig {
                     "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
         }
         m_autoTuneTargetInternalLatency = targetLatency;
+    }
+
+    /**
+     * <p>Enable Kerberos authentication with the provided subject credentials<p>
+     * @param subject
+     */
+    public void enableKerberosAuthentication(final Subject subject) {
+        m_subject = subject;
+    }
+
+    /**
+     * <p>Use the provided JAAS login context entry key to get the authentication
+     * credentials held by the caller<p>
+     *
+     * @param loginContextEntryKey JAAS login context config entry designation
+     */
+    public void enableKerberosAuthentication(final String loginContextEntryKey) {
+       try {
+           LoginContext lc = new LoginContext(loginContextEntryKey);
+           lc.login();
+           m_subject = lc.getSubject();
+       } catch (SecurityException ex) {
+           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
+       } catch (LoginException ex) {
+           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
+       }
     }
 }

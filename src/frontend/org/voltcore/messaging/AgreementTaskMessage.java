@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.server.Request;
 
@@ -62,60 +63,19 @@ public class AgreementTaskMessage extends VoltMessage {
             buf.limit(oldlimit);
             buf.position(oldposition + requestBytesLength);
         }
-        ArrayList<Id> ids = new ArrayList<Id>();
-        ArrayList<String> schemes = new ArrayList<String>();
-        ArrayList<String> names = new ArrayList<String>();
-        int numIds = buf.getInt();
-        if (numIds > -1) {
-            try {
-                for (int ii = 0; ii < numIds; ii++) {
-                    byte bytes[] = new byte[buf.getInt()];
-                    buf.get(bytes);
-                    schemes.add(new String(bytes, "UTF-8"));
-                }
-                for (int ii = 0; ii < numIds; ii++) {
-                    byte bytes[] = new byte[buf.getInt()];
-                    buf.get(bytes);
-                    names.add(new String(bytes, "UTF-8"));
-                }
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-            }
-            for (int ii = 0; ii < numIds; ii++) {
-                ids.add(new Id(schemes.get(ii), names.get(ii)));
-            }
-        } else {
-            ids = null;
-        }
 
-        m_request = new Request(null, sessionId, cxid, type, requestBuffer, ids);
+        m_request = new Request(null, sessionId, cxid, type, requestBuffer, ImmutableList.<Id>of());
         assert(buf.capacity() == buf.position());
     }
 
     @Override
     public int getSerializedSize() {
-        int msgsize = 48 + super.getSerializedSize();
-        if (m_request.authInfo != null) {
-            msgsize += (8 * m_request.authInfo.size());
-        }
+        int msgsize = 44 + super.getSerializedSize();
+
         if (m_request.request != null) {
             msgsize += m_request.request.remaining();
         }
-        if (m_request.authInfo != null) {
-            for (Id id : m_request.authInfo) {
-                try {
-                    byte bytes[] = id.getScheme().getBytes("UTF-8");
-                    m_schemes.add(bytes);
-                    msgsize += bytes.length;
 
-                    bytes = id.getId().getBytes("UTF-8");
-                    m_ids.add(bytes);
-                    msgsize += bytes.length;
-                } catch (UnsupportedEncodingException e) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
-                }
-            }
-        }
         return msgsize;
     }
 
@@ -133,20 +93,6 @@ public class AgreementTaskMessage extends VoltMessage {
         if (m_request.request != null) {
             buf.putInt(m_request.request.remaining());
             buf.put(m_request.request.duplicate());
-        } else {
-            buf.putInt(-1);
-        }
-
-        if (m_request.authInfo != null) {
-            buf.putInt(m_schemes.size());
-            for (byte bytes[] : m_schemes) {
-                buf.putInt(bytes.length);
-                buf.put(bytes);
-            }
-            for (byte bytes[] : m_ids) {
-                buf.putInt(bytes.length);
-                buf.put(bytes);
-            }
         } else {
             buf.putInt(-1);
         }

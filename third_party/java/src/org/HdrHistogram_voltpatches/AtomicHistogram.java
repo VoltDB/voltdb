@@ -135,4 +135,14 @@ public class AtomicHistogram extends AbstractHistogram {
             throws IOException, ClassNotFoundException {
         o.defaultReadObject();
     }
+
+    public static AtomicHistogram diff(AtomicHistogram newer, AtomicHistogram older) {
+        AtomicHistogram h = new AtomicHistogram(newer.getLowestTrackableValue(), newer.getHighestTrackableValue(), newer.getNumberOfSignificantValueDigits());
+        h.totalCount = newer.totalCount - older.totalCount;
+        for (int ii = 0; ii < h.countsArrayLength; ii++) {
+            h.counts.set(ii, newer.counts.get(ii) - older.counts.get(ii));
+        }
+        h.reestablishTotalCount();
+        return h;
+    }
 }

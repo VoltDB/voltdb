@@ -327,21 +327,25 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     node->m_planNodeId = obj.valueForKey("ID").asInt();
 
-    PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
-    for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
-        PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-        AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
+    if (obj.hasKey("INLINE_NODES")) {
+        PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
+        for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
+            PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
+            AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
-        // todo: if this throws, new Node can be leaked.
-        // As long as newNode is not NULL, this will not throw.
-        assert(newNode);
-        node->addInlinePlanNode(newNode);
+            // todo: if this throws, new Node can be leaked.
+            // As long as newNode is not NULL, this will not throw.
+            assert(newNode);
+            node->addInlinePlanNode(newNode);
+        }
     }
 
-    PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
-    for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
-        int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
-        node->m_childIds.push_back(childNodeId);
+    if (obj.hasKey("CHILDREN_IDS")) {
+        PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
+        for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
+            int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
+            node->m_childIds.push_back(childNodeId);
+        }
     }
 
     // Output schema are optional -- when they can be determined by a child's copy.
@@ -349,7 +353,7 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
             node->m_outputSchema.push_back(outputColumn);
         }
         node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());

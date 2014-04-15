@@ -29,11 +29,14 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -126,7 +129,7 @@ public class TestJDBCQueries {
         // Add one T_<type> table for each data type.
         String ddl = "";
         for (Data d : data) {
-            ddl += String.format("CREATE TABLE %s(ID %s NOT NULL, VALUE VARCHAR(255)); ",
+            ddl += String.format("CREATE TABLE %s(ID %s, VALUE VARCHAR(255)); ",
                                  d.tablename, d.typedecl);
         }
 
@@ -379,4 +382,101 @@ public class TestJDBCQueries {
             }
         }
     }
+
+    @Test
+    public void testVarbinarySetBytes() throws Exception
+    {
+        // Verify that setBytes() works to set VARBINARY with byte[] input
+        PreparedStatement ps = conn.prepareStatement("insert into T_VARBINARY values (?, ?)");
+        byte[] data = {'a', 'b', 'g', '0', 0, 1, 127, -128};
+        ps.setBytes(1, data);
+        ps.setString(2, "bytes");
+        ps.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_VARBINARY where VALUE='bytes'");
+        ps.executeQuery();
+        ResultSet rs = ps.getResultSet();
+        while (rs.next()) {
+            byte[] data2 = rs.getBytes(1);
+            assertEquals(data.length, data2.length);
+            for (int i = 0; i < data.length; i++) {
+                assertEquals(data[i], data2[i]);
+            }
+        }
+
+        // Also verify that setString() with a hex-encoded string works to set VARBINARY
+        ps = conn.prepareStatement("insert into T_VARBINARY values (?, ?)");
+        String stringdata = "000102030405060708090a";
+        ps.setString(1, stringdata);
+        ps.setString(2, "string");
+        ps.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_VARBINARY where VALUE='string'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            byte[] data2 = rs.getBytes(1);
+            assertEquals(stringdata.length()/2, data2.length);
+            for (int i = 0; i < data2.length; i++) {
+                assertEquals(i, data2[i]);
+            }
+        }
+    }
+
+    @Test
+    public void testGetTimestamp() throws Exception
+    {
+        PreparedStatement ins = conn.prepareStatement("insert into T_TIMESTAMP values (?, ?)");
+        // Bad reported input
+        Timestamp ts = Timestamp.valueOf("2014-03-23 05:12:08.156000");
+        ins.setTimestamp(1, ts);
+        ins.setString(2, "badinput");
+        ins.executeUpdate();
+        PreparedStatement ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='badinput'");
+        ps.executeQuery();
+        ResultSet rs = ps.getResultSet();
+        while (rs.next()) {
+            assertEquals(ts, rs.getTimestamp(1));
+            assertEquals(new Date(ts.getTime()), rs.getDate(1));
+            assertEquals(new Time(ts.getTime()), rs.getTime(1));
+        }
+        // Bad round-trip
+        ts = new Timestamp(System.currentTimeMillis());
+        ins.setTimestamp(1, ts);
+        ins.setString(2, "timestamp");
+        ins.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='timestamp'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            assertEquals(ts, rs.getTimestamp(1));
+            assertEquals(new Date(ts.getTime()), rs.getDate(1));
+            assertEquals(new Time(ts.getTime()), rs.getTime(1));
+        }
+        // Crashy null
+        ins.setTimestamp(1, null);
+        ins.setString(2, "crashy");
+        ins.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='crashy'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            assertEquals(null, rs.getTimestamp(1));
+            assertEquals(null, rs.getDate(1));
+            assertEquals(null, rs.getTime(1));
+        }
+        // THE TIMESTAMP BEFORE TIME
+        //Timestamp ts = new Timestamp(-10000);
+        //ts.setNanos(999999000);
+        //System.out.println("BEFORE TIME: " + ts.toString());
+        //ins.setTimestamp(1, ts);
+        //ins.setString(2, "beforetime");
+        //ins.executeUpdate();
+        //PreparedStatement ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime'");
+        //ps.executeQuery();
+        //ResultSet rs = ps.getResultSet();
+        //while (rs.next()) {
+        //    Timestamp ts1 = rs.getTimestamp(1);
+        //    assertEquals(ts, ts1);
+        //}
+    }
+
 }

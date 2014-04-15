@@ -92,7 +92,8 @@ implements Runnable {
         try {
             while (true) {
                 BBContainer container = null;
-                BBContainer compressionBuffer = null;
+                BBContainer compressionBufferC = null;
+                ByteBuffer compressionBuffer = null;
                 boolean success = false;
 
                 try {
@@ -111,17 +112,18 @@ implements Runnable {
                     // this thread could hold on to a buffer it may not need and other receivers
                     // will be blocked if the pool has no more buffers left.
                     container = bufferQueue.take();
-                    ByteBuffer messageBuffer = container.b;
+                    ByteBuffer messageBuffer = container.b();
                     messageBuffer.clear();
 
-                    compressionBuffer = compressionBufferQueue.take();
-                    compressionBuffer.b.clear();
-                    compressionBuffer.b.limit(data.length);
-                    compressionBuffer.b.put(data);
-                    compressionBuffer.b.flip();
+                    compressionBufferC = compressionBufferQueue.take();
+                    compressionBuffer = compressionBufferC.b();
+                    compressionBuffer.clear();
+                    compressionBuffer.limit(data.length);
+                    compressionBuffer.put(data);
+                    compressionBuffer.flip();
                     int uncompressedSize =
                             CompressionService.decompressBuffer(
-                                    compressionBuffer.b,
+                                    compressionBuffer,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
                     m_queue.offer(Pair.of(dataMsg.m_sourceHSId, Pair.of(dataMsg.getTargetId(), container)));
@@ -131,7 +133,7 @@ implements Runnable {
                         container.discard();
                     }
                     if (compressionBuffer != null) {
-                        compressionBuffer.discard();
+                        compressionBufferC.discard();
                     }
                 }
             }

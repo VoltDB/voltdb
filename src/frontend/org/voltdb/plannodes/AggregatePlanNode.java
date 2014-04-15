@@ -190,15 +190,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
         }
-        for (TupleValueExpression tve : output_tves)
-        {
+        for (TupleValueExpression tve : output_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            if (index == -1)
-            {
+            if (index == -1) {
                 // check to see if this TVE is the aggregate output
                 // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
-                if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
-                {
+                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
                     throw new RuntimeException("Unable to find index for column: " +
                                                tve.getColumnName());
                 }

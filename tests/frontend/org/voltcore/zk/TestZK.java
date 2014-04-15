@@ -125,6 +125,7 @@ public class TestZK extends ZKTestBase {
         assertEquals(zk.getData("/foo", false, null).length, 0);
         System.out.println("Created node");
         failSite(0);
+        Thread.sleep(1000);
         assertEquals(zk.getData("/foo", false, null).length, 0);
     }
 

@@ -56,7 +56,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -977,7 +976,7 @@ public class VoltCompiler {
         }
 
         // add extra classes from the DDL
-        m_addedClasses = voltDdlTracker.m_extraClassses;
+        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         addExtraClasses(jarOutput);
     }
 
@@ -1075,9 +1074,9 @@ public class VoltCompiler {
                     throw new VoltCompilerException(msg);
                 }
                 // reset the added classes to the actual added classes
-                m_addedClasses = addedClasses.toArray(new String[0]);
             }
         }
+        m_addedClasses = addedClasses.toArray(new String[0]);
     }
 
     /**
@@ -1777,9 +1776,6 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
-        // Ugh, need to keep the ShutdownHooks from printing the shutdown message
-        // because using VoltLogger causes it to get pulled in
-        ShutdownHooks.useOnlyCrashHooks();
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
@@ -1985,9 +1981,11 @@ public class VoltCompiler {
                         "\tfor best performance. For information on VoltDB partitioning, see:\n"+
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
-            outputStream.println("------------------------------------------\n");
-            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            if (m_reportPath != null) {
+                outputStream.println("------------------------------------------\n");
+                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            }
             outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {
@@ -2264,14 +2262,17 @@ public class VoltCompiler {
      * an upgraded jar file.
      *
      * @param outputJar  in-memory jar file (updated in place here)
+     * @return source version upgraded from or null if not upgraded
      * @throws IOException
      */
-    public void upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
+    public String upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
                     throws IOException
     {
         // getBuildInfoFromJar() performs some validation.
         String[] buildInfoLines = CatalogUtil.getBuildInfoFromJar(outputJar);
         String versionFromCatalog = buildInfoLines[0];
+        // Set if an upgrade happens.
+        String upgradedFromVersion = null;
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
@@ -2332,6 +2333,11 @@ public class VoltCompiler {
                 // Do the compilation work.
                 boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
 
+                if (success) {
+                    // Set up the return string.
+                    upgradedFromVersion = versionFromCatalog;
+                }
+
                 // Summarize the results to a file.
                 // Briefly log success or failure and mention the output text file.
                 PrintStream outputStream = new PrintStream(outputTextPath);
@@ -2372,5 +2378,6 @@ public class VoltCompiler {
                 m_classLoader = originalClassLoader;
             }
         }
+        return upgradedFromVersion;
     }
 }

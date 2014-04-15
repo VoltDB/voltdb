@@ -111,7 +111,7 @@ public class SysprocFragmentTask extends TransactionTask
         // to take place.
         if (m_fragmentMsg.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
-            VoltDB.instance().rejoinDataPending()) {
+            !VoltDB.instance().isMpSysprocSafeToExecute(m_txnState.txnId)) {
             respondWithDummy();
             return;
         }
@@ -138,7 +138,7 @@ public class SysprocFragmentTask extends TransactionTask
         //Provide it to the site so it can decide to enable recording in the task log
         //if it is our rejoin snapshot start
         if (SysProcFragmentId.isFirstSnapshotFragment(m_fragmentMsg.getPlanHash(0))) {
-            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[0]);
+            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1]);
         }
         taskLog.logTask(m_fragmentMsg);
 

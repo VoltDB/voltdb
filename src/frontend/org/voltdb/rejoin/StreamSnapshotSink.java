@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -35,6 +34,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Takes the decompressed snapshot blocks and pass them to EE. Once constructed,
@@ -227,7 +228,7 @@ public class StreamSnapshotSink {
         long targetId = msg.getSecond().getFirst();
         BBContainer container = msg.getSecond().getSecond();
         try {
-            ByteBuffer block = container.b;
+            ByteBuffer block = container.b();
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
             final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];

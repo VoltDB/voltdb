@@ -238,6 +238,16 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
 
+    if (originalTable->m_tableStreamer != NULL) {
+        std::stringstream message;
+        message << "Transfering table stream after truncation of table ";
+        message << name() << " partition " << originalTable->m_tableStreamer->getPartitionID() << '\n';
+        std::string str = message.str();
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
+
+        originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -961,7 +971,8 @@ std::string PersistentTable::debug() {
 void PersistentTable::onSetColumns() {
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        m_allowNulls[i] = m_schema->columnAllowNull(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
     }
 
     // Also clear some used block state. this structure doesn't have

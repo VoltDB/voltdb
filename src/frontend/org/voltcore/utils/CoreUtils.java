@@ -42,7 +42,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -73,6 +72,13 @@ public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
+    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
+
     public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
@@ -88,6 +94,11 @@ public class CoreUtils {
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
 
+    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
+        @Override
+        public void run() {}
+    };
+
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
      * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
@@ -101,22 +112,49 @@ public class CoreUtils {
                 1,
                 keepAlive,
                 TimeUnit.MILLISECONDS,
-                new LinkedTransferQueue<Runnable>(),
+                new LinkedBlockingQueue<Runnable>(),
                 CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
     }
 
     /**
      * Create an unbounded single threaded executor
      */
-    public static ListeningExecutorService getSingleThreadExecutor(String name) {
+    public static ExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return ste;
+    }
+
+    public static ExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
+        return ste;
+    }
+
+    /**
+     * Create an unbounded single threaded executor
+     */
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
-    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name, int size) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -290,6 +328,8 @@ public class CoreUtils {
                             r.run();
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
+                        } finally {
+                            m_threadLocalDeallocator.run();
                         }
                     }
                 };

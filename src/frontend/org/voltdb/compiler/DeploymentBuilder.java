@@ -41,6 +41,7 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
@@ -90,6 +91,7 @@ public class DeploymentBuilder {
     boolean m_jsonApiEnabled = true;
 
     boolean m_securityEnabled = false;
+    String  m_securityProvider = SecurityProviderString.HASH.value();
 
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
@@ -198,6 +200,13 @@ public class DeploymentBuilder {
 
     public void setSecurityEnabled(final boolean enabled) {
         m_securityEnabled = enabled;
+    }
+
+    public void setSecurityProvider(final String provider) {
+        if (provider != null && !provider.trim().isEmpty()) {
+            SecurityProviderString.fromValue(provider);
+            m_securityProvider = provider;
+        }
     }
 
     public void setSnapshotSettings(
@@ -310,6 +319,12 @@ public class DeploymentBuilder {
         SecurityType security = factory.createSecurityType();
         deployment.setSecurity(security);
         security.setEnabled(m_securityEnabled);
+        SecurityProviderString provider = SecurityProviderString.HASH;
+        if (m_securityEnabled) try {
+            provider = SecurityProviderString.fromValue(m_securityProvider);
+        } catch (IllegalArgumentException shouldNotHappenSeeSetter) {
+        }
+        security.setProvider(provider);
 
         if (m_commandLogSync != null || m_commandLogEnabled != null ||
                 m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||

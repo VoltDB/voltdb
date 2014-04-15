@@ -18,6 +18,8 @@
 #ifndef STRINGFUNCTIONS_H
 #define STRINGFUNCTIONS_H
 
+#include <boost/algorithm/string.hpp>
+
 namespace voltdb {
 
 static inline int32_t getCharLength(const char *valueChars, const size_t length) {
@@ -53,7 +55,7 @@ template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull())
         return getNullValue();
 
-    return getIntegerValue(getObjectLength());
+    return getIntegerValue(getObjectLength_withoutNull());
 }
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
@@ -61,8 +63,8 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull())
         return getNullValue();
 
-    char *valueChars = reinterpret_cast<char*>(getObjectValue());
-    return getBigIntValue(static_cast<int64_t>(getCharLength(valueChars, getObjectLength())));
+    char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
+    return getBigIntValue(static_cast<int64_t>(getCharLength(valueChars, getObjectLength_withoutNull())));
 }
 
 /** implement the 1-argument SQL SPACE function */
@@ -80,6 +82,40 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
 
     std::string spacesStr (count, ' ');
     return getTempStringValue(spacesStr.c_str(),count);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_FOLD_LOWER>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    int32_t objectLength = getObjectLength_withoutNull();
+
+    std::string inputStr = std::string(ptr, objectLength);
+    boost::algorithm::to_lower(inputStr);
+
+    return getTempStringValue(inputStr.c_str(),objectLength);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_FOLD_UPPER>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    int32_t objectLength = getObjectLength_withoutNull();
+
+    std::string inputStr = std::string(ptr, objectLength);
+    boost::algorithm::to_upper(inputStr);
+
+    return getTempStringValue(inputStr.c_str(),objectLength);
 }
 
 /** implement the 2-argument SQL REPEAT function */
@@ -108,8 +144,8 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
         return getTempStringValue("", 0);
     }
 
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *repeatChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    char *repeatChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
 
     std::string repeatStr;
     while (count-- > 0)
@@ -128,15 +164,15 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     if (target.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (target.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    int32_t lenTarget = target.getObjectLength();
+    int32_t lenTarget = target.getObjectLength_withoutNull();
 
     const NValue& pool = arguments[1];
     if (pool.isNull()) {
         return getNullValue();
     }
-    int32_t lenPool = pool.getObjectLength();
-    char *targetChars = reinterpret_cast<char*>(target.getObjectValue());
-    char *poolChars = reinterpret_cast<char*>(pool.getObjectValue());
+    int32_t lenPool = pool.getObjectLength_withoutNull();
+    char *targetChars = reinterpret_cast<char*>(target.getObjectValue_withoutNull());
+    char *poolChars = reinterpret_cast<char*>(pool.getObjectValue_withoutNull());
 
     std::string poolStr(poolChars, lenPool);
     std::string targetStr(targetChars, lenTarget);
@@ -176,8 +212,8 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
         return getTempStringValue("", 0);
     }
 
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
 
     return getTempStringValue(valueChars,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
 }
@@ -209,8 +245,8 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
         return getTempStringValue("", 0);
     }
 
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
     const char *valueEnd = valueChars+valueUTF8Length;
     int32_t charLen = getCharLength(valueChars,valueUTF8Length);
     if (count >= charLen)
@@ -230,15 +266,15 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     if (left.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (left.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    int32_t lenLeft = left.getObjectLength();
+    int32_t lenLeft = left.getObjectLength_withoutNull();
 
     const NValue& right = arguments[1];
     if (right.isNull()) {
         return getNullStringValue();
     }
-    int32_t lenRight = right.getObjectLength();
-    char *leftChars = reinterpret_cast<char*>(left.getObjectValue());
-    char *rightChars = reinterpret_cast<char*>(right.getObjectValue());
+    int32_t lenRight = right.getObjectLength_withoutNull();
+    char *leftChars = reinterpret_cast<char*>(left.getObjectValue_withoutNull());
+    char *rightChars = reinterpret_cast<char*>(right.getObjectValue_withoutNull());
 
     std::string leftStr(leftChars, lenLeft);
     leftStr.append(rightChars, lenRight);
@@ -262,8 +298,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
         return getNullStringValue();
     }
 
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
     const char *valueEnd = valueChars+valueUTF8Length;
 
     int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
@@ -292,8 +328,8 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     if (lengthArg.isNull()) {
         return getNullStringValue();
     }
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
     const char *valueEnd = valueChars+valueUTF8Length;
     int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
     int64_t length = lengthArg.castAsBigIntAndGetValue();

@@ -21,10 +21,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 
@@ -43,6 +45,7 @@ public class DuplicateCounter
     final long m_destinationId;
     Long m_responseHash = null;
     protected VoltMessage m_lastResponse = null;
+    protected VoltTable m_lastResultTables[] = null;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     private final String m_storedProcName;
@@ -82,7 +85,7 @@ public class DuplicateCounter
         }
     }
 
-    protected int checkCommon(long hash, boolean rejoining, VoltMessage message)
+    protected int checkCommon(long hash, boolean rejoining, VoltTable resultTables[], VoltMessage message)
     {
         if (!rejoining) {
             if (m_responseHash == null) {
@@ -100,7 +103,21 @@ public class DuplicateCounter
                 tmLog.error(msg);
                 return MISMATCH;
             }
+            /*
+             * Replicas will return a response to a write with no result tables
+             * always keep the local response which has the result tables
+             */
+//            if (m_lastResponse != null && resultTables != null) {
+//                if (m_lastResultTables.length < resultTables.length) {
+//                    m_lastResponse = message;
+//                    m_lastResultTables = resultTables;
+//                }
+//            } else {
+//                m_lastResponse = message;
+//                m_lastResultTables = resultTables;
+//            }
             m_lastResponse = message;
+            m_lastResultTables = resultTables;
         }
 
         /*
@@ -111,6 +128,7 @@ public class DuplicateCounter
          */
         if (m_lastResponse == null) {
             m_lastResponse = message;
+            m_lastResultTables = resultTables;
         }
 
         m_expectedHSIds.remove(message.m_sourceHSId);
@@ -131,12 +149,12 @@ public class DuplicateCounter
         if (sqlHash != null) {
             hash = sqlHash.intValue();
         }
-        return checkCommon(hash, message.isRecovering(), message);
+        return checkCommon(hash, message.isRecovering(), r.getResults(), message);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), message);
+        return checkCommon(0, message.isRecovering(), null, message);
     }
 
     VoltMessage getLastResponse()
@@ -144,6 +162,7 @@ public class DuplicateCounter
         return m_lastResponse;
     }
 
+    @Override
     public String toString()
     {
         String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,

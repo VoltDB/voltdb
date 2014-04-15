@@ -225,6 +225,10 @@ SnapshotCompletionInterest, Promotable
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
         public final InstanceId instanceId;
+        // Track the tables contained in the snapshot digest file
+        public final Set<String> digestTables = new HashSet<String>();
+        // Track the tables for which we found files on the node reporting this SnapshotInfo
+        public final Set<String> fileTables = new HashSet<String>();
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
@@ -232,7 +236,8 @@ SnapshotCompletionInterest, Promotable
 
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
-                            long catalogCrc, int hostId, InstanceId instanceId)
+                            long catalogCrc, int hostId, InstanceId instanceId,
+                            Set<String> digestTables)
         {
             this.txnId = txnId;
             this.path = path;
@@ -242,6 +247,7 @@ SnapshotCompletionInterest, Promotable
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
             this.instanceId = instanceId;
+            this.digestTables.addAll(digestTables);
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -277,6 +283,14 @@ SnapshotCompletionInterest, Promotable
                  Long val = jsonPtoTxnId.getLong(key);
                  partitionToTxnId.put(Integer.valueOf(key), val);
             }
+            JSONArray jdt = jo.getJSONArray("digestTables");
+            for (int i = 0; i < jdt.length(); i++) {
+                digestTables.add(jdt.getString(i));
+            }
+            JSONArray ft = jo.getJSONArray("fileTables");
+            for (int i = 0; i < ft.length(); i++) {
+                fileTables.add(ft.getString(i));
+            }
         }
 
         public JSONObject toJSONObject()
@@ -309,6 +323,16 @@ SnapshotCompletionInterest, Promotable
                 }
                 stringer.endObject(); // partitionToTxnId
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("digestTables").array();
+                for (String digestTable : digestTables) {
+                    stringer.value(digestTable);
+                }
+                stringer.endArray();
+                stringer.key("fileTables").array();
+                for (String fileTable : fileTables) {
+                    stringer.value(fileTable);
+                }
+                stringer.endArray();
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -703,6 +727,7 @@ SnapshotCompletionInterest, Promotable
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        Set<String> digestTableNames = new HashSet<String>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
         int newParitionCount = -1;
@@ -729,6 +754,13 @@ SnapshotCompletionInterest, Promotable
 
             if (digest_detail.has("newPartitionCount")) {
                 newParitionCount = digest_detail.getInt("newPartitionCount");
+            }
+
+            if (digest_detail.has("tables")) {
+                JSONArray tableObj = digest_detail.getJSONArray("tables");
+                for (int i = 0; i < tableObj.length(); i++) {
+                    digestTableNames.add(tableObj.getString(i));
+                }
             }
         }
         catch (IOException ioe)
@@ -797,7 +829,8 @@ SnapshotCompletionInterest, Promotable
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId);
+                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId,
+                    digestTableNames);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -808,6 +841,8 @@ SnapshotCompletionInterest, Promotable
             if (!tableFile.m_isReplicated) {
                 info.partitions.put(te.getKey(), ids);
             }
+            // keep track of tables for which we've seen files while we're here
+            info.fileTables.add(te.getKey());
         }
         info.setPidToTxnIdMap(pidToTxnMap);
         return info;
@@ -973,6 +1008,8 @@ SnapshotCompletionInterest, Promotable
         SnapshotInfo newest = null;
         while (it.hasNext()) {
             Entry<String, Set<SnapshotInfo>> e = it.next();
+            Set<String> fileTables = new HashSet<String>();
+            Set<String> digestTables = null;
             String nonce = e.getKey();
             Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(nonce);
             if (tablePartitions == null) {
@@ -984,6 +1021,22 @@ SnapshotCompletionInterest, Promotable
             boolean inconsistent = false;
             Set<SnapshotInfo> fragments = e.getValue();
             for (SnapshotInfo s : fragments) {
+                LOG.debug("SnapshotInfo " + s.nonce + " claims digest tables: " + s.digestTables);
+                LOG.debug("SnapshotInfo " + s.nonce + " claims files for tables: " + s.fileTables);
+                if (digestTables == null) {
+                    digestTables = new HashSet<String>(s.digestTables);
+                }
+                else if (!digestTables.equals(s.digestTables)) {
+                    m_snapshotLogStr.append("\nRejected snapshot ")
+                                    .append(s.nonce)
+                                    .append(" due to disagreement in digest table list.  Got ")
+                                    .append(s.digestTables)
+                                    .append(", expecting ")
+                                    .append(digestTables);
+                    inconsistent = true;
+                    break;
+                }
+                fileTables.addAll(s.fileTables);
                 if (totalPartitions == -1) {
                     totalPartitions = s.partitionCount;
                 } else if (totalPartitions != s.partitionCount) {
@@ -1011,6 +1064,17 @@ SnapshotCompletionInterest, Promotable
                 }
             }
 
+            // Check that we have files for all the tables listed in the digest
+            if (!fileTables.equals(digestTables)) {
+                m_snapshotLogStr.append("\nRejected snapshot ")
+                    .append(nonce)
+                    .append(" because there were not table files for all tables in the digest.  Expected ")
+                    .append(digestTables)
+                    .append(", but only found table data for ")
+                    .append(fileTables);
+                inconsistent = true;
+            }
+
             // Check if we have all the partitions
             for (Set<Integer> partitions : tablePartitions.values()) {
                 if (partitions.size() != totalPartitions) {
@@ -1021,7 +1085,6 @@ SnapshotCompletionInterest, Promotable
                                     .append(", expecting ")
                                     .append(totalPartitions);
                     inconsistent = true;
-                    break;
                 }
             }
 
@@ -1037,9 +1100,12 @@ SnapshotCompletionInterest, Promotable
         }
 
         // If we have a command log and it requires a snapshot but no snapshot
-        // fragments were found, simply bail.
-        if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
-            snapshotFragments.size() == 0) {
+        // fragments were found, simply bail (or, if we didn't find a viable
+        // snapshot from which to recover)
+        // Reluctant to muck with the first predicate here, even though
+        // the newest == null should cover all of the 'no viable snapshot' possiblities
+        if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
+            snapshotFragments.size() == 0) || newest == null) {
             if (m_snapshotLogStr.length() > 0) {
                 LOG.error(m_snapshotLogStr.toString());
             }
