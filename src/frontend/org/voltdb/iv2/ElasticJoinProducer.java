@@ -280,7 +280,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    public void enableRecording() {
+    public void enableRecording(long snapshotSpHandle) {
         //Implemented by the nest task log, it is enabled immediately on construction
     }
 }
