@@ -1420,7 +1420,7 @@ public class DDLCompiler {
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw m_compiler.new VoltCompilerException(msg);
                 }
-                if (!inBytes) {
+                if (!inBytes && type == VoltType.STRING) {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
                         String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
                                 "will be enforced as byte counts rather than UTF8 character counts. " +
