@@ -22,8 +22,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,8 +49,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.COWMap;
-import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
@@ -65,6 +61,7 @@ import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.primitives.Longs;
+import java.util.Collection;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -1085,16 +1082,28 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_zk;
     }
 
-    public void sendPoisonPill(String err) {
-        sendPoisonPill(m_foreignHosts.keySet(), err);
-    }
-
-    public void sendPoisonPill(Collection<Integer> hostIds, String err) {
+    public void sendPoisonPill(Collection<Integer> hostIds, String err, int cause) {
         for (int hostId : hostIds) {
             ForeignHost fh = m_foreignHosts.get(hostId);
             if (fh != null && fh.isUp()) {
-                fh.sendPoisonPill(err);
+                fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
             }
+        }
+    }
+
+    public void sendPoisonPill(String err) {
+        for (int hostId : m_foreignHosts.keySet()) {
+            ForeignHost fh = m_foreignHosts.get(hostId);
+            if (fh != null && fh.isUp()) {
+                fh.sendPoisonPill(err, ForeignHost.CRASH_ALL);
+            }
+        }
+    }
+
+    public void sendPoisonPill(String err, int targetHostId, int cause) {
+        ForeignHost fh = m_foreignHosts.get(targetHostId);
+        if (fh != null && fh.isUp()) {
+            fh.sendPoisonPill(err, cause);
         }
     }
 

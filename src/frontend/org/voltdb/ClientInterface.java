@@ -115,6 +115,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1726,6 +1727,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@GC")) {
                 return dispatchSystemGC(handler, task, user);
             }
+            if (task.procName.equals("@StopNode")) {
+                return dispatchStopNode(task);
+            }
         }
 
         Procedure catProc = catalogContext.procedures.get(task.procName);
@@ -2034,6 +2038,55 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
+    }
+
+    private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
+        VoltTable table = new VoltTable(
+                new ColumnInfo("RESULT", VoltType.STRING));
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "@StopNode must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "@StopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        List<Integer> liveHids = VoltDB.instance().getHostMessenger().getLiveHostIds();
+        if (!liveHids.contains(ihid)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
+                    task.clientHandle);
+        }
+        if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
+            hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
+                    + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                    + " Use shutdown to stop the cluster.");
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                            + " Use shutdown to stop the cluster.", task.clientHandle);
+        }
+
+        int hid = VoltDB.instance().getHostMessenger().getHostId();
+        if (hid == ihid) {
+            //Killing myself no pill needs to be sent
+            VoltDB.instance().halt();
+        } else {
+            //Send poison pill with target to kill
+            VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)

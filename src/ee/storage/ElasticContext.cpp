@@ -48,8 +48,35 @@ ElasticContext::~ElasticContext()
 
 TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
 {
-    return new ElasticContext(surgeon.getTable(), surgeon,
+    if ( ! m_indexActive) {
+        return NULL;
+    }
+    ElasticContext *cloned = new ElasticContext(surgeon.getTable(), surgeon,
         getPartitionId(), getSerializer(), m_predicateStrings, m_nTuplesPerCall);
+    cloned->handleActivation(TABLE_STREAM_ELASTIC_INDEX);
+
+    TupleOutputStreamProcessor dummyProcessor;
+    std::vector<int> dummyPosition;
+    while (true) {
+        int64_t retCode = cloned->handleStreamMore(dummyProcessor, dummyPosition);
+        if (retCode == 0) {
+            break;
+        } else if (retCode == TABLE_STREAM_SERIALIZATION_ERROR) {
+            break;
+        } else if (retCode == 1) {
+            continue;
+        } else {
+            char errMsg[1024];
+            snprintf(errMsg,
+                     1024,
+                     "Received an unrecognized return value %jd from handleStreamMore()",
+                     (intmax_t)retCode);
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+            break;
+        }
+    }
+
+    return cloned;
 }
 
 /**
