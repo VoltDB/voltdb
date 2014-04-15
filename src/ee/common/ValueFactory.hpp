@@ -107,9 +107,7 @@ public:
 
     static inline NValue castAsBigInt(NValue value) {
         if (value.isNull()) {
-            NValue retval(VALUE_TYPE_BIGINT);
-            retval.setNull();
-            return retval;
+            return NValue::getNullValue(VALUE_TYPE_BIGINT);
         }
         return value.castAsBigInt();
     }
