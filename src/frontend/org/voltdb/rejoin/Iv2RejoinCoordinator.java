@@ -24,28 +24,25 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.collect.ArrayListMultimap;
-import com.google_voltpatches.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.SnapshotSiteProcessor;
-
 import org.voltdb.SnapshotFormat;
-
-import org.voltdb.catalog.Database;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
+
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.Multimap;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -123,14 +120,14 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
      * Send rejoin initiation message to the local site
      * @param HSId
      */
-    private void initiateRejoinOnSites(long HSId)
+    private void initiateRejoinOnSites(long HSId, boolean emptyRejoin)
     {
         List<Long> HSIds = new ArrayList<Long>();
         HSIds.add(HSId);
-        initiateRejoinOnSites(HSIds);
+        initiateRejoinOnSites(HSIds, emptyRejoin);
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds)
+    private void initiateRejoinOnSites(List<Long> HSIds, boolean emptyRejoin)
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
@@ -147,7 +144,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
                                               1, // 1 source per rejoining site
-                                              m_snapshotBufPool);
+                                              m_snapshotBufPool,
+                                              emptyRejoin);
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -169,6 +167,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
+        boolean emptyRejoin = catalog.getTables().isEmpty();
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -178,7 +177,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             }
             String HSIdString = CoreUtils.hsIdToString(firstSite);
             REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
-            initiateRejoinOnSites(firstSite);
+            initiateRejoinOnSites(firstSite, emptyRejoin);
         }
         else {
             List<Long> firstSites = new ArrayList<Long>();
@@ -188,13 +187,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                 m_pendingSites.clear();
             }
             REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
-            initiateRejoinOnSites(firstSites);
+            initiateRejoinOnSites(firstSites, emptyRejoin);
         }
 
         return true;
     }
 
-    private void initiateNextSite() {
+    private void initiateNextSite(boolean emptyRejoin) {
         // make all the decisions under lock.
         Long nextSite = null;
         synchronized (m_lock) {
@@ -206,7 +205,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             }
         }
         if (nextSite != null) {
-            initiateRejoinOnSites(nextSite);
+            initiateRejoinOnSites(nextSite, emptyRejoin);
         }
     }
 
@@ -250,7 +249,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            m_srcToDest.put(masterHSId, dataSinkHSId);
+            // Long.MIN_VALUE is used when there are no tables in the database and
+            // no snapshot transfer is needed.
+            if (dataSinkHSId != Long.MIN_VALUE) {
+                m_srcToDest.put(masterHSId, dataSinkHSId);
+            }
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
@@ -284,7 +287,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             REJOINLOG.info("Finished streaming snapshot to site: " +
                            CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
-            initiateNextSite();
+            assert(m_catalog != null);
+            boolean emptyRejoin = m_catalog.getTables().isEmpty();
+            initiateNextSite(emptyRejoin);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());

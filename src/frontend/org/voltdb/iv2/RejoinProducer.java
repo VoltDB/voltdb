@@ -37,8 +37,6 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 /**
  * Manages the lifecycle of snapshot serialization to a site
  * for the purposes of rejoin.
@@ -49,7 +47,7 @@ public class RejoinProducer extends JoinProducerBase {
     private final AtomicBoolean m_currentlyRejoining;
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
-    private StreamSnapshotSink m_rejoinSiteProcessor;
+    private StreamSnapshotSink m_rejoinSiteProcessor = null;
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -196,13 +194,22 @@ public class RejoinProducer extends JoinProducerBase {
     void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
+        if (!message.isEmptyRejoin()) {
+            m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+            m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
+        }
+        else {
+            m_streamSnapshotMb = null;
+            m_rejoinSiteProcessor = null;
+        }
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
-                                                     message.getSnapshotBufferPool());
+        // Provide a valid sink host id unless it is an empty database.
+        long hsId = (m_rejoinSiteProcessor != null
+                        ? m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
+                                                           message.getSnapshotBufferPool())
+                        : Long.MIN_VALUE);
 
         REJOINLOG.debug(m_whoami
                 + "received INITIATION message. Doing rejoin"
@@ -247,21 +254,29 @@ public class RejoinProducer extends JoinProducerBase {
     public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog m_taskLog) throws IOException
     {
-        RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
-        if (rejoinWork != null) {
-            restoreBlock(rejoinWork, siteConnection);
+        if (m_rejoinSiteProcessor != null) {
+            RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
+            if (rejoinWork != null) {
+                restoreBlock(rejoinWork, siteConnection);
+            }
+
+            if (m_rejoinSiteProcessor.isEOF() == false) {
+                m_taskQueue.offer(this);
+            } else {
+                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+                m_rejoinSiteProcessor.close();
+
+                if (m_streamSnapshotMb != null) {
+                    VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+                }
+
+                doFinishingTask(siteConnection);
+            }
         }
-
-        if (m_rejoinSiteProcessor.isEOF() == false) {
-            m_taskQueue.offer(this);
-        } else {
-            REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
-            m_rejoinSiteProcessor.close();
-
-            Preconditions.checkNotNull(m_streamSnapshotMb);
-            VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
-
+        // Manually remove the future if an empty snapshot skipped around it.
+        else {
             doFinishingTask(siteConnection);
+            m_snapshotCompletionMonitor.set(null);
         }
     }
 
@@ -311,7 +326,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 setJoinComplete(
                         siteConnection,
-                        event.exportSequenceNumbers,
+                        event.exportSequenceNumbers,//XXXXX empty -> send empty collection
                         true /* requireExistingSequenceNumbers */);
             }
         };
