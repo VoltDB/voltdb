@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true" target="kafka">
+        <configuration>
+            <!-- Set any properties that you would like your kafka client to use. -->
+            <property name="metadata.broker.list">localhost:9092</property>
+            <property name="request.required.acks">1</property>
+            <property name="producer.type">async</property>
+            <!-- <property name="compression.codec">snappy</property> -->
+        </configuration>
+    </export>
+</deployment>

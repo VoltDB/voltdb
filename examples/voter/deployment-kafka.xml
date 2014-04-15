@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="6" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true" target="kafka">
+        <configuration>
+            <!-- Set any properties that you would like your kafka client to use. -->
+            <!-- 
+                 If you are running kafka locally make sure you run zookeeper needed by kafka
+                 on different port as kafka and voltdb default port clashes
+            -->
+            <property name="metadata.broker.list">localhost:9092</property>
+            <property name="request.required.acks">1</property>
+            <!-- Async producer is preferred for better performance -->
+            <property name="producer.type">async</property>
+        </configuration>
+    </export>
+</deployment>

@@ -18,6 +18,13 @@ CREATE TABLE votes
 , contestant_number  integer    NOT NULL
 );
 
+CREATE TABLE export_votes
+(
+  phone_number       bigint     NOT NULL
+, state              varchar(2) NOT NULL
+, contestant_number  integer    NOT NULL
+);
+
 PARTITION TABLE votes ON COLUMN phone_number;
 
 -- Map of Area Codes and States for geolocation classification of incoming calls
@@ -67,3 +74,5 @@ CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
 PARTITION PROCEDURE Vote ON TABLE votes COLUMN phone_number;
 CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
+-- export votes table.
+EXPORT table export_votes;
