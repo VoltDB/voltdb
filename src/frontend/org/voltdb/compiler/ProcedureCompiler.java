@@ -49,6 +49,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockConstants;
@@ -270,7 +271,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             InMemoryJarfile jarOutput)
     throws VoltCompiler.VoltCompilerException {
 
-        final String className = procedureDescriptor.m_className;
+        final String className = procedureDescriptor.getProcedureName();
         final Language lang = procedureDescriptor.m_language;
 
         // Load the class given the class name
@@ -281,7 +282,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         // add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String groupName : procedureDescriptor.m_authGroups) {
+        for (String groupName : procedureDescriptor.getAuthGroups()) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
                 throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
@@ -295,6 +296,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
         procedure.setLanguage(lang.name());
+        if (procedureDescriptor.m_scriptImpl != null) {
+            // This is a Groovy procedure and we need to add an annotation with the script to the Procedure element in the Catalog
+            ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
+            if (pa == null) {
+                pa = new ProcedureAnnotation();
+                procedure.setAnnotation(pa);
+            }
+            pa.scriptImpl = procedureDescriptor.m_scriptImpl;
+        }
 
         // get the annotation
         // first try to get one that has been passed from the compiler
@@ -609,7 +619,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             ProcedureDescriptor procedureDescriptor)
     throws VoltCompiler.VoltCompilerException {
 
-        final String className = procedureDescriptor.m_className;
+        final String className = procedureDescriptor.getProcedureName();
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
@@ -624,7 +634,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         // add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String groupName : procedureDescriptor.m_authGroups) {
+        for (String groupName : procedureDescriptor.getAuthGroups()) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
                 throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
@@ -794,6 +804,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                     if (column.getTypeName().equalsIgnoreCase(columnName)) {
                         if (partitionColumn.getTypeName().equals(column.getTypeName())) {
                             procedure.setPartitioncolumn(column);
+                            procedure.setPartitiontable(table);
                             return;
                         }
                         else {

@@ -621,15 +621,15 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), Language.JAVA, clazz);
+                    new ArrayList<String>(), Language.JAVA, null, clazz);
 
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
                     // Don't put the same role in the list more than once.
                     String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
-                        descriptor.m_authGroups.add(roleNameFixed);
+                    if (!descriptor.getAuthGroups().contains(roleNameFixed)) {
+                        descriptor.getAuthGroups().add(roleNameFixed);
                     }
                 }
             }
@@ -647,12 +647,12 @@ public class DDLCompiler {
             String sqlStatement = statementMatcher.group(3);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                    descriptor.getAuthGroups().add(roleName.trim().toLowerCase());
                 }
             }
 
@@ -689,12 +689,12 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), language, scriptClass);
+                    new ArrayList<String>(), language, codeBlock, scriptClass);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                    descriptor.getAuthGroups().add(roleName.trim().toLowerCase());
                 }
             }
             // track the defined procedure
@@ -908,10 +908,6 @@ public class DDLCompiler {
     }
 
     public void compileToCatalog(Database db) throws VoltCompilerException {
-        // note this will need to be decompressed to be used
-        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
-        db.setSchema(binDDL);
-
         VoltXMLElement xmlCatalog;
         try
         {
@@ -1239,7 +1235,6 @@ public class DDLCompiler {
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
-        annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
 
         // handle the case where this is a materialized view
         String query = node.attributes.get("query");
@@ -1322,6 +1317,9 @@ public class DDLCompiler {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
+        // Temporarily assign the view Query to the annotation so we can use when when we build the full DDL statements
+        annotation.ddl = query;
+
         if (maxRowSize > MAX_ROW_SIZE) {
             throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
                     " but the maximum supported row size is " + MAX_ROW_SIZE);
