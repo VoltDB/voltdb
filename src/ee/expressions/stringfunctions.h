@@ -395,7 +395,6 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     int32_t length = str0.getObjectLength_withoutNull();
     std::string targetStr = std::string(ptr, length);
 
-
     const NValue& str1 = arguments[1];
     if (str1.isNull()) {
         return getTempStringValue(targetStr.c_str(), targetStr.length());
@@ -406,7 +405,7 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     ptr = reinterpret_cast<char*>(str1.getObjectValue_withoutNull());
     std::string matchStr = std::string(ptr, str1.getObjectLength_withoutNull());
 
-    std::string replaceStr = "";
+    std::string replaceStr = ""; // NULL default behavior
     const NValue& str2 = arguments[2];
     if (!str2.isNull()) {
         if (str2.getValueType() != VALUE_TYPE_VARCHAR) {
@@ -455,7 +454,7 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     return getTempStringValue(startChar, endChar - startChar);
 }
 
-/** implement the 3 or4 argument SQL OVERLAY function */
+/** implement the 3 or 4 argument SQL OVERLAY function */
 template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3 || arguments.size() == 4);
 
@@ -472,7 +471,7 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
 
     const NValue& str1 = arguments[1];
     if (str1.isNull()) {
-        return getTempStringValue(sourceStr.c_str(), sourceStr.length());
+        return getNullStringValue();
     }
     if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
@@ -487,22 +486,29 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     int64_t start = startArg.castAsBigIntAndGetValue();
     start -= 1;
     if (start < 0 || start > sourceStr.length()) {
-        return getNullStringValue();
+        char message[128];
+        snprintf(message, 128, "data exception -- OVERLAY error, invalid start argument %ld", (long)(start+1));
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
     }
 
-    int64_t length = sourceStr.length() - start;
+    int64_t length = 0;
     if (arguments.size() == 4) {
         const NValue& lengthArg = arguments[3];
         if (lengthArg.isNull()) {
             return getNullStringValue();
         }
         length = lengthArg.castAsBigIntAndGetValue();
+        if (length < 0) {
+            char message[128];
+            snprintf(message, 128, "data exception -- OVERLAY error, negative length argument %ld",(long)length);
+            throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        }
+    } else {
+        // By default without length argument
+        length = getCharLength(ptr, str1.getObjectLength_withoutNull());
     }
 
-    if (length < 0) {
-        return getNullStringValue();
-    }
-
+    // FIXME(xin): Function does not work properly for UTF-8 String
     sourceStr.erase(start, length);
     sourceStr.insert(start, insertStr);
     return getTempStringValue(sourceStr.c_str(), sourceStr.length());

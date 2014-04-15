@@ -2234,7 +2234,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("Vo", result.getString(1));
 
-
         // UTF-8 String
         cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2259,6 +2258,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("XinJia", result.getString(1));
 
+        result = client.callProcedure("OVERLAY", "Jia_", 4, 1, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia_VoltDB", result.getString(1));
+
         result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
         System.out.println(result);
         assertTrue(result.advanceRow());
@@ -2270,6 +2274,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("XinJia", result.getString(1));
 
         // Test NULL results
+        result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
         result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
         System.out.println(result);
         assertTrue(result.advanceRow());
@@ -2279,6 +2288,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "Jia", 4, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJialtDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "J", 4, 1).getResults()[0];
+        System.out.println(result);
+        assertTrue(result.advanceRow());
+        assertEquals("XinJVoltDB", result.getString(1));
+
+        // Test UTF-8 OVERLAY
+//        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//
+//        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
+//        System.out.println(result);
+//        assertTrue(result.advanceRow());
+//        assertEquals("XinJia@VoltDB", result.getString(1));
+
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2899,6 +2928,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
 
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
