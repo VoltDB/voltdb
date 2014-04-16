@@ -66,6 +66,9 @@ public class Tokens {
     public static final String T_BIGINT           = "BIGINT";
     public static final String T_BINARY           = "BINARY";
     static final String        T_BIT_LENGTH       = "BIT_LENGTH";
+    // A VoltDB extension to support varchar column in bytes.
+    static final String        T_BYTES            = "BYTES"; // For VoltDB
+    // End of VoltDB extension
     public static final String T_BLOB             = "BLOB";
     public static final String T_BOOLEAN          = "BOOLEAN";
     static final String        T_BOTH             = "BOTH";
@@ -1355,6 +1358,9 @@ public class Tokens {
     static final int        AUTOCOMMIT            = 552;
     static final int        BIT                   = 553;
     static final int        BIT_LENGTH            = 554;
+    // A VoltDB extension to support varchar column in bytes.
+    static final int        BYTES                 = 1010; // For VoltDB
+    // End of VoltDB extension
     static final int        CACHED                = 555;
     static final int        CASEWHEN              = 556;
     static final int        CHECKPOINT            = 557;
@@ -1595,6 +1601,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_BIGINT, BIGINT);
         reservedKeys.put(Tokens.T_BINARY, BINARY);
         reservedKeys.put(Tokens.T_BIT_LENGTH, BIT_LENGTH);
+        // A VoltDB extension to support varchar column in bytes.
+        reservedKeys.put(Tokens.T_BYTES, BYTES); // For VoltDB
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_BLOB, BLOB);
         reservedKeys.put(Tokens.T_BOOLEAN, BOOLEAN);
         reservedKeys.put(Tokens.T_BOTH, BOTH);
