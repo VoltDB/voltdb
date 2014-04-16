@@ -50,32 +50,33 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
         }
 
         ParameterSet params = invocation.getParams();
-        // deployment string can be null, indicating that the user
-        // doesn't want to alter that, and we'll use the previous deployment
-        if (params.toArray().length != 2 ||
-            params.toArray()[0] == null)
+        // Either the catalog bytes or the deployment string can be null, indicating
+        // that the user doesn't want to change that component.  Null values will
+        // be populated correctly by the AsyncCompilerAgentHelper downstream.
+        if (params.toArray().length != 2)
         {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
                     "UpdateApplicationCatalog system procedure requires exactly " +
                     "two parameters, the catalog bytes and the deployment file " +
-                    "string (which may be null).",
+                    "string (either of which may be null).",
                     invocation.clientHandle);
         }
-
-        boolean isHex = false;
-        if (params.toArray()[0] instanceof String) {
-            isHex = Encoder.isHexEncodedString((String) params.toArray()[0]);
+        if (params.toArray()[0] != null)
+        {
+            boolean isHex = false;
+            if (params.toArray()[0] instanceof String) {
+                isHex = Encoder.isHexEncodedString((String) params.toArray()[0]);
+            }
+            if (!isHex && !(params.toArray()[0] instanceof byte[])) {
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "UpdateApplicationCatalog system procedure takes the " +
+                        "catalog bytes as a byte array. The received parameter " +
+                        "is of type " + params.toArray()[0].getClass() + ".",
+                        invocation.clientHandle);
+            }
         }
-        if (!isHex && !(params.toArray()[0] instanceof byte[])) {
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "UpdateApplicationCatalog system procedure takes the " +
-                    "catalog bytes as a byte array. The received parameter " +
-                    "is of type " + params.toArray()[0].getClass() + ".",
-                    invocation.clientHandle);
-        }
-
         return null;
     }
 }
