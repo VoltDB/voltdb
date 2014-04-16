@@ -253,7 +253,7 @@ public class RejoinProducer extends JoinProducerBase {
         }
 
         if (m_rejoinSiteProcessor.isEOF() == false) {
-            m_taskQueue.offer(this);
+            returnToTaskQueue(rejoinWork);
         } else {
             REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
             m_rejoinSiteProcessor.close();

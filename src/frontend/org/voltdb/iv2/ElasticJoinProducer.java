@@ -188,7 +188,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         } else {
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
-            m_taskQueue.offer(this);
+            returnToTaskQueue(restoreWork);
         }
     }
 
