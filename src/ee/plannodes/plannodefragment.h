@@ -70,6 +70,10 @@ class AbstractPlanNode;
 class PlanNodeFragment {
 
   public:
+    typedef std::map<int, std::vector<AbstractPlanNode*>* >::iterator PlanNodeMapIterator;
+    typedef std::map<int, std::vector<AbstractPlanNode*>* >::const_iterator PlanNodeMapIteratorConst;
+    typedef std::vector<AbstractPlanNode*>::iterator PlanNodeListIterator;
+
     PlanNodeFragment();
     virtual ~PlanNodeFragment();
 
@@ -87,13 +91,18 @@ class PlanNodeFragment {
     }
 
     // the list of plannodes in execution order for a given sub-statement
-    const std::vector<AbstractPlanNode*>& getExecuteList(int stmtId = 0) const {
-        assert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
-        return *m_stmtExecutionListMap.find(stmtId)->second;
+    PlanNodeMapIteratorConst executeListBegin() const {
+        return m_stmtExecutionListMap.begin();
+    }
+    PlanNodeMapIterator executeListBegin() {
+        return m_stmtExecutionListMap.begin();
     }
 
-    int getStatementCount() const {
-        return m_stmtPlanNodesMap.size();
+    PlanNodeMapIteratorConst executeListEnd() const {
+        return m_stmtExecutionListMap.end();
+    }
+    PlanNodeMapIterator executeListEnd() {
+        return m_stmtExecutionListMap.end();
     }
 
     // true if this plan fragment contains a delete plan node.  Used
@@ -128,10 +137,6 @@ class PlanNodeFragment {
     std::map<int, std::vector<AbstractPlanNode*>* > m_stmtPlanNodesMap;
     // Pairs of argument index and type for parameters to the fragment
     std::vector<std::pair< int, voltdb::ValueType> > m_parameters;
-
-    typedef std::map<int, std::vector<AbstractPlanNode*>* >::iterator PlanNodeMapIterator;
-    typedef std::vector<AbstractPlanNode*>::iterator PlanNodeListIterator;
-
 };
 
 

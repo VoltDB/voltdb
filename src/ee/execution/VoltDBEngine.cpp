@@ -1731,8 +1731,10 @@ void VoltDBEngine::reportProgessToTopend() {
 void VoltDBEngine::ExecutorVector::initExecutors(VoltDBEngine* engine)
 {
     // Initialize each node!
-    for (int stmtId = 0; stmtId < planFragment->getStatementCount(); ++stmtId) {
-        const std::vector<AbstractPlanNode*>& executeList = planFragment->getExecuteList(stmtId);
+    for (PlanNodeFragment::PlanNodeMapIterator it = planFragment->executeListBegin(); 
+        it != planFragment->executeListEnd(); ++it) {
+        assert(it->second != NULL);
+        const std::vector<AbstractPlanNode*>& executeList = *it->second;
         auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
         for (int ctr = 0, cnt = (int)executeList.size(); ctr < cnt; ctr++) {
             if (!engine->initPlanNode(fragId, executeList[ctr], &limits))
@@ -1740,13 +1742,13 @@ void VoltDBEngine::ExecutorVector::initExecutors(VoltDBEngine* engine)
                 char msg[1024 * 10];
                 snprintf(msg, 1024 * 10,
                 "Failed to initialize PlanNode '%s' at position '%d' in statement '%d' for PlanFragment '%jd'",
-                         executeList[ctr]->debug().c_str(), ctr, stmtId, (intmax_t)fragId);
+                         executeList[ctr]->debug().c_str(), ctr, it->first, (intmax_t)fragId);
                 VOLT_ERROR("%s", msg);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
             }
             executorList->push_back(executeList[ctr]->getExecutor());
         }
-        executorListMap.insert(std::make_pair(stmtId, executorList.get()));
+        executorListMap.insert(std::make_pair(it->first, executorList.get()));
         executorList.release();
     }
 }

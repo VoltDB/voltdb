@@ -144,6 +144,7 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
         for (int i = 0; i < stmtCnt; i++) {
             PlannerDomValue planNodesList = planNodesListArray.valueAtIndex(i).valueForKey("PLAN_NODES");
             PlannerDomValue executeList = executeListArray.valueAtIndex(i).valueForKey("EXECUTE_LIST");
+must pass stmtid not i
             PlanNodeFragment::nodeListFromJSONObject(pnf.get(), planNodesList, executeList, i);
         }
     } else {
