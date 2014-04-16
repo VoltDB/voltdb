@@ -117,7 +117,7 @@ protected:
             columnLengths.push_back(COLUMN_SIZES[ctr]);
             columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
         }
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
             persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
             table = persistent_table;

@@ -66,6 +66,7 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
     vector<ValueType> columnTypes(numColumns);
     vector<int32_t> columnLengths(numColumns);
     vector<bool> columnAllowNull(numColumns);
+    vector<bool> columnInBytes(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
     vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
@@ -80,11 +81,13 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
         const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
+        columnInBytes[columnIndex] = catalog_column->inbytes();
     }
 
     return TupleSchema::createTupleSchema(columnTypes,
                                           columnLengths,
-                                          columnAllowNull, true);
+                                          columnAllowNull,
+                                          columnInBytes);
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
