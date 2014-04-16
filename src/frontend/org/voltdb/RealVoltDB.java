@@ -520,12 +520,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
                 // IV2 mailbox stuff
-                m_cartographer = new Cartographer(m_messenger);
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
+                m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
+                m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
+                        m_catalogContext.cluster.getNetworkpartition());
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           clusterConfig.getSitesPerHost());
                     if (partitions.size() == 0) {
@@ -537,7 +538,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 else {
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
-                    m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                 }
                 for (int ii = 0; ii < partitions.size(); ii++) {
@@ -2098,6 +2098,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public boolean isRunning() {
         return m_isRunning;
+    }
+
+    @Override
+    public void halt() {
+        Thread shutdownThread = new Thread() {
+            @Override
+            public void run() {
+                hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
+                System.exit(0);
+            }
+        };
+        shutdownThread.start();
     }
 
     /**

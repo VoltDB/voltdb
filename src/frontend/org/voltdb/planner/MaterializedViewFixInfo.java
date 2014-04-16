@@ -184,6 +184,7 @@ public class MaterializedViewFixInfo {
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
+            tve.setInBytes(mvCol.getInbytes());
 
             mvDDLGroupbyColumnNames.add(colName);
 

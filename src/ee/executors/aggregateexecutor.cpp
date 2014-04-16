@@ -450,16 +450,18 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
     std::vector<bool> groupByColumnAllowNull;
+    std::vector<bool> groupByColumnInBytes;
     for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
         AbstractExpression* expr = m_groupByExpressions[ii];
         groupByColumnTypes.push_back(expr->getValueType());
         groupByColumnSizes.push_back(expr->getValueSize());
         groupByColumnAllowNull.push_back(true);
+        groupByColumnInBytes.push_back(expr->getInBytes());
     }
     m_groupByKeySchema = TupleSchema::createTupleSchema(groupByColumnTypes,
                                                         groupByColumnSizes,
                                                         groupByColumnAllowNull,
-                                                        true);
+                                                        groupByColumnInBytes);
     return true;
 }
 
