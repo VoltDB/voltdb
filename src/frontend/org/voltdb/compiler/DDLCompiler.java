@@ -908,6 +908,10 @@ public class DDLCompiler {
     }
 
     public void compileToCatalog(Database db) throws VoltCompilerException {
+        // note this will need to be decompressed to be used
+        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
+        db.setSchema(binDDL);
+
         VoltXMLElement xmlCatalog;
         try
         {

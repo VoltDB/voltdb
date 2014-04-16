@@ -496,15 +496,13 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
+        String binDDL = new String();
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                String m_fullDDL;
-                m_fullDDL = CatalogSchemaTools.toSchema(db, m_addedClasses);
-                // note this will need to be decompressed to be used
-                String binDDL = CatalogSchemaTools.encodeDDL(m_fullDDL);
-                db.setSchema(binDDL);
+                binDDL += CatalogSchemaTools.toSchema(db, m_addedClasses);
             }
         }
+        jarOutput.put("autogen-ddl.sql", binDDL.getBytes(Constants.UTF8ENCODING));
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -527,17 +525,6 @@ public class VoltCompiler {
                 jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-            if (projectReader != null) {
-                projectReader.putInJar(jarOutput, "project.xml");
-            }
-            // Only add ddl file contents if not already in the in-memory catalog jar.
-            // This will happen during version upgrade.
-            for (final Entry<String, String> e : m_ddlFilePaths.entrySet()) {
-                String key = e.getKey();
-                if (!jarOutput.containsKey(key)) {
-                    jarOutput.put(e.getKey(), new File(e.getValue()));
-                }
-            }
             // put the compiler report into the jarfile
             jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
             jarOutput.writeToFile(new File(jarOutputPath)).run();
@@ -612,17 +599,6 @@ public class VoltCompiler {
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         Catalog catalog = compileCatalogInternal(database, DDLPathsToReaderList(ddlFilePaths), jarOutput);
 
-        // Build DDL from Catalog Data
-        for (Cluster cluster : catalog.getClusters()) {
-            for (Database db : cluster.getDatabases()) {
-                String m_fullDDL;
-                m_fullDDL = CatalogSchemaTools.toSchema(db, m_addedClasses);
-                // note this will need to be decompressed to be used
-                String binDDL = CatalogSchemaTools.encodeDDL(m_fullDDL);
-                db.setSchema(binDDL);
-            }
-        }
-
         return catalog;
     }
 
@@ -649,16 +625,6 @@ public class VoltCompiler {
         // Provide an empty DDL reader list.
         Catalog catalog = compileCatalogInternal(database, DDLPathsToReaderList(), jarOutput);
 
-        // Build DDL from Catalog Data
-        for (Cluster cluster : catalog.getClusters()) {
-            for (Database db : cluster.getDatabases()) {
-                String m_fullDDL;
-                m_fullDDL = CatalogSchemaTools.toSchema(db, m_addedClasses);
-                // note this will need to be decompressed to be used
-                String binDDL = CatalogSchemaTools.encodeDDL(m_fullDDL);
-                db.setSchema(binDDL);
-            }
-        }
         return catalog;
     }
 
