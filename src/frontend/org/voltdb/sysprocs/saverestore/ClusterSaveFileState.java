@@ -76,12 +76,6 @@ public class ClusterSaveFileState
     public ClusterSaveFileState(VoltTable saveFileState)
         throws IOException
     {
-        if (saveFileState.getRowCount() == 0)
-        {
-            String error = "No savefile state to restore";
-            throw new IOException(error);
-        }
-
         // Checks cluster/database name consistency between rows.
         ConsistencyChecker checker = new ConsistencyChecker();
 
