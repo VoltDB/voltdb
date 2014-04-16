@@ -37,6 +37,7 @@ import org.voltdb.types.IndexType;
  *
  */
 public abstract class CatalogSizing {
+    public final static int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     /**
      * Base class for raw catalog sizes.
@@ -231,7 +232,10 @@ public abstract class CatalogSizing {
             VoltType ctype = VoltType.get((byte)column.getType());
             switch(ctype) {
             case STRING: {
+                boolean inBytes = column.getInbytes();
                 int capacity = column.getSize();
+                if (!inBytes) capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
+
                 csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
                 csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
                 break;

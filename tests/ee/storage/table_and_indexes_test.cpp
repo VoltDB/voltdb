@@ -54,17 +54,17 @@ class TableAndIndexTest : public Test {
 
             districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
             districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(16);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(2);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(9);
             districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-            districtTupleSchema = TupleSchema::createTupleSchema(districtColumnTypes, districtColumnLengths, districtColumnAllowNull, true);
+            districtTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
 
             districtIndex1ColumnIndices.push_back(1);
             districtIndex1ColumnIndices.push_back(0);
@@ -79,16 +79,16 @@ class TableAndIndexTest : public Test {
             warehouseColumnAllowNull[0] = false;
 
             warehouseColumnTypes.push_back(VALUE_TYPE_TINYINT); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(16);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(2);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(9);
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
 
-            warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull, true);
+            warehouseTupleSchema = TupleSchema::createTupleSchemaForTest(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
 
             warehouseIndex1ColumnIndices.push_back(0);
 
@@ -106,15 +106,15 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
             customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(9);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_TIMESTAMP); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
@@ -125,7 +125,7 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(500);
 
-            customerTupleSchema = TupleSchema::createTupleSchema(customerColumnTypes, customerColumnLengths, customerColumnAllowNull, true);
+            customerTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
 
             customerIndex1ColumnIndices.push_back(2);
             customerIndex1ColumnIndices.push_back(1);
@@ -297,7 +297,7 @@ TEST_F(TableAndIndexTest, BigTest) {
 
     temp_tuple = &warehouseTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
-    cachedStringValues.push_back(ValueFactory::getStringValue("EZ Street WHouse"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("EZ Street House"));
     temp_tuple->setNValue(1, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Headquarters"));
     temp_tuple->setNValue(2, cachedStringValues.back());
@@ -333,7 +333,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(9, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("91083"));
     temp_tuple->setNValue(10, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("(193) 099 - 9082"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("(193) 099-9082"));
     temp_tuple->setNValue(11, cachedStringValues.back());
     temp_tuple->setNValue(12, ValueFactory::getTimestampValue(static_cast<int32_t>(123456789)));
     cachedStringValues.push_back(ValueFactory::getStringValue("BC"));
@@ -386,7 +386,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(4, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Customer"));
     temp_tuple->setNValue(5, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("Random Department"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("Random Depart"));
     temp_tuple->setNValue(6, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Place2"));
     temp_tuple->setNValue(7, cachedStringValues.back());
@@ -396,7 +396,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(9, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("13908"));
     temp_tuple->setNValue(10, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("(913) 909 - 0928"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("(913) 909-0928"));
     temp_tuple->setNValue(11, cachedStringValues.back());
     temp_tuple->setNValue(12, ValueFactory::getTimestampValue(static_cast<int64_t>(123456789)));
     cachedStringValues.push_back(ValueFactory::getStringValue("GC"));
