@@ -201,8 +201,6 @@ public abstract class JoinProducerBase extends SiteTasker {
         }
     }
 
-
-
     // Based on whether or not we just did real work, return ourselves to the task queue either now
     // or after waiting a few milliseconds
     protected void returnToTaskQueue(RestoreWork work)
