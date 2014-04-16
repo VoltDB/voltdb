@@ -356,6 +356,7 @@ public abstract class CatalogSchemaTools {
         if (proc.getDefaultproc()) {
             return "";
         }
+        ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
         if (!proc.getHasjava()) {
             // SQL Statement procedure
             ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS\n";
@@ -371,10 +372,12 @@ public abstract class CatalogSchemaTools {
         else {
             // Groovy procedure
             ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS ###\n";
-            ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
             ret += annot.scriptImpl + "\n### LANGUAGE GROOVY;\n";
         }
         if (proc.getSinglepartition()) {
+            if (annot.classAnnotated) {
+                ret += "--Annotated Partioning Takes Precedence Over DDL Procedure Partitioning Statement\n--";
+            }
             ret += "PARTITION PROCEDURE " + proc.getTypeName() + " ON TABLE " +
                     proc.getPartitiontable().getTypeName() + " COLUMN " +
                     proc.getPartitioncolumn().getTypeName() + ";\n\n";
@@ -410,7 +413,8 @@ public abstract class CatalogSchemaTools {
         ret += "\n";
 
         for (Table table : db.getTables()) {
-            String viewQuery = ((TableAnnotation)table.getAnnotation()).ddl;
+            Object annotation = table.getAnnotation();
+            String viewQuery = annotation == null ? "" : ((TableAnnotation)annotation).ddl;
             ret += CatalogSchemaTools.toSchema(table, viewQuery, CatalogUtil.isTableExportOnly(db, table));
         }
         ret += "\n";

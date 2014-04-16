@@ -34,4 +34,5 @@ public class ProcedureAnnotation {
     public SortedSet<Table> tablesRead = new TreeSet<Table>();
     public SortedSet<Table> tablesUpdated = new TreeSet<Table>();
     public String scriptImpl = null;
+    public boolean classAnnotated = false;
 }

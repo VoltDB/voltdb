@@ -135,7 +135,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
-        TestVoltCompiler.VerifyDbSchemaConsistency(catalog.getClusters().get("cluster").getDatabases().
+        TestVoltCompiler.verifyRegeneratedDatabaseDDL(catalog.getClusters().get("cluster").getDatabases().
                 get("database"));
     }
 
