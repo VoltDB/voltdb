@@ -327,7 +327,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      */
     VoltXMLElement voltGetColumnXML(Session session)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-            {
+    {
         VoltXMLElement column = new VoltXMLElement("column");
 
         // output column metadata
@@ -338,18 +338,10 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         column.attributes.put("size", String.valueOf(dataType.precision));
 
         if (dataType.precision > 1048576) {
-            String typeName = "";
-            if (typestring.compareTo("VARCHAR") == 0) {
-                typeName = "VARCHAR"; 
-            } else if (typestring.compareTo("VARBINARY") == 0) {
-                typeName = "VARBINARY"; 
-            }
-            if (typeName.compareTo("") != 0) {
-                String msg = typeName + " column size for column ";
-                msg += getTableNameString() + "." + columnName.name;
-                msg += " is > 1048576 char maximum.";
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
-            }
+            String msg = typestring + " column size for column ";
+            msg += getTableNameString() + "." + columnName.name;
+            msg += " is > 1048576 char maximum.";
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(msg);
         }
 
         if (typestring.compareTo("VARCHAR") == 0) {
@@ -375,6 +367,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         }
 
         return column;
-            }
+    }
     /**********************************************************************/
 }
