@@ -43,7 +43,11 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
-      m_openSpHandle(0), m_openTransactionUso(0),
+      // snapshot restores will call load table which in turn
+      // calls appendTupple with LONG_MIN transaction ids
+      // this allows initial ticks to succeed after rejoins
+      m_openSpHandle(0),
+      m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
       m_signature(""), m_generation(0)
 {
@@ -128,7 +132,10 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
 {
     if (currentSpHandle < m_openSpHandle)
     {
-        throwFatalException("Active transactions moving backwards");
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle
+                );
     }
 
     // more data for an ongoing transaction with no new committed data
