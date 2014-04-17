@@ -2215,22 +2215,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         result = client.callProcedure("REPLACE", "o", "XX", 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("fXXXX", result.getString(1));
 
         result = client.callProcedure("REPLACE", "o", null, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("f", result.getString(1));
 
         result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("foo", result.getString(1));
 
         result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("Vo", result.getString(1));
 
@@ -2239,7 +2235,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         result = client.callProcedure("REPLACE", "鑫", "XX", 2).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
@@ -2254,60 +2249,122 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         result = client.callProcedure("OVERLAY", "Jia", 4, 7, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJia", result.getString(1));
 
         result = client.callProcedure("OVERLAY", "Jia_", 4, 1, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJia_VoltDB", result.getString(1));
 
         result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJia", result.getString(1));
 
         result = client.callProcedure("OVERLAY", "Jia", 4.9, 7, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJia", result.getString(1));
 
         // Test NULL results
         result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
 
         result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
 
         result = client.callProcedure("OVERLAY", "Jia", null, 7, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
 
         result = client.callProcedure("OVERLAY_FULL_LENGTH", "Jia", 4, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJialtDB", result.getString(1));
 
         result = client.callProcedure("OVERLAY_FULL_LENGTH", "J", 4, 1).getResults()[0];
-        System.out.println(result);
         assertTrue(result.advanceRow());
         assertEquals("XinJVoltDB", result.getString(1));
 
-        // Test UTF-8 OVERLAY
-//        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//
-//        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
-//        System.out.println(result);
-//        assertTrue(result.advanceRow());
-//        assertEquals("XinJia@VoltDB", result.getString(1));
 
+        // Test UTF-8 OVERLAY
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia@VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 8, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 9, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 7, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJiaB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 8, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "_", 3, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫_VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", " at ", 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾 at ltDB", result.getString(1));
+
+
+        // Hsql has bugs on string index
+        if (!isHSQL()) {
+            result = client.callProcedure("OVERLAY", "XinJia", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDB石宁", result.getString(1));
+
+            // various start argument tests
+            // start from 0, not 1, but treat it at least 1
+            result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia@VoltDB", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia@VoltDB", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 100, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+
+            // various length argument
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 10, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia", result.getString(1));
+        }
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
