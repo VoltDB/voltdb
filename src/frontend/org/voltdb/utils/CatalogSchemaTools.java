@@ -375,7 +375,7 @@ public abstract class CatalogSchemaTools {
             ret += annot.scriptImpl + "\n### LANGUAGE GROOVY;\n";
         }
         if (proc.getSinglepartition()) {
-            if (annot.classAnnotated) {
+            if (annot != null && annot.classAnnotated) {
                 ret += "--Annotated Partioning Takes Precedence Over DDL Procedure Partitioning Statement\n--";
             }
             ret += "PARTITION PROCEDURE " + proc.getTypeName() + " ON TABLE " +
@@ -414,7 +414,7 @@ public abstract class CatalogSchemaTools {
 
         for (Table table : db.getTables()) {
             Object annotation = table.getAnnotation();
-            String viewQuery = annotation == null ? "" : ((TableAnnotation)annotation).ddl;
+            String viewQuery = annotation == null ? null : ((TableAnnotation)annotation).ddl;
             ret += CatalogSchemaTools.toSchema(table, viewQuery, CatalogUtil.isTableExportOnly(db, table));
         }
         ret += "\n";
