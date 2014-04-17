@@ -46,7 +46,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         super(root_node);
         try {
             // Construct execute lists for all sub statement
-            for(List<AbstractPlanNode> nodeList : m_planNodesList) {
+            for(List<AbstractPlanNode> nodeList : m_planNodesListMap.values()) {
                 List<AbstractPlanNode> list = constructList(nodeList);
                 m_executeLists.add(list);
             }
@@ -67,9 +67,10 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     @Override
     public String toString() {
-        String ret = "EXECUTE LISTS: " + m_planNodesList.size() + " lists\n";
-        for (List<AbstractPlanNode> nodeList : m_planNodesList) {
-            ret = "\tEXECUTE LIST: " + nodeList.size() + " nodes\n";
+        String ret = "EXECUTE LISTS: " + m_planNodesListMap.size() + " lists\n";
+        for (Map.Entry<Integer, List<AbstractPlanNode>> entry : m_planNodesListMap.entrySet()) {
+            List<AbstractPlanNode> nodeList = entry.getValue();
+            ret = "\tEXECUTE LIST id:" + entry.getKey() + " ," + nodeList.size() + " nodes\n";
             for (int ctr = 0, cnt = nodeList.size(); ctr < cnt; ctr++) {
                 ret += "   [" + ctr + "] " + nodeList.get(ctr) + "\n";
             }

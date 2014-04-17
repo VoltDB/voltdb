@@ -142,10 +142,10 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
         int stmtCnt = planNodesListArray.arrayLen();
         pnf.reset(new PlanNodeFragment());
         for (int i = 0; i < stmtCnt; i++) {
+            int stmtId = planNodesListArray.valueAtIndex(i).valueForKey("STATEMENT_ID").asInt();
             PlannerDomValue planNodesList = planNodesListArray.valueAtIndex(i).valueForKey("PLAN_NODES");
             PlannerDomValue executeList = executeListArray.valueAtIndex(i).valueForKey("EXECUTE_LIST");
-must pass stmtid not i
-            PlanNodeFragment::nodeListFromJSONObject(pnf.get(), planNodesList, executeList, i);
+            PlanNodeFragment::nodeListFromJSONObject(pnf.get(), planNodesList, executeList, stmtId);
         }
     } else {
         pnf.reset(new PlanNodeFragment());
