@@ -487,13 +487,15 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
             case FUNC_ASCII :
-            case FUNC_CHAR :
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 // $FALL-THROUGH$
                 // End of VoltDB extension
+            case FUNC_CHAR :
+                parseList = singleParamList;
+                break;
             case FUNC_SPACE :
                 parseList = singleParamList;
                 break;

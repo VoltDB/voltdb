@@ -19,6 +19,7 @@
 #define STRINGFUNCTIONS_H
 
 #include <boost/algorithm/string.hpp>
+#include <boost/locale.hpp>
 
 namespace voltdb {
 
@@ -28,6 +29,17 @@ template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
         return getNullValue();
 
     return getIntegerValue(getObjectLength_withoutNull());
+}
+
+/** implement the 1-argument SQL CHAR function */
+template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
+    if (isNull())
+        return getNullValue();
+
+    unsigned int point = static_cast<unsigned int>(castAsBigIntAndGetValue());
+    std::string utf8 = boost::locale::conv::utf_to_utf<char>(&point, &point + 1);
+
+    return getTempStringValue(utf8.c_str(), utf8.length());
 }
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
@@ -426,11 +438,39 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     return getTempStringValue(startChar, endChar - startChar);
 }
 
+static inline std::string overlay_function(const char* ptrSource, size_t lengthSource,
+        std::string insertStr, size_t start, size_t length) {
+    assert(start >= 1);
+    int32_t i = 0, j = 0;
+    while (i < lengthSource) {
+        if ((ptrSource[i] & 0xc0) != 0x80) {
+            if (++j == start) break;
+        }
+        i++;
+    }
+    std::string result = std::string(ptrSource, i);
+    result.append(insertStr);
+
+    bool reached = false;
+    j = 0;
+    if (length > 0) {
+        while (i < lengthSource) {
+            if ((ptrSource[i] & 0xc0) != 0x80) {
+                if (reached) break;
+                if (++j == length) reached = true;
+            }
+            i++;
+        }
+    }
+    result.append(std::string(&ptrSource[i], lengthSource - i));
+
+    return result;
+}
+
 /** implement the 3 or 4 argument SQL OVERLAY function */
 template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3 || arguments.size() == 4);
 
-    char* ptr;
     const NValue& str0 = arguments[0];
     if (str0.isNull()) {
         return getNullStringValue();
@@ -438,8 +478,8 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     if (str0.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str0.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    ptr = reinterpret_cast<char*>(str0.getObjectValue_withoutNull());
-    std::string sourceStr = std::string(ptr, str0.getObjectLength_withoutNull());
+    const char* ptrSource = reinterpret_cast<const char*>(str0.getObjectValue_withoutNull());
+    size_t lengthSource = str0.getObjectLength_withoutNull();
 
     const NValue& str1 = arguments[1];
     if (str1.isNull()) {
@@ -448,18 +488,19 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    ptr = reinterpret_cast<char*>(str1.getObjectValue_withoutNull());
-    std::string insertStr = std::string(ptr, str1.getObjectLength_withoutNull());
+    const char* ptrInsert = reinterpret_cast<const char*>(str1.getObjectValue_withoutNull());
+    size_t lengthInsert = str1.getObjectLength_withoutNull();
+    std::string insertStr = std::string(ptrInsert, lengthInsert);
 
     const NValue& startArg = arguments[2];
     if (startArg.isNull()) {
         return getNullStringValue();
     }
+
     int64_t start = startArg.castAsBigIntAndGetValue();
-    start -= 1;
-    if (start < 0 || start > sourceStr.length()) {
+    if (start <= 0) {
         char message[128];
-        snprintf(message, 128, "data exception -- OVERLAY error, invalid start argument %ld", (long)(start+1));
+        snprintf(message, 128, "data exception -- OVERLAY error, not positive start argument %ld",(long)start);
         throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
     }
 
@@ -477,13 +518,13 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         }
     } else {
         // By default without length argument
-        length = getCharLength(ptr, str1.getObjectLength_withoutNull());
+        length = getCharLength(ptrInsert, lengthInsert);
     }
 
-    // FIXME(xin): Function does not work properly for UTF-8 String
-    sourceStr.erase(start, length);
-    sourceStr.insert(start, insertStr);
-    return getTempStringValue(sourceStr.c_str(), sourceStr.length());
+    assert(start >= 1);
+    std::string resultStr = overlay_function(ptrSource, lengthSource, insertStr, start, length);
+
+    return getTempStringValue(resultStr.c_str(), resultStr.length());
 }
 
 }
