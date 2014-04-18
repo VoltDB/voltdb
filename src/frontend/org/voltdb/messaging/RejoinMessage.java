@@ -52,7 +52,7 @@ public class RejoinMessage extends VoltMessage {
     // number of sources sending to this site
     private int m_snapshotSourceCount = 1;
     private long m_snapshotSinkHSId = -1;
-    private boolean m_emptyRejoin = false;
+    private boolean m_schemaHasNoTables = false;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -82,7 +82,7 @@ public class RejoinMessage extends VoltMessage {
         m_snapshotNonce = snapshotNonce;
         m_snapshotSourceCount = sourceCount;
         m_bufferPool = bufferPool;
-        m_emptyRejoin = emptyRejoin;
+        m_schemaHasNoTables = emptyRejoin;
     }
 
     /**
@@ -122,8 +122,8 @@ public class RejoinMessage extends VoltMessage {
         return m_snapshotSourceCount;
     }
 
-    public boolean isEmptyRejoin() {
-        return m_emptyRejoin;
+    public boolean schemaHasNoTables() {
+        return m_schemaHasNoTables;
     }
 
     /**

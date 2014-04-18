@@ -18,6 +18,8 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
@@ -48,6 +51,9 @@ public class RejoinProducer extends JoinProducerBase {
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor = null;
+
+    // True if we're handling a table-less rejoin.
+    boolean m_schemaHasNoTables = false;
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -194,7 +200,8 @@ public class RejoinProducer extends JoinProducerBase {
     void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        if (!message.isEmptyRejoin()) {
+        m_schemaHasNoTables = message.schemaHasNoTables();
+        if (!m_schemaHasNoTables) {
             m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
             m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
         }
@@ -273,9 +280,9 @@ public class RejoinProducer extends JoinProducerBase {
                 doFinishingTask(siteConnection);
             }
         }
-        // Manually remove the future if an empty snapshot skipped around it.
         else {
             doFinishingTask(siteConnection);
+            // Remove the completion monitor for an empty (zero table) rejoin.
             m_snapshotCompletionMonitor.set(null);
         }
     }
@@ -301,16 +308,19 @@ public class RejoinProducer extends JoinProducerBase {
 
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
-                if (!m_snapshotCompletionMonitor.isDone()) {
+                if (!m_schemaHasNoTables && !m_snapshotCompletionMonitor.isDone()) {
                     m_taskQueue.offer(this);
                     return;
                 }
                 SnapshotCompletionEvent event = null;
+                Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 try {
-                    REJOINLOG.debug(m_whoami
-                            + "waiting on snapshot completion monitor.");
-                    event = m_snapshotCompletionMonitor.get();
-                    m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                    if (!m_schemaHasNoTables) {
+                        REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
+                        event = m_snapshotCompletionMonitor.get();
+                        exportSequenceNumbers = event.exportSequenceNumbers;
+                        m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                    }
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
                     RejoinMessage snap_complete = new RejoinMessage(
@@ -324,9 +334,13 @@ public class RejoinProducer extends JoinProducerBase {
                             "Unexpected exception awaiting snapshot completion.", true,
                             e);
                 }
+                if (exportSequenceNumbers == null) {
+                    // Send empty sequence number map if the schema is empty (no tables).
+                    exportSequenceNumbers = new HashMap<String, Map<Integer, Pair<Long,Long>>>();
+                }
                 setJoinComplete(
                         siteConnection,
-                        event.exportSequenceNumbers,//XXXXX empty -> send empty collection
+                        exportSequenceNumbers,
                         true /* requireExistingSequenceNumbers */);
             }
         };
