@@ -18,8 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,7 +111,7 @@ public class SysprocFragmentTask extends TransactionTask
         // to take place.
         if (m_fragmentMsg.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
-            VoltDB.instance().rejoinDataPending()) {
+            !VoltDB.instance().isMpSysprocSafeToExecute(m_txnState.txnId)) {
             respondWithDummy();
             return;
         }
@@ -136,10 +134,10 @@ public class SysprocFragmentTask extends TransactionTask
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 
-        //If this is a snapshot save test we have the nonce of the snapshot
+        //If this is a snapshot creation we have the nonce of the snapshot
         //Provide it to the site so it can decide to enable recording in the task log
         //if it is our rejoin snapshot start
-        if (SysProcFragmentId.isSnapshotSaveTestFragment(m_fragmentMsg.getPlanHash(0))) {
+        if (SysProcFragmentId.isFirstSnapshotFragment(m_fragmentMsg.getPlanHash(0))) {
             siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1]);
         }
         taskLog.logTask(m_fragmentMsg);

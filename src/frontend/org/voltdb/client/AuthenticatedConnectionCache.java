@@ -57,6 +57,38 @@ public class AuthenticatedConnectionCache {
         int passHash;
     }
 
+    /**
+     * Provides a callback to be notified on node failure. Close
+     * the connection if this callback is invoked.
+     */
+    class StatusListener extends ClientStatusListenerExt {
+        Connection m_conn = null;
+
+        StatusListener(Connection conn)
+        {
+            m_conn = conn;
+        }
+
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            // Close the connection. The cause can be CONNECTION_CLOSED or TIMEOUT, we don't care which.
+
+            // debug printstacktrace, to be remove later.  In theory we shouldn't hit this code
+            // because the JSON/HTTP client is within the server.  Speculation that this
+            // can be called if the connection is closed by the server, which is odd because
+            // this client is running *within* the server!
+            new Exception("Client Disconnect").printStackTrace();
+            System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
+            try {
+                if (null != m_conn.client) {
+                    m_conn.client.close();
+                }
+            } catch (InterruptedException ex) {
+            }
+        }
+    }
+
+
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
@@ -109,7 +141,7 @@ public class AuthenticatedConnectionCache {
         m_targetSize = targetSize;
     }
 
-    public synchronized Client getClient(String userName, byte[] hashedPassword, boolean admin) throws IOException {
+    public synchronized Client getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
         // ADMIN MODE
         if (admin) {
             ClientImpl adminClient = null;
@@ -180,8 +212,9 @@ public class AuthenticatedConnectionCache {
 
         // AUTHENTICATED
         int passHash = 0;
-        if (hashedPassword != null)
+        if (hashedPassword != null) {
             passHash = Arrays.hashCode(hashedPassword);
+        }
 
         Connection conn = m_connections.get(userName);
         if (conn != null) {
@@ -208,8 +241,14 @@ public class AuthenticatedConnectionCache {
             {
                 conn.hashedPassword = null;
             }
+
+            // Add a callback listener for this client, to detect if
+            // a connection gets closed/disconnected.  If this happens,
+            // we need to remove it from the m_conections cache.
+            ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn));
+
             conn.user = userName;
-            conn.client = (ClientImpl) ClientFactory.createClient();
+            conn.client = (ClientImpl) ClientFactory.createClient(config);
             try
             {
                 conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
@@ -235,16 +274,18 @@ public class AuthenticatedConnectionCache {
      * Dec-ref a client.
      * @param client The client to release.
      */
-    public void releaseClient(Client client) {
+    public synchronized void releaseClient(Client client) {
         ClientImpl ci = (ClientImpl) client;
 
         // if no username, this is the unauth client
-        if (ci.getUsername().length() == 0)
+        if (ci.getUsername().length() == 0) {
             return;
+        }
 
         Connection conn = m_connections.get(ci.getUsername());
-        if (conn == null)
+        if (conn == null) {
             throw new RuntimeException("Released client not in pool.");
+        }
         conn.refCount--;
         attemptToShrinkPoolIfNeeded();
     }

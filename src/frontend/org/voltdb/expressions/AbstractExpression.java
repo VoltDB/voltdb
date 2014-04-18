@@ -27,10 +27,9 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -44,6 +43,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         RIGHT,
         VALUE_TYPE,
         VALUE_SIZE,
+        IN_BYTES,
         ARGS,
     }
 
@@ -55,6 +55,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
+    protected boolean m_inBytes = false;
 
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
@@ -137,6 +138,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         clone.m_type = m_type;
         clone.m_valueType = m_valueType;
         clone.m_valueSize = m_valueSize;
+        clone.m_inBytes = m_inBytes;
         if (m_left != null)
         {
             AbstractExpression left_clone = (AbstractExpression)m_left.clone();
@@ -257,6 +259,14 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         assert (size >= 0);
         assert (size <= 10000000);
         m_valueSize = size;
+    }
+
+    public boolean getInBytes() {
+        return m_inBytes;
+    }
+
+    public void setInBytes(boolean bytes) {
+        m_inBytes = bytes;
     }
 
     @Override
@@ -456,9 +466,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
-        stringer.key(Members.TYPE.name()).value(m_type.toString());
-        stringer.key(Members.VALUE_TYPE.name()).value(m_valueType == null ? null : m_valueType.name());
-        stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+        stringer.key(Members.TYPE.name()).value(m_type.getValue());
+
+        if (m_valueType == null) {
+            stringer.key(Members.VALUE_TYPE.name()).value( VoltType.NULL.getValue());
+            stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+        } else {
+            stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.getValue());
+            if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
+                stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+            }
+
+            if (m_inBytes) {
+                assert(m_valueType == VoltType.STRING);
+                stringer.key(Members.IN_BYTES.name()).value(true);
+            }
+        }
 
         if (m_left != null) {
             assert (m_left instanceof JSONString);
@@ -524,7 +547,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private static AbstractExpression fromJSONObject(JSONObject obj,  StmtTableScan tableScan) throws JSONException
     {
-        ExpressionType type = ExpressionType.valueOf(obj.getString(Members.TYPE.name()));
+        ExpressionType type = ExpressionType.get(obj.getInt(Members.TYPE.name()));
         AbstractExpression expr;
         try {
             expr = type.getExpressionClass().newInstance();
@@ -538,8 +561,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         expr.m_type = type;
 
-        expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
-        expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        expr.m_valueType = VoltType.get((byte) obj.getInt(Members.VALUE_TYPE.name()));
+        if (obj.has(Members.VALUE_SIZE.name())) {
+            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        } else {
+            expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
+        }
 
         expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
         expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name(), tableScan);
@@ -940,26 +967,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
-            }
-        }
-    }
-
-    /** Associate underlying TupleValueExpressions with columns in the schema
-     * and propagate the type implications to parent expressions.
-     */
-    public void resolveForDB(Database db) {
-        resolveChildrenForDB(db);
-    }
-
-    /** Do the recursive part of resolveForDB as required for tree-structured expession types. */
-    protected final void resolveChildrenForDB(Database db) {
-        if (m_left != null)
-            m_left.resolveForDB(db);
-        if (m_right != null)
-            m_right.resolveForDB(db);
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                argument.resolveForDB(db);
             }
         }
     }

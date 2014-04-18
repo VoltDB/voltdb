@@ -26,24 +26,32 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class SnapshotTableTask
 {
-    final Table m_table;
-    final SnapshotDataTarget m_target;
-    final SnapshotDataFilter m_filters[];
-    final AbstractExpression m_predicate;
-    final boolean m_deleteTuples;
+    public final Table m_table;
+    public final SnapshotDataFilter m_filters[];
+    public final AbstractExpression m_predicate;
+    public final boolean m_deleteTuples;
+
+    volatile SnapshotDataTarget m_target;
 
     public SnapshotTableTask(
             final Table table,
-            final SnapshotDataTarget target,
             final SnapshotDataFilter filters[],
             final AbstractExpression predicate,
             final boolean deleteTuples)
     {
         m_table = table;
-        m_target = target;
         m_filters = filters;
         m_predicate = predicate;
         m_deleteTuples = deleteTuples;
+    }
+
+    public void setTarget(SnapshotDataTarget target)
+    {
+        m_target = target;
+    }
+    public SnapshotDataTarget getTarget()
+    {
+        return m_target;
     }
 
     @Override

@@ -87,6 +87,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
+        cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
+        cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -458,6 +460,23 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:+UseTLAB");
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        cmdline.add("-XX:+CMSClassUnloadingEnabled");
+        cmdline.add("-XX:PermSize=64m");
+
+        /*
+         * Have RMI not invoke System.gc constantly
+         */
+        cmdline.add("-Dsun.rmi.dgc.server.gcInterval=" + Long.MAX_VALUE);
+        cmdline.add("-Dsun.rmi.dgc.client.gcInterval=" + Long.MAX_VALUE);
+        /*
+         * To ensure that CMS is low pause on a consistent basis, have it wait a looong time
+         * for young gen GCs to occur when load is low. Scavenge before remark
+         * so when remarks occur they are a consistent duration.
+         */
+        cmdline.add("-XX:CMSWaitDuration=120000");
+        cmdline.add("-XX:CMSMaxAbortablePrecleanTime=120000");
+        cmdline.add("-XX:+ExplicitGCInvokesConcurrent");
+        cmdline.add("-XX:+CMSScavengeBeforeRemark");
         //If a Volt root is provided such as local cluster or VEM, put the error file in it
         if ( !volt_root.isEmpty() ) {
             cmdline.add("-XX:ErrorFile=" + volt_root + "/hs_err_pid%p.log");
@@ -585,6 +604,14 @@ public class CommandLine extends VoltDB.Configuration
 
         if (target() == BackendTarget.NATIVE_EE_IPC) {
             cmdline.add("ipc");
+        }
+
+        // handle overrides for testing hotfix version compatibility
+        if (m_versionStringOverrideForTest != null) {
+            assert(m_versionCompatibilityRegexOverrideForTest != null);
+            cmdline.add("versionoverride");
+            cmdline.add(m_versionStringOverrideForTest);
+            cmdline.add(m_versionCompatibilityRegexOverrideForTest);
         }
 
         if (m_tag != null) {

@@ -51,6 +51,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
         int m_hostId = Integer.MAX_VALUE;
         long m_initTime;
 
+        // optional watcher interface
+        OutputWatcher m_watcher = null;
+
         // memoize the process here so we can easily check for process death
         Process m_process;
 
@@ -76,6 +79,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
             return m_process;
         }
 
+        /**
+         * Inject a watcher to scan output.
+         */
+        void setWatcher(OutputWatcher watcher) {
+            m_watcher = watcher;
+        }
+
         public int getHostId() {
             synchronized(this) {
                 return m_hostId;
@@ -92,6 +102,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
                     if (data == null) {
                         m_eof.set(true);
                         continue;
+                    }
+
+                    // let the optional watcher take a peak
+                    if (m_watcher != null) {
+                        m_watcher.handleLine(data);
                     }
 
                     // look for the non-exec site id

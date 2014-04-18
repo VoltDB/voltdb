@@ -42,7 +42,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -73,6 +72,13 @@ public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
+    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
+
     public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
@@ -88,6 +94,11 @@ public class CoreUtils {
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
 
+    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
+        @Override
+        public void run() {}
+    };
+
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
      * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
@@ -101,22 +112,49 @@ public class CoreUtils {
                 1,
                 keepAlive,
                 TimeUnit.MILLISECONDS,
-                new LinkedTransferQueue<Runnable>(),
+                new LinkedBlockingQueue<Runnable>(),
                 CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
     }
 
     /**
      * Create an unbounded single threaded executor
      */
-    public static ListeningExecutorService getSingleThreadExecutor(String name) {
+    public static ExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return ste;
+    }
+
+    public static ExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
+        return ste;
+    }
+
+    /**
+     * Create an unbounded single threaded executor
+     */
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
-    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name, int size) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -290,6 +328,8 @@ public class CoreUtils {
                             r.run();
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
+                        } finally {
+                            m_threadLocalDeallocator.run();
                         }
                     }
                 };
@@ -503,19 +543,22 @@ public class CoreUtils {
         }
     }
 
-    /*
+    /**
      * A helper for retrying tasks asynchronously returns a settable future
-     * that can be used to attempt to cancel the task
+     * that can be used to attempt to cancel the task.
      *
      * The first executor service is used to schedule retry attempts
      * The second is where the task will be subsmitted for execution
      * If the two services are the same only the scheduled service is used
+     *
+     * @param maxAttempts It is the number of total attempts including the first one.
+     * If the value is 0, that means there is no limit.
      */
     public static final<T>  ListenableFuture<T> retryHelper(
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
-            final Long maxAttempts,
+            final long maxAttempts,
             final long startInterval,
             final TimeUnit startUnit,
             final long maxInterval,
@@ -537,7 +580,7 @@ public class CoreUtils {
                     retval.set(callable.call());
                 } catch (RetryException e) {
                     //Now schedule a retry
-                    retryHelper(ses, es, callable, maxAttempts, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
+                    retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
                 } catch (Exception e) {
                     retval.setException(e);
                 }
@@ -550,13 +593,18 @@ public class CoreUtils {
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
-            final Long maxAttempts,
+            final long maxAttempts,
             final long startInterval,
             final TimeUnit startUnit,
             final long maxInterval,
             final TimeUnit maxUnit,
             final long ii,
             final SettableFuture<T> retval) {
+        if (maxAttempts == 0) {
+            retval.setException(new RuntimeException("Max attempts reached"));
+            return;
+        }
+
         long intervalMax = maxUnit.toMillis(maxInterval);
         final long interval = Math.min(intervalMax, startUnit.toMillis(startInterval) * 2);
         ses.schedule(new Runnable() {
@@ -570,7 +618,7 @@ public class CoreUtils {
                         try {
                             retval.set(callable.call());
                         } catch (RetryException e) {
-                            retryHelper(ses, es, callable, maxAttempts, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
+                            retryHelper(ses, es, callable, maxAttempts - 1, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
                         } catch (Exception e3) {
                             retval.setException(e3);
                         }

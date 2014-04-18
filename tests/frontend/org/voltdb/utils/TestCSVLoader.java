@@ -76,6 +76,7 @@ public class TestCSVLoader extends TestCase {
     protected void setUp() throws Exception
     {
         super.setUp();
+        prepare();
     }
 
     public void testCommon() throws Exception
@@ -901,7 +902,6 @@ public class TestCSVLoader extends TestCase {
             client = ClientFactory.createClient();
             client.createConnection("localhost");
 
-            prepare();
             CSVLoader.testMode = true;
             CSVLoader.main( my_options );
             // do the test

@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.xerial.snappy.Snappy;
+import org.voltcore.utils.CompressionStrategy;
 
 /**
  * This non-public AbstractHistogramBase super-class separation is meant to bunch "cold" fields
@@ -619,7 +619,7 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
         return ((long) subBucketIndex) << ( bucketIndex + unitMagnitude);
     }
 
-    public byte[] toCompressedBytes() {
+    public byte[] toCompressedBytes(CompressionStrategy strategy) {
         ByteBuffer buf = ByteBuffer.allocate(8 * countsArrayLength + (3 * 8) + 4);
         buf.order(ByteOrder.LITTLE_ENDIAN);
         buf.putLong(lowestTrackableValue);
@@ -630,15 +630,15 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
             buf.putLong(getCountAtIndex(ii));
         }
         try {
-            return Snappy.compress(buf.array());
+            return strategy.compress(buf.array());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Histogram fromCompressedBytes(byte bytes[]) {
+    public static Histogram fromCompressedBytes(byte bytes[], CompressionStrategy strategy) {
         try {
-            ByteBuffer buf = ByteBuffer.wrap(Snappy.uncompress(bytes));
+            ByteBuffer buf = ByteBuffer.wrap(strategy.uncompress(bytes));
             buf.order(ByteOrder.LITTLE_ENDIAN);
             final long lTrackableValue = buf.getLong();
             final long hTrackableValue = buf.getLong();

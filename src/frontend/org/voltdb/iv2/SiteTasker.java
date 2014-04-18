@@ -25,6 +25,19 @@ import org.voltdb.SiteProcedureConnection;
 
 public abstract class SiteTasker {
 
+    public static abstract class SiteTaskerRunnable extends SiteTasker {
+        abstract void run();
+
+        public void run(SiteProcedureConnection siteConnection) {
+            run();
+        }
+
+        public void runForRejoin(SiteProcedureConnection siteConnection,
+                TaskLog rejoinTaskLog) throws IOException {
+            run();
+        }
+    }
+
     /**
      * Run executes the task. Run is called on the ExecutionSite thread
      * and has exclusive access to the ee. Tasks are not preempted.

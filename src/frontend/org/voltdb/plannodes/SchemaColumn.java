@@ -126,7 +126,7 @@ public class SchemaColumn
     @Override
     public int hashCode () {
         // based on implementation of equals
-        int result = m_tableName.hashCode();
+        int result = m_tableAlias != null ? m_tableAlias.hashCode() : m_tableName.hashCode();
         if (m_columnName != null && !m_columnName.equals("")) {
             result += m_columnName.hashCode();
         } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
@@ -153,6 +153,7 @@ public class SchemaColumn
             // XXX not sure this is right
             new_exp.setValueType(m_expression.getValueType());
             new_exp.setValueSize(m_expression.getValueSize());
+            new_exp.setInBytes(m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp);
@@ -208,7 +209,7 @@ public class SchemaColumn
         return sb.toString();
     }
 
-    public void toJSONString(JSONStringer stringer) throws JSONException
+    public void toJSONString(JSONStringer stringer, boolean finalOutput) throws JSONException
     {
         stringer.object();
         // Tell the EE that the column name is either a valid column
@@ -216,16 +217,14 @@ public class SchemaColumn
         // bit hacky, but it's the easiest way for the EE to generate
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
-        if (getColumnAlias() != null && !getColumnAlias().equals(""))
-        {
-            stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
-        }
-        else if (getColumnName() != null) {
-            stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
-        }
-        else
-        {
-            stringer.key(Members.COLUMN_NAME.name()).value("");
+        if (finalOutput) {
+            if (getColumnAlias() != null && !getColumnAlias().equals(""))
+            {
+                stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
+            }
+            else if (getColumnName() != null) {
+                stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
+            }
         }
 
         if (m_expression != null) {
@@ -233,10 +232,6 @@ public class SchemaColumn
             stringer.object();
             m_expression.toJSONString(stringer);
             stringer.endObject();
-        }
-        else
-        {
-            stringer.key(Members.EXPRESSION.name()).value("");
         }
 
         stringer.endObject();

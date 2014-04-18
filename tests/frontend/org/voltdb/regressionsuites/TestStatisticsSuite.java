@@ -34,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.Test;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -204,7 +206,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         long invocations = 0;
         results[0].resetRowPosition();
         while (results[0].advanceRow()) {
-            invocations += AbstractHistogram.fromCompressedBytes(results[0].getVarbinary("HISTOGRAM")).getHistogramData().getTotalCount();
+            byte histogramBytes[] = results[0].getVarbinary("HISTOGRAM");
+            Histogram h = AbstractHistogram.fromCompressedBytes(histogramBytes, CompressionStrategySnappy.INSTANCE);
+            invocations += h.getHistogramData().getTotalCount();
         }
         assertTrue(invocations > 0);
     }
@@ -289,7 +293,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[12];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -302,6 +306,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
+        expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

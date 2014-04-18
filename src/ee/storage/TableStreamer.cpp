@@ -25,6 +25,7 @@
 #include "storage/ElasticIndexReadContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "logging/LogManager.h"
 
 namespace voltdb
 {
@@ -48,6 +49,22 @@ TableStreamer::TableStreamer(int32_t partitionId, PersistentTable &table, Catalo
 
 TableStreamer::~TableStreamer()
 {}
+
+TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+{
+    TableStreamer* the_clone = new TableStreamer(m_partitionId, surgeon.getTable(), m_tableId);
+    surgeon.initTableStreamer(the_clone);
+    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        assert(streamPtr != NULL);
+        boost::shared_ptr<TableStreamerContext> cloned_context;
+        cloned_context.reset(streamPtr->m_context->cloneForTruncatedTable(surgeon));
+        if (cloned_context != NULL) {
+            the_clone->m_streams.push_back(StreamPtr(new Stream(streamPtr->m_streamType,
+                                                                cloned_context)));
+        }
+    }
+    return the_clone;
+}
 
 /**
  * activateStream() knows how to create streams based on type.
@@ -143,6 +160,13 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
     int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
+
+    if (m_streams.empty()) {
+        char errMsg[1024];
+        snprintf(errMsg, 1024, "Table streamer has no streams to serialize more for table %s.",
+                 m_table.name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+    }
 
     // Rebuild the stream list as dictated by context semantics.
     StreamList savedStreams(m_streams);

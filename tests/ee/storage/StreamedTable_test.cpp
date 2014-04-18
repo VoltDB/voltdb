@@ -48,8 +48,6 @@ using namespace voltdb;
 using namespace boost;
 
 const int COLUMN_COUNT = 5;
-// 5 kilobytes of buffer
-const int BUFFER_SIZE = 1024 * 5;
 
 class MockTopend : public Topend {
   public:
@@ -118,10 +116,9 @@ public:
             columnAllowNull.push_back(false);
         }
         m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
+          TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero

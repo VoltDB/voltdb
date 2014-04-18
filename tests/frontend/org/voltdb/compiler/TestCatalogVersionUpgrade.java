@@ -25,15 +25,12 @@ package org.voltdb.compiler;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
@@ -41,44 +38,6 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
     // The message substring we expect to find from an upgrade failure.
     private static String UPGRADE_ERROR_MESSAGE_SUBSTRING = "Failed to generate upgraded catalog file";
-
-    private String[] getBuildInfoLines(InMemoryJarfile memCatalog)
-            throws UnsupportedEncodingException
-    {
-        assertNotNull(memCatalog);
-        assertTrue(memCatalog.containsKey(CatalogUtil.CATALOG_BUILDINFO_FILENAME));
-        byte[] buildInfoBytes = memCatalog.get(CatalogUtil.CATALOG_BUILDINFO_FILENAME);
-        assertNotNull(buildInfoBytes);
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
-        String[] buildInfoLines = buildInfo.split("\n");
-        assertTrue(buildInfoLines.length == 5);
-        return buildInfoLines;
-    }
-
-    private void dorkVersion(InMemoryJarfile memCatalog) throws IOException
-    {
-        String[] bi = getBuildInfoLines(memCatalog);
-        bi[0] = bi[0].substring(0, bi[0].lastIndexOf('.'));
-        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
-    }
-
-    private void dorkCatalogDDL(InMemoryJarfile memCatalog, String statement) throws UnsupportedEncodingException {
-        // Squizzle creation is no longer supported.
-        String key = new File(TPCCProjectBuilder.ddlURL.getPath()).getName();
-        String ddl = String.format("%s;\n%s", statement, new String(memCatalog.get(key), "UTF-8"));
-        memCatalog.put(key, ddl.getBytes());
-    }
-
-    private static InMemoryJarfile loadCatalog(byte[] catalogBytes, boolean upgrade)
-            throws IOException
-    {
-        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(catalogBytes);
-        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
-        // I.e. jarfile may be modified.
-        VoltCompiler compiler = new VoltCompiler();
-        compiler.upgradeCatalogAsNeeded(jarfile);
-        return jarfile;
-    }
 
     public void testCatalogAutoUpgrade() throws Exception
     {
@@ -94,13 +53,13 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
         // Load the catalog to an in-memory jar and tweak the version.
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        InMemoryJarfile memCatalog = loadCatalog(bytes, false);
-        dorkVersion(memCatalog);
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
+        CatalogUpgradeTools.dorkVersion(memCatalog);
 
         // Load/upgrade and check against the server version.
-        InMemoryJarfile memCatalog2 = loadCatalog(memCatalog.getFullJarBytes(), true);
+        InMemoryJarfile memCatalog2 = CatalogUpgradeTools.loadCatalog(memCatalog.getFullJarBytes(), true);
         assertNotNull(memCatalog2);
-        String[] buildInfoLines2 = getBuildInfoLines(memCatalog2);
+        String[] buildInfoLines2 = CatalogUpgradeTools.getBuildInfoLines(memCatalog2);
         String serverVersion = VoltDB.instance().getVersionString();
         assertTrue(serverVersion.equals(buildInfoLines2[0]));
 
@@ -124,14 +83,14 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
         // Load the catalog to an in-memory jar and tweak the version to make it incompatible.
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        InMemoryJarfile memCatalog = loadCatalog(bytes, false);
-        dorkVersion(memCatalog);
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
+        CatalogUpgradeTools.dorkVersion(memCatalog);
         // Squizzle creation is no longer supported.
-        dorkCatalogDDL(memCatalog, "CREATE SQUIZZLE");
+        CatalogUpgradeTools.dorkDDL(memCatalog, "CREATE SQUIZZLE");
 
         // Check the (hopefully) upgraded catalog version against the server version.
         try {
-            loadCatalog(memCatalog.getFullJarBytes(), true);
+            CatalogUpgradeTools.loadCatalog(memCatalog.getFullJarBytes(), true);
             fail("Expected load to generate an exception");
         }
         catch (IOException e) {
@@ -155,9 +114,9 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
         // Load the catalog to an in-memory jar and tweak the version.
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        InMemoryJarfile memCatalog = loadCatalog(bytes, false);
-        dorkVersion(memCatalog);
-        dorkCatalogDDL(memCatalog,
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
+        CatalogUpgradeTools.dorkVersion(memCatalog);
+        CatalogUpgradeTools.dorkDDL(memCatalog,
             "CREATE PROCEDURE groovy.procedures.SelectItem AS ### \n" +
             "  selectItem = new SQLStmt('SELECT I_ID, I_NAME FROM ITEM WHERE I_ID = ?') \n" +
             "  transactOn = { id -> \n" +
@@ -167,9 +126,9 @@ public class TestCatalogVersionUpgrade extends TestCase {
             "### LANGUAGE GROOVY");
 
         // Load/upgrade and check against the server version.
-        InMemoryJarfile memCatalog2 = loadCatalog(memCatalog.getFullJarBytes(), true);
+        InMemoryJarfile memCatalog2 = CatalogUpgradeTools.loadCatalog(memCatalog.getFullJarBytes(), true);
         assertNotNull(memCatalog2);
-        String[] buildInfoLines2 = getBuildInfoLines(memCatalog2);
+        String[] buildInfoLines2 = CatalogUpgradeTools.getBuildInfoLines(memCatalog2);
         String serverVersion = VoltDB.instance().getVersionString();
         assertTrue(serverVersion.equals(buildInfoLines2[0]));
 

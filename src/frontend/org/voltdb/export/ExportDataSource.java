@@ -57,7 +57,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.concurrent.RejectedExecutionException;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -282,7 +281,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             } else if (releaseOffset >= sb.uso()) {
                 sb.releaseUso(releaseOffset);
@@ -408,20 +407,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long uso,
-            final long bufferPtr,
             ByteBuffer buffer,
             boolean sync,
-            boolean endOfStream) {
+            boolean endOfStream) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
             assert(!m_endOfStream);
-            assert(bufferPtr == 0);
             assert(buffer == null);
             assert(!sync);
 
             m_endOfStream = endOfStream;
 
-            if (m_committedBuffers.sizeInBytes() == 0) {
+            if (m_committedBuffers.isEmpty()) {
                 exportLog.info("Pushed EOS buffer with 0 bytes remaining");
                 if (m_pollFuture != null) {
                     m_pollFuture.set(null);
@@ -439,26 +436,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         assert(!m_endOfStream);
         if (buffer != null) {
-            if (buffer.capacity() > 0) {
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + buffer.capacity())) {
+            //There will be 8 bytes of no data that we can ignore, it is header space for storing
+            //the USO in stream block
+            if (buffer.capacity() > 8) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
                     //What ack from future is known?
                     exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     return;
                 }
+                final BBContainer cont = DBBPool.wrapBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
-                            new BBContainer(buffer, bufferPtr) {
+                            new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    DBBPool.deleteCharArrayMemory(address);
+                                    final ByteBuffer buf = checkDoubleFree();
+                                    cont.discard();
                                     deleted.set(true);
                                 }
                             }, uso, false));
                 } catch (IOException e) {
                     exportLog.error(e);
                     if (!deleted.get()) {
-                        DBBPool.deleteCharArrayMemory(bufferPtr);
+                        cont.discard();
                     }
                 }
             } else {
@@ -486,7 +487,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long uso,
-            final long bufferPtr,
             final ByteBuffer buffer,
             final boolean sync,
             final boolean endOfStream) {
@@ -495,15 +495,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        executeExportDataSourceRunner((new Runnable() {
+        m_es.execute((new Runnable() {
             @Override
             public void run() {
                 try {
-                    pushExportBufferImpl(uso, bufferPtr, buffer, sync, endOfStream);
-                } catch (Exception e) {
-                    exportLog.error("Error pushing export buffer", e);
-                } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, e);
+                    pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                } catch (Throwable t) {
+                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {
                     m_bufferPushPermits.release();
                 }
@@ -530,7 +528,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        return runExportDataSourceRunner((new Runnable() {
+        return m_es.submit((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -544,15 +542,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_onDrain.run();
                         }
                     }
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
+                } catch (Throwable t) {
+                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
                 }
             }
         }));
     }
 
     public ListenableFuture<?> close() {
-        return runExportDataSourceRunner((new Runnable() {
+        return m_es.submit((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -568,19 +566,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        runExportDataSourceRunner(new Runnable() {
+        m_es.execute(new Runnable() {
             @Override
             public void run() {
-                /*
-                 * The poll is blocking through the future, shouldn't
-                 * call poll a second time until a response has been given
-                 * which nulls out the field
-                 */
-                if (m_pollFuture != null) {
-                    fut.setException(new RuntimeException("Should not poll more than once"));
-                    return;
+                try {
+                    /*
+                     * The poll is blocking through the future, shouldn't
+                     * call poll a second time until a response has been given
+                     * which nulls out the field
+                     */
+                    if (m_pollFuture != null) {
+                        fut.setException(new RuntimeException("Should not poll more than once"));
+                        return;
+                    }
+                    pollImpl(fut);
+                } catch (Exception e) {
+                    exportLog.error("Exception polling export buffer", e);
+                } catch (Error e) {
+                    VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                 }
-                pollImpl(fut);
             }
         });
         return fut;
@@ -594,7 +598,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             StreamBlock first_unpolled_block = null;
 
-            if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
+            if (m_endOfStream && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
                 fut.set(null);
                 if (m_onDrain != null) {
@@ -631,7 +635,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 //Try hard not to leak memory
                 for (StreamBlock sb : blocksToDelete) {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             }
 
@@ -640,7 +644,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 fut.set(
-                        new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
+                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
                 m_pollFuture = null;
             }
@@ -651,13 +655,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     class AckingContainer extends BBContainer {
         final long m_uso;
-        public AckingContainer(ByteBuffer buf, long uso) {
-            super(buf, 0L);
+        final BBContainer m_backingCont;
+        public AckingContainer(BBContainer cont, long uso) {
+            super(cont.b());
             m_uso = uso;
+            m_backingCont = cont;
         }
 
         @Override
         public void discard() {
+            checkDoubleFree();
+            m_backingCont.discard();
             try {
                 ack(m_uso);
             } finally {
@@ -691,7 +699,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
-        executeExportDataSourceRunner(new Runnable() {
+        m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -729,8 +737,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-
-        executeExportDataSourceRunner(m_onMastership);
+        m_es.execute(m_onMastership);
     }
 
     /**
@@ -739,47 +746,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
-
         m_onMastership = toBeRunOnMastership;
-    }
-
-    private void executeExportDataSourceRunner(Runnable runner) {
-        try {
-            m_es.execute(new ExportDataSourceRunnable(runner));
-        } catch (RejectedExecutionException rej) {
-            exportLog.warn("Failed to execute Export Data Source task. " + rej);
-            Throwables.propagate(rej);
-        }
-    }
-
-    /**
-     * Convenience method to submit wrapped Runnables to executor.
-     *
-     * @param runner Runnable task.
-     * @return ListenableFuture
-     */
-    private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
-        try {
-            return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
-        } catch (RejectedExecutionException rej) {
-            exportLog.warn("Failed to run Export Data Source task. " + rej);
-            Throwables.propagate(rej);
-        }
-        return null;
-    }
-
-    //Wrapper Runnable.
-    final class ExportDataSourceRunnable implements Runnable {
-
-        private final Runnable m_runner;
-
-        public ExportDataSourceRunnable(Runnable runner) {
-            m_runner = runner;
-        }
-
-        @Override
-        public void run() {
-            m_runner.run();
-        }
     }
 }

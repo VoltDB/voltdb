@@ -32,7 +32,9 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -120,7 +122,7 @@ public class VoltDB {
         public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
-        public String m_pathToLicense = "license.xml";
+        public String m_pathToLicense = null;
 
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
@@ -198,6 +200,14 @@ public class VoltDB {
         public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public String m_commandLogBinding = null;
+
+        /**
+         * Allow a secret CLI config option to test multiple versions of VoltDB running together.
+         * This is used to test online upgrade (currently, for hotfixes).
+         * Also used to test error conditons like incompatible versions running together.
+         */
+        public String m_versionStringOverrideForTest = null;
+        public String m_versionCompatibilityRegexOverrideForTest = null;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -316,8 +326,15 @@ public class VoltDB {
                         m_httpPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.startsWith("zkport")) {
-                    m_zkInterface = "127.0.0.1:" + args[++i].trim();
-                }  else if (arg.equals("externalinterface")) {
+                    //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                    } else {
+                        m_zkInterface = "127.0.0.1:" + portStr.trim();
+                    }
+                } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
@@ -423,16 +440,24 @@ public class VoltDB {
                 }
                 else if (arg.equals("deployment")) {
                     m_pathToDeployment = args[++i];
-                } else if (arg.equals("license")) {
+                }
+                else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcport")) {
+                }
+                else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
                 }
                 else if (arg.equals("forcecatalogupgrade")) {
                     hostLog.info("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
-                } else {
+                }
+                // version string override for testing online upgrade
+                else if (arg.equalsIgnoreCase("versionoverride")) {
+                    m_versionStringOverrideForTest = args[++i].trim();
+                    m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
+                }
+                else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
@@ -669,10 +694,17 @@ public class VoltDB {
         }
     }
 
+    public static void crashLocalVoltDB(String errMsg) {
+        crashLocalVoltDB(errMsg, false, null);
+    }
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        try {
+            OnDemandBinaryLogger.flush();
+        } catch (Throwable e) {}
 
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
@@ -786,6 +818,7 @@ public class VoltDB {
             }
         }
         finally {
+            ShutdownHooks.useOnlyCrashHooks();
             System.exit(-1);
         }
     }

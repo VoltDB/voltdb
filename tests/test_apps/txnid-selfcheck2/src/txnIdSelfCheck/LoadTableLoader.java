@@ -80,6 +80,7 @@ public class LoadTableLoader extends Thread {
     final Random m_random;
     final AtomicLong currentRowCount = new AtomicLong(0);
     final BlockingQueue<Long> cpDelQueue = new LinkedBlockingQueue<Long>();
+    final BlockingQueue<Long> onlyDelQueue = new LinkedBlockingQueue<Long>();
 
     LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
@@ -122,23 +123,28 @@ public class LoadTableLoader extends Thread {
 
     class InsertCallback implements ProcedureCallback {
 
-        CountDownLatch latch;
+        final CountDownLatch latch;
+        final long p;
+        final byte shouldCopy;
 
-        InsertCallback(CountDownLatch latch) {
+        InsertCallback(CountDownLatch latch, long p, byte shouldCopy) {
             this.latch = latch;
+            this.p = p;
+            this.shouldCopy = shouldCopy;
         }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE) {
-                // log what happened
-                log.error("LoadTableLoader gracefully failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
+            if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
+                // log what happened status will be logged in json error log.
+                log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 System.exit(-1);
             }
+            //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
                 log.error("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
@@ -276,11 +282,12 @@ public class LoadTableLoader extends Thread {
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
         try {
-            ArrayList<Long> onlyDeleteList = new ArrayList<Long>();
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);
+                final ArrayList<Long> lcpDelQueue = new ArrayList<Long>();
+
                 // try to insert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
@@ -292,31 +299,35 @@ public class LoadTableLoader extends Thread {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
-                        success = client.callProcedure(new InsertCallback(latch), m_procName, rpartitionParam, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, m_table);
                     } else {
-                        success = client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, m_table);
                     }
+                    //Ad if successfully queued but remove if proc fails.
                     if (success) {
                         if (shouldCopy != 0) {
-                            cpDelQueue.add(p);
+                            lcpDelQueue.add(p);
                         } else {
-                            onlyDeleteList.add(p);
+                            onlyDelQueue.add(p);
                         }
                     }
                 }
+                //Wait for all @Load{SP|MP}Done
                 latch.await();
+                cpDelQueue.addAll(lcpDelQueue);
                 long nextRowCount = getRowCount();
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                if (onlyDeleteList.size() > 100) {
-                    CountDownLatch odlatch = new CountDownLatch(onlyDeleteList.size());
-                    for (Long lcid : onlyDeleteList) {
+                if (onlyDelQueue.size() > 0 && m_shouldContinue.get()) {
+                    List<Long> workList = new ArrayList<Long>();
+                    onlyDelQueue.drainTo(workList);
+                    CountDownLatch odlatch = new CountDownLatch(workList.size());
+                    for (Long lcid : workList) {
                         client.callProcedure(new DeleteCallback(odlatch, 1), m_onlydelprocName, lcid);
                     }
                     odlatch.await();
-                    onlyDeleteList.clear();
                 }
             }
             //Any accumulated in p/mp tables are left behind.

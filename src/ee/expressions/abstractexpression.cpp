@@ -186,21 +186,33 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
 
     ExpressionType peek_type = EXPRESSION_TYPE_INVALID;
     ValueType value_type = VALUE_TYPE_INVALID;
+    bool inBytes = false;
     AbstractExpression *left_child = NULL;
     AbstractExpression *right_child = NULL;
     std::vector<AbstractExpression*>* argsVector = NULL;
 
     // read the expression type
-    std::string exprTypeStr = obj.valueForKey("TYPE").asStr();
-    assert(stringToExpression(exprTypeStr) != EXPRESSION_TYPE_INVALID);
-    peek_type = stringToExpression(exprTypeStr);
+    peek_type = static_cast<ExpressionType>(obj.valueForKey("TYPE").asInt());
+    assert(peek_type != EXPRESSION_TYPE_INVALID);
 
-    std::string valueTypeString = obj.valueForKey("VALUE_TYPE").asStr();
-    value_type = stringToValue(valueTypeString);
-    assert(value_type != VALUE_TYPE_INVALID);
+    if (obj.hasNonNullKey("VALUE_TYPE")) {
+        int32_t value_type_int = obj.valueForKey("VALUE_TYPE").asInt();
+        value_type = static_cast<ValueType>(value_type_int);
+        assert(value_type != VALUE_TYPE_INVALID);
+
+        if (obj.hasNonNullKey("IN_BYTES")) {
+            inBytes = true;
+        }
+    }
 
     // add the value size
-    int valueSize = obj.valueForKey("VALUE_SIZE").asInt();
+    int valueSize = -1;
+    if (obj.hasNonNullKey("VALUE_SIZE")) {
+        valueSize = obj.valueForKey("VALUE_SIZE").asInt();
+    } else {
+        // This value size should be consistent with VoltType.java
+        valueSize = NValue::getTupleStorageSize(value_type);
+    }
 
     // recurse to children
     try {
@@ -230,8 +242,12 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         // pass it the serialization stream in case a subclass has more
         // to read. yes, the per-class data really does follow the
         // child serializations.
-        return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
-                                                 left_child, right_child, argsVector);
+        AbstractExpression* finalExpr = ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
+                left_child, right_child, argsVector);
+
+        finalExpr->setInBytes(inBytes);
+
+        return finalExpr;
     }
     catch (const SerializableEEException &ex) {
         delete left_child;

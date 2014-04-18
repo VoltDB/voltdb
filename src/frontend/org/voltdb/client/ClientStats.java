@@ -17,10 +17,18 @@
 
 package org.voltdb.client;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
-import org.voltdb.LatencyBucketSet;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.HdrHistogram_voltpatches.HistogramData;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * <p>Essentially a set of counters for a specific context with helper
@@ -48,11 +56,12 @@ public class ClientStats {
     long m_invocationsCompleted;
     long m_invocationAborts;
     long m_invocationErrors;
+    long m_invocationTimeouts;
 
     // cumulative latency measured by client, used to calculate avg. lat.
-    long m_roundTripTime; // microsecs
+    long m_roundTripTimeNanos;
     // cumulative latency measured by the cluster, used to calculate avg lat.
-    long m_clusterRoundTripTime; // microsecs
+    long m_clusterRoundTripTime; // milliseconds
 
     /** The number of buckets tracking latency with 1ms granularity. */
     final public static int ONE_MS_BUCKET_COUNT = 50;
@@ -61,12 +70,22 @@ public class ClientStats {
     /** The number of buckets tracking latency with 100ms granularity. */
     final public static int HUNDRED_MS_BUCKET_COUNT = 10;
 
-    LatencyBucketSet m_latencyBy1ms;
-    LatencyBucketSet m_latencyBy10ms;
-    LatencyBucketSet m_latencyBy100ms;
+    Histogram m_latencyHistogram;
 
     long m_bytesSent;
     long m_bytesReceived;
+
+    private static final long LOWEST_TRACKABLE = 50;
+    private static final long HIGHEST_TRACKABLE = 10L * (1000L * 1000L);
+    private static final int SIGNIFICANT_VALUE_DIGITS = 2;
+
+    /*
+     * Get a that tracks from 1 microsecond to 10 seconds with
+     * 2 significant value digits
+     */
+    public static Histogram constructHistogram() {
+        return new Histogram( LOWEST_TRACKABLE, HIGHEST_TRACKABLE, SIGNIFICANT_VALUE_DIGITS);
+    }
 
     ClientStats() {
         m_procName = "";
@@ -76,11 +95,9 @@ public class ClientStats {
         m_startTS = Long.MAX_VALUE;
         m_endTS = Long.MIN_VALUE;
         m_invocationsCompleted = m_invocationAborts = m_invocationErrors = 0;
-        m_roundTripTime = m_clusterRoundTripTime = 0;
-        m_latencyBy1ms = new LatencyBucketSet(1, ONE_MS_BUCKET_COUNT);
-        m_latencyBy10ms = new LatencyBucketSet(10, TEN_MS_BUCKET_COUNT);
-        m_latencyBy100ms = new LatencyBucketSet(100, HUNDRED_MS_BUCKET_COUNT);
+        m_roundTripTimeNanos = m_clusterRoundTripTime = 0;
         m_bytesSent = m_bytesReceived = 0;
+        m_latencyHistogram = constructHistogram();
     }
 
     ClientStats(ClientStats other) {
@@ -93,11 +110,11 @@ public class ClientStats {
         m_invocationsCompleted = other.m_invocationsCompleted;
         m_invocationAborts = other.m_invocationAborts;
         m_invocationErrors = other.m_invocationErrors;
-        m_roundTripTime = other.m_roundTripTime;
+        m_invocationTimeouts = other.m_invocationTimeouts;
+        m_roundTripTimeNanos = other.m_roundTripTimeNanos;
         m_clusterRoundTripTime = other.m_clusterRoundTripTime;
-        m_latencyBy1ms = (LatencyBucketSet) other.m_latencyBy1ms.clone();
-        m_latencyBy10ms = (LatencyBucketSet) other.m_latencyBy10ms.clone();
-        m_latencyBy100ms = (LatencyBucketSet) other.m_latencyBy100ms.clone();
+        m_latencyHistogram = other.m_latencyHistogram.copy();
+        m_latencyHistogram.reestablishTotalCount();
         m_bytesSent = other.m_bytesSent;
         m_bytesReceived = other.m_bytesReceived;
     }
@@ -121,13 +138,12 @@ public class ClientStats {
         retval.m_invocationsCompleted = newer.m_invocationsCompleted - older.m_invocationsCompleted;
         retval.m_invocationAborts = newer.m_invocationAborts - older.m_invocationAborts;
         retval.m_invocationErrors = newer.m_invocationErrors - older.m_invocationErrors;
+        retval.m_invocationTimeouts = newer.m_invocationTimeouts - older.m_invocationTimeouts;
 
-        retval.m_roundTripTime = newer.m_roundTripTime - older.m_roundTripTime;
+        retval.m_roundTripTimeNanos = newer.m_roundTripTimeNanos - older.m_roundTripTimeNanos;
         retval.m_clusterRoundTripTime = newer.m_clusterRoundTripTime - older.m_clusterRoundTripTime;
 
-        retval.m_latencyBy1ms = LatencyBucketSet.diff(newer.m_latencyBy1ms, older.m_latencyBy1ms);
-        retval.m_latencyBy10ms = LatencyBucketSet.diff(newer.m_latencyBy10ms, older.m_latencyBy10ms);
-        retval.m_latencyBy100ms = LatencyBucketSet.diff(newer.m_latencyBy100ms, older.m_latencyBy100ms);
+        retval.m_latencyHistogram = Histogram.diff(newer.m_latencyHistogram, older.m_latencyHistogram);
 
         retval.m_bytesSent = newer.m_bytesSent - older.m_bytesSent;
         retval.m_bytesReceived = newer.m_bytesReceived - older.m_bytesReceived;
@@ -170,29 +186,38 @@ public class ClientStats {
         m_invocationsCompleted += other.m_invocationsCompleted;
         m_invocationAborts += other.m_invocationAborts;
         m_invocationErrors += other.m_invocationErrors;
+        m_invocationTimeouts += other.m_invocationTimeouts;
 
-        m_roundTripTime += other.m_roundTripTime;
+        m_roundTripTimeNanos += other.m_roundTripTimeNanos;
         m_clusterRoundTripTime += other.m_clusterRoundTripTime;
 
-        m_latencyBy1ms.add(other.m_latencyBy1ms);
-        m_latencyBy10ms.add(other.m_latencyBy10ms);
-        m_latencyBy100ms.add(other.m_latencyBy100ms);
+        m_latencyHistogram.add(other.m_latencyHistogram);
+        m_latencyHistogram.reestablishTotalCount();
 
         m_bytesSent += other.m_bytesSent;
         m_bytesReceived += other.m_bytesReceived;
     }
 
-    void update(int roundTripTime, int clusterRoundTripTime, boolean abort, boolean error) {
+    void update(long roundTripTimeNanos, int clusterRoundTripTime, boolean abort, boolean error, boolean timeout) {
         m_invocationsCompleted++;
         if (abort) m_invocationAborts++;
         if (error) m_invocationErrors++;
-        m_roundTripTime += roundTripTime;
+        if (timeout) m_invocationTimeouts++;
+        m_roundTripTimeNanos += roundTripTimeNanos;
         m_clusterRoundTripTime += clusterRoundTripTime;
 
-        // calculate the latency buckets to increment and increment.
-        m_latencyBy1ms.update(roundTripTime);
-        m_latencyBy10ms.update(roundTripTime);
-        m_latencyBy100ms.update(roundTripTime);
+        //Round up to 50 microseconds. Average is still accurate and it doesn't change the percentile distribution
+        //above 50 micros
+        final long roundTripMicros = Math.max(LOWEST_TRACKABLE, TimeUnit.NANOSECONDS.toMicros(roundTripTimeNanos));
+        if (roundTripMicros > HIGHEST_TRACKABLE) {
+            m_latencyHistogram.recordValue(roundTripMicros % HIGHEST_TRACKABLE);
+            int count = (int)(roundTripMicros / HIGHEST_TRACKABLE);
+            for (int ii = 0; ii < count; ii++) {
+                m_latencyHistogram.recordValue(HIGHEST_TRACKABLE);
+            }
+        } else {
+            m_latencyHistogram.recordValue(roundTripMicros);
+        }
     }
 
     /**
@@ -300,6 +325,16 @@ public class ClientStats {
     }
 
     /**
+     * Get the number of transactions timed out before being sent to or responded by VoltDB server(s)
+     * during the time period covered by this stats instance.
+     *
+     * @return The number of transactions that failed.
+     */
+    public long getInvocationTimeouts() {
+        return m_invocationTimeouts;
+    }
+
+    /**
      * Get the average latency in milliseconds for the time period
      * covered by this stats instance. This is computed by summing the client-measured
      * round trip times of all transactions and dividing by the competed
@@ -309,7 +344,7 @@ public class ClientStats {
      */
     public double getAverageLatency() {
         if (m_invocationsCompleted == 0) return 0;
-        return (double)m_roundTripTime / (double)m_invocationsCompleted;
+        return (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0;
     }
 
     /**
@@ -343,7 +378,12 @@ public class ClientStats {
      * @return An array containing counts for different latency values.
      */
     public long[] getLatencyBucketsBy1ms() {
-        return m_latencyBy1ms.buckets.clone();
+        final long buckets[] = new long[ONE_MS_BUCKET_COUNT];
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        for (int ii = 0; ii < ONE_MS_BUCKET_COUNT; ii++) {
+            buckets[ii] = data.getCountBetweenValues(ii * 1000, (ii + 1) * 1000);
+        }
+        return buckets;
     }
 
     /**
@@ -360,7 +400,12 @@ public class ClientStats {
      * @return An array containing counts for different latency values.
      */
     public long[] getLatencyBucketsBy10ms() {
-        return m_latencyBy10ms.buckets.clone();
+        final long buckets[] = new long[TEN_MS_BUCKET_COUNT];
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        for (int ii = 0; ii < TEN_MS_BUCKET_COUNT; ii++) {
+            buckets[ii] = data.getCountBetweenValues(ii * 10000, (ii + 1) * 10000);
+        }
+        return buckets;
     }
 
     /**
@@ -377,7 +422,12 @@ public class ClientStats {
      * @return An array containing counts for different latency values.
      */
     public long[] getLatencyBucketsBy100ms() {
-        return m_latencyBy100ms.buckets.clone();
+        final long buckets[] = new long[HUNDRED_MS_BUCKET_COUNT];
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        for (int ii = 0; ii < HUNDRED_MS_BUCKET_COUNT; ii++) {
+            buckets[ii] = data.getCountBetweenValues(ii * 100000, (ii + 1) * 100000);
+        }
+        return buckets;
     }
 
     /**
@@ -410,73 +460,61 @@ public class ClientStats {
      * <p>For example, k=.5 returns an estimate of the median. k=0 returns the
      * minimum. k=1.0 returns the maximum.</p>
      *
-     * <p>The accuracy is limited by the precision of the buckets, and will have
-     * higher margin of error as courser sets of buckets are used. Small numbers
-     * of transactions in the period will also increase error. Finally, note that
-     * latency isn't tracked for transactions are outside values tracked by the
-     * largest set of buckets. If k=X implies latency greater than
-     * <code>{@link #HUNDRED_MS_BUCKET_COUNT} * 100</code>, then it will return
-     * a number larger than <code>{@link #HUNDRED_MS_BUCKET_COUNT} * 100</code>,
-     * but nothing more is promised.</p>
+     * <p>Latencies longer than the highest trackable value (10 seconds) will be
+     * reported as multiple entries at the highest trackable value</p>
      *
      * @param percentile A floating point number between 0.0 and 1.0.
      * @return An estimate of k-percentile latency in whole milliseconds.
      */
     public int kPercentileLatency(double percentile) {
-        int kpl;
-
-        kpl = m_latencyBy1ms.kPercentileLatency(percentile);
-        if (kpl != Integer.MAX_VALUE) {
-            return kpl;
-        }
-
-        kpl = m_latencyBy10ms.kPercentileLatency(percentile);
-        if (kpl != Integer.MAX_VALUE) {
-            return kpl;
-        }
-
-        kpl = m_latencyBy100ms.kPercentileLatency(percentile);
-        if (kpl != Integer.MAX_VALUE) {
-            return kpl;
-        }
-
-        return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        if (data.getTotalCount() == 0) return 0;
+        percentile = Math.max(0.0, percentile);
+        //Convert from micros to millis for return value, round to nearest integer
+        return (int) (Math.round(data.getValueAtPercentile(percentile * 100.0)) / 1000.0);
     }
 
     /**
-     * Generate a human-readable report of latencies in the form of a histogram.
+     * <p>Using the latency bucketing statistics gathered by the client, estimate
+     * the k-percentile latency value for the time period covered by this stats
+     * instance.</p>
+     *
+     * <p>For example, k=.5 returns an estimate of the median. k=0 returns the
+     * minimum. k=1.0 returns the maximum.</p>
+     *
+     * <p>Latencies longer than the highest trackable value (10 seconds) will be
+     * reported as multiple entries at the highest trackable value</p>
+     *
+     * @param percentile A floating point number between 0.0 and 1.0.
+     * @return An estimate of k-percentile latency in whole milliseconds.
+     */
+    public double kPercentileLatencyAsDouble(double percentile) {
+        final HistogramData data = m_latencyHistogram.getHistogramData();
+        if (data.getTotalCount() == 0) return 0.0;
+        percentile = Math.max(0.0, percentile);
+        //Convert from micros to millis for return value, enjoy having precision
+        return data.getValueAtPercentile(percentile * 100.0) / 1000.0;
+    }
+
+    /**
+     * Generate a human-readable report of latencies in the form of a histogram. Latency is
+     * in milliseconds
      *
      * @return String containing human-readable report.
      */
     public String latencyHistoReport() {
-        StringBuilder sb = new StringBuilder();
-
-        // for now, I believe 3 digit accuracy is enough
-        int upper = kPercentileLatency(0.99999);
-        int high = kPercentileLatency(0.99);
-
-        if(high <= m_latencyBy1ms.numberOfBuckets * m_latencyBy1ms.msPerBucket){
-            if(upper <= m_latencyBy1ms.numberOfBuckets * m_latencyBy1ms.msPerBucket) {
-                return m_latencyBy1ms.latencyHistoReport(upper);
-            } else {
-                // 99% are within the range, ignore 1% outliners for more accurate result
-                return m_latencyBy1ms.latencyHistoReport(high);
-            }
-        } else if(upper <= m_latencyBy10ms.numberOfBuckets * m_latencyBy10ms.msPerBucket) {
-           return m_latencyBy10ms.latencyHistoReport(upper);
-        } else if(upper <= m_latencyBy100ms.numberOfBuckets * m_latencyBy100ms.msPerBucket) {
-            return m_latencyBy100ms.latencyHistoReport(upper);
-        } else {
-            // rare case; add one more bin to calculate percentile for txns with latency over 1000ms
-            sb.append(m_latencyBy100ms.latencyHistoReport(m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets));
-            sb.append(String.format(">%1-10sms:", m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets));
-            int height = (int)Math.ceil(m_latencyBy100ms.unaccountedTxns * m_latencyBy100ms.maxBinHeight / m_latencyBy100ms.totalTxns);
-            for(int i = 0; i < height; i++) {
-                sb.append("|");
-            }
-            sb.append(String.format("]%7.3f%%\n", ((double)m_latencyBy100ms.unaccountedTxns / (double)m_latencyBy100ms.totalTxns * 100)));
-            return sb.toString();
+        ByteArrayOutputStream baos= new ByteArrayOutputStream();
+        PrintStream pw = null;
+        try {
+            pw = new PrintStream(baos, false, Charsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            Throwables.propagate(e);
         }
+
+        //Get a latency report in milliseconds
+        m_latencyHistogram.getHistogramData().outputPercentileDistributionVolt(pw, 1, 1000.0);
+
+        return new String(baos.toByteArray(), Charsets.UTF_8);
     }
 
     /**
@@ -557,14 +595,12 @@ public class ClientStats {
                 new Date(m_startTS).toString(), new Date(m_endTS).toString(), m_procName, m_connectionId));
         sb.append(String.format("    hostname: %s:%d\n",
                 m_hostname, m_port));
-        sb.append(String.format("    invocations completed/aborted/errors: %d/%d/%d\n",
-                m_invocationsCompleted, m_invocationAborts, m_invocationErrors));
+        sb.append(String.format("    invocations completed/aborted/errors/timeouts: %d/%d/%d/%d\n",
+                m_invocationsCompleted, m_invocationAborts, m_invocationErrors, m_invocationTimeouts));
         if (m_invocationsCompleted > 0) {
-            sb.append(String.format("    avg latency client/internal: %d/%d\n",
-                    m_roundTripTime / m_invocationsCompleted, m_clusterRoundTripTime / m_invocationsCompleted));
-            sb.append(m_latencyBy1ms).append("\n");
-            sb.append(m_latencyBy10ms).append("\n");
-            sb.append(m_latencyBy100ms).append("\n");
+            sb.append(String.format("    avg latency client/internal: %.2f/%d\n",
+                    (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0, m_clusterRoundTripTime / m_invocationsCompleted));
+            sb.append(latencyHistoReport()).append("\n");
         }
 
         return sb.toString();

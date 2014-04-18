@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 
@@ -121,6 +122,7 @@ public class SystemProcedureCatalog {
             p.setPartitiontable(null);
             p.setPartitioncolumn(partitionCol);
             p.setPartitionparameter(partitionParam);
+            p.setAttachment(new ProcedurePartitionInfo( partitionParamType, partitionParam ));
             return p;
         }
     }

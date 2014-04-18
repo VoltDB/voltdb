@@ -30,8 +30,9 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -134,6 +135,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 return plan;
             }
 
+            if (((AbstractScanPlanNode)child).isSubQuery()) {
+                return plan;
+            }
+
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
             Index ret = findQualifiedIndex(((SeqScanPlanNode)child), aggExpr, bindings);
@@ -174,6 +179,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // we added for reverse scan purpose only
         if (((IndexScanPlanNode)child).getPredicate() != null &&
                 !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+            return plan;
+        }
+
+        // Guard against (possible future?) cases of indexable subquery.
+        if (((AbstractScanPlanNode)child).isSubQuery()) {
             return plan;
         }
 
@@ -323,8 +333,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            int idx = m_parsedStmt.tableAliasIndexMap.get(fromTableAlias);
-            StmtTableScan tableScan = m_parsedStmt.stmtCache.get(idx);
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(fromTableAlias);
 
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
@@ -341,7 +350,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
     // lookup aggCol up to min((filterSize + 1), indexedColIdx.size())
     // aggCol can be one of equality comparison key (then a constant value),
     // or all filters compose the complete set of prefix key components
-    private boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
+    private static boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
 
         boolean found = false;
 
@@ -372,7 +381,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         return false;
     }
 
-    private boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
+    private static boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
             AbstractExpression aggExpr,
             List<AbstractExpression> filterExprs,
             List<AbstractExpression> bindingExprs) {
