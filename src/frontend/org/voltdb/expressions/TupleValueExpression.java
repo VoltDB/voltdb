@@ -276,6 +276,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
+        setInBytes(column.getInbytes());
     }
 
     /**
@@ -290,6 +291,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
             setValueType(inputColumn.getType());
             setValueSize(inputColumn.getSize());
+            setInBytes(inputColumn.getExpression().getInBytes());
         }
         return index;
     }

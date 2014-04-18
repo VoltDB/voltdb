@@ -111,12 +111,22 @@ class AbstractExpression {
         return m_valueSize;
     }
 
+    bool getInBytes() const
+    {
+        return m_inBytes;
+    }
+
     // These should really be part of the constructor, but plumbing
     // the type and size args through the whole of the expression world is
     // not something I'm doing right now.
     void setValueType(ValueType type)
     {
         m_valueType = type;
+    }
+
+    void setInBytes(bool bytes)
+    {
+        m_inBytes = bytes;
     }
 
     void setValueSize(int size)
@@ -149,6 +159,7 @@ class AbstractExpression {
     bool m_hasParameter;
     ValueType m_valueType;
     int m_valueSize;
+    bool m_inBytes;
 };
 
 }

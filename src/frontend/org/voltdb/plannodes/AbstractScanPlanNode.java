@@ -239,6 +239,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                             m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
                     tve.setValueType(VoltType.get((byte)col.getType()));
                     tve.setValueSize(col.getSize());
+                    tve.setInBytes(col.getInbytes());
                     m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
                                                              m_targetTableAlias,
                                                              col.getTypeName(),
@@ -394,7 +395,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
-            m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+            m_isSubQuery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
         }
     }
 

@@ -610,7 +610,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
-
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
