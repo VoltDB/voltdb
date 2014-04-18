@@ -22,6 +22,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -117,6 +118,14 @@ public abstract class JoinProducerBase extends SiteTasker {
         }
     }
 
+    private class ReturnToTaskQueueAction implements Runnable
+    {
+        @Override
+        public void run() {
+            m_taskQueue.offer(JoinProducerBase.this);
+        }
+    }
+
     JoinProducerBase(int partitionId, String whoami, SiteTaskerQueue taskQueue)
     {
         m_partitionId = partitionId;
@@ -189,6 +198,19 @@ public abstract class JoinProducerBase extends SiteTasker {
             if (m_taskLog != null) {
                 m_taskLog.enableRecording();
             }
+        }
+    }
+
+    // Based on whether or not we just did real work, return ourselves to the task queue either now
+    // or after waiting a few milliseconds
+    protected void returnToTaskQueue(boolean sourcesReady)
+    {
+        if (sourcesReady) {
+            // If we've done something meaningful, go ahead and return ourselves to the queue immediately
+            m_taskQueue.offer(this);
+        } else {
+            // Otherwise, avoid spinning too aggressively, so wait a few milliseconds before requeueing
+            VoltDB.instance().scheduleWork(new ReturnToTaskQueueAction(), 5, -1, TimeUnit.MILLISECONDS);
         }
     }
 }
