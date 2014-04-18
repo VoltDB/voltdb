@@ -203,9 +203,9 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     // Based on whether or not we just did real work, return ourselves to the task queue either now
     // or after waiting a few milliseconds
-    protected void returnToTaskQueue(RestoreWork work)
+    protected void returnToTaskQueue(boolean sourcesReady)
     {
-        if (work != null) {
+        if (sourcesReady) {
             // If we've done something meaningful, go ahead and return ourselves to the queue immediately
             m_taskQueue.offer(this);
         } else {
