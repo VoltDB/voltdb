@@ -277,6 +277,7 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
+      <xs:enumeration value="kafka"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

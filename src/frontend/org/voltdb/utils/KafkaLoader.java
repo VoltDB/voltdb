@@ -99,9 +99,6 @@ public class KafkaLoader {
          */
         @Override
         public void validate() {
-            if (maxerrors < 0) {
-                exitWithMessageAndUsage("abortfailurecount must be >=0");
-            }
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }

@@ -64,6 +64,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         m_tableData = tableData;
         m_outputExpression.setValueType(m_tableData.getValueType());
         m_outputExpression.setValueSize(m_tableData.getValueSize());
+        m_outputExpression.setInBytes(m_tableData.getInBytes());
     }
 
     public void setSortDirection(SortDirectionType direction) {
