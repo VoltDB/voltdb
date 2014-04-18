@@ -47,7 +47,6 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -74,6 +73,8 @@ public class WindowingApp {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
+    final ContinuousDeleter ctb;
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -84,7 +85,7 @@ public class WindowingApp {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 20;
+        int duration = 2000;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
@@ -92,20 +93,20 @@ public class WindowingApp {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
-        int contestants = 6;
+        @Option(desc = "")
+        long maxrows = 0;
 
-        @Option(desc = "Maximum number of votes cast per voter.")
-        int maxvotes = 2;
+        @Option(desc = "")
+        long historyseconds = 30;
+
+        @Option(desc = "")
+        long maxrss = 0;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
-
-        @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
 
         @Option(desc = "User name for connection.")
         String user = "";
@@ -118,8 +119,9 @@ public class WindowingApp {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
-            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
+            if (maxrows < 0) exitWithMessageAndUsage("maxrows must be >= 0");
+            if (historyseconds < 0) exitWithMessageAndUsage("historyseconds must be >= 0");
+            if (historyseconds < 0) exitWithMessageAndUsage("historyseconds must be >= 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
         }
     }
@@ -154,6 +156,8 @@ public class WindowingApp {
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
+
+        ctb = new ContinuousDeleter(client);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -238,14 +242,19 @@ public class WindowingApp {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
+        long totalDeletes = ctb.getTotalDeletes();
+        long deletesSinceLastChecked = ctb.getDeletesSinceLastChecked();
+
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d",
+        System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         if(this.config.latencyreport) {
-            System.out.printf(", Avg/95%% Latency %.2f/%dms", stats.getAverageLatency(),
+            System.out.printf("Avg/95%% Latency %.2f/%dms, ", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
         }
+
+        System.out.printf("Total Deletes/Deletes %d/%d", totalDeletes, deletesSinceLastChecked);
         System.out.printf("\n");
     }
 
@@ -273,7 +282,7 @@ public class WindowingApp {
                 badVoteCountVotes.get(), failedVotes.get());*/
 
         // 2. Voting results
-        VoltTable result = client.callProcedure("Results").getResults()[0];
+        /*VoltTable result = client.callProcedure("Results").getResults()[0];
 
         System.out.println("Contestant Name\t\tVotes Received");
         while(result.advanceRow()) {
@@ -308,9 +317,8 @@ public class WindowingApp {
             System.out.println(" Latency Histogram");
             System.out.println(HORIZONTAL_RULE);
             System.out.println(stats.latencyHistoReport());
-        }
-        // 4. Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        }*/
+
     }
 
     /**
@@ -347,6 +355,7 @@ public class WindowingApp {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
+        ctb.start();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -355,6 +364,8 @@ public class WindowingApp {
         while (benchmarkEndTime > System.currentTimeMillis()) {
             DataGenerator.insert(client);
         }
+
+        ctb.stop();
 
         // cancel periodic stats printing
         timer.cancel();

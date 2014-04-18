@@ -32,44 +32,44 @@ package windowing;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
 
-public class DeleteRows extends VoltProcedure {
+public class DeleteOldestRows extends VoltProcedure {
 
     public final SQLStmt countRows = new SQLStmt(
             "SELECT COUNT(*) FROM timedata;");
-    public final SQLStmt countMatchingRows = new SQLStmt(
-            "SELECT COUNT(*) FROM timedata WHERE update_ts <= ?;");
 
     public final SQLStmt getNthOldestTimestamp = new SQLStmt(
             "SELECT update_ts FROM timedata ORDER BY update_ts ASC OFFSET ? LIMIT 1;");
 
+    public final SQLStmt deleteAll = new SQLStmt(
+            "DELETE FROM timedata;");
+
     public final SQLStmt deleteOlderThanDate = new SQLStmt(
             "DELETE FROM timedata WHERE update_ts <= ?;");
 
-    public long run(String partitionValue, TimestampType newestToDiscard, long maxTotalRows, long maxRowsToDeletePerProc) {
-        if (newestToDiscard == null) {
-            throw new VoltAbortException("newestToDiscard shouldn't be null.");
-            // It might be Long.MIN_VALUE as a TimestampType though.
+    public long run(String partitionValue, long maxRowsToDeletePerProc) {
+        if (maxRowsToDeletePerProc <= 0) {
+            throw new VoltAbortException("maxRowsToDeletePerProc must be > 0.");
         }
 
         voltQueueSQL(countRows, EXPECT_SCALAR_LONG);
-        voltQueueSQL(countMatchingRows, EXPECT_SCALAR_LONG, newestToDiscard);
-        VoltTable[] countResults = voltExecuteSQL();
-        long oversizeCount = countResults[0].asScalarLong();
-        long agedOutCount = countResults[0].asScalarLong();
+        long count = voltExecuteSQL()[0].asScalarLong();
 
-        long rowsToConsider = Math.max(oversizeCount, agedOutCount);
-
-        if (rowsToConsider > maxRowsToDeletePerProc) {
+        if (count <= maxRowsToDeletePerProc) {
+            voltQueueSQL(deleteAll, EXPECT_SCALAR_MATCH(count));
+            voltExecuteSQL(true);
+            return count;
+        }
+        else {
             voltQueueSQL(getNthOldestTimestamp, EXPECT_SCALAR, maxRowsToDeletePerProc);
-            newestToDiscard = voltExecuteSQL()[0].fetchRow(0).getTimestampAsTimestamp(0);
+            TimestampType newestToDiscard = voltExecuteSQL()[0].fetchRow(0).getTimestampAsTimestamp(0);
+
+            voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
+            long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
+
+            return deletedCount;
         }
 
-        voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
-        voltExecuteSQL(true);
-
-        return 0;
     }
 }
