@@ -484,7 +484,7 @@ public class VoltProjectBuilder {
         if (config == null) {
             config = new Properties();
             config.putAll(ImmutableMap.<String, String>of(
-                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
                     ));
         }
         m_elConfig = config;
