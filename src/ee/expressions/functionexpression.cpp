@@ -238,6 +238,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_CEILING:
             ret = new UnaryFunctionExpression<FUNC_CEILING>((*arguments)[0]);
             break;
+        case FUNC_CHAR:
+            ret = new UnaryFunctionExpression<FUNC_CHAR>((*arguments)[0]);
+            break;
         case FUNC_CHAR_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
             break;

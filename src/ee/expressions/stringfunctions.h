@@ -19,6 +19,7 @@
 #define STRINGFUNCTIONS_H
 
 #include <boost/algorithm/string.hpp>
+#include <boost/locale.hpp>
 
 namespace voltdb {
 
@@ -28,6 +29,17 @@ template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
         return getNullValue();
 
     return getIntegerValue(getObjectLength_withoutNull());
+}
+
+/** implement the 1-argument SQL CHAR function */
+template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
+    if (isNull())
+        return getNullValue();
+
+    unsigned int point = static_cast<unsigned int>(castAsBigIntAndGetValue());
+    std::string utf8 = boost::locale::conv::utf_to_utf<char>(&point, &point + 1);
+
+    return getTempStringValue(utf8.c_str(), utf8.length());
 }
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
@@ -428,7 +440,7 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
 
 static inline std::string overlay_function(const char* ptrSource, size_t lengthSource,
         std::string insertStr, size_t start, size_t length) {
-	assert(start >= 1);
+    assert(start >= 1);
     int32_t i = 0, j = 0;
     while (i < lengthSource) {
         if ((ptrSource[i] & 0xc0) != 0x80) {
@@ -441,12 +453,14 @@ static inline std::string overlay_function(const char* ptrSource, size_t lengthS
 
     bool reached = false;
     j = 0;
-    while (i < lengthSource) {
-        if ((ptrSource[i] & 0xc0) != 0x80) {
-            if (reached) break;
-            if (++j == length) reached = true;
+    if (length > 0) {
+        while (i < lengthSource) {
+            if ((ptrSource[i] & 0xc0) != 0x80) {
+                if (reached) break;
+                if (++j == length) reached = true;
+            }
+            i++;
         }
-        i++;
     }
     result.append(std::string(&ptrSource[i], lengthSource - i));
 
@@ -483,7 +497,12 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
         return getNullStringValue();
     }
 
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
+    int64_t start = startArg.castAsBigIntAndGetValue();
+    if (start <= 0) {
+        char message[128];
+        snprintf(message, 128, "data exception -- OVERLAY error, not positive start argument %ld",(long)start);
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+    }
 
     int64_t length = 0;
     if (arguments.size() == 4) {

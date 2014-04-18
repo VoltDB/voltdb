@@ -2319,7 +2319,15 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾 at ltDB", result.getString(1));
 
 
-        // Hsql has bugs on string index
+        result = client.callProcedure("OVERLAY", "XinJia", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "石宁", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+        // Hsql has bugs on string(substring) index
         if (!isHSQL()) {
             result = client.callProcedure("OVERLAY", "XinJia", 9, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
@@ -2339,20 +2347,15 @@ public class TestFunctionsSuite extends RegressionSuite {
 
             // various start argument tests
             // start from 0, not 1, but treat it at least 1
-            result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
-            assertTrue(result.advanceRow());
-            assertEquals("XinJia@VoltDB", result.getString(1));
-
-            result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
-            assertTrue(result.advanceRow());
-            assertEquals("XinJia@VoltDB", result.getString(1));
-
             result = client.callProcedure("OVERLAY", "XinJia", 100, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
             assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
 
-
             // various length argument
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 0, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia鑫@VoltDB", result.getString(1));
+
             result = client.callProcedure("OVERLAY", "XinJia", 1, 10, 2).getResults()[0];
             assertTrue(result.advanceRow());
             assertEquals("XinJia", result.getString(1));
@@ -2364,7 +2367,68 @@ public class TestFunctionsSuite extends RegressionSuite {
             result = client.callProcedure("OVERLAY", "XinJia", 2, 100, 2).getResults()[0];
             assertTrue(result.advanceRow());
             assertEquals("贾XinJia", result.getString(1));
+
+
+            // Negative tests
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument -10"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument 0"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 1, -1, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, negative length argument -1"));
+            }
         }
+    }
+
+    // Unicode character to UTF8 string character
+    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test CHAR");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        // Hsql has wrong answers.
+        if (isHSQL()) return;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("CHAR", 36158, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾", result.getString(1));
+
+        result = client.callProcedure("CHAR", 37995, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("鑫", result.getString(1));
+
+        String voltDB = "VoltDB";
+
+        for (int i = 0; i < voltDB.length(); i++) {
+            char ch = voltDB.charAt(i);
+            result = client.callProcedure("CHAR", (int)ch, 1).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(String.valueOf(ch), result.getString(1));
+        }
+
+        result = client.callProcedure("CHAR", null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2987,6 +3051,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
 
+        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
