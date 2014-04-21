@@ -42,10 +42,12 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
@@ -123,6 +125,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public int overrideId(int newId) {
         m_id = newId++;
+        return newId;
+    }
+
+    /**
+     * Override the plan node ids from subquery expressions
+     * @param newId the next available node id
+     * @param expr - expression with possible subqury expressions
+     * @return the next available node id
+     */
+    protected int overrideSubqueryIds(int newId, AbstractExpression expr) {
+        if (expr == null) {
+            return newId;
+        }
+        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
+        for (AbstractExpression subquery : subqueries) {
+            assert(subquery instanceof SubqueryExpression);
+            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();
+            newId = subqueryPlan.resetPlanNodeIds(newId);
+        }
         return newId;
     }
 

@@ -1731,7 +1731,7 @@ void VoltDBEngine::reportProgessToTopend() {
 void VoltDBEngine::ExecutorVector::initExecutors(VoltDBEngine* engine)
 {
     // Initialize each node!
-    for (PlanNodeFragment::PlanNodeMapIterator it = planFragment->executeListBegin(); 
+    for (PlanNodeFragment::PlanNodeMapIterator it = planFragment->executeListBegin();
         it != planFragment->executeListEnd(); ++it) {
         assert(it->second != NULL);
         const std::vector<AbstractPlanNode*>& executeList = *it->second;

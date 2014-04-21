@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -27,10 +26,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.CompiledPlan;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -146,22 +142,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     @Override
     public int overrideId(int newId) {
         m_id = newId++;
-        List<AbstractExpression> subqueries = new ArrayList<AbstractExpression>();
-        if (m_preJoinPredicate != null) {
-            subqueries.addAll(m_preJoinPredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
-        }
-        // Now override the ids in the subqueries nodes if any
-        if (m_joinPredicate != null) {
-            subqueries.addAll(m_joinPredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
-        }
-        if (m_wherePredicate != null) {
-            subqueries.addAll(m_wherePredicate.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
-        }
-        for (AbstractExpression subquery : subqueries) {
-            assert(subquery instanceof SubqueryExpression);
-            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();
-            newId = subqueryPlan.resetPlanNodeIds(newId);
-        }
+        newId = overrideSubqueryIds(newId, m_preJoinPredicate);
+        newId = overrideSubqueryIds(newId, m_joinPredicate);
+        newId = overrideSubqueryIds(newId, m_wherePredicate);
         return newId;
     }
 

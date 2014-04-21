@@ -391,4 +391,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
+
+    @Override
+    public int overrideId(int newId) {
+        m_id = newId++;
+        newId = overrideSubqueryIds(newId, m_prePredicate);
+        newId = overrideSubqueryIds(newId, m_postPredicate);
+        return newId;
+    }
 }

@@ -84,10 +84,10 @@ class PlanNodeFragment {
     PlanNodeFragment(AbstractPlanNode *root_node);
     bool constructTree(AbstractPlanNode *node);
 
-    // first node in serialization order
+    // first node from the statement plan
     AbstractPlanNode * getRootNode(int stmtId = 0) {
-        assert(m_stmtPlanNodesMap.find(stmtId) != m_stmtPlanNodesMap.end());
-        return m_stmtPlanNodesMap[stmtId]->front();
+        assert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
+        return m_stmtExecutionListMap[stmtId]->front();
     }
 
     // the list of plannodes in execution order for a given sub-statement
@@ -132,9 +132,6 @@ class PlanNodeFragment {
     // Pointers to nodes in execution order grouped by substatement
     // The statement id is the key. The top statement (parent) always has id = 0
     std::map<int, std::vector<AbstractPlanNode*>* > m_stmtExecutionListMap;
-    // Pointers to subqueries nodes in serialization order grouped by substatement
-    // The statement id is the key. The top statement (parent) always has id = 0
-    std::map<int, std::vector<AbstractPlanNode*>* > m_stmtPlanNodesMap;
     // Pairs of argument index and type for parameters to the fragment
     std::vector<std::pair< int, voltdb::ValueType> > m_parameters;
 };
