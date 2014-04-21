@@ -197,6 +197,8 @@ class HashIndex {
 
         // A VoltDB extension to diagnose ArrayOutOfBounds.
         boolean voltDBreclaimed = (reclaimedNodePointer != -1);
+        // Keep a history of events, wrapping to the start of the buffer when capacity runs out
+        // so the most recent events are never lost.
         voltDBhistory[voltDBhistoryDepth++ % voltDBhistoryCapacity] = index;
         // End of VoltDB extension
         if (lookup == -1) {
@@ -234,9 +236,15 @@ class HashIndex {
             for (int look : voltDBhistory) {
                 ++depth;
                 if (depth == voltDBhistoryDepth) {
-                    report.append("/* <- ends here */ ");
-		}
-                report.append(look).append(", ");
+                    report.append("/* <- history ends here and/or starts here -> */ ");
+                }
+                if (look < 0) {
+                    report.append(look+1).append(" unlinked, ");
+                } else if (look > 1000000) {
+                    report.append(look-1000000).append(" removed lookup, ");
+                } else {
+                    report.append(look).append(" linked, ");
+                }
             }
             report.append("]\n");
             report.append("next reclaimedPointer is ").append(reclaimedNodePointer);
@@ -267,7 +275,7 @@ class HashIndex {
     void unlinkNode(int index, int lastLookup, int lookup) {
 
         // A VoltDB extension to diagnose ArrayOutOfBounds.
-        voltDBhistory[voltDBhistoryDepth++ % voltDBhistoryCapacity] = -index;
+        voltDBhistory[voltDBhistoryDepth++ % voltDBhistoryCapacity] = -index-1;
         // End of VoltDB extension
         // unlink the node
         if (lastLookup == -1) {
