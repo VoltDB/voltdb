@@ -277,47 +277,41 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             {
                 final String jsString = String.class.cast(params[0]);
                 final JSONObject jsObj = new JSONObject(jsString);
-                final String format = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
                 boolean initiateSnapshot;
-                VoltTable checkResult = null;
+                VoltTable checkResult;
 
-                // Only do file check if this snapshot actually writes to files, stream snapshots don't
-                if (SnapshotFormat.getEnumIgnoreCase(format).isFileBased()) {
-                    // Do scan work on all known live hosts
-                    VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
-                    List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    for (int hostId : liveHosts) {
-                        m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
-                    }
-
-                    // Wait for responses from all hosts for a certain amount of time
-                    Map<Integer, VoltTable> responses = Maps.newHashMap();
-                    final long timeoutMs = 10 * 1000; // 10s timeout
-                    final long endTime = System.currentTimeMillis() + timeoutMs;
-                    SnapshotCheckResponseMessage response;
-                    while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
-                        // ignore responses to previous requests
-                        if (jsObj.getString("path").equals(response.getPath()) &&
-                            jsObj.getString("nonce").equals(response.getNonce())) {
-                            responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
-                        }
-
-                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
-                            break;
-                        }
-                    }
-
-                    // Retry if timed out
-                    if (responses.size() != liveHosts.size()) {
-                        throw new CoreUtils.RetryException();
-                    }
-                    // TRAIL [TruncSnap:12] all participating nodes have initiated successfully
-                    // Call @SnapshotSave if check passed, return the failure otherwise
-                    checkResult = VoltTableUtil.unionTables(responses.values());
-                    initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[] {checkResult});
-                } else {
-                    initiateSnapshot = true;
+                // Do scan work on all known live hosts
+                VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
+                List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                for (int hostId : liveHosts) {
+                    m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
                 }
+
+                // Wait for responses from all hosts for a certain amount of time
+                Map<Integer, VoltTable> responses = Maps.newHashMap();
+                final long timeoutMs = 10 * 1000; // 10s timeout
+                final long endTime = System.currentTimeMillis() + timeoutMs;
+                SnapshotCheckResponseMessage response;
+                while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
+                    // ignore responses to previous requests
+                    if (jsObj.getString("path").equals(response.getPath()) &&
+                        jsObj.getString("nonce").equals(response.getNonce())) {
+                        responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
+                    }
+
+                    if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
+                        break;
+                    }
+                }
+
+                // Retry if timed out
+                if (responses.size() != liveHosts.size()) {
+                    throw new CoreUtils.RetryException();
+                }
+                // TRAIL [TruncSnap:12] all participating nodes have initiated successfully
+                // Call @SnapshotSave if check passed, return the failure otherwise
+                checkResult = VoltTableUtil.unionTables(responses.values());
+                initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[] {checkResult});
 
                 if (initiateSnapshot) {
                     m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
