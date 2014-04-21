@@ -17,15 +17,16 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.DevNullSnapshotTarget;
 import org.voltdb.SnapshotDataFilter;
@@ -46,15 +47,15 @@ import com.google_voltpatches.common.primitives.Longs;
 
 public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
-    protected boolean createSetupInternal(String file_path, String file_nonce, long txnId,
-                                          Map<Integer, Long> partitionTransactionIds,
-                                          JSONObject jsData,
-                                          SystemProcedureExecutionContext context, String hostname,
-                                          VoltTable result,
-                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                          SiteTracker tracker,
-                                          HashinatorSnapshotData hashinatorData,
-                                          long timestamp) throws IOException
+    public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
+                                         Map<Integer, Long> partitionTransactionIds,
+                                         JSONObject jsData,
+                                         SystemProcedureExecutionContext context,
+                                         VoltTable result,
+                                         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                         SiteTracker tracker,
+                                         HashinatorSnapshotData hashinatorData,
+                                         long timestamp)
     {
         assert SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty();
 
@@ -64,7 +65,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
 
         // mark snapshot start in registry
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
-        final SnapshotRegistry.Snapshot snapshotRecord =
+        m_snapshotRecord =
             SnapshotRegistry.startSnapshot(txnId,
                                            context.getHostId(),
                                            file_path,
@@ -78,11 +79,11 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                 config.partitionRanges,
                                 pidToLocalHSIds,
                                 numTables,
-                                snapshotRecord);
-            result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
+                                m_snapshotRecord);
+            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 
-        return false;
+        return null;
     }
 
     private static Map<Integer, Long>
@@ -153,10 +154,10 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                 // based on the source partition, the predicate is different
                 final SnapshotTableTask task =
                     new SnapshotTableTask(table,
-                                          dataTarget,
                                           new SnapshotDataFilter[0],
                                           createIndexExpressionForTable(table, partitionRange.ranges),
                                           false);
+                task.setTarget(dataTarget);
 
                 placeTask(task, Arrays.asList(localHSId));
             }

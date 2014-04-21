@@ -26,6 +26,7 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.google_voltpatches.common.collect.Sets;
 import junit.framework.TestCase;
 
 import org.voltcore.messaging.HeartbeatMessage;
@@ -266,7 +267,7 @@ public class TestVoltMessageSerialization extends TestCase {
         itask.setSpHandle(31337);
 
         // this is the important part.
-        ft.setInitiateTask(itask);
+        ft.setStateForDurability(itask, Sets.newHashSet(0, 1, 2));
         assertTrue(ft.getInitiateTask() != null);
         assertTrue(ft.m_initiateTaskBuffer != null);
         assertTrue(ft.m_initiateTaskBuffer.remaining() > 0);

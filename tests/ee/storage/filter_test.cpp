@@ -89,7 +89,7 @@ public:
             columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
             columnAllowNull.push_back(false);
         }
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
         table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
 

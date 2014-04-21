@@ -43,6 +43,7 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.store.BitMap;
 import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.BlobType;
+import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalType;
@@ -200,6 +201,9 @@ public class ParserDQL extends ParserBase {
             throw unexpectedTokenRequire(Tokens.T_OPENBRACKET);
         }
 
+        // A VoltDB extension to support the character in bytes.
+        boolean           inBytes = false;
+        // End of VoltDB extension
         if (Types.acceptsPrecision(typeNumber)) {
             if (token.tokenType == Tokens.OPENBRACKET) {
                 int multiplier = 1;
@@ -282,6 +286,12 @@ public class ParserDQL extends ParserBase {
                     }
                 }
 
+                // A VoltDB extension to support the character in bytes.
+                if (typeNumber == Types.SQL_VARCHAR) {
+                    inBytes = readIfThis(Tokens.BYTES);
+                }
+                // End of VoltDB extension
+
                 readThis(Tokens.CLOSEBRACKET);
             } else if (typeNumber == Types.SQL_BIT) {
                 length = 1;
@@ -327,6 +337,11 @@ public class ParserDQL extends ParserBase {
         Type typeObject = Type.getType(typeNumber, 0, length, scale);
 
         if (typeObject.isCharacterType()) {
+            // A VoltDB extension to support the character in bytes.
+            if (inBytes) {
+                ((CharacterType) typeObject).inBytes = true;
+            }
+            // End of VoltDB extension
             if (token.tokenType == Tokens.CHARACTER) {
                 read();
                 readThis(Tokens.SET);

@@ -31,6 +31,13 @@ public class Constants
 
     public static final int DEFAULT_PORT = 21212;
 
+    // authentication handshake codes
+    public static final byte AUTH_HANDSHAKE_VERSION = 2;
+    public static final byte AUTH_SERVICE_NAME = 4;
+    public static final byte AUTH_HANDSHAKE = 5;
+
+    public static final String KERBEROS = "kerberos";
+
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
     public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;

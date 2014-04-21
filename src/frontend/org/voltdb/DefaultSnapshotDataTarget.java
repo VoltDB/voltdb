@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -59,7 +58,6 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
-
     /*
      * Make it possible for test code to block a write and thus snapshot completion
      */
@@ -105,7 +103,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final Condition m_noMoreOutstandingWriteTasksCondition =
             m_outstandingWriteTasksLock.newCondition();
 
-    private static final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Snapshot write service ");
+    private static final ListeningExecutorService m_es = CoreUtils.getListeningSingleThreadExecutor("Snapshot write service ");
     static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
@@ -255,6 +253,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         ScheduledFuture<?> syncTask = null;
         syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
             private long fadvisedBytes = 0;
+            private long syncedBytes = 0;
             @Override
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
@@ -264,7 +263,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     long positionAtSync = 0;
                     try {
                         positionAtSync = m_channel.position();
-                        m_channel.force(false);
+                        final long syncStart = syncedBytes;
+                        syncedBytes = Bits.sync_file_range(SNAP_LOG, m_fos.getFD(), m_channel, syncStart, positionAtSync);
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);
@@ -324,14 +324,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
+            ListenableFuture<?> task = m_syncService.submit(new Runnable() {
+                @Override
+                public void run() {
+                    // Empty task to wait on 'cancel' above, since m_syncTask.get()
+                    // will immediately throw a CancellationException
+                }
+            });
             try {
-                m_syncTask.get();
-            } catch (CancellationException ignore) {
-                // Ignored because we just called cancel
+                task.get();
             } catch (ExecutionException e) {
-                SNAP_LOG.error("Error cancelling snapshot sync task", e);
+                SNAP_LOG.error("Error waiting on snapshot sync task cancellation", e);
             }
-
             m_channel.force(false);
         } finally {
             m_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));

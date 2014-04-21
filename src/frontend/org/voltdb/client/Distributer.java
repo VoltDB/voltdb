@@ -43,6 +43,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
+import javax.security.auth.Subject;
+import com.google_voltpatches.common.collect.ImmutableList;
+
 import jsr166y.ThreadLocalRandom;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -150,6 +153,11 @@ class Distributer {
 
     //Until catalog subscription is implemented, only fetch it once
     private boolean m_fetchedCatalog = false;
+
+    /**
+     * JAAS Authentication Subject
+     */
+    private final Subject m_subject;
 
     /**
      * Handles topology updates for client affinity
@@ -834,14 +842,15 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false);
+                false, null);
     }
 
     Distributer(
             boolean useMultipleThreads,
             long procedureCallTimeoutNanos,
             long connectionResponseTimeoutMS,
-            boolean useClientAffinity) {
+            boolean useClientAffinity,
+            Subject subject) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
             m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
@@ -852,6 +861,7 @@ class Distributer {
 
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
+        m_subject = subject;
     }
 
     void createConnection(String host, String program, String password, int port)
@@ -865,7 +875,7 @@ class Distributer {
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject);
         InetSocketAddress address = new InetSocketAddress(host, port);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];

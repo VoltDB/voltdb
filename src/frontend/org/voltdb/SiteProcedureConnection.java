@@ -180,5 +180,5 @@ public interface SiteProcedureConnection {
     public TheHashinator getCurrentHashinator();
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
-    public void notifyOfSnapshotNonce(String nonce);
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
 }

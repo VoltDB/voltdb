@@ -25,35 +25,35 @@
 --SELECT
 -- test select expressions
 --- test simple projection
-SELECT _variable[@comparabletype] FROM @fromtables
-SELECT _variable[@comparabletype], _variable FROM @fromtables
+SELECT _variable[#arg @comparabletype] FROM @fromtables A
+SELECT _variable[#arg @comparabletype], _variable FROM @fromtables A
 --- test column alias
-SELECT _variable[@columntype] AS DUDE FROM @fromtables
+SELECT _variable[#arg @columntype] AS DUDE FROM @fromtables A
 --- test *
-SELECT * FROM @fromtables
+SELECT * FROM @fromtables A
 --- test simple arithmetic expressions (+, -, *, /) with constant
-SELECT _variable[@columntype] @aftermath AS LITTLE_MATH FROM @fromtables
+SELECT _variable[#arg @columntype] @aftermath AS LITTLE_MATH FROM @fromtables A
 
 --- test DISTINCT
-SELECT DISTINCT _variable[@comparabletype] FROM @fromtables
+SELECT DISTINCT _variable[#arg @comparabletype] FROM @fromtables A
 --- test ALL
-SELECT ALL _variable[@comparabletype] FROM @fromtables
+SELECT ALL _variable[#arg @comparabletype] FROM @fromtables A
 --- test aggregate functions (COUNT, SUM, MAX, MIN, AVG)
-SELECT @agg(_variable[@comparabletype]) FROM @fromtables
+SELECT @agg(_variable[#arg @comparabletype]) FROM @fromtables A
 
 --- count(*), baby
 -- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
-SELECT COUNT(*) FROM @fromtables
+SELECT COUNT(*) FROM @fromtables A
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @fromtables WHERE _maybe _variable[@comparabletype] _cmp @comparableconstant
+SELECT * FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @fromtables WHERE (_variable[@comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
-SELECT _variable[#grouped @columntype] FROM @fromtables GROUP BY __[#grouped]
+SELECT _variable[#grouped @columntype] FROM @fromtables A GROUP BY __[#grouped]
 
 {_optionallimitoffset |= ""}
 {_optionallimitoffset |= "LIMIT _value[int:1,3]"}
@@ -62,12 +62,12 @@ SELECT _variable[#grouped @columntype] FROM @fromtables GROUP BY __[#grouped]
 --{_optionallimitoffset |= "                      OFFSET _value[int:1,3]"}
 
 -- test ORDER BY with optional LIMIT/OFFSET
-SELECT _variable[#order], _variable FROM @fromtables ORDER BY __[#order] _sortorder _optionallimitoffset
+SELECT _variable[#order], _variable FROM @fromtables A ORDER BY __[#order] _sortorder _optionallimitoffset
 
 -- test GROUP BY count(*)
-SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped]
+SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables A GROUP BY __[#grouped]
 -- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
-SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
+SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables A GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
 
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
 SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS.@idcol = RHS.@idcol

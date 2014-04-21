@@ -2042,6 +2042,49 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("     ", result.getString(1));
     }
 
+
+    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Space");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("voltdb", result.getString(1));
+        assertEquals("VOLTDB", result.getString(2));
+
+
+        cr = client.callProcedure("P1.insert", 2, "VoltDB贾鑫", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("voltdb贾鑫", result.getString(1));
+        assertEquals("VOLTDB贾鑫", result.getString(2));
+
+
+        cr = client.callProcedure("P1.insert", 3, null, 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+        assertEquals(null, result.getString(2));
+    }
+
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
@@ -2681,6 +2724,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("LEFT", "select id, LEFT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
+        project.addStmtProcedure("LOWER_UPPER", "select id, LOWER(DESC), UPPER(DESC) from P1 where id = ?");
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
