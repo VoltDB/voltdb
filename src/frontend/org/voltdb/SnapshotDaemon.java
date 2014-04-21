@@ -35,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.util.concurrent.Callables;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -318,7 +319,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 } else if (requestId != null) {
                     final ClientResponseImpl failureResponse =
                             new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{checkResult}, null);
-                    saveResponseToZKAndReset(requestId, failureResponse);
+                    failureResponse.setClientHandle(handle);
+                    processClientResponse(Callables.returning(failureResponse));
                 }
 
                 return null;
