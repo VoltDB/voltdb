@@ -149,9 +149,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
+        boolean sourcesReady = false;
         RestoreWork restoreWork = m_dataSink.poll(m_snapshotBufferAllocator);
         if (restoreWork != null) {
             restoreBlock(restoreWork, siteConnection);
+            sourcesReady = true;
         }
 
         // The completion monitor may fire even if m_dataSink has not reached EOF in the case that there's no
@@ -188,7 +190,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         } else {
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
-            m_taskQueue.offer(this);
+            returnToTaskQueue(sourcesReady);
         }
     }
 
@@ -280,7 +282,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    public void enableRecording() {
+    public void enableRecording(long snapshotSpHandle) {
         //Implemented by the nest task log, it is enabled immediately on construction
     }
 }

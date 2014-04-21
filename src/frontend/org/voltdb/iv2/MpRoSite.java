@@ -39,7 +39,6 @@ import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -502,7 +501,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce) {
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
 
     }

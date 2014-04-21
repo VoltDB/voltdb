@@ -39,7 +39,7 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {
-    updatePredicates(predicateStrings);
+    TableStreamerContext::updatePredicates(predicateStrings);
 }
 
 /**
@@ -68,7 +68,8 @@ void TableStreamerContext::updatePredicates(const std::vector<std::string> &pred
     std::ostringstream errmsg;
     m_predicates.clear();
     if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
-        throwFatalException("TableStreamerContext() failed to parse predicate strings.");
+        const char* details = errmsg.str().c_str();
+        throwFatalException("TableStreamerContext() failed to parse predicate strings: %s", details);
     }
 }
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Random;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
@@ -92,7 +93,7 @@ public class RandomMsgGenerator
         else if (!m_mpInProgress) {
             m_currentMpReadOnly = (m_rand.nextDouble() < READCHANCE);
             FragmentTaskMessage msg = makeFragmentTaskMsg(m_currentMpReadOnly, false);
-            msg.setInitiateTask(mock(Iv2InitiateTaskMessage.class));
+            msg.setStateForDurability(mock(Iv2InitiateTaskMessage.class), Sets.newHashSet(0, 1, 2));
             m_mpInProgress = true;
             return msg;
         }

@@ -86,8 +86,8 @@ NValue getRandomValue(ValueType type) {
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 16);
-            char characters[17];
+            int length = (rand() % 10);
+            char characters[11];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
