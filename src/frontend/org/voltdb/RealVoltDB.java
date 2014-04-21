@@ -492,8 +492,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 Class<?> elasticJoinCoordClass =
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger);
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, m_catalogContext.cluster.getVoltroot());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(m_deployment.getCluster().getKfactor());
                 } catch (Exception e) {
