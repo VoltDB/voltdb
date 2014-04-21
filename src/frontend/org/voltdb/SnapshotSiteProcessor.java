@@ -261,6 +261,19 @@ public class SnapshotSiteProcessor {
         }
     }
 
+
+    public static boolean isSnapshotInProgress()
+    {
+        final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
+        if (numSitesSnapshotting > 0) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Snapshot in progress, " + numSitesSnapshotting + " sites are still snapshotting");
+            }
+            return true;
+        }
+        return false;
+    }
+
     private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
         return new BBContainer(origin.b()) {
