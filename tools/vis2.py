@@ -273,6 +273,8 @@ def main():
         fns.append(iorder)
         filenames.append(tuple(fns))
 
+    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+
     # generate index file
     index_file = open(root_path + '-index.html', 'w')
     sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[1]))
