@@ -296,10 +296,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
 static inline std::string trim_function(std::string source, const std::string match,
         bool doltrim, bool dortrim) {
     // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
-    int mlen = match.length();
+    size_t mlen = match.length();
 
     if (doltrim) {
-        int lengthSource = source.length();
+        size_t lengthSource = source.length();
         while (lengthSource > 0) {
           if (!boost::starts_with(source, match)) break;
 
@@ -308,7 +308,7 @@ static inline std::string trim_function(std::string source, const std::string ma
         }
     }
     if (dortrim) {
-        int lengthSource = source.length();
+        size_t lengthSource = source.length();
         while (lengthSource > 0) {
           if (!boost::ends_with(source, match)) break;
 
