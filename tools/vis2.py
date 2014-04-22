@@ -80,6 +80,7 @@ class Plot:
         plt.tick_params(axis='y', labelleft=True, labelright=True)
         plt.ylabel(ylabel, fontsize=10)
         plt.xlabel(xlabel, fontsize=10)
+        plt.grid(True)
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend):
@@ -89,6 +90,9 @@ class Plot:
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
+        loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
+        self.ax.xaxis.set_major_locator(loc)
+        self.ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(n=7))
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
