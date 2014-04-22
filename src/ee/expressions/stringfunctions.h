@@ -293,19 +293,31 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
     return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
 }
 
-static inline bool checkCharLengthNumber(const char *valueChars, const int32_t length, const int32_t expectLength) {
-    int32_t j = 0;
-    int32_t i = length;
-    while (i-- > 0) {
-        if ((valueChars[i] & 0xc0) != 0x80) {
-            j++;
-            if (j > expectLength) {
-                return false;
-            }
+static inline std::string trim_function(std::string source, const std::string match,
+        bool doltrim, bool dortrim) {
+    // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
+    int mlen = match.length();
+
+    if (doltrim) {
+        int lengthSource = source.length();
+        while (lengthSource > 0) {
+          if (!boost::starts_with(source, match)) break;
+
+            source.erase(0, mlen);
+            lengthSource = source.length();
         }
     }
-    if (j != expectLength) return false;
-    return true;
+    if (dortrim) {
+        int lengthSource = source.length();
+        while (lengthSource > 0) {
+          if (!boost::ends_with(source, match)) break;
+
+            source.erase(lengthSource - mlen, mlen);
+            lengthSource = source.length();
+        }
+    }
+
+    return source;
 }
 
 /** implement the 3-argument SQL TRIM function */
@@ -328,10 +340,6 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     ptr = reinterpret_cast<char*>(trimChar.getObjectValue_withoutNull());
     int32_t length = trimChar.getObjectLength_withoutNull();
 
-    if (!checkCharLengthNumber(ptr, length, 1)) {
-        throw SQLException(SQLException::dynamic_sql_error, "SQL TRIM exception:  "
-                "unsupported multiple TRIM characters.");
-    }
     std::string trimArg = std::string(ptr, length);
 
     const NValue& strVal = arguments[2];
@@ -346,21 +354,22 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     int32_t objectLength = strVal.getObjectLength_withoutNull();
     std::string inputStr = std::string(ptr, objectLength);
 
+    std::string result = "";
     switch (optArg) {
     case SQL_TRIM_BOTH:
-        boost::trim_if(inputStr, boost::is_any_of(trimArg));
+        result = trim_function(inputStr, trimArg, true, true);
         break;
     case SQL_TRIM_LEADING:
-        boost::trim_left_if(inputStr, boost::is_any_of(trimArg));
+        result = trim_function(inputStr, trimArg, true, false);
         break;
     case SQL_TRIM_TRAILING:
-        boost::trim_right_if(inputStr, boost::is_any_of(trimArg));
+        result = trim_function(inputStr, trimArg, false, true);
         break;
     default:
         throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
     }
 
-    return getTempStringValue(inputStr.c_str(), inputStr.length());
+    return getTempStringValue(result.c_str(), result.length());
 }
 
 /** implement the 3-argument SQL REPLACE function */
@@ -381,7 +390,7 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
 
     const NValue& str1 = arguments[1];
     if (str1.isNull()) {
-        return getTempStringValue(targetStr.c_str(), targetStr.length());
+        return getNullStringValue();
     }
     if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
@@ -389,15 +398,16 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     ptr = reinterpret_cast<char*>(str1.getObjectValue_withoutNull());
     std::string matchStr = std::string(ptr, str1.getObjectLength_withoutNull());
 
-    std::string replaceStr = ""; // NULL default behavior
     const NValue& str2 = arguments[2];
-    if (!str2.isNull()) {
-        if (str2.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (str2.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        ptr = reinterpret_cast<char*>(str2.getObjectValue_withoutNull());
-        replaceStr = std::string(ptr, str2.getObjectLength_withoutNull());
+    if (str2.isNull()) {
+        return getNullStringValue();
     }
+
+    if (str2.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (str2.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    ptr = reinterpret_cast<char*>(str2.getObjectValue_withoutNull());
+    std::string replaceStr = std::string(ptr, str2.getObjectLength_withoutNull());
 
     boost::algorithm::replace_all(targetStr, matchStr, replaceStr);
     return getTempStringValue(targetStr.c_str(), targetStr.length());

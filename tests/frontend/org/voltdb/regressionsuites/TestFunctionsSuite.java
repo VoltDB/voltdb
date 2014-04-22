@@ -2083,6 +2083,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
         assertEquals(null, result.getString(2));
+
+        // Edge case: UTF-8 string can have Upper and Lower cases
+        String grussen = "grüßEN";
+        cr = client.callProcedure("P1.insert", 4, grussen, 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        // Turn on this test case when EE supports the locale CASE conversion
+//        if (isHSQL()) {
+//            assertEquals(grussen, result.getString(1));
+//            assertEquals(grussen, result.getString(2));
+//        } else {
+//            assertEquals("GRÜSSEN", result.getString(1));
+//            assertEquals("grüßen", result.getString(2));
+//        }
     }
 
     public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
@@ -2134,6 +2154,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("vVoltD", result.getString(2));
         assertEquals("vVoltD", result.getString(3));
 
+        // Multiple character trim, Hsql does not support
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "vV", "BB", "Vv", 2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB", result.getString(1));
+            assertEquals("vVoltDB", result.getString(2));
+            assertEquals("vVoltDBBB", result.getString(3));
+        }
+
         // Test null trim character
         cr = client.callProcedure("TRIM_ANY", null, null, null, 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2158,19 +2190,72 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾vVoltDBBB", result.getString(2));
         assertEquals("vVoltDBBB", result.getString(3));
 
-        if (isHSQL()) return;
-        // TRIM with multiple characters.
-        // Maybe should check the size of input character, which should be 1 character exactly.
-        cr = client.callProcedure("P1.insert", 4, "vVoltDBDBDB", 1, 1.0, new Timestamp(1000000000000L));
+        if (!isHSQL()) {
+            // Complete match
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB", "贾vVoltDBBB", "贾vVoltDBBB", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("", result.getString(1));
+            assertEquals("", result.getString(2));
+            assertEquals("", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB_TEST", "贾vVoltDBBB贾vVoltDBBB", "贾vVoltDBBBT", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾vVoltDBBB", result.getString(1));
+            assertEquals("贾vVoltDBBB", result.getString(2));
+            assertEquals("贾vVoltDBBB", result.getString(3));
+        }
+
+        // Complicated test
+        cr = client.callProcedure("P1.insert", 4, "贾贾vVoltDBBB贾贾贾", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        try {
-            cr = client.callProcedure("TRIM_ANY", "d", "DB", "B", 4);
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("SQL TRIM exception"));
-            assertTrue(ex.getMessage().contains("unsupported multiple TRIM characters."));
+        // UTF-8 hex, 贾: 0xe8 0xb4 0xbe, 辴: 0xe8 0xbe 0xb4
+        cr = client.callProcedure("TRIM_ANY", "辴", "辴", "辴", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "贾", "贾", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "贾辴", "贾辴", "贾辴", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾贾vV", "贾贾", "B贾贾贾", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾", result.getString(2));
+            assertEquals("贾贾vVoltDBB", result.getString(3));
         }
+
+        cr = client.callProcedure("P1.insert", 5, "vVoltADBDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
     }
 
@@ -2220,11 +2305,21 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         result = client.callProcedure("REPLACE", "o", null, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("f", result.getString(1));
+        if (isHSQL()) {
+            // NULL means empty string for Hsql
+            assertEquals("f", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
 
         result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("foo", result.getString(1));
+        if (isHSQL()) {
+            // NULL means not change for the original string for Hsql
+            assertEquals("foo", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
 
         result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
         assertTrue(result.advanceRow());
