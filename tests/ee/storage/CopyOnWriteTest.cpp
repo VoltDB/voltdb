@@ -216,12 +216,11 @@ public:
         m_niteration++;
     }
 
-    void initTable(bool allowInlineStrings, int nparts_, int tableAllocationTargetSize) {
+    void initTable(int nparts_, int tableAllocationTargetSize) {
         m_npartitions = nparts_;
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
+        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+                                                               m_tableSchemaAllowNull);
 
         voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -1133,7 +1132,7 @@ public:
 };
 
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
-    initTable(true, 1, 0);
+    initTable(1, 0);
 
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
@@ -1163,7 +1162,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
 }
 
 TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
-    initTable(true, 1, 0);
+    initTable(1, 0);
     char storage[9];
     std::memset(storage, 0, 9);
     TableTuple tuple(m_table->schema());
@@ -1184,7 +1183,7 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
 }
 
 TEST_F(CopyOnWriteTest, BigTest) {
-    initTable(true, 1, 0);
+    initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
@@ -1238,7 +1237,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 }
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
-    initTable(true, 1, 0);
+    initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
@@ -1305,7 +1304,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 }
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
-    initTable(true, 1, 0);
+    initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
@@ -1382,7 +1381,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
     const int32_t npartitions = 7;
     const int tupleCount = TUPLE_COUNT;
 
-    initTable(true, npartitions, 0);
+    initTable(npartitions, 0);
     addRandomUniqueTuples(m_table, tupleCount);
 
     for (size_t iteration = 0; iteration < NUM_REPETITIONS; iteration++) {
@@ -1534,7 +1533,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
 TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     const size_t tupleCount = 3;
     const size_t bufferSize = 12 + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
-    initTable(true, 1, 0);
+    initTable(1, 0);
     TableTuple tuple(m_table->schema());
     addRandomUniqueTuples(m_table, tupleCount);
     size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
@@ -1623,7 +1622,7 @@ public:
     {}
 
     void initialize() {
-        m_test.initTable(true, m_npartitions, static_cast<int>(m_test.m_tupleWidth * (m_tuplesPerBlock + sizeof(int32_t))));
+        m_test.initTable(m_npartitions, static_cast<int>(m_test.m_tupleWidth * (m_tuplesPerBlock + sizeof(int32_t))));
 
         m_test.m_table->deleteAllTuples(true);
         m_test.addRandomUniqueTuples(m_test.m_table, m_numInitial, &m_test.m_initial);

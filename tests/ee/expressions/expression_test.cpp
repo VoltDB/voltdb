@@ -400,10 +400,7 @@ TEST_F(ExpressionTest, HashRange) {
     types.push_back(voltdb::VALUE_TYPE_BIGINT);
     types.push_back(voltdb::VALUE_TYPE_INTEGER);
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(types,
-                                                               columnSizes,
-                                                               allowNull,
-                                                               true);
+    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(types,columnSizes,allowNull);
 
     boost::scoped_array<char> tupleStorage(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
 

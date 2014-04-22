@@ -90,7 +90,7 @@ class TableSerializeTest : public Test {
                 columnSizes.push_back(static_cast<int32_t>(size));
                 columnTypes.push_back(col_types[ctr]);
             }
-            voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+            voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
             table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 
             for (int64_t i = 1; i <= TUPLES; ++i) {
@@ -163,7 +163,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
     std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
     columnNames[0] = "";
     table_->deleteAllTuples(true);
     delete table_;
@@ -192,7 +192,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ("", deserialized->columnName(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
-    EXPECT_EQ(true, table_->schema()->columnIsInlined(0));
+    EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
     TableIterator iter = deserialized->iterator();
     TableTuple t(deserialized->schema());

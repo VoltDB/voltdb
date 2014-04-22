@@ -981,7 +981,6 @@ public class PlanAssembler {
 
             // get the expression for the column
             AbstractExpression expr = m_parsedInsert.columns.get(column);
-
             // if there's no expression, make sure the column has
             // some supported default value
             if (expr == null) {
@@ -1043,6 +1042,8 @@ public class PlanAssembler {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
+
+            expr.setInBytes(column.getInbytes());
 
             // The current insertexecutor implementation requires its input tuple from the
             // materializeexecutor to be formatted exactly like the target persistent tuple.
@@ -1528,6 +1529,7 @@ public class PlanAssembler {
                             "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
                     tve.setValueType(rootExpr.getValueType());
                     tve.setValueSize(rootExpr.getValueSize());
+                    tve.setInBytes(rootExpr.getInBytes());
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
