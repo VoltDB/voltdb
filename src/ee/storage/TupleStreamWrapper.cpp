@@ -26,6 +26,7 @@
 #include "common/executorcontext.hpp"
 
 #include <cstdio>
+#include <limits>
 #include <iostream>
 #include <cassert>
 #include <ctime>
@@ -319,12 +320,21 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0) {
+        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
             m_lastFlush = timeInMillis;
         }
 
-        extendBufferChain(0);
-        commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
+        /*
+         * handle cases when the currentSpHandle was set by rejoin
+         * and snapshot restore load table statements that send in
+         * Long.MIN_VALUE as their tx id. ee's tick which results
+         * in calls to this procedure may be called right after
+         * these.
+         */
+        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
+            extendBufferChain(0);
+            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
+        }
     }
 }
 
