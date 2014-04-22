@@ -582,6 +582,39 @@ class NValue {
     // Declared public for cppunit test purposes .
     static int64_t parseTimestampString(const std::string &txt);
 
+    static inline int32_t getCharLength(const char *valueChars, const size_t length) {
+        // very efficient code to count characters in UTF string and ASCII string
+        int32_t j = 0;
+        size_t i = length;
+        while (i-- > 0) {
+            if ((valueChars[i] & 0xc0) != 0x80) j++;
+        }
+        return j;
+    }
+
+    static inline int32_t getIthCharIndex(const char *valueChars, const size_t length, const int32_t ith) {
+        if (ith <= 0) return -1;
+        int32_t i = 0, j = 0;
+
+        while (i < length) {
+            if ((valueChars[i] & 0xc0) != 0x80) {
+                if (++j == ith) break;
+            }
+            i++;
+        }
+        return i;
+    }
+
+    // Return the beginning char * place of the ith char.
+    // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
+    static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
+        // very efficient code to count characters in UTF string and ASCII string
+        int32_t i = getIthCharIndex(valueChars,length, ith);
+        if (i < 0) return NULL;
+        return &valueChars[i];
+    }
+
+
   private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -1462,33 +1495,6 @@ class NValue {
             }
         }
 
-    }
-
-    static inline int32_t getCharLength(const char *valueChars, const size_t length) {
-        // very efficient code to count characters in UTF string and ASCII string
-        int32_t j = 0;
-        size_t i = length;
-        while (i-- > 0) {
-            if ((valueChars[i] & 0xc0) != 0x80) j++;
-        }
-        return j;
-    }
-
-    // Return the beginning char * place of the ith char.
-    // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
-    static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
-        // very efficient code to count characters in UTF string and ASCII string
-        if (ith <= 0) return NULL;
-        int32_t i = 0, j = 0;
-        size_t len = length;
-        while (len-- > 0) {
-            if ((valueChars[i] & 0xc0) != 0x80) {
-                j++;
-                if (ith == j) break;
-            }
-            i++;
-        }
-        return &valueChars[i];
     }
 
     static inline bool validVarcharSize(const char *valueChars, const size_t length, const int32_t maxLength) {

@@ -494,8 +494,6 @@ public class FunctionCustom extends FunctionSQL {
                 // $FALL-THROUGH$
                 // End of VoltDB extension
             case FUNC_CHAR :
-                parseList = singleParamList;
-                break;
             case FUNC_SPACE :
                 parseList = singleParamList;
                 break;

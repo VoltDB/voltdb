@@ -165,7 +165,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     if (position == std::string::npos)
         position = 0;
     else {
-        position = getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
+        position = NValue::getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
     }
     return getIntegerValue(static_cast<int32_t>(position));
 }
@@ -199,7 +199,7 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
     const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
 
-    return getTempStringValue(valueChars,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
+    return getTempStringValue(valueChars,(int32_t)(NValue::getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
 }
 
 /** implement the 2-argument SQL RIGHT function */
@@ -236,7 +236,7 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     if (count >= charLen)
         return getTempStringValue(valueChars,(int32_t)(valueEnd - valueChars));
 
-    const char* newStartChar = getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1);
+    const char* newStartChar = NValue::getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1);
     return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
 }
 
@@ -299,21 +299,13 @@ static inline std::string trim_function(std::string source, const std::string ma
     size_t mlen = match.length();
 
     if (doltrim) {
-        size_t lengthSource = source.length();
-        while (lengthSource > 0) {
-          if (!boost::starts_with(source, match)) break;
-
+        while (boost::starts_with(source, match)) {
             source.erase(0, mlen);
-            lengthSource = source.length();
         }
     }
     if (dortrim) {
-        size_t lengthSource = source.length();
-        while (lengthSource > 0) {
-          if (!boost::ends_with(source, match)) break;
-
-            source.erase(lengthSource - mlen, mlen);
-            lengthSource = source.length();
+        while (boost::ends_with(source, match)) {
+            source.erase(source.length() - mlen, mlen);
         }
     }
 
@@ -324,15 +316,18 @@ static inline std::string trim_function(std::string source, const std::string ma
 template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
 
+    for (int i = 0; i < arguments.size(); i++) {
+        const NValue& arg = arguments[i];
+        if (arg.isNull()) {
+            return getNullStringValue();
+        }
+    }
+
     const NValue& opt = arguments[0];
-    assert(opt.isNull() == false);
     int32_t optArg = static_cast<int32_t>(opt.castAsBigIntAndGetValue());
 
     char* ptr;
     const NValue& trimChar = arguments[1];
-    if (trimChar.isNull()) {
-        return getNullStringValue();
-    }
     if (trimChar.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -343,9 +338,6 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     std::string trimArg = std::string(ptr, length);
 
     const NValue& strVal = arguments[2];
-    if (strVal.isNull()) {
-        return getNullStringValue();
-    }
     if (strVal.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -376,11 +368,15 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
 template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
 
+    for (int i = 0; i < arguments.size(); i++) {
+        const NValue& arg = arguments[i];
+        if (arg.isNull()) {
+            return getNullStringValue();
+        }
+    }
+
     char* ptr;
     const NValue& str0 = arguments[0];
-    if (str0.isNull()) {
-        return getNullStringValue();
-    }
     if (str0.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str0.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -389,9 +385,6 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     std::string targetStr = std::string(ptr, length);
 
     const NValue& str1 = arguments[1];
-    if (str1.isNull()) {
-        return getNullStringValue();
-    }
     if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -399,9 +392,6 @@ template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& a
     std::string matchStr = std::string(ptr, str1.getObjectLength_withoutNull());
 
     const NValue& str2 = arguments[2];
-    if (str2.isNull()) {
-        return getNullStringValue();
-    }
 
     if (str2.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str2.getValueType(), VALUE_TYPE_VARCHAR);
@@ -450,29 +440,16 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
 
 static inline std::string overlay_function(const char* ptrSource, size_t lengthSource,
         std::string insertStr, size_t start, size_t length) {
-    assert(start >= 1);
-    int32_t i = 0, j = 0;
-    while (i < lengthSource) {
-        if ((ptrSource[i] & 0xc0) != 0x80) {
-            if (++j == start) break;
-        }
-        i++;
-    }
+    int32_t i = NValue::getIthCharIndex(ptrSource, lengthSource, start);
     std::string result = std::string(ptrSource, i);
     result.append(insertStr);
 
-    bool reached = false;
-    j = 0;
+    int32_t j = i;
     if (length > 0) {
-        while (i < lengthSource) {
-            if ((ptrSource[i] & 0xc0) != 0x80) {
-                if (reached) break;
-                if (++j == length) reached = true;
-            }
-            i++;
-        }
+        // the end the last character may be multiple byte character, get to the next character index
+        j += NValue::getIthCharIndex(&ptrSource[i], lengthSource-i, length+1);
     }
-    result.append(std::string(&ptrSource[i], lengthSource - i));
+    result.append(std::string(&ptrSource[j], lengthSource - j));
 
     return result;
 }
@@ -481,10 +458,14 @@ static inline std::string overlay_function(const char* ptrSource, size_t lengthS
 template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3 || arguments.size() == 4);
 
-    const NValue& str0 = arguments[0];
-    if (str0.isNull()) {
-        return getNullStringValue();
+    for (int i = 0; i < arguments.size(); i++) {
+        const NValue& arg = arguments[i];
+        if (arg.isNull()) {
+            return getNullStringValue();
+        }
     }
+
+    const NValue& str0 = arguments[0];
     if (str0.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str0.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -492,9 +473,6 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     size_t lengthSource = str0.getObjectLength_withoutNull();
 
     const NValue& str1 = arguments[1];
-    if (str1.isNull()) {
-        return getNullStringValue();
-    }
     if (str1.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (str1.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -503,9 +481,6 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     std::string insertStr = std::string(ptrInsert, lengthInsert);
 
     const NValue& startArg = arguments[2];
-    if (startArg.isNull()) {
-        return getNullStringValue();
-    }
 
     int64_t start = startArg.castAsBigIntAndGetValue();
     if (start <= 0) {
@@ -517,9 +492,6 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     int64_t length = 0;
     if (arguments.size() == 4) {
         const NValue& lengthArg = arguments[3];
-        if (lengthArg.isNull()) {
-            return getNullStringValue();
-        }
         length = lengthArg.castAsBigIntAndGetValue();
         if (length < 0) {
             char message[128];

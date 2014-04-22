@@ -754,7 +754,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
-        return "CHAR_LENGTH,CHAR,CONCAT,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
+        return "CHAR,CHAR_LENGTH,CONCAT,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
                 "REPEAT,REPLACE,RIGHT,SPACE,SUBSTRING,TRIM,UPPER";
     }
 
