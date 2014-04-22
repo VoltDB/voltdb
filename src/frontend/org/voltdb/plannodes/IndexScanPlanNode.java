@@ -137,29 +137,26 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate() {
-        setSkipNullPredicate(-1);
+        // prepare position of non null key
+        int searchKeySize = m_searchkeyExpressions.size();
+        if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
+            m_skip_null_predicate = null;
+            return;
+        }
+
+        int nextKeyIndex;
+        if (m_endExpression != null &&
+                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
+            nextKeyIndex = searchKeySize;
+        } else {
+            nextKeyIndex = searchKeySize - 1;
+        }
+
+        setSkipNullPredicate(nextKeyIndex);
     }
 
-    public void setSkipNullPredicate(int nonNullkeyIndex) {
-        int nextKeyIndex;
-
-        // Set the position of non null key
-        if (nonNullkeyIndex < 0) {
-            int searchKeySize = m_searchkeyExpressions.size();
-            if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
-                m_skip_null_predicate = null;
-                return;
-            }
-
-            if (m_endExpression != null &&
-                    searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
-                nextKeyIndex = searchKeySize;
-            } else {
-                nextKeyIndex = searchKeySize - 1;
-            }
-        } else {
-            nextKeyIndex = nonNullkeyIndex;
-        }
+    public void setSkipNullPredicate(int nonNullKeyIndex) {
+        int nextKeyIndex = nonNullKeyIndex;
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -167,9 +164,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
-            if (nextKeyIndex >= indexedColRefs.size()) {
-                return;
-            }
+            assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
@@ -183,9 +178,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
-                if (nextKeyIndex >= indexedExprs.size()) {
-                    return;
-                }
+                assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
