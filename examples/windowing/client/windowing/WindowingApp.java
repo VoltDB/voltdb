@@ -42,17 +42,28 @@
 
 package windowing;
 
+import java.io.IOException;
+import java.util.Date;
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcedureCallback;
 
 public class WindowingApp {
 
@@ -64,7 +75,8 @@ public class WindowingApp {
     // validated command line configuration
     final WindowingConfig config;
     // Reference to the database connection we will use
-    final Client client;
+    final Client insertsClient;
+    final Client nonInsertsClient;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -73,7 +85,15 @@ public class WindowingApp {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
+    private final AtomicLong totalDeletes = new AtomicLong(0);
+    private final AtomicLong deletesSinceLastChecked = new AtomicLong(0);
+
     final ContinuousDeleter ctb;
+    final PartitionDataTracker partitionData;
+
+    static Random rand = new Random(0);
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -152,12 +172,14 @@ public class WindowingApp {
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
-        client = ClientFactory.createClient(clientConfig);
+        insertsClient = ClientFactory.createClient(clientConfig);
+        nonInsertsClient = ClientFactory.createClient(clientConfig);
 
-        periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
+        periodicStatsContext = insertsClient.createStatsContext();
+        fullStatsContext = insertsClient.createStatsContext();
 
-        ctb = new ContinuousDeleter(client);
+        partitionData = new PartitionDataTracker(nonInsertsClient);
+        ctb = new ContinuousDeleter();
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -175,7 +197,7 @@ public class WindowingApp {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server) {
+    static void connectToOneServerWithRetry(final Client client, String server) {
         int sleep = 1000;
         while (true) {
             try {
@@ -199,7 +221,7 @@ public class WindowingApp {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers) throws InterruptedException {
+    static void connect(final Client client, String servers) throws InterruptedException {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
@@ -210,7 +232,7 @@ public class WindowingApp {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    connectToOneServerWithRetry(server);
+                    connectToOneServerWithRetry(client, server);
                     connections.countDown();
                 }
             }).start();
@@ -242,8 +264,8 @@ public class WindowingApp {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
-        long totalDeletes = ctb.getTotalDeletes();
-        long deletesSinceLastChecked = ctb.getDeletesSinceLastChecked();
+        long nowTotalDeletes = totalDeletes.get();
+        long nowDeletesSinceLastChecked = deletesSinceLastChecked.getAndSet(0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
@@ -254,7 +276,7 @@ public class WindowingApp {
                 stats.kPercentileLatency(0.95));
         }
 
-        System.out.printf("Total Deletes/Deletes %d/%d", totalDeletes, deletesSinceLastChecked);
+        System.out.printf("Total Deletes/Deletes %d/%d", nowTotalDeletes, nowDeletesSinceLastChecked);
         System.out.printf("\n");
     }
 
@@ -321,6 +343,63 @@ public class WindowingApp {
 
     }
 
+    public Runnable getDeleterRunnable() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                long[] updateData = ctb.deleteSomeTuples(nonInsertsClient, partitionData);
+                long nowTuplesDeleted = updateData[0];
+                long partitionsThatStoppedEarly = updateData[1];
+
+                totalDeletes.addAndGet(nowTuplesDeleted);
+                deletesSinceLastChecked.addAndGet(nowTuplesDeleted);
+
+                try {
+                    if (partitionsThatStoppedEarly > 0) {
+                        scheduler.execute(getDeleterRunnable());
+                    }
+                    else {
+                        scheduler.schedule(getDeleterRunnable(), 100, TimeUnit.MILLISECONDS);
+                    }
+                }
+                catch (RejectedExecutionException e) {
+                    // ignore this... presumably the executor service has shutdown
+                }
+            }
+        };
+    }
+
+    class InsertCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            assert(clientResponse.getStatus() == ClientResponse.SUCCESS);
+        }
+    }
+
+    void insertRandomRow() {
+        // unique identifier and partition key
+        String uuid = UUID.randomUUID().toString();
+
+        // millisecond timestamp
+        Date now = new Date();
+
+        // for some odd reason, this will give LONG_MAX if the
+        // computed value is > LONG_MAX.
+        long val = (long) (rand.nextGaussian() * 1000.0);
+
+        try {
+            insertsClient.callProcedure(new InsertCallback(),
+                                 "TIMEDATA.insert",
+                                 uuid,
+                                 val,
+                                 now);
+        }
+        catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -333,51 +412,66 @@ public class WindowingApp {
         System.out.println(HORIZONTAL_RULE);
 
         // connect to one or more servers, loop until success
-        connect(config.servers);
+        connect(insertsClient, config.servers);
+        connect(nonInsertsClient, config.servers);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            DataGenerator.insert(client);
-        }
-
-        // reset the stats after warmup
+        // reset the stats
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
-        // print periodic statistics to the console
+        // record the start of the benchmark
         benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
 
-        ctb.start();
+        // print periodic statistics to the console
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                printStatistics();
+            }
+        }, config.displayinterval, config.displayinterval, TimeUnit.SECONDS);
+
+        // update the partition key set, row counts and redundancy level once per second
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                partitionData.update();
+            }
+        }, 1, 1, TimeUnit.SECONDS);
+
+        // delete data as often as need be
+        //  -- this will resubmit at varying rates according to insert load
+        scheduler.execute(getDeleterRunnable());
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
-            DataGenerator.insert(client);
+            insertRandomRow();
         }
 
-        ctb.stop();
-
-        // cancel periodic stats printing
-        timer.cancel();
+        scheduler.shutdown();
+        try {
+            scheduler.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
         // block until all outstanding txns return
-        client.drain();
+        insertsClient.drain();
+        nonInsertsClient.drain();
 
         // print the summary results
         printResults();
 
         // close down the client connections
-        client.close();
+        insertsClient.close();
+        nonInsertsClient.drain();
     }
 
     /**
