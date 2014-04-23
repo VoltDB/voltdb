@@ -261,14 +261,16 @@ public class RejoinProducer extends JoinProducerBase {
     public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog m_taskLog) throws IOException
     {
-        if (m_rejoinSiteProcessor != null) {
+        if (!m_schemaHasNoTables) {
+            boolean sourcesReady = false;
             RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
             if (rejoinWork != null) {
                 restoreBlock(rejoinWork, siteConnection);
+                sourcesReady = true;
             }
 
             if (m_rejoinSiteProcessor.isEOF() == false) {
-                m_taskQueue.offer(this);
+                returnToTaskQueue(sourcesReady);
             } else {
                 REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
                 m_rejoinSiteProcessor.close();

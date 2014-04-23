@@ -76,13 +76,13 @@ public class RejoinMessage extends VoltMessage {
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
                          int sourceCount, FixedDBBPool bufferPool,
-                         boolean emptyRejoin) {
+                         boolean schemaHasNoTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
         m_snapshotSourceCount = sourceCount;
         m_bufferPool = bufferPool;
-        m_schemaHasNoTables = emptyRejoin;
+        m_schemaHasNoTables = schemaHasNoTables;
     }
 
     /**
@@ -143,7 +143,7 @@ public class RejoinMessage extends VoltMessage {
             8 + // m_sourceHSId
             1 + // m_type
             8 + // m_snapshotTxnId
-            1;  // m_emptyRejoin
+            1;  // m_schemaHasNoTables
         return msgsize;
     }
 

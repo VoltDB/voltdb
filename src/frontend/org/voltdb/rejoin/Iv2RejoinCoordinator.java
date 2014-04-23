@@ -120,14 +120,14 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
      * Send rejoin initiation message to the local site
      * @param HSId
      */
-    private void initiateRejoinOnSites(long HSId, boolean emptyRejoin)
+    private void initiateRejoinOnSites(long HSId, boolean schemaHasNoTables)
     {
         List<Long> HSIds = new ArrayList<Long>();
         HSIds.add(HSId);
-        initiateRejoinOnSites(HSIds, emptyRejoin);
+        initiateRejoinOnSites(HSIds, schemaHasNoTables);
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds, boolean emptyRejoin)
+    private void initiateRejoinOnSites(List<Long> HSIds, boolean schemaHasNoTables)
     {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
@@ -145,7 +145,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               nonce,
                                               1, // 1 source per rejoining site
                                               m_snapshotBufPool,
-                                              emptyRejoin);
+                                              schemaHasNoTables);
         send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -167,7 +167,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
-        boolean emptyRejoin = catalog.getTables().isEmpty();
+        boolean schemaHasNoTables = catalog.getTables().isEmpty();
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -177,7 +177,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             }
             String HSIdString = CoreUtils.hsIdToString(firstSite);
             REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
-            initiateRejoinOnSites(firstSite, emptyRejoin);
+            initiateRejoinOnSites(firstSite, schemaHasNoTables);
         }
         else {
             List<Long> firstSites = new ArrayList<Long>();
@@ -187,13 +187,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                 m_pendingSites.clear();
             }
             REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
-            initiateRejoinOnSites(firstSites, emptyRejoin);
+            initiateRejoinOnSites(firstSites, schemaHasNoTables);
         }
 
         return true;
     }
 
-    private void initiateNextSite(boolean emptyRejoin) {
+    private void initiateNextSite(boolean schemaHasNoTables) {
         // make all the decisions under lock.
         Long nextSite = null;
         synchronized (m_lock) {
@@ -205,7 +205,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             }
         }
         if (nextSite != null) {
-            initiateRejoinOnSites(nextSite, emptyRejoin);
+            initiateRejoinOnSites(nextSite, schemaHasNoTables);
         }
     }
 
@@ -243,7 +243,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId)
+    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId,
+                                   boolean schemaHasNoTables)
     {
         String nonce = null;
         String data = null;
@@ -266,7 +267,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
                     CoreUtils.hsIdToString(HSId));
         }
-        if (data != null) {
+        if (data != null && !schemaHasNoTables) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
@@ -288,11 +289,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                            CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
             assert(m_catalog != null);
-            boolean emptyRejoin = m_catalog.getTables().isEmpty();
-            initiateNextSite(emptyRejoin);
+            boolean schemaHasNoTables = m_catalog.getTables().isEmpty();
+            initiateNextSite(schemaHasNoTables);
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
-            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());
+            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId(),
+                              rm.schemaHasNoTables());
         } else {
             VoltDB.crashLocalVoltDB("Wrong rejoin message of type " + type +
                                     " sent to the rejoin coordinator", false, null);
