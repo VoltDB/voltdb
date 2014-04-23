@@ -107,7 +107,7 @@ public interface VoltDBInterface
      */
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
+            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

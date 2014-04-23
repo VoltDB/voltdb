@@ -218,7 +218,7 @@ public class TestClientInterface {
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true, false);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
+        m_context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 

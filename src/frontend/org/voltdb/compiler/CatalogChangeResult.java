@@ -34,4 +34,5 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public long originalUniqueId;
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
+    public byte[] deploymentHash;
 }
