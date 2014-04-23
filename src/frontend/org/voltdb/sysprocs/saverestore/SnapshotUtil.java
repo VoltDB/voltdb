@@ -1453,7 +1453,7 @@ public class SnapshotUtil {
             @Override
             public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
             {
-                if (event.nonce.equals(nonce)) {
+                if (event.nonce.equals(nonce) && event.didSucceed) {
                     VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
                     result.set(event);
                 }

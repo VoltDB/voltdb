@@ -758,6 +758,7 @@ public class SnapshotSiteProcessor {
                 }
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
                 jsonObj.put("hostCount", remainingHosts);
+                jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
                     SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
