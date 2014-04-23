@@ -677,6 +677,12 @@ public class SnapshotSiteProcessor {
                                 }
                             }
                         } finally {
+                            // Caching the value here before the site removes itself from the
+                            // ExecutionSitesCurrentlySnapshotting set, so
+                            // logSnapshotCompletionToZK() will not see incorrect values
+                            // from the next snapshot
+                            final boolean snapshotSucceeded = m_lastSnapshotSucceded;
+
                             try {
                                 VoltDB.instance().getHostMessenger().getZK().delete(
                                         VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
@@ -700,7 +706,7 @@ public class SnapshotSiteProcessor {
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
 
-                            logSnapshotCompleteToZK(txnId, m_lastSnapshotSucceded, exportSequenceNumbers);
+                            logSnapshotCompleteToZK(txnId, snapshotSucceeded, exportSequenceNumbers);
                         }
                     }
                 };
