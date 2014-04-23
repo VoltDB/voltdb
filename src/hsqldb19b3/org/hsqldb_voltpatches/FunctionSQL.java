@@ -470,9 +470,6 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 2, Tokens.USING, Tokens.CHARACTERS,
                     Tokens.CLOSEBRACKET
                 };
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_CATALOG :
@@ -1517,6 +1514,11 @@ public class FunctionSQL extends Expression {
                     if (nodes[1] == null) {
                         nodes[1] = new ExpressionValue(" ", Type.SQL_CHAR);
                     }
+                    // A VoltDB extension to customize the SQL function set support
+                    else if (nodes[1].dataType != Type.SQL_CHAR) {
+                        nodes[1].dataType = Type.SQL_CHAR;
+                    }
+                    // End of VoltDB extension
                 } else if (dataType.isBinaryType()) {
                     funcType = FUNC_TRIM_BINARY;
 
@@ -2274,7 +2276,6 @@ public class FunctionSQL extends Expression {
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
-
 
         default :
             if (voltDisabled != null) {
