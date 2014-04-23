@@ -30,10 +30,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
@@ -59,6 +61,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
+    final CSL m_listener = new CSL();
 
     /*
      * Username and password as set by the constructor.
@@ -99,7 +102,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_subject);
-        m_distributer.addClientStatusListener(new CSL());
+        m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
             username = config.m_subject.getPrincipals().iterator().next().getName();
@@ -210,7 +213,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, unit.toNanos(timeout), invocation);
+        return callProcedure(cb, System.nanoTime(), unit.toNanos(timeout), invocation);
     }
 
     /**
@@ -230,10 +233,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, Distributer.USE_DEFAULT_TIMEOUT, invocation);
+        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_TIMEOUT, invocation);
     }
 
-    private final ClientResponse callProcedure(SyncCallback cb, long timeout, ProcedureInvocation invocation)
+    private final ClientResponse callProcedure(SyncCallback cb, long nowNanos, long timeout, ProcedureInvocation invocation)
             throws IOException, NoConnectionsException, ProcCallException
     {
         if (m_isShutdown) {
@@ -248,7 +251,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.queue(
                 invocation,
                 cb,
-                true, timeout);
+                true, nowNanos, timeout);
 
         try {
             cb.waitForResponse();
@@ -367,15 +370,36 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             callback = new NullCallback();
         }
 
+        final long nowNanos = System.nanoTime();
+
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         if (m_blockingQueue) {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeoutNanos)) {
+                    isBlessed, nowNanos, timeoutNanos)) {
+
+                /*
+                 * Wait on backpressure honoring the timeout settings
+                 */
+                final long delta = Math.max(1, System.nanoTime() - nowNanos);
+                final long timeout = timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT ? m_distributer.getProcedureTimeoutNanos() : timeoutNanos;
                 try {
-                    backpressureBarrier();
+                    if (backpressureBarrier(nowNanos, timeout - delta)) {
+                        final ClientResponseImpl r = new ClientResponseImpl(
+                                ClientResponse.CONNECTION_TIMEOUT,
+                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                "",
+                                new VoltTable[0],
+                                String.format("No response received in the allotted time (set to %d ms).",
+                                        TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+                        try {
+                            callback.clientCallback(r);
+                        } catch (Throwable t) {
+                            m_distributer.uncaughtException(callback, r, t);
+                        }
+                    }
                 } catch (InterruptedException e) {
                     throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
                 }
@@ -385,7 +409,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeoutNanos);
+                    isBlessed, nowNanos, timeoutNanos);
         }
     }
 
@@ -460,8 +484,17 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     @Override
     public void backpressureBarrier() throws InterruptedException {
+        backpressureBarrier( 0, 0);
+    }
+
+    /**
+     * Wait on backpressure with a timeout. Returns true on timeout, false otherwise.
+     * Timeout nanos is the initial timeout quantity which will be adjusted to reflect remaining
+     * time on spurious wakeups
+     */
+    public boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
-            return;
+            return false;
         }
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
             throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
@@ -471,11 +504,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             synchronized (m_backpressureLock) {
                 if (m_backpressure) {
                     while (m_backpressure && !m_isShutdown) {
-                            m_backpressureLock.wait();
+                       if (start != 0) {
+                            //Wait on the condition for the specified timeout remaining
+                            m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
+
+                            //Condition is true, break and return false
+                            if (!m_backpressure) break;
+
+                            //Calculate whether the timeout should be triggered
+                            final long nowNanos = System.nanoTime();
+                            final long deltaNanos = Math.max(1, nowNanos - start);
+                            if (deltaNanos >= timeoutNanos) {
+                                return true;
+                            }
+
+                            //Reassigning timeout nanos with remainder of timeout
+                            timeoutNanos -= deltaNanos;
+                       } else {
+                           m_backpressureLock.wait();
+                       }
                     }
                 }
             }
         }
+        return false;
     }
 
     class CSL extends ClientStatusListenerExt {
