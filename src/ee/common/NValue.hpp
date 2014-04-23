@@ -592,7 +592,7 @@ class NValue {
         return j;
     }
 
-    static inline int32_t getIthCharIndex(const char *valueChars, const size_t length, const int32_t ith) {
+    static inline int32_t getIthCharIndex(const char *valueChars, const int64_t length, const int64_t ith) {
         if (ith <= 0) return -1;
         int32_t i = 0, j = 0;
 

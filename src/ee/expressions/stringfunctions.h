@@ -297,7 +297,7 @@ static inline std::string trim_function(std::string source, const std::string ma
         bool doltrim, bool dortrim) {
     // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
     size_t mlen = match.length();
-
+    assert (mlen > 0);
     if (doltrim) {
         while (boost::starts_with(source, match)) {
             source.erase(0, mlen);
@@ -345,6 +345,14 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
     ptr = reinterpret_cast<char*>(strVal.getObjectValue_withoutNull());
     int32_t objectLength = strVal.getObjectLength_withoutNull();
     std::string inputStr = std::string(ptr, objectLength);
+
+    // SQL03 standard only allows 1 character trim character.
+    // In order to be compatible with other popular databases like MySQL,
+    // our implementation also allows multiple characters, but rejects 0 character.
+    if (length == 0) {
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range,
+                "data exception -- trim error, invalid length argument 0");
+    }
 
     std::string result = "";
     switch (optArg) {

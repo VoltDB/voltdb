@@ -2116,7 +2116,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals(null, result.getString(0));
+//        assertEquals(null, result.getString(0));
 
         cr = client.callProcedure("TRIM_SPACE", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2140,6 +2140,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("  VoltDB",  result.getString(2));
         assertEquals("VoltDB",  result.getString(3));
 
+        try {
+            cr = client.callProcedure("TRIM_ANY", "", "", "", 1);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("data exception"));
+            assertTrue(ex.getMessage().contains("trim error"));
+        }
 
         // Test TRIM with other character
         cr = client.callProcedure("P1.insert", 2, "vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
