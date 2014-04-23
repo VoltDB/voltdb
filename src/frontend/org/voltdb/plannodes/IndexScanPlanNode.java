@@ -155,8 +155,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         setSkipNullPredicate(nextKeyIndex);
     }
 
-    public void setSkipNullPredicate(int nonNullKeyIndex) {
-        int nextKeyIndex = nonNullKeyIndex;
+    public void setSkipNullPredicate(int nextKeyIndex) {
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
