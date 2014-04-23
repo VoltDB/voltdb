@@ -2116,7 +2116,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
         assertTrue(result.advanceRow());
-//        assertEquals(null, result.getString(0));
+        assertEquals(null, result.getString(0));
 
         cr = client.callProcedure("TRIM_SPACE", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
