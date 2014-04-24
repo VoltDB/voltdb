@@ -1029,7 +1029,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
-        if (event.truncationSnapshot) {
+        if (event.truncationSnapshot && event.didSucceed) {
             synchronized(m_lock) {
                 writeIv2ViableReplayEntry();
             }

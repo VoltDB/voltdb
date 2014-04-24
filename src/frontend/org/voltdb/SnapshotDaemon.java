@@ -1828,7 +1828,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
-        if (!event.truncationSnapshot) {
+        if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
         }
         final CountDownLatch latch = new CountDownLatch(1);
