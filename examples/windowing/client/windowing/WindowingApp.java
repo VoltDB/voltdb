@@ -20,50 +20,16 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
- * This samples uses the native asynchronous request processing protocol
- * to post requests to the VoltDB server, thus leveraging to the maximum
- * VoltDB's ability to run requests in parallel on multiple database
- * partitions, and multiple servers.
- *
- * While asynchronous processing is (marginally) more convoluted to work
- * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it allows a single client with a small amount of
- * threads to flood VoltDB with requests, guaranteeing blazing throughput
- * performance.
- *
- * Note that this benchmark focuses on throughput performance and
- * not low latency performance.  This benchmark will likely 'firehose'
- * the database cluster (if the cluster is too slow or has too few CPUs)
- * and as a result, queue a significant amount of requests on the server
- * to maximize throughput measurement. To test VoltDB latency, run the
- * SyncBenchmark client, also found in the voter sample directory.
- */
 
 package windowing;
 
-import java.io.IOException;
-import java.util.Date;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientStats;
-import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.ProcedureCallback;
 
 public class WindowingApp {
 
@@ -72,79 +38,13 @@ public class WindowingApp {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    // validated command line configuration
-    final WindowingConfig config;
-    // Reference to the database connection we will use
-    final Client insertsClient;
-    final Client nonInsertsClient;
-    // Timer for periodic stats printing
-    Timer timer;
-    // Benchmark start time
-    long benchmarkStartTS;
-    // Statistics manager objects from the client
-    final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
+    final GlobalState state;
 
-    private final AtomicLong totalDeletes = new AtomicLong(0);
-    private final AtomicLong deletesSinceLastChecked = new AtomicLong(0);
-
-    final ContinuousDeleter ctb;
-    final PartitionDataTracker partitionData;
-
-    static Random rand = new Random(0);
-
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
-     */
-    static class WindowingConfig extends CLIConfig {
-        @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 5;
-
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 2000;
-
-        @Option(desc = "Warmup duration in seconds.")
-        int warmup = 2;
-
-        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
-        String servers = "localhost";
-
-        @Option(desc = "")
-        long maxrows = 0;
-
-        @Option(desc = "")
-        long historyseconds = 30;
-
-        @Option(desc = "")
-        long maxrss = 0;
-
-        @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = Integer.MAX_VALUE;
-
-        @Option(desc = "Report latency for async benchmark run.")
-        boolean latencyreport = false;
-
-        @Option(desc = "User name for connection.")
-        String user = "";
-
-        @Option(desc = "Password for connection.")
-        String password = "";
-
-        @Override
-        public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (maxrows < 0) exitWithMessageAndUsage("maxrows must be >= 0");
-            if (historyseconds < 0) exitWithMessageAndUsage("historyseconds must be >= 0");
-            if (historyseconds < 0) exitWithMessageAndUsage("historyseconds must be >= 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-        }
-    }
+    final ContinuousDeleter deleter;
+    final PartitionDataTracker partitionTracker;
+    final RandomDataInserter inserter;
+    final MaxTracker maxTracker;
+    final Reporter reporter;
 
     /**
      * Provides a callback to be notified on node failure.
@@ -154,7 +54,7 @@ public class WindowingApp {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
+            if (inserter.isDone() == false) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
         }
@@ -167,27 +67,38 @@ public class WindowingApp {
      * @param config Parsed & validated CLI options.
      */
     public WindowingApp(WindowingConfig config) {
-        this.config = config;
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.println(config.getConfigDumpString());
+
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Setup & Initialization");
+        System.out.println(HORIZONTAL_RULE);
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
-        insertsClient = ClientFactory.createClient(clientConfig);
-        nonInsertsClient = ClientFactory.createClient(clientConfig);
+        Client insertsClient = ClientFactory.createClient(clientConfig);
+        Client nonInsertsClient = ClientFactory.createClient(clientConfig);
 
-        periodicStatsContext = insertsClient.createStatsContext();
-        fullStatsContext = insertsClient.createStatsContext();
-
-        partitionData = new PartitionDataTracker(nonInsertsClient);
-        ctb = new ContinuousDeleter();
-
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
-        if(config.latencyreport) {
-            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
+        // connect to one or more servers, loop until success
+        try {
+            connect(insertsClient, config.servers);
+            connect(nonInsertsClient, config.servers);
         }
+        catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        state = new GlobalState(config, nonInsertsClient);
+
+        partitionTracker = new PartitionDataTracker(state);
+        deleter = new ContinuousDeleter(state);
+        inserter = new RandomDataInserter(state, insertsClient);
+        maxTracker = new MaxTracker(state);
+        reporter = new Reporter(state, inserter);
     }
 
     /**
@@ -242,25 +153,10 @@ public class WindowingApp {
     }
 
     /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
-    public void schedulePeriodicStats() {
-        timer = new Timer();
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() { printStatistics(); }
-        };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
-    }
-
-    /**
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      */
-    public synchronized void printStatistics() {
+    /*public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
@@ -278,127 +174,7 @@ public class WindowingApp {
 
         System.out.printf("Total Deletes/Deletes %d/%d", nowTotalDeletes, nowDeletesSinceLastChecked);
         System.out.printf("\n");
-    }
-
-    /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
-     *
-     * @throws Exception if anything unexpected happens.
-     */
-    public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
-
-        // 1. Voting Board statistics, Voting results and performance statistics
-        String display = "\n" +
-                         HORIZONTAL_RULE +
-                         " Voting Results\n" +
-                         HORIZONTAL_RULE +
-                         "\nA total of %d votes were received...\n" +
-                         " - %,9d Accepted\n" +
-                         " - %,9d Rejected (Invalid Contestant)\n" +
-                         " - %,9d Rejected (Maximum Vote Count Reached)\n" +
-                         " - %,9d Failed (Transaction Error)\n\n";
-        /*System.out.printf(display, stats.getInvocationsCompleted(),
-                acceptedVotes.get(), badContestantVotes.get(),
-                badVoteCountVotes.get(), failedVotes.get());*/
-
-        // 2. Voting results
-        /*VoltTable result = client.callProcedure("Results").getResults()[0];
-
-        System.out.println("Contestant Name\t\tVotes Received");
-        while(result.advanceRow()) {
-            System.out.printf("%s\t\t%,14d\n", result.getString(0), result.getLong(2));
-        }
-        System.out.printf("\nThe Winner is: %s\n\n", result.fetchRow(0).getString(0));
-
-        // 3. Performance statistics
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Client Workload Statistics");
-        System.out.println(HORIZONTAL_RULE);
-
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        if(this.config.latencyreport) {
-            System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-            System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-            System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-            System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-            System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-            System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-            System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-            System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-            System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-            System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
-
-            System.out.print("\n" + HORIZONTAL_RULE);
-            System.out.println(" System Server Statistics");
-            System.out.println(HORIZONTAL_RULE);
-            System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
-
-            System.out.print("\n" + HORIZONTAL_RULE);
-            System.out.println(" Latency Histogram");
-            System.out.println(HORIZONTAL_RULE);
-            System.out.println(stats.latencyHistoReport());
-        }*/
-
-    }
-
-    public Runnable getDeleterRunnable() {
-        return new Runnable() {
-            @Override
-            public void run() {
-                long[] updateData = ctb.deleteSomeTuples(nonInsertsClient, partitionData);
-                long nowTuplesDeleted = updateData[0];
-                long partitionsThatStoppedEarly = updateData[1];
-
-                totalDeletes.addAndGet(nowTuplesDeleted);
-                deletesSinceLastChecked.addAndGet(nowTuplesDeleted);
-
-                try {
-                    if (partitionsThatStoppedEarly > 0) {
-                        scheduler.execute(getDeleterRunnable());
-                    }
-                    else {
-                        scheduler.schedule(getDeleterRunnable(), 100, TimeUnit.MILLISECONDS);
-                    }
-                }
-                catch (RejectedExecutionException e) {
-                    // ignore this... presumably the executor service has shutdown
-                }
-            }
-        };
-    }
-
-    class InsertCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            assert(clientResponse.getStatus() == ClientResponse.SUCCESS);
-        }
-    }
-
-    void insertRandomRow() {
-        // unique identifier and partition key
-        String uuid = UUID.randomUUID().toString();
-
-        // millisecond timestamp
-        Date now = new Date();
-
-        // for some odd reason, this will give LONG_MAX if the
-        // computed value is > LONG_MAX.
-        long val = (long) (rand.nextGaussian() * 1000.0);
-
-        try {
-            insertsClient.callProcedure(new InsertCallback(),
-                                 "TIMEDATA.insert",
-                                 uuid,
-                                 val,
-                                 now);
-        }
-        catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
+    }*/
 
     /**
      * Core benchmark code.
@@ -408,70 +184,37 @@ public class WindowingApp {
      */
     public void runBenchmark() throws Exception {
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
-
-        // connect to one or more servers, loop until success
-        connect(insertsClient, config.servers);
-        connect(nonInsertsClient, config.servers);
-
-        System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // reset the stats
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
+        // Print periodic stats/analysis to the console
+        state.scheduler.scheduleWithFixedDelay(reporter,
+                                               state.config.displayinterval,
+                                               state.config.displayinterval,
+                                               TimeUnit.SECONDS);
 
-        // record the start of the benchmark
-        benchmarkStartTS = System.currentTimeMillis();
+        // Update the partition key set, row counts and redundancy level once per second
+        state.scheduler.scheduleWithFixedDelay(partitionTracker,
+                                               1,
+                                               1,
+                                               TimeUnit.SECONDS);
 
-        // print periodic statistics to the console
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                printStatistics();
-            }
-        }, config.displayinterval, config.displayinterval, TimeUnit.SECONDS);
+        // Delete data as often as need be
+        //  -- This will resubmit itself at varying rates according to insert load
+        state.scheduler.execute(deleter);
 
-        // update the partition key set, row counts and redundancy level once per second
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                partitionData.update();
-            }
-        }, 1, 1, TimeUnit.SECONDS);
-
-        // delete data as often as need be
-        //  -- this will resubmit at varying rates according to insert load
-        scheduler.execute(getDeleterRunnable());
+        // Start tracking changes to the maximum value after a 5 second delay to
+        // let things settle a bit. Then check up to 100 times per second.
+        state.scheduler.scheduleWithFixedDelay(maxTracker,
+                                               5000,
+                                               10,
+                                               TimeUnit.MILLISECONDS);
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        while (benchmarkEndTime > System.currentTimeMillis()) {
-            insertRandomRow();
-        }
+        inserter.run();
 
-        scheduler.shutdown();
-        try {
-            scheduler.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        // block until all outstanding txns return
-        insertsClient.drain();
-        nonInsertsClient.drain();
-
-        // print the summary results
-        printResults();
-
-        // close down the client connections
-        insertsClient.close();
-        nonInsertsClient.drain();
+        state.shutdown();
     }
 
     /**

@@ -13,13 +13,21 @@ CREATE VIEW agg_by_second
 (
   second_ts,
   count_values,
-  sum_values,
-  max_value
+  sum_values
 )
-AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val), MAX(val)
+AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
    FROM timedata
    GROUP BY TRUNCATE(SECOND, update_ts);
 
 -- stored procedures
 CREATE PROCEDURE FROM CLASS windowing.DeleteAfterDate;
 PARTITION PROCEDURE DeleteAfterDate ON TABLE timedata COLUMN uuid;
+
+CREATE PROCEDURE windowing.Average AS
+    SELECT SUM(sum_values) / SUM(count_values)
+    FROM agg_by_second
+    WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
+
+CREATE PROCEDURE windowing.MaxValue AS
+    SELECT MAX(val)
+    FROM timedata;

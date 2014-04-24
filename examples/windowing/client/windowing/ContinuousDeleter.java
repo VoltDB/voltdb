@@ -25,39 +25,49 @@ package windowing;
 
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.client.Client;
+import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.types.TimestampType;
 
-import windowing.PartitionDataTracker.PartitionInfo;
+public class ContinuousDeleter implements Runnable {
 
-public class ContinuousDeleter {
+    static final long CHUNK_SIZE = 100;
+    static final int DELETE_YIELD_MS = 50;
 
-    static final long CHUNK_SIZE = 1000;
+    final GlobalState state;
+
+    ContinuousDeleter(GlobalState state) {
+        this.state = state;
+    }
+
+    @Override
+    public void run() {
+        deleteSomeTuples(1);
+    }
 
     class Callback implements ProcedureCallback {
 
         final CountDownLatch latch;
-        final AtomicLong totalTuplesDeleted;
-        final AtomicLong partitionsUnfinished;
+        final AtomicLong totalTuplesNotDeleted;
 
-        Callback(CountDownLatch latch, AtomicLong totalTuplesDeleted, AtomicLong partitionsUnfinished) {
+        Callback(CountDownLatch latch, AtomicLong totalTuplesNotDeleted) {
             this.latch = latch;
-            this.totalTuplesDeleted = totalTuplesDeleted;
-            this.partitionsUnfinished = partitionsUnfinished;
+            this.totalTuplesNotDeleted = totalTuplesNotDeleted;
         }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                long tuplesDeleted = clientResponse.getResults()[0].asScalarLong();
-                totalTuplesDeleted.addAndGet(tuplesDeleted);
-                if (tuplesDeleted >= CHUNK_SIZE) {
-                    partitionsUnfinished.incrementAndGet();
-                }
+                VoltTable results = clientResponse.getResults()[0];
+                long tuplesDeleted = results.fetchRow(0).getLong("deleted");
+                long tuplesNotDeleted = results.fetchRow(0).getLong("not_deleted");
+
+                state.addToDeletedTuples(tuplesDeleted);
+                totalTuplesNotDeleted.addAndGet(tuplesNotDeleted);
             }
             else {
                 System.err.println(clientResponse.getStatusString());
@@ -68,27 +78,32 @@ public class ContinuousDeleter {
         }
     }
 
-    public long[] deleteSomeTuples(Client client, PartitionDataTracker partitionData) {
-        final Map<Long, PartitionInfo> currentPartitionInfo = partitionData.getPartitionInfo();
+    protected void deleteSomeTuples(int rounds) {
+        final Map<Long, GlobalState.PartitionInfo> currentPartitionInfo = state.getPartitionData();
         final long partitionCount = currentPartitionInfo.size();
 
-        final CountDownLatch latch = new CountDownLatch((int) partitionCount);
-        final AtomicLong totalTuplesDeleted = new AtomicLong(0);
-        final AtomicLong partitionsUnfinished = new AtomicLong(0);
+        final CountDownLatch latch = new CountDownLatch((int) partitionCount * rounds);
+        AtomicLong tuplesNotDeleted = null;
 
-        TimestampType dateTarget = new TimestampType((System.currentTimeMillis() - 30 * 1000) * 1000);
+        for (int round = 0; round < rounds; round++) {
+            final AtomicLong tuplesNotDeletedForRound = new AtomicLong(0);
 
-        for (PartitionInfo pinfo : currentPartitionInfo.values()) {
-            try {
-                client.callProcedure(new Callback(latch, totalTuplesDeleted, partitionsUnfinished),
-                                     "DeleteAfterDate",
-                                     pinfo.partitionKey,
-                                     dateTarget,
-                                     CHUNK_SIZE);
-            } catch (Exception e) {
-                e.printStackTrace();
-                latch.countDown();
+            TimestampType dateTarget = new TimestampType((System.currentTimeMillis() - 30 * 1000) * 1000);
+
+            for (GlobalState.PartitionInfo pinfo : currentPartitionInfo.values()) {
+                try {
+                    state.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
+                                         "DeleteAfterDate",
+                                         pinfo.partitionKey,
+                                         dateTarget,
+                                         CHUNK_SIZE);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    latch.countDown();
+                }
             }
+
+            tuplesNotDeleted = tuplesNotDeletedForRound;
         }
 
         try {
@@ -98,6 +113,24 @@ public class ContinuousDeleter {
             e.printStackTrace();
         }
 
-        return new long[] { totalTuplesDeleted.get(), partitionsUnfinished.get() };
+        long finalTuplesNotDeleted = tuplesNotDeleted.get();
+        if (tuplesNotDeleted.get() > 0) {
+            double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) state.getPartitionCount();
+            int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / ContinuousDeleter.CHUNK_SIZE);
+            assert(desiredRounds > 0);
+            state.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
+        }
+        else {
+            state.scheduler.schedule(this, DELETE_YIELD_MS, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    protected Runnable getRunnableForMulitpleRounds(final int rounds) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                deleteSomeTuples(rounds);
+            }
+        };
     }
 }

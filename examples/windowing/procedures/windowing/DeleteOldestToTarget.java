@@ -21,13 +21,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-//
-// Accepts a vote, enforcing business logic: make sure the vote is for a valid
-// contestant and that the voter (phone number of the caller) is not above the
-// number of allowed votes.
-//
-
 package windowing;
 
 import org.voltdb.SQLStmt;

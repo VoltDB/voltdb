@@ -21,32 +21,30 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-//
-// Accepts a vote, enforcing business logic: make sure the vote is for a valid
-// contestant and that the voter (phone number of the caller) is not above the
-// number of allowed votes.
-//
-
 package windowing;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 public class DeleteAfterDate extends VoltProcedure {
 
-    public final SQLStmt countMatchingRows = new SQLStmt(
+    final SQLStmt countMatchingRows = new SQLStmt(
             "SELECT COUNT(*) FROM timedata WHERE update_ts <= ?;");
 
-    public final SQLStmt getNthOldestTimestamp = new SQLStmt(
+    final SQLStmt getNthOldestTimestamp = new SQLStmt(
             "SELECT update_ts FROM timedata ORDER BY update_ts ASC OFFSET ? LIMIT 1;");
 
-    public final SQLStmt deleteOlderThanDate = new SQLStmt(
-            "DELETE FROM timedata WHERE update_ts <= ?;");
+    final SQLStmt deleteOlderThanDate = new SQLStmt(
+            "DELETE FROM timedata WHERE update_ts <= ? and update_ts > FROM_UNIXTIME(0);");
 
-    public long run(String partitionValue, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
+    final VoltTable retvalTemplate = new VoltTable(
+            new VoltTable.ColumnInfo("deleted", VoltType.BIGINT),
+            new VoltTable.ColumnInfo("not_deleted", VoltType.BIGINT));
+
+    public VoltTable run(String partitionValue, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
         if (newestToDiscard == null) {
             throw new VoltAbortException("newestToDiscard shouldn't be null.");
             // It might be Long.MIN_VALUE as a TimestampType though.
@@ -67,6 +65,8 @@ public class DeleteAfterDate extends VoltProcedure {
         voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
         long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
 
-        return deletedCount;
+        VoltTable retval = retvalTemplate.clone(20); // 20b to hold two longs in one row
+        retval.addRow(deletedCount, agedOutCount - deletedCount);
+        return retval;
     }
 }
