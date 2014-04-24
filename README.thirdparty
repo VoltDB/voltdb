@@ -654,6 +654,23 @@ HdrHistogram https://github.com/HdrHistogram/HdrHistogram
  * This code was Written by Gil Tene of Azul Systems, and released to the
  * public domain, as explained at http://creativecommons.org/publicdomain/zero/1.0/
 ================================================================================
+Netty, code related to replacing the Set in java.nio.channels.Selector
+/*
+ * Copyright 2012 The Netty Project
+ *
+ * The Netty Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+================================================================================
 Node.js VoltDB client
 (portions used in VoltDB Node.js client)
 Author Jacob Wright, MIT License (https://github.com/jacwright/voltjs/blob/master/LICENSE)

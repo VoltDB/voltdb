@@ -922,31 +922,32 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        CompleteTransactionMessage msg = message;
         if (m_isLeader) {
-            CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
+            msg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
-            replmsg.setSpHandle(getCurrentTxnId());
+            msg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
-                m_mailbox.send(m_sendToHSIds, replmsg);
+                m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
-            setMaxSeenTxnId(message.getSpHandle());
+            setMaxSeenTxnId(msg.getSpHandle());
         }
-        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
         if (txn != null)
         {
-            Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
+            Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
+                new CompleteTransactionTask(txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
             // If this is a restart, then we need to leave the transaction state around
-            if (!message.isRestart()) {
-                m_outstandingTxns.remove(message.getTxnId());
+            if (!msg.isRestart()) {
+                m_outstandingTxns.remove(msg.getTxnId());
             }
         }
     }

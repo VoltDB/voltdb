@@ -1206,7 +1206,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce) {
-        m_initiatorMailbox.notifyOfSnapshotNonce(nonce);
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        m_initiatorMailbox.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 }

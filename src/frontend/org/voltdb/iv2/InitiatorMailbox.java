@@ -421,8 +421,8 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    public void notifyOfSnapshotNonce(String nonce) {
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
-        m_joinProducer.notifyOfSnapshotNonce(nonce);
+        m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 }
