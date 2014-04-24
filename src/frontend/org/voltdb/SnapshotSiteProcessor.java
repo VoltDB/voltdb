@@ -511,8 +511,10 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
 
