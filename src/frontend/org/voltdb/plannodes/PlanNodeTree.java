@@ -325,7 +325,7 @@ public class PlanNodeTree implements JSONString {
             int stmtId = subqueryExpr.getSubqueryId();
             m_subqueryMap.put(stmtId, subqueryExpr.getSubqueryNode());
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
-            assert(m_planNodesListMap.containsKey(stmtId));
+            assert(!m_planNodesListMap.containsKey(stmtId));
             m_planNodesListMap.put(stmtId, planNodes);
             constructTree(planNodes, subqueryExpr.getSubqueryNode());
         }

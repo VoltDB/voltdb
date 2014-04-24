@@ -221,15 +221,14 @@ bool PlanNodeFragment::hasDelete() const
 
 std::string PlanNodeFragment::debug() {
     std::ostringstream buffer;
-    int i = 0;
-    for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end(); ++mapIt, ++i) {
-        buffer << "Execute List " << i << ":\n";
+    for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end(); ++mapIt) {
+        buffer << "Execute List " << mapIt->first << ":\n";
         std::vector<AbstractPlanNode*>* executeList = mapIt->second;
         for (int ctr = 0, cnt = (int)executeList->size(); ctr < cnt; ctr++) {
             buffer << "   [" << ctr << "]: " << (*executeList)[ctr]->debug() << "\n";
         }
-        buffer << "Execute Tree " << i << ":\n";
-        buffer << getRootNode(i)->debug(true);
+        buffer << "Execute Tree " << mapIt->first << ":\n";
+        buffer << getRootNode(mapIt->first)->debug(true);
     }
     return (buffer.str());
 }

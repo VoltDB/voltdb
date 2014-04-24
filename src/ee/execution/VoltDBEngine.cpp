@@ -1103,9 +1103,6 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         // Initialize each node!
         ev->initExecutors(this);
 
-        // update the context
-        m_executorContext->setupForExecutors(&ev->executorListMap);
-
         // add the plan to the back
         m_plans.get<0>().push_back(ev);
 
@@ -1117,6 +1114,10 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
 
         VoltDBEngine::ExecutorVector *retval = ev.get();
         assert(retval);
+
+        // update the context
+        m_executorContext->setupForExecutors(&retval->executorListMap);
+
         return retval;
     }
 

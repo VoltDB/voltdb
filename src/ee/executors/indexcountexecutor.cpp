@@ -202,7 +202,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
-        VOLT_TRACE("Search key: '%s'", m_searchKey.debugNoHeader().c_str());
     }
 
     if (m_numOfEndkeys != 0) {

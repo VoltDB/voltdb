@@ -138,7 +138,7 @@ class ExecutorContext {
     }
 
     /** Executor List for a given sub statement id */
-    std::vector<AbstractExecutor*>& getExecutorLists(int stmtId = 0) {
+    std::vector<AbstractExecutor*>& getExecutorList(int stmtId = 0) {
         assert(m_executorsMap->find(stmtId) != m_executorsMap->end());
         return *m_executorsMap->find(stmtId)->second;
     }

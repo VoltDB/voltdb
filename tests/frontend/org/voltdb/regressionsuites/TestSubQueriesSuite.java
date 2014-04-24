@@ -257,21 +257,21 @@ public class TestSubQueriesSuite extends RegressionSuite {
          System.out.println(vt.toString());
          validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
-//         // Core dump
-//         if (!isHSQL()) {
-//             vt = client.callProcedure("@AdHoc",
-//                     "select id, newid  " +
-//                             "FROM (SELECT id, wage FROM R1) T1 " +
-//                             "   LEFT OUTER JOIN " +
-//                             "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
-//                             "   ON T1.id = T2.dept and EXISTS( " +
-//                             "      select 1 from R1 where R1.ID =  T2.newid ) " +
-//                     "ORDER BY id, newid").getResults()[0];
-//             System.out.println(vt.toString());
-//             validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
-//                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
-//         }
-     }
+         // Core dump
+         if (!isHSQL()) {
+             vt = client.callProcedure("@AdHoc",
+                     "select id, newid  " +
+                             "FROM (SELECT id, wage FROM R1) T1 " +
+                             "   LEFT OUTER JOIN " +
+                             "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
+                             "   ON T1.id = T2.dept and EXISTS( " +
+                             "      select 1 from R1 where R1.ID =  T2.newid ) " +
+                     "ORDER BY id, newid").getResults()[0];
+             System.out.println(vt.toString());
+             validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
+                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
+         }
+    }
 
  }
 
