@@ -57,6 +57,7 @@ namespace voltdb {
 #define SHORT_OBJECT_LENGTHLENGTH static_cast<char>(1)
 #define LONG_OBJECT_LENGTHLENGTH static_cast<char>(4)
 #define OBJECT_NULL_BIT static_cast<char>(1 << 6)
+#define OBJECT_NULL_INLINE_LENGTH static_cast<char>(0x80)
 #define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
 #define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
 
@@ -1476,25 +1477,22 @@ class NValue {
              * The 7th bit of the length preceding value
              * is used to indicate that the object is null.
              */
-            *reinterpret_cast<char*>(storage) = OBJECT_NULL_BIT;
+            *reinterpret_cast<char*>(storage) = OBJECT_NULL_INLINE_LENGTH;
         }
         else {
             const int32_t objLength = getObjectLength_withoutNull();
             checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
-
-            if (m_sourceInlined)
-            {
-                ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objLength);
+            const char* sourceBytes;
+            if (m_sourceInlined) {
+                sourceBytes = *reinterpret_cast<char *const *>(m_data) + 1;
             }
-            else
-            {
-                const StringRef* sref =
-                    *reinterpret_cast<StringRef* const*>(m_data);
-                ::memcpy(storage, sref->get(),
-                         getObjectLengthLength() + objLength);
+            else {
+                const StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+                sourceBytes = sref->get() + getObjectLengthLength();
             }
+            *reinterpret_cast<char*>(storage) = static_cast<char>(objLength);
+            ::memcpy(reinterpret_cast<char*>(storage)+1, sourceBytes, objLength);
         }
-
     }
 
     static inline bool validVarcharSize(const char *valueChars, const size_t length, const int32_t maxLength) {
@@ -2511,7 +2509,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
              * If a string is inlined in its storage location there will be no pointer to
              * check for NULL. The length preceding value must be used instead.
              */
-            if ((inline_data[0] & OBJECT_NULL_BIT) != 0) {
+            if (inline_data[0] == OBJECT_NULL_INLINE_LENGTH) {
                 retval.tagAsNull();
                 break;
             }

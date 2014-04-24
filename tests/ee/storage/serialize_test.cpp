@@ -161,7 +161,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
 TEST_F(TableSerializeTest, NullStrings) {
     std::vector<std::string> columnNames(1);
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
-    std::vector<int32_t> columnSizes(1, 20);
+    std::vector<int32_t> columnSizes(1, 80);
     std::vector<bool> columnAllowNull(1, false);
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
     columnNames[0] = "";
