@@ -47,25 +47,23 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
      * Only applies when stronger determinism is needed.
      */
     @Override
-    boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement)
+    void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
-        return ( ! hasDeterministicStatement) && detMode != DeterminismMode.FASTER;
+        if (detMode == DeterminismMode.FASTER) {
+            return;
+        }
+        if (plan.hasDeterministicStatement()) {
+            return;
+        }
+        AbstractPlanNode planGraph = plan.rootPlanGraph;
+        if (planGraph.isOrderDeterministic()) {
+            return;
+        }
+        super.apply(plan, detMode, parsedStmt);
     }
 
     @Override
-    public void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
-    {
-        m_parsedStmt = parsedStmt;
-        // The statement is already known NOT to be inherently order deterministic.
-        // Some PLANs for a non-ordered query may turn out to be deterministic anyway.
-        // So, check first.
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        if ( ! planGraph.isOrderDeterministic()) {
-            plan.rootPlanGraph = recursivelyApply(planGraph);
-        }
-    }
-
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 

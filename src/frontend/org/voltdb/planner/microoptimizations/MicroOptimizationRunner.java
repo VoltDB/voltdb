@@ -38,10 +38,7 @@ public class MicroOptimizationRunner {
             DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
         for (MicroOptimization opt : optimizations) {
-            // skip optimizations that don't apply at this determinism level
-            if (opt.shouldRun(detMode, plan.hasDeterministicStatement())) {
-                opt.apply(plan, parsedStmt);
-            }
+            opt.apply(plan, detMode, parsedStmt);
         }
     }
 }
