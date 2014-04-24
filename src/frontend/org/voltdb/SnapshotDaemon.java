@@ -266,11 +266,28 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
+    private ListenableFuture<Object> m_currentFeasibilityCheck = null;
     private Mailbox m_mb;
     private void initiateSnapshotSave(final String requestId,
                                       final long handle,
                                       final Object params[])
     {
+        if (m_currentFeasibilityCheck != null) {
+            if (m_currentFeasibilityCheck.isDone()) {
+                m_currentFeasibilityCheck = null;
+            } else {
+                // Feasibility check in progress, prevent two checks running at the same time.
+                final VoltTable result = SnapshotUtil.constructNodeResultsTable();
+                result.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(),
+                        "", "FAILURE", "SNAPSHOT IN PROGRESS");
+                final ClientResponseImpl response =
+                        new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{result}, null);
+                response.setClientHandle(handle);
+                processClientResponse(Callables.returning(response));
+                return;
+            }
+        }
+
         // TRAIL [TruncSnap:11] initiate is in a retriable code block
         Callable<Object> work = new Callable<Object>() {
             @Override
@@ -327,7 +344,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         };
 
-        CoreUtils.retryHelper(VoltDB.instance().getSES(true), m_es, work, 3, 10, TimeUnit.SECONDS, 1, TimeUnit.HOURS);
+        m_currentFeasibilityCheck = CoreUtils.retryHelper(m_es, m_es, work, 3, 10, TimeUnit.SECONDS, 1, TimeUnit.HOURS);
     }
 
     private void saveResponseToZKAndReset(String requestId, ClientResponseImpl response) throws Exception
@@ -1811,7 +1828,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
-        if (!event.truncationSnapshot) {
+        if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
         }
         final CountDownLatch latch = new CountDownLatch(1);

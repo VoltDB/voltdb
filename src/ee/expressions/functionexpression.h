@@ -200,6 +200,11 @@ static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
+// These are from Tokens.java.
+static const int SQL_TRIM_LEADING                      = 149;
+static const int SQL_TRIM_TRAILING                     = 284;
+static const int SQL_TRIM_BOTH                         = 22;
+
 // VoltDB-specific functions
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
 static const int FUNC_DECODE                           = 20001;

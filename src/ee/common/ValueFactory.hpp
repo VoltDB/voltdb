@@ -106,26 +106,58 @@ public:
     // What follows exists for test only!
 
     static inline NValue castAsBigInt(NValue value) {
+        if (value.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BIGINT);
+        }
         return value.castAsBigInt();
     }
 
     static inline NValue castAsInteger(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_INTEGER);
+            retval.setNull();
+            return retval;
+        }
+
         return value.castAsInteger();
     }
 
     static inline NValue castAsSmallInt(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_SMALLINT);
+            retval.setNull();
+            return retval;
+        }
+
         return value.castAsSmallInt();
     }
 
     static inline NValue castAsTinyInt(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_TINYINT);
+            retval.setNull();
+            return retval;
+        }
+
         return value.castAsTinyInt();
     }
 
     static inline NValue castAsDouble(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_DOUBLE);
+            retval.setNull();
+            return retval;
+        }
+
         return value.castAsDouble();
     }
 
     static inline NValue castAsDecimal(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_DECIMAL);
+            retval.setNull();
+            return retval;
+        }
         return value.castAsDecimal();
     }
 

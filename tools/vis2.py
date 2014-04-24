@@ -49,12 +49,14 @@ def get_stats(hostname, port, days):
 
     # keyed on app name, value is a list of runs sorted chronologically
     maxdate = datetime.datetime(1970,1,1,0,0,0)
+    mindate = datetime.datetime(2038,1,19,0,0,0)
     stats = dict()
     run_stat_keys = ['app', 'nodes', 'branch', 'date', 'tps', 'lat95', 'lat99']
     for row in resp.tables[0].tuples:
         group = (row[0],row[1])
         app_stats = []
         maxdate = max(maxdate, row[3])
+        mindate = min(mindate, row[3])
         if group not in stats:
             stats[group] = app_stats
         else:
@@ -62,18 +64,18 @@ def get_stats(hostname, port, days):
         run_stats = dict(zip(run_stat_keys, row))
         app_stats.append(run_stats)
 
-    return (stats, maxdate)
+    return (stats, mindate, maxdate)
 
 class Plot:
     DPI = 100.0
 
-    def __init__(self, title, xlabel, ylabel, filename, w, h, ndays, xmax):
+    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax):
         self.filename = filename
-        self.ndays = ndays
         self.legends = {}
         w = w == None and 2000 or w
         h = h == None and 1000 or h
         self.xmax = xmax
+        self.xmin = xmin
 
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
@@ -98,15 +100,13 @@ class Plot:
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        xmin, xmax = plt.xlim()
-        xmax = self.xmax.toordinal()
-        plt.xlim((xmin, xmax))
+        plt.xlim((self.xmin.toordinal(), self.xmax.toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, series, maxdate):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate):
     global mc
     plot_data = dict()
     for run in data:
@@ -124,7 +124,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, maxd
     if len(plot_data) == 0:
         return
 
-    pl = Plot(title, xlabel, ylabel, filename, width, height, 1, maxdate)
+    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
     for b,bd in plot_data.items():
         for k,v in bd.items():
             v = sorted(v, key=lambda x: x[0])
@@ -245,7 +245,8 @@ def main():
         height = int(sys.argv[5])
 
     # show all the history
-    (stats, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
+    (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
+    mindate = (mindate).replace(hour=0, minute=0, second=0, microsecond=0)
     maxdate = (maxdate + datetime.timedelta(days=1)).replace(minute=0, hour=0, second=0, microsecond=0)
 
     root_path = path
@@ -275,7 +276,7 @@ def main():
             title = app + " " + r[1]
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], maxdate)
+            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
 
         fns.append(iorder)
         filenames.append(tuple(fns))
