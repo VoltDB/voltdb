@@ -33,15 +33,14 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.types.TimestampType;
 
+import windowing.WindowingApp.PartitionInfo;
+
 public class ContinuousDeleter implements Runnable {
 
-    static final long CHUNK_SIZE = 100;
-    static final int DELETE_YIELD_MS = 50;
+    final WindowingApp app;
 
-    final GlobalState state;
-
-    ContinuousDeleter(GlobalState state) {
-        this.state = state;
+    ContinuousDeleter(WindowingApp app) {
+        this.app = app;
     }
 
     @Override
@@ -66,7 +65,7 @@ public class ContinuousDeleter implements Runnable {
                 long tuplesDeleted = results.fetchRow(0).getLong("deleted");
                 long tuplesNotDeleted = results.fetchRow(0).getLong("not_deleted");
 
-                state.addToDeletedTuples(tuplesDeleted);
+                app.addToDeletedTuples(tuplesDeleted);
                 totalTuplesNotDeleted.addAndGet(tuplesNotDeleted);
             }
             else {
@@ -79,7 +78,7 @@ public class ContinuousDeleter implements Runnable {
     }
 
     protected void deleteSomeTuples(int rounds) {
-        final Map<Long, GlobalState.PartitionInfo> currentPartitionInfo = state.getPartitionData();
+        final Map<Long, PartitionInfo> currentPartitionInfo = app.getPartitionData();
         final long partitionCount = currentPartitionInfo.size();
 
         final CountDownLatch latch = new CountDownLatch((int) partitionCount * rounds);
@@ -88,15 +87,25 @@ public class ContinuousDeleter implements Runnable {
         for (int round = 0; round < rounds; round++) {
             final AtomicLong tuplesNotDeletedForRound = new AtomicLong(0);
 
-            TimestampType dateTarget = new TimestampType((System.currentTimeMillis() - 30 * 1000) * 1000);
+            TimestampType dateTarget = app.getTargetDate();
+            long rowTarget = app.getTargetRowsPerPartition();
 
-            for (GlobalState.PartitionInfo pinfo : currentPartitionInfo.values()) {
+            for (PartitionInfo pinfo : currentPartitionInfo.values()) {
                 try {
-                    state.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
-                                         "DeleteAfterDate",
-                                         pinfo.partitionKey,
-                                         dateTarget,
-                                         CHUNK_SIZE);
+                    if (app.config.historyseconds > 0) {
+                        app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
+                                                 "DeleteAfterDate",
+                                                 pinfo.partitionKey,
+                                                 dateTarget,
+                                                 app.config.deletechunksize);
+                    }
+                    else /* if (app.config.maxrows > 0) */ {
+                        app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
+                                                 "DeleteOldestToTarget",
+                                                 pinfo.partitionKey,
+                                                 rowTarget,
+                                                 app.config.deletechunksize);
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     latch.countDown();
@@ -115,13 +124,13 @@ public class ContinuousDeleter implements Runnable {
 
         long finalTuplesNotDeleted = tuplesNotDeleted.get();
         if (tuplesNotDeleted.get() > 0) {
-            double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) state.getPartitionCount();
-            int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / ContinuousDeleter.CHUNK_SIZE);
+            double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) app.getPartitionCount();
+            int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / app.config.deletechunksize);
             assert(desiredRounds > 0);
-            state.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
+            app.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
         }
         else {
-            state.scheduler.schedule(this, DELETE_YIELD_MS, TimeUnit.MILLISECONDS);
+            app.scheduler.schedule(this, app.config.deleteyieldtime, TimeUnit.MILLISECONDS);
         }
     }
 

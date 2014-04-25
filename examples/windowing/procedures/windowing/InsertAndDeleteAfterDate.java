@@ -25,11 +25,12 @@ package windowing;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
-public class DeleteAfterDate extends VoltProcedure {
+public class InsertAndDeleteAfterDate extends VoltProcedure {
+
+    final SQLStmt insert = new SQLStmt(
+            "INSERT INTO timedata (uuid, val, update_ts) VALUES (?, ?, ?);");
 
     final SQLStmt countMatchingRows = new SQLStmt(
             "SELECT COUNT(*) FROM timedata WHERE update_ts <= ?;");
@@ -38,24 +39,19 @@ public class DeleteAfterDate extends VoltProcedure {
             "SELECT update_ts FROM timedata ORDER BY update_ts ASC OFFSET ? LIMIT 1;");
 
     final SQLStmt deleteOlderThanDate = new SQLStmt(
-            "DELETE FROM timedata WHERE update_ts <= ? and update_ts > FROM_UNIXTIME(0);");
-
-    // Template for returned table created here to keep the proc code
-    // cleaner, but it also has a *tiny* performance benefit.
-    final VoltTable retvalTemplate = new VoltTable(
-            new VoltTable.ColumnInfo("deleted", VoltType.BIGINT),
-            new VoltTable.ColumnInfo("not_deleted", VoltType.BIGINT));
+            "DELETE FROM timedata WHERE update_ts <= ?;");
 
     /**
      *
-     * @param partitionValue Partitioning key for this procedure.
+     * @param uuid Column value for tuple insertion and partitioning key for this procedure.
+     * @param val Column value for tuple insertion.
+     * @param update_ts Column value for tuple insertion.
      * @param newestToDiscard Try to remove any tuples as old or older than this value.
      * @param maxRowsToDeletePerProc The upper limit on the number of rows to delete per transaction.
-     * @return A table with one row containing the number of deleted rows and the number that could
-     * have been deleted (but weren't) if there were no per-transaction delete limits.
+     * @return The number of deleted rows.
      * @throws VoltAbortException on bad input.
-     */
-    public VoltTable run(String partitionValue, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
+    */
+    public long run(String uuid, long val, TimestampType update_ts, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
         if (newestToDiscard == null) {
             throw new VoltAbortException("newestToDiscard shouldn't be null.");
             // It might be Long.MIN_VALUE as a TimestampType though.
@@ -64,9 +60,13 @@ public class DeleteAfterDate extends VoltProcedure {
             throw new VoltAbortException("maxRowsToDeletePerProc must be > 0.");
         }
 
-        // Get the total number of rows older than the given timestamp.
+        // This line inserts the row.
+        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), uuid, val, update_ts);
+        // In the same round trip to the storage engine, count the rows.
         voltQueueSQL(countMatchingRows, EXPECT_SCALAR_LONG, newestToDiscard);
-        long agedOutCount = voltExecuteSQL()[0].asScalarLong();
+        // Can assume insert worked because of EXPECT_SCALAR_MATCH(1)
+        // Note that the index into the set of results tables below is the second table.
+        long agedOutCount = voltExecuteSQL()[1].asScalarLong();
 
         if (agedOutCount > maxRowsToDeletePerProc) {
             // Find the timestamp of the row at position N in the sorter order, where N is the chunk size
@@ -82,12 +82,6 @@ public class DeleteAfterDate extends VoltProcedure {
         voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
         long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
 
-        // Return a table containing the number of rows deleted and the number
-        // of rows that could have been deleted (but weren't) if there were no
-        // per-transaction delete limits.
-        // VoltTable.clone(int) copies the schema of a table but not the data.
-        VoltTable retval = retvalTemplate.clone(20); // 20b is plenty to hold two longs
-        retval.addRow(deletedCount, agedOutCount - deletedCount);
-        return retval;
+        return deletedCount;
     }
 }

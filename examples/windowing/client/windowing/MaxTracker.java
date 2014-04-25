@@ -30,18 +30,19 @@ import org.voltdb.client.ProcCallException;
 
 public class MaxTracker implements Runnable {
 
-    final GlobalState state;
+    // Global state
+    final WindowingApp app;
 
     long previousMax = Long.MIN_VALUE;
 
-    MaxTracker(GlobalState state) {
-        this.state = state;
+    MaxTracker(WindowingApp app) {
+        this.app = app;
     }
 
     @Override
     public void run() {
         try {
-            ClientResponse cr = state.client.callProcedure("MaxValue");
+            ClientResponse cr = app.client.callProcedure("MaxValue");
             long currentMax = cr.getResults()[0].asScalarLong();
             long previousMaxCopy = previousMax;
 
@@ -54,7 +55,7 @@ public class MaxTracker implements Runnable {
 
             // Output synchronized on global state to make this line not print in the middle
             // of other reporting lines.
-            synchronized(state) {
+            synchronized(app) {
                 if (previousMaxCopy == Long.MIN_VALUE) {
                     System.out.printf("The initial maximum value for the dataset has been set to %d.\n\n",
                                       currentMax);

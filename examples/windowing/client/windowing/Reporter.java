@@ -34,12 +34,10 @@ import org.voltdb.client.ProcCallException;
 
 public class Reporter implements Runnable {
 
-    final GlobalState state;
-    RandomDataInserter inserter;
+    final WindowingApp app;
 
-    Reporter(GlobalState state, RandomDataInserter inserter) {
-        this.state = state;
-        this.inserter = inserter;
+    Reporter(WindowingApp app) {
+        this.app = app;
     }
 
     @Override
@@ -47,7 +45,7 @@ public class Reporter implements Runnable {
         Map<Integer, Long> averagesForWindows = new TreeMap<Integer, Long>();
         for (int seconds : new int[] { 1, 5, 10, 30 }) {
             try {
-                ClientResponse cr = state.client.callProcedure("Average", seconds);
+                ClientResponse cr = app.client.callProcedure("Average", seconds);
                 long average = cr.getResults()[0].asScalarLong();
                 averagesForWindows.put(seconds, average);
             } catch (IOException | ProcCallException e) {
@@ -56,9 +54,9 @@ public class Reporter implements Runnable {
             }
         }
 
-        synchronized(state) {
+        synchronized(app) {
             long now = System.currentTimeMillis();
-            long time = Math.round((now - state.benchmarkStartTS) / 1000.0);
+            long time = Math.round((now - app.benchmarkStartTS) / 1000.0);
 
             System.out.printf("%02d:%02d:%02d Report:\n", time / 3600, (time / 60) % 60, time % 60);
 
@@ -67,7 +65,7 @@ public class Reporter implements Runnable {
                 System.out.printf("    Average for past %2ds: %d\n", e.getKey(), e.getValue());
             }
 
-            inserter.printReport();
+            app.inserter.printReport();
 
             System.out.println();
             System.out.flush();

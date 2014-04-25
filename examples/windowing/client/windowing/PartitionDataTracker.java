@@ -31,24 +31,27 @@ import java.util.Map;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 
+import windowing.WindowingApp.PartitionInfo;
+
 public class PartitionDataTracker implements Runnable {
 
-    final GlobalState state;
+    // Global state
+    final WindowingApp app;
 
-    public PartitionDataTracker(GlobalState state) {
-        this.state = state;
+    public PartitionDataTracker(WindowingApp app) {
+        this.app = app;
     }
 
     @Override
     public void run() {
         try {
-            Map<Long, GlobalState.PartitionInfo> partitionData = new HashMap<Long, GlobalState.PartitionInfo>();
+            Map<Long, PartitionInfo> partitionData = new HashMap<Long, PartitionInfo>();
 
             VoltTable partitionKeys = null, tableStats = null;
 
             try {
-                tableStats = state.client.callProcedure("@Statistics", "TABLE").getResults()[0];
-                partitionKeys = state.client.callProcedure("@GetPartitionKeys", "STRING").getResults()[0];
+                tableStats = app.client.callProcedure("@Statistics", "TABLE").getResults()[0];
+                partitionKeys = app.client.callProcedure("@GetPartitionKeys", "STRING").getResults()[0];
             }
             catch (IOException | ProcCallException e) {
                 // TODO Auto-generated catch block
@@ -61,7 +64,7 @@ public class PartitionDataTracker implements Runnable {
                     continue;
                 }
 
-                GlobalState.PartitionInfo pinfo = new GlobalState.PartitionInfo();
+                PartitionInfo pinfo = new PartitionInfo();
                 long partitionId = tableStats.getLong("PARTITION_ID");
                 pinfo.tupleCount = tableStats.getLong("TUPLE_COUNT");
                 pinfo.partitionKey = null;
@@ -73,7 +76,7 @@ public class PartitionDataTracker implements Runnable {
 
             while (partitionKeys.advanceRow()) {
                 long partitionId = partitionKeys.getLong("PARTITION_ID");
-                GlobalState.PartitionInfo pinfo = partitionData.get(partitionId);
+                PartitionInfo pinfo = partitionData.get(partitionId);
                 if (pinfo == null) {
                     // The set of partitions from the two calls don't match.
                     // Try again next time this is called... Maybe things
@@ -87,7 +90,7 @@ public class PartitionDataTracker implements Runnable {
             // this is a sanity check to see that every partition has
             // a partition value
             boolean allMatched = true;
-            for (GlobalState.PartitionInfo pinfo : partitionData.values()) {
+            for (PartitionInfo pinfo : partitionData.values()) {
                 // a partition has a count, but no key
                 if (pinfo.partitionKey == null) {
                     allMatched = false;
@@ -101,7 +104,7 @@ public class PartitionDataTracker implements Runnable {
             }
 
             // atomically update the new map for the old one
-            state.updatePartitionInfoAndRedundancy(partitionData, tableStats.getRowCount() / partitionData.size());
+            app.updatePartitionInfoAndRedundancy(partitionData, tableStats.getRowCount() / partitionData.size());
         }
         catch (Throwable t) {
             t.printStackTrace();

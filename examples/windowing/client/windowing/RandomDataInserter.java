@@ -28,50 +28,46 @@ import java.io.IOException;
 import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 public class RandomDataInserter {
 
-    final GlobalState state;
+    // Global state
+    final WindowingApp app;
+    // Client used just for inserts so stats will be isolated
     final Client client;
 
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
 
+    // Seed RNG with 0 for what predictability we can have in the async world...
     static final Random rand = new Random(0);
 
-    private AtomicBoolean isDone = new AtomicBoolean(false);
-
-    RandomDataInserter(GlobalState state, Client client) {
-        this.state = state;
+    RandomDataInserter(WindowingApp app, Client client) {
+        this.app = app;
         this.client = client;
 
+        // Tracks client-side stats like invocation counts and end2end latency
         periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
-    }
-
-    boolean isDone() {
-        return isDone.get();
     }
 
     void printReport() {
+        // Get the client stats since the last time this method was called.
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
 
-        System.out.printf("  Insert Statistics:\n    Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
+        System.out.printf("  Insert Statistics:\n" +
+                          "    Throughput %d/s, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%dms\n",
+                          stats.getTxnThroughput(),
                           stats.getInvocationAborts(),
-                          stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms",
+                          stats.getInvocationErrors(),
                           stats.getAverageLatency(),
                           stats.kPercentileLatency(0.95));
-        System.out.printf("\n");
     }
 
     class InsertCallback implements ProcedureCallback {
@@ -81,12 +77,58 @@ public class RandomDataInserter {
         }
     }
 
+    class InsertWithDeleteCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            assert(clientResponse.getStatus() == ClientResponse.SUCCESS);
+            long deleted = clientResponse.getResults()[0].asScalarLong();
+            app.addToDeletedTuples(deleted);
+        }
+    }
+
+    void basicInsert(String uuid, long val, Date update_ts)
+            throws NoConnectionsException, IOException
+    {
+        client.callProcedure(new InsertCallback(),
+                "TIMEDATA.insert",
+                uuid,
+                val,
+                update_ts);
+    }
+
+    void insertWithDateDelete(String uuid, long val, Date update_ts)
+            throws NoConnectionsException, IOException
+    {
+        client.callProcedure(new InsertWithDeleteCallback(),
+                "InsertAndDeleteAfterDate",
+                uuid,
+                val,
+                update_ts,
+                app.getTargetDate(),
+                app.config.deletechunksize);
+    }
+
+    void insertWithRowcountDelete(String uuid, long val, Date update_ts)
+            throws NoConnectionsException, IOException
+    {
+        client.callProcedure(new InsertWithDeleteCallback(),
+                "InsertAndDeleteOldestToTarget",
+                uuid,
+                val,
+                update_ts,
+                app.getTargetRowsPerPartition(),
+                app.config.deletechunksize);
+    }
+
+    /**
+     * Run a loop inserting tuples into the database for the amount
+     * of time specified in config.duration.
+     */
     public void run() {
         // reset the stats
-        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
-        final long benchmarkEndTime = state.benchmarkStartTS + (1000l * state.config.duration);
+        final long benchmarkEndTime = app.benchmarkStartTS + (1000l * app.config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
             // unique identifier and partition key
             String uuid = UUID.randomUUID().toString();
@@ -99,19 +141,24 @@ public class RandomDataInserter {
             long val = (long) (rand.nextGaussian() * 1000.0);
 
             try {
-                client.callProcedure(new InsertCallback(),
-                                     "TIMEDATA.insert",
-                                     uuid,
-                                     val,
-                                     now);
+                // Do an vanilla insert.
+                if (!app.config.inline) {
+                    basicInsert(uuid, val, now);
+                }
+                // Do an insert with date-based deleting
+                else if (app.config.historyseconds > 0) {
+                    insertWithDateDelete(uuid, val, now);
+                }
+                // Do an insert with timestamp-based deleting
+                else if (app.config.maxrows > 0) {
+                    insertWithRowcountDelete(uuid, val, now);
+                }
             }
             catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
-
-        isDone.set(true);
 
         try {
             client.drain();
