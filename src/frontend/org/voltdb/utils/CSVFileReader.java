@@ -36,6 +36,15 @@ import org.voltdb.common.Constants;
  *
  */
 class CSVFileReader implements Runnable {
+    private static final String COLUMN_COUNT_ERROR =
+            "Incorrect number of columns. %d found, %d expected. Please check the table schema " +
+            "and the line content";
+    private static final String BLANK_ERROR =
+            "A blank value is detected in column %d while \"--blank error\" is used. " +
+            "To proceed, either fill in the blank column or use \"--blank {null|empty}\".";
+    private static final String WHITESPACE_ERROR =
+            "Whitespace detected in column %d while --nowhitespace is used. " +
+            "To proceed, either remove the whitespaces from the column or remove --nowhitespace.";
 
     static AtomicLong m_totalRowCount = new AtomicLong(0);
     static AtomicLong m_totalLineCount = new AtomicLong(0);
@@ -155,15 +164,14 @@ class CSVFileReader implements Runnable {
 
     private String checkparams_trimspace(String[] lineValues) {
         if (lineValues.length != m_columnCount) {
-            return "Error: Incorrect number of columns. " + lineValues.length
-                    + " found, " + m_columnCount + " expected.";
+            return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
         }
 
         for (int i = 0; i<lineValues.length; i++) {
             //supercsv read "" to null
             if (lineValues[i] == null) {
                 if (m_config.blank.equalsIgnoreCase("error")) {
-                    return "Error: blank item";
+                    return String.format(BLANK_ERROR, i + 1);
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
                     lineValues[i] = m_blankStrings.get(m_columnTypes[i]);
                 }
@@ -172,7 +180,7 @@ class CSVFileReader implements Runnable {
             else {
                 if (m_config.nowhitespace
                         && (lineValues[i].charAt(0) == ' ' || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
-                    return "Error: White Space Detected in nowhitespace mode.";
+                    return String.format(WHITESPACE_ERROR, i + 1);
                 } else {
                     lineValues[i] = lineValues[i].trim();
                 }
