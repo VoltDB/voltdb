@@ -236,7 +236,7 @@ class BaseGenerator:
     LABEL_PATTERN_GROUP =                    "label" # optional label for variables
     #                   |       |             |
     __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" \
-                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(-?\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
     #                       |                      |              |                        |                   |
     #                       |                      |              |                        |       end of [] attribute section
     NULL_PCT_PATTERN_GROUP  =                                                             "nullpct" # optional null percentage
@@ -292,6 +292,7 @@ class BaseGenerator:
                 if rewrite:
                     prior_generators = another_gen.configure_from_schema(schema, prior_generators)
                     field_map[field_name] = another_gen
+                    ### print "DEBUG field_map[" + field_name + "] got " + another_gen.debug_gen_to_string()
                     new_generators.append(another_gen)
                     statement = rewrite
                 else:
@@ -376,6 +377,14 @@ class BaseGenerator:
         if not self.prior_generator:
             return False
         return self.prior_generator.has_reserved(name)
+
+    def debug_gen_to_string(self):
+        result = "generator: " + self.__token + " VALUES: "
+        for val in self.values:
+            result += val + ", "
+        if self.reserved_value:
+            result += "reserved: " + self.reserved_value
+        return result
 
 
 class TableGenerator(BaseGenerator):
@@ -609,6 +618,17 @@ class Schema:
     def get_typed_columns(self, supertype):
         return self.__col_by_type[supertype].keys()
 
+    def debug_schema_to_string(self):
+        result = "TABLES: "
+        for table in self.get_tables():
+            result += table + ", "
+
+        result += "COLUMNS: "
+        for code, supertype in Schema.TYPE_NAMES.iteritems():
+            for column_name in self.get_typed_columns(supertype):
+                result += supertype + " " + column_name + ", "
+        return result
+
 
 class Template:
     def __init__(self, **kwargs):
@@ -788,6 +808,7 @@ class SQLGenerator:
                  not SQLGenerator.LIKELY_FALSE_ALARMS.search(statement))):
                 print ('WARNING: final statement contains suspicious unresolved symbol(s): "' +
                        statement + '"')
+                print ('with schema "' + self.__schema.debug_schema_to_string() + '"')
             for generated_stmt in BaseGenerator.generate_statements_from_list(statement,
                                                                               generators,
                                                                               field_map):
