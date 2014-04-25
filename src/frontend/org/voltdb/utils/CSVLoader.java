@@ -448,9 +448,9 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                 }
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
-                String message = "Invalid input on line " + irow.getKey() + ".\n  Reason: " + info[1];
+                String message = "Invalid input on line " + irow.getKey() + ". " + info[1];
                 m_log.error(message);
-                out_logfile.write(message + "\n  " + info[1] + "\n");
+                out_logfile.write(message + "\n  Content: " + info[0] + "\n");
                 if (linect % bulkflush == 0) {
                     out_invaliderowfile.flush();
                     out_logfile.flush();
