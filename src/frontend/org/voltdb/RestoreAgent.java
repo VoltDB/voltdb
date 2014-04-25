@@ -1344,7 +1344,7 @@ SnapshotCompletionInterest, Promotable
      */
     @Override
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
-        if (!event.truncationSnapshot) {
+        if (!event.truncationSnapshot || !event.didSucceed) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {

@@ -504,7 +504,7 @@ class Distributer {
             try {
                 callback.clientCallback(r);
             } catch (Throwable e1) {
-                e1.printStackTrace();
+                uncaughtException( callback, r, e1);
             }
 
             //Drain needs to know when all callbacks have been invoked
@@ -853,7 +853,8 @@ class Distributer {
             Subject subject) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-            m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
+                m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
+                1, null, "Client");
         m_network.start();
         m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
         m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
@@ -992,19 +993,18 @@ class Distributer {
      * @param invocation
      * @param cb
      * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure
+     * @param nowNanos Current time in nanoseconds using System.nanoTime
+     * @param timeoutNanos nanoseconds from nowNanos where timeout should fire
      * @return True if the message was queued and false if the message was not queued due to backpressure
      * @throws NoConnectionsException
      */
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            final boolean ignoreBackpressure, final long timeoutNanos)
+            final boolean ignoreBackpressure, final long nowNanos, final long timeoutNanos)
             throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
-
-        //The time when the transaction was submitted and the timeout and latency should be relative to
-        final long nowNanos = System.nanoTime();
 
         NodeConnection cxn = null;
         boolean backpressure = true;
@@ -1149,7 +1149,7 @@ class Distributer {
         m_network.shutdown();
     }
 
-    private void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
+    void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
         boolean handledByClient = false;
         for (ClientStatusListenerExt csl : m_listeners) {
             if (csl instanceof ClientImpl.CSL) {
@@ -1375,5 +1375,9 @@ class Distributer {
         buf.flip();
         return buf;
 
+    }
+
+    long getProcedureTimeoutNanos() {
+        return m_procedureCallTimeoutNanos;
     }
 }

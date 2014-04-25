@@ -46,43 +46,51 @@ vector<string> IndexStats::generateIndexStatsColumnNames() {
 void IndexStats::populateIndexStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
-        vector<bool> &allowNull) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
+        vector<bool> &allowNull,
+        vector<bool> &inBytes) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
 
     // index name
     types.push_back(VALUE_TYPE_VARCHAR);
-    columnLengths.push_back(4096);
+    columnLengths.push_back(4096); // This means if user's index name length exceed 4096, problem may happen.
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // table name
     types.push_back(VALUE_TYPE_VARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // index type
     types.push_back(VALUE_TYPE_VARCHAR);
     columnLengths.push_back(4096);
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // is unique
     types.push_back(VALUE_TYPE_TINYINT);
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // is countable
     types.push_back(VALUE_TYPE_TINYINT);
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // entry count
     types.push_back(VALUE_TYPE_BIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
+    inBytes.push_back(false);
 
     // memory usage
     types.push_back(VALUE_TYPE_INTEGER);
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
     allowNull.push_back(false);
+    inBytes.push_back(false);
 }
 
 Table*
@@ -97,11 +105,12 @@ IndexStats::generateEmptyIndexStatsTable()
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
+    vector<bool> columnInBytes;
     IndexStats::populateIndexStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull);
+                                         columnAllowNull, columnInBytes);
     TupleSchema *schema =
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
+                                       columnAllowNull, columnInBytes);
 
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
@@ -199,9 +208,10 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
 void IndexStats::populateSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
-        vector<bool> &allowNull)
+        vector<bool> &allowNull,
+        vector<bool> &inBytes)
 {
-    IndexStats::populateIndexStatsSchema(types, columnLengths, allowNull);
+    IndexStats::populateIndexStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 
 IndexStats::~IndexStats() {

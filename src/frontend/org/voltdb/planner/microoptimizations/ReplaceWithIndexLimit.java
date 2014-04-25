@@ -154,6 +154,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 // specify sorting direction here
                 IndexScanPlanNode ispn = new IndexScanPlanNode((SeqScanPlanNode) child, aggplan, ret, sortDirection);
                 ispn.setBindings(bindings);
+                assert(ispn.getSearchKeyExpressions().size() == 0);
+                if (sortDirection == SortDirectionType.ASC) {
+                    assert(aggplan.isTableMin());
+                    ispn.setSkipNullPredicate(0);
+                }
 
                 LimitPlanNode lpn = new LimitPlanNode();
                 lpn.setLimit(1);
@@ -255,6 +260,15 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // we know which end we want to fetch, set the sort direction
             ispn.setSortDirection(sortDirection);
+
+            // for SELECT MIN(X) FROM T WHERE [prefix filters] = ?
+            if (numberOfExprs == numOfSearchKeys && sortDirection == SortDirectionType.ASC) {
+                if (ispn.getLookupType() == IndexLookupType.GTE) {
+                    assert(aggplan.isTableMin());
+                    ispn.setSkipNullPredicate(numOfSearchKeys);
+                }
+            }
+
             // for SELECT MIN(X) FROM T WHERE [...] X < / <= ?
             // reset the IndexLookupType, remove "added" searchKey, add back to endExpression, and clear "added" predicate
             if (sortDirection == SortDirectionType.ASC &&

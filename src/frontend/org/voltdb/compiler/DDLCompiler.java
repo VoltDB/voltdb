@@ -1391,10 +1391,15 @@ public class DDLCompiler {
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
-
         column.setType(type.getValue());
-        column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        column.setNullable(Boolean.valueOf(nullable));
         int size = type.getMaxLengthInBytes();
+
+        boolean inBytes = false;
+        if (node.attributes.containsKey("bytes")) {
+            inBytes = Boolean.valueOf(node.attributes.get("bytes"));
+        }
+
         // Require a valid length if variable length is supported for a type
         if (type == VoltType.STRING || type == VoltType.VARBINARY) {
             if (sizeString == null) {
@@ -1410,11 +1415,23 @@ public class DDLCompiler {
                 size = MAX_ROW_SIZE / MAX_COLUMNS;
             } else {
                 int userSpecifiedSize = Integer.parseInt(sizeString);
-                if (userSpecifiedSize < 0 || userSpecifiedSize > VoltType.MAX_VALUE_LENGTH) {
+                if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw m_compiler.new VoltCompilerException(msg);
                 }
+                if (!inBytes && type == VoltType.STRING) {
+                    if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+                        String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
+                                "will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)",
+                                name, table.getTypeName(),
+                                VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
+                        m_compiler.addWarn(msg);
+                        inBytes = true;
+                    }
+                }
+
                 if (userSpecifiedSize > 0) {
                     size = userSpecifiedSize;
                 } else {
@@ -1427,7 +1444,9 @@ public class DDLCompiler {
                 }
             }
         }
+        column.setInbytes(inBytes);
         column.setSize(size);
+
 
         column.setDefaultvalue(defaultvalue);
         if (defaulttype != null)

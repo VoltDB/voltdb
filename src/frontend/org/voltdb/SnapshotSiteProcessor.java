@@ -261,6 +261,19 @@ public class SnapshotSiteProcessor {
         }
     }
 
+
+    public static boolean isSnapshotInProgress()
+    {
+        final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
+        if (numSitesSnapshotting > 0) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Snapshot in progress, " + numSitesSnapshotting + " sites are still snapshotting");
+            }
+            return true;
+        }
+        return false;
+    }
+
     private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
         return new BBContainer(origin.b()) {
@@ -498,8 +511,10 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
 
@@ -664,6 +679,12 @@ public class SnapshotSiteProcessor {
                                 }
                             }
                         } finally {
+                            // Caching the value here before the site removes itself from the
+                            // ExecutionSitesCurrentlySnapshotting set, so
+                            // logSnapshotCompletionToZK() will not see incorrect values
+                            // from the next snapshot
+                            final boolean snapshotSucceeded = m_lastSnapshotSucceded;
+
                             try {
                                 VoltDB.instance().getHostMessenger().getZK().delete(
                                         VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
@@ -687,7 +708,7 @@ public class SnapshotSiteProcessor {
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
 
-                            logSnapshotCompleteToZK(txnId, m_lastSnapshotSucceded, exportSequenceNumbers);
+                            logSnapshotCompleteToZK(txnId, snapshotSucceeded, exportSequenceNumbers);
                         }
                     }
                 };
@@ -745,6 +766,7 @@ public class SnapshotSiteProcessor {
                 }
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
                 jsonObj.put("hostCount", remainingHosts);
+                jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
                     SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
