@@ -15,13 +15,22 @@ SELECT * FROM @fromtables LHS22 @jointype JOIN @fromtables RHS ON    LHS22.@idco
 -- These STILL need softening
 -- SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2
 -- SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
-   SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol = 2
-   SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol = 2
+-- Also, the equality test is too selective until ENG-6174 is fixed, so even this will not work:
+-- SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol = 2
+-- SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol = 2
+-- Even these new inequality variants suffer from ENG-6204
+-- SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol <> 2
+-- SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol <> 2
+
 SELECT * FROM @fromtables LHS25 @jointype JOIN @fromtables RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
 -- Still triggers wrong answer from mis-partitioning?
-SELECT * FROM @fromtables LHS31 @jointype JOIN @fromtables RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol = 2
-SELECT * FROM @fromtables LHS32 @jointype JOIN @fromtables RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol = 2
+-- And suffers from ENG-6174
+-- SELECT * FROM @fromtables LHS31 @jointype JOIN @fromtables RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol = 2
+-- SELECT * FROM @fromtables LHS32 @jointype JOIN @fromtables RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol = 2
+-- These inequality variants may fare better for now?
+   SELECT * FROM @fromtables LHS31 @jointype JOIN @fromtables RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol <> 2
+   SELECT * FROM @fromtables LHS32 @jointype JOIN @fromtables RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol <> 2
 
 SELECT * FROM @fromtables LHS36 @jointype JOIN @fromtables RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
 SELECT * FROM @fromtables LHS37 @jointype JOIN @fromtables RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol

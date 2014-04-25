@@ -72,7 +72,7 @@
     "numeric-decimals": {"schema": "decimal-schema.py",
                          "ddl": "DDL.sql",
                          "template": "numeric-decimals.sql",
-                        "normalizer": "normalizer.py"},
+                        "normalizer": "fuzzynormalizer.py"},
     "numeric-ints": {"schema": "int-schema.py",
                      "ddl": "int-DDL.sql",
                      "template": "numeric-ints.sql",
