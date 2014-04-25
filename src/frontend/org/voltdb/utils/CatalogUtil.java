@@ -1669,6 +1669,15 @@ public abstract class CatalogUtil {
             this.deploymentHash = deploymentHash;
             this.bytes = catalogBytes;
         }
+
+        @Override
+        public String toString()
+        {
+            return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
+                    txnId,
+                    Encoder.hexEncode(catalogHash).substring(0, 10),
+                    Encoder.hexEncode(deploymentHash).substring(0, 10));
+        }
     }
 
     public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
