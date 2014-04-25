@@ -93,7 +93,7 @@ public class TableLeafNode extends JoinNode {
     }
 
     @Override
-    public boolean containsSubSelects() {
+    public boolean containsPartitionedTablesFromSubSelects() {
         return false;
     }
 }
