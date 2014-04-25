@@ -727,6 +727,25 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
+    @Test
+    public void testIncorrectColumnSize() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,1,1,1,line one,1.10,1.11",                       // too short
+                "2,1,1,1,line two,1.10,1.11,7777-12-25 14:35:26,1", // too long
+                "3,1,1,1,line three,1.10,1.11,7777-12-25 14:35:26", // just right
+        };
+        int invalidLineCnt = 2;
+        int validLineCnt = 1;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
         try{
