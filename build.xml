@@ -2224,18 +2224,17 @@ DBBPool.java preprocessing
           <arg value='-CC'/>
           <arg value='-xc' />
           <arg value='-Wp,-P' />
-          <arg value='-traditional-cpp' />
+          <arg value='-ffreestanding' />
           <arg value='-D${jmemcheck}' />
           <arg value='-o' />
           <arg value='DBBPool.java' />
           <arg value='DBBPool.java.template' />
     </exec>
-    <touch file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
 </target>
 
 <target name="dbbpool_gen_check" depends="">
     <uptodate property="dbbpool_gen_uptodate"
-              targetfile="${src.gpl.dir}/org/voltcore/utils/.flagfile">
+              targetfile="${src.gpl.dir}/org/voltcore/utils/DBBPool.java">
         <srcfiles file="${src.gpl.dir}/org/voltcore/utils/DBBPool.java.template" />
     </uptodate>
 </target>
