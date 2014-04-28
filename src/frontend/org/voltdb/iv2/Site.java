@@ -298,14 +298,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public byte[] getCatalogHash() {
-            byte[] catalogHash = null;
-            try {
-                // IZZY: memoize the catalog hash in the catalog context sometime, maybe
-                catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(m_context.getCatalogJarBytes());
-            } catch (IOException ioe) {
-                // Should never happen
-            }
-            return catalogHash;
+            return m_context.getCatalogHash();
         }
 
         @Override

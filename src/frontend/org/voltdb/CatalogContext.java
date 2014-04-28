@@ -32,6 +32,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -293,5 +294,17 @@ public class CatalogContext {
 
     public long getCatalogCRC() {
         return catalogCRC;
+    }
+
+    public byte[] getCatalogHash()
+    {
+        byte[] catalogHash = null;
+        try {
+            // IZZY: memoize the catalog hash in the catalog context sometime, maybe
+            catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(getCatalogJarBytes());
+        } catch (IOException ioe) {
+            // Should never happen
+        }
+        return catalogHash;
     }
 }
