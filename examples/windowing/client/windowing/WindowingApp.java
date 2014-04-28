@@ -41,7 +41,19 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.types.TimestampType;
 
 /**
+ * <p>App that does four simultaneous things on a single-table schema:</p>
  *
+ * <ol>
+ * <li>Insert random, timestamped tuples at a high rate.</li>
+ * <li>Continuously delete tuples that are either to old or over a table size limit.</li>
+ * <li>Check for changes in the maximum value stored in the table.</li>
+ * <li>Periodically compute an average of values over various time windows.</li>
+ * </ol>
+ *
+ * <p>It does this by creating task-focused classes that implement Runnable.
+ * Each class has a specific job and is scheduled to run periodically in a
+ * threadpool. All inter-task communication is done via the main instance of
+ * this class.</p>
  *
  */
 public class WindowingApp {

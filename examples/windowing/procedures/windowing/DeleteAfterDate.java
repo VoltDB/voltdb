@@ -25,10 +25,16 @@ package windowing;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
+/**
+ * <p>Find tuples with timestamps older than or equivalent to newestToDiscard.
+ * Delete up to maxRowsToDeletePerProc of them, in oldest to newest order.</p>
+ *
+ * <p>Note, there is a lot of redundant code among the stored procedures in
+ * this example app. That's intentional to make each stand alone and be easier
+ * to follow. A production app might offer less choice or just reuse more code.</p>
+ */
 public class DeleteAfterDate extends VoltProcedure {
 
     final SQLStmt countMatchingRows = new SQLStmt(
@@ -40,22 +46,16 @@ public class DeleteAfterDate extends VoltProcedure {
     final SQLStmt deleteOlderThanDate = new SQLStmt(
             "DELETE FROM timedata WHERE update_ts <= ? and update_ts > FROM_UNIXTIME(0);");
 
-    // Template for returned table created here to keep the proc code
-    // cleaner, but it also has a *tiny* performance benefit.
-    final VoltTable retvalTemplate = new VoltTable(
-            new VoltTable.ColumnInfo("deleted", VoltType.BIGINT),
-            new VoltTable.ColumnInfo("not_deleted", VoltType.BIGINT));
-
     /**
+     * Procedure main logic.
      *
      * @param partitionValue Partitioning key for this procedure.
      * @param newestToDiscard Try to remove any tuples as old or older than this value.
      * @param maxRowsToDeletePerProc The upper limit on the number of rows to delete per transaction.
-     * @return A table with one row containing the number of deleted rows and the number that could
-     * have been deleted (but weren't) if there were no per-transaction delete limits.
+     * @return The number of rows deleted.
      * @throws VoltAbortException on bad input.
      */
-    public VoltTable run(String partitionValue, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
+    public long run(String partitionValue, TimestampType newestToDiscard, long maxRowsToDeletePerProc) {
         if (newestToDiscard == null) {
             throw new VoltAbortException("newestToDiscard shouldn't be null.");
             // It might be Long.MIN_VALUE as a TimestampType though.
@@ -82,12 +82,7 @@ public class DeleteAfterDate extends VoltProcedure {
         voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
         long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
 
-        // Return a table containing the number of rows deleted and the number
-        // of rows that could have been deleted (but weren't) if there were no
-        // per-transaction delete limits.
-        // VoltTable.clone(int) copies the schema of a table but not the data.
-        VoltTable retval = retvalTemplate.clone(20); // 20b is plenty to hold two longs
-        retval.addRow(deletedCount, agedOutCount - deletedCount);
-        return retval;
+        // Return the number of deleted rows.
+        return deletedCount;
     }
 }

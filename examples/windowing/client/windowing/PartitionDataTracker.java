@@ -35,7 +35,18 @@ import org.voltdb.client.ProcCallException;
 import windowing.WindowingApp.PartitionInfo;
 
 /**
+ * <p>Runnable-implementor that fetches some per-partition information
+ * from a running VoltDB procedure using VoltDB system procedures.
+ * First, it uses "@GetPartitionKeys" to get a value that will partition
+ * to each partition (used for targeting single-partition procedure call).
+ * Then it uses "@Statistics" with the "TABLE" selector to get the number
+ * of tuples in the 'timedata' table at each partition.</p>
  *
+ * <p>Every time that it's called, it updates a global data structure. This
+ * structure is primarily used by the ContinuousDeleter class.</p>
+ *
+ * <p>This code is pretty adaptable to other applications without much
+ * modification.</p>
  *
  */
 public class PartitionDataTracker implements Runnable {

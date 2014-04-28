@@ -44,7 +44,7 @@ import org.voltdb.client.ProcedureCallback;
  * <p>If the user selects 'inline' deletes, this class will call procedures
  * that delete data as they insert it.</p>
  *
- * <p>The rate of insertion is probably ratelimited by a user specified
+ * <p>The rate of insertion is probably rate-limited by a user specified
  * rate limiting parameter passed to the insert client.</p>
  *
  */

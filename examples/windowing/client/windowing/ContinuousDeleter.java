@@ -26,9 +26,9 @@ package windowing;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.types.TimestampType;
@@ -36,7 +36,10 @@ import org.voltdb.types.TimestampType;
 import windowing.WindowingApp.PartitionInfo;
 
 /**
- *
+ * Runnable-implementor that runs a stored procedure at every partition.
+ * Each stored procedure deletes tuples that are older than a given
+ * cutoff date or past the maximum desired row count for the partition.
+ * All stored procedures are run concurrently using asynchronous calls.
  *
  */
 public class ContinuousDeleter implements Runnable {
@@ -51,33 +54,33 @@ public class ContinuousDeleter implements Runnable {
         this.app = app;
     }
 
-    @Override
-    public void run() {
-        deleteSomeTuples(1);
-    }
-
+    /**
+     * Callback for the asynchronous procedure that deletes tuples.
+     *
+     */
     class Callback implements ProcedureCallback {
 
         final CountDownLatch latch;
-        final AtomicLong totalTuplesNotDeleted;
+        final AtomicBoolean unifinished;
 
-        Callback(CountDownLatch latch, AtomicLong totalTuplesNotDeleted) {
+        Callback(CountDownLatch latch, AtomicBoolean unfinished) {
             this.latch = latch;
-            this.totalTuplesNotDeleted = totalTuplesNotDeleted;
+            this.unifinished = unfinished;
         }
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                VoltTable results = clientResponse.getResults()[0];
-                long tuplesDeleted = results.fetchRow(0).getLong("deleted");
-                long tuplesNotDeleted = results.fetchRow(0).getLong("not_deleted");
-
+                long tuplesDeleted = clientResponse.getResults()[0].asScalarLong();
                 app.addToDeletedTuples(tuplesDeleted);
-                totalTuplesNotDeleted.addAndGet(tuplesNotDeleted);
+                // If the procedue deleted up to its limit, reduce the time before
+                // the deletes process runs again.
+                if (tuplesDeleted >= app.config.deletechunksize) {
+                    unifinished.set(true);
+                }
             }
             else {
-                // Uncomment to see problems on the console
+                // Un-comment to see problems on the console
                 //System.err.println(clientResponse.getStatusString());
 
                 // Track failures in a simplistic way.
@@ -89,77 +92,83 @@ public class ContinuousDeleter implements Runnable {
         }
     }
 
-    protected void deleteSomeTuples(int rounds) {
+    @Override
+    public void run() {
+        // Set of partition keys and row counts for each partition, updated
+        // periodically by the PartitionTracker class.
         final Map<Long, PartitionInfo> currentPartitionInfo = app.getPartitionData();
         final long partitionCount = currentPartitionInfo.size();
 
-        final CountDownLatch latch = new CountDownLatch((int) partitionCount * rounds);
-        AtomicLong tuplesNotDeleted = null;
+        // Used to block until all asynchronous procedure calls have completed.
+        final CountDownLatch latch = new CountDownLatch((int) partitionCount);
+
+        // Will be set to true if any partition needs to delete more rows to
+        // meet the goals.
+        AtomicBoolean unfinished = new AtomicBoolean(false);
+
+        // Default yield time between deletes. May be shortened if there are a ton of
+        // tuples that need deleting.
+        long yieldTimeMs = app.config.deleteyieldtime;
 
         try {
-            for (int round = 0; round < rounds; round++) {
-                final AtomicLong tuplesNotDeletedForRound = new AtomicLong(0);
+            // Get the targets from the main app class.
+            // Only one will be used, depending on whether the user is deleting
+            // old rows by date or by row count.
+            TimestampType dateTarget = app.getTargetDate();
+            long rowTarget = app.getTargetRowsPerPartition();
 
-                TimestampType dateTarget = app.getTargetDate();
-                long rowTarget = app.getTargetRowsPerPartition();
-
-                for (PartitionInfo pinfo : currentPartitionInfo.values()) {
-                    try {
-                        if (app.config.historyseconds > 0) {
-                            app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
-                                                     "DeleteAfterDate",
-                                                     pinfo.partitionKey,
-                                                     dateTarget,
-                                                     app.config.deletechunksize);
-                        }
-                        else /* if (app.config.maxrows > 0) */ {
-                            app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
-                                                     "DeleteOldestToTarget",
-                                                     pinfo.partitionKey,
-                                                     rowTarget,
-                                                     app.config.deletechunksize);
-                        }
-                    } catch (Exception e) {
-                        // Track failures in a simplistic way.
-                        failureCount.incrementAndGet();
-                        // Make sure the latch is released for this call, even if failed
-                        latch.countDown();
+            // Send one procedure invocation to each partition. This is done
+            // by using the partitioning keys retrieved by the PartitionTracker
+            // class. It uses the @GetPartitionKeys system procedure to get
+            // a value that can be used as a partitioning value to target each
+            // partition.
+            for (PartitionInfo pinfo : currentPartitionInfo.values()) {
+                try {
+                    // Deleting all rows older than date...
+                    if (app.config.historyseconds > 0) {
+                        app.client.callProcedure(new Callback(latch, unfinished),
+                                                 "DeleteAfterDate",
+                                                 pinfo.partitionKey,
+                                                 dateTarget,
+                                                 app.config.deletechunksize);
+                    }
+                    // Deleting all rows beyond a given rowcount...
+                    else /* if (app.config.maxrows > 0) */ {
+                        app.client.callProcedure(new Callback(latch, unfinished),
+                                                 "DeleteOldestToTarget",
+                                                 pinfo.partitionKey,
+                                                 rowTarget,
+                                                 app.config.deletechunksize);
                     }
                 }
-
-                tuplesNotDeleted = tuplesNotDeletedForRound;
+                catch (Exception e) {
+                    // Track failures in a simplistic way.
+                    failureCount.incrementAndGet();
+                    // Make sure the latch is released for this call, even if failed
+                    latch.countDown();
+                }
             }
 
             // Wait for all of the calls to return.
             latch.await();
 
-            long finalTuplesNotDeleted = tuplesNotDeleted.get();
-            if (tuplesNotDeleted.get() > 0) {
-                double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) app.getPartitionCount();
-                int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / app.config.deletechunksize);
-                assert(desiredRounds > 0);
-                app.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
-                // Done once re-scheduled.
-                return;
+            // If this round of deletes didn't remove all of the tuples
+            // that could have been removed, reduce the pause time before the
+            // next round to zero.
+            // If this process still can't keep up, then
+            // you can always add a second ContinuousDeleter instance in
+            // WindowingApp and schedule two of them to run concurrently.
+            if (unfinished.get()) {
+                yieldTimeMs = 0;
             }
         }
         catch (Throwable t) {
             t.printStackTrace();
             // Live dangerously and ignore this.
         }
-
-        // This is after the try/catch to ensure it gets scheduled again
-        // It's not a 'finally' block because this should only run if the other
-        // scheduling code above doesn't run.
-        app.scheduler.schedule(this, app.config.deleteyieldtime, TimeUnit.MILLISECONDS);
-    }
-
-    protected Runnable getRunnableForMulitpleRounds(final int rounds) {
-        return new Runnable() {
-            @Override
-            public void run() {
-                deleteSomeTuples(rounds);
-            }
-        };
+        finally {
+            // Use a finally block to ensure this task is re-scheduled.
+            app.scheduler.schedule(this, yieldTimeMs, TimeUnit.MILLISECONDS);
+        }
     }
 }

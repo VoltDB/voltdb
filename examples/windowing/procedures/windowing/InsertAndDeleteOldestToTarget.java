@@ -27,6 +27,19 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.types.TimestampType;
 
+/**
+ * <p>Step 1. Insert given tuple.
+ * Step 2. If the table (at this partition) is larger than than maxTotalRows,
+ * delete tuples from oldest to newest until it's the right size, or until
+ * maxRowsToDeletePerProc tuples have been deleted.</p>
+ *
+ * <p>This procedure basically combines TIMEDATA.insert with DeleteOldestToTarget.</p>
+ *
+ * <p>Note, there is a lot of redundant code among the stored procedures in
+ * this example app. That's intentional to make each stand alone and be easier
+ * to follow. A production app might offer less choice or just reuse more code.</p>
+ *
+ */
 public class InsertAndDeleteOldestToTarget extends VoltProcedure {
 
     final SQLStmt insert = new SQLStmt(
@@ -45,6 +58,7 @@ public class InsertAndDeleteOldestToTarget extends VoltProcedure {
             "DELETE FROM timedata WHERE update_ts <= ?;");
 
     /**
+     * Procedure main logic.
      *
      * @param uuid Column value for tuple insertion and partitioning key for this procedure.
      * @param val Column value for tuple insertion.

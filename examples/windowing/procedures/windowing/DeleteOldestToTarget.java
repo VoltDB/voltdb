@@ -25,10 +25,18 @@ package windowing;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
+/**
+ * <p>If the table (at this partition) is larger than than maxTotalRows,
+ * delete tuples from oldest to newest until it's the right size, or until
+ * maxRowsToDeletePerProc tuples have been deleted.</p>
+ *
+ * <p>Note, there is a lot of redundant code among the stored procedures in
+ * this example app. That's intentional to make each stand alone and be easier
+ * to follow. A production app might offer less choice or just reuse more code.</p>
+ *
+ */
 public class DeleteOldestToTarget extends VoltProcedure {
 
     public final SQLStmt countRows = new SQLStmt(
@@ -43,20 +51,16 @@ public class DeleteOldestToTarget extends VoltProcedure {
     public final SQLStmt deleteOlderThanDate = new SQLStmt(
             "DELETE FROM timedata WHERE update_ts <= ?;");
 
-    final VoltTable retvalTemplate = new VoltTable(
-            new VoltTable.ColumnInfo("deleted", VoltType.BIGINT),
-            new VoltTable.ColumnInfo("not_deleted", VoltType.BIGINT));
-
     /**
+     * Procedure main logic.
      *
      * @param partitionValue Partitioning key for this procedure.
      * @param maxTotalRows The desired number of rows per partition.
      * @param maxRowsToDeletePerProc The upper limit on the number of rows to delete per transaction.
-     * @return A table with one row containing the number of deleted rows and the number that could
-     * have been deleted (but weren't) if there were no per-transaction delete limits.
+     * @return The number of rows deleted.
      * @throws VoltAbortException on bad input.
      */
-    public VoltTable run(String partitionValue, long maxTotalRows, long maxRowsToDeletePerProc) {
+    public long run(String partitionValue, long maxTotalRows, long maxRowsToDeletePerProc) {
         if (maxRowsToDeletePerProc <= 0) {
             throw new VoltAbortException("maxRowsToDeletePerProc must be > 0.");
         }
@@ -68,24 +72,18 @@ public class DeleteOldestToTarget extends VoltProcedure {
         voltQueueSQL(countRows, EXPECT_SCALAR_LONG);
         long count = voltExecuteSQL()[0].asScalarLong();
 
-        // Return a table containing the number of rows deleted and the number
-        // of rows that could have been deleted (but weren't) if there were no
-        // per-transaction delete limits.
-        // VoltTable.clone(int) copies the schema of a table but not the data.
-        VoltTable retval = retvalTemplate.clone(20); // 20b is plenty to hold two longs
-
-        // If partition is smaller than desired, return
+        // If partition is smaller than desired, return without deleting rows.
         if (count < maxTotalRows) {
-            retval.addRow(0, 0);
-            return retval;
+            // Return 0 deleted rows.
+            return 0;
         }
 
         // If asked to remove all rows, go ahead
         if ((maxTotalRows == 0) && (count < maxRowsToDeletePerProc)) {
             voltQueueSQL(deleteAll, EXPECT_SCALAR_MATCH(count));
             voltExecuteSQL(true);
-            retval.addRow(count, 0);
-            return retval;
+            // Total deleted rows = table size.
+            return count;
         }
 
         // Figure out how many rows to try to delete.
@@ -104,7 +102,6 @@ public class DeleteOldestToTarget extends VoltProcedure {
         voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
         long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
 
-        retval.addRow(deletedCount, agedOutCount - deletedCount);
-        return retval;
+        return deletedCount;
     }
 }

@@ -27,6 +27,18 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.types.TimestampType;
 
+/**
+ * <p>Step 1. Insert given tuple.
+ * Step 2. Find tuples with timestamps older than or equivalent to newestToDiscard.
+ * Delete up to maxRowsToDeletePerProc of them, in oldest to newest order.</p>
+ *
+ * <p>This procedure basically combines TIMEDATA.insert with DeleteAfterDate.</p>
+ *
+ * <p>Note, there is a lot of redundant code among the stored procedures in
+ * this example app. That's intentional to make each stand alone and be easier
+ * to follow. A production app might offer less choice or just reuse more code.</p>
+ *
+ */
 public class InsertAndDeleteAfterDate extends VoltProcedure {
 
     final SQLStmt insert = new SQLStmt(
@@ -42,6 +54,7 @@ public class InsertAndDeleteAfterDate extends VoltProcedure {
             "DELETE FROM timedata WHERE update_ts <= ?;");
 
     /**
+     * Procedure main logic.
      *
      * @param uuid Column value for tuple insertion and partitioning key for this procedure.
      * @param val Column value for tuple insertion.
