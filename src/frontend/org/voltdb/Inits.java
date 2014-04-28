@@ -362,12 +362,14 @@ public class Inits {
             try {
                 //This is where we compile real catalog and create runtime catalog context. To validate deployment
                 //we compile and create a starter context which uses a placeholder catalog.
-                long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true, false);
-                if (depCRC < 0)
-                    System.exit(-1);
+                long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, false);
+                if (result < 0) {
+                    hostLog.fatal("Error parsing deployment file");
+                    VoltDB.crashLocalVoltDB("Error parsing deployment file");
+                }
             } catch (Exception e) {
                 hostLog.fatal("Error parsing deployment file", e);
-                System.exit(-1);
+                VoltDB.crashLocalVoltDB("Error parsing deployment file", true, e);
             }
 
             try {

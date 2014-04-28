@@ -216,7 +216,7 @@ public class TestClientInterface {
         catalog.execute(serializedCat);
 
         String deploymentPath = builder.getPathToDeployment();
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true, false);
+        CatalogUtil.compileDeployment(catalog, deploymentPath, true, false);
 
         m_context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
@@ -455,7 +455,6 @@ public class TestClientInterface {
         catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
-        catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;

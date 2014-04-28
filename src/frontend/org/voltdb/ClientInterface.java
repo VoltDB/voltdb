@@ -2243,7 +2243,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.procName = "@UpdateApplicationCatalog";
                             task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0,
+                                           changeResult.requiresSnapshotIsolation ? 1 : 0,
                                            changeResult.worksWithElastic ? 1 : 0,
                                            changeResult.deploymentHash);
                             task.clientHandle = changeResult.clientHandle;
