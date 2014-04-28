@@ -47,12 +47,11 @@ class SubqueryExpression : public AbstractExpression {
 
   protected:
     int m_subqueryId;
-    // The list of parameter indexes that need to be set
+    // The list of parameter indexes that need to be set by this subquery
+    // before the expression can be evaluated
     std::vector<int> m_paramIdxs;
-    // The list of the corresponding TVE for each parameter
+    // The list of the corresponding TVE for each parameter index
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
-    // The size of the parameter vector;
-    size_t m_tveParamsSize;
     // The pointer to the global parameters
     NValueArray* m_parameterContainer;
 

@@ -29,15 +29,13 @@ namespace voltdb {
         const std::vector<AbstractExpression*>* tveParams) :
             AbstractExpression(EXPRESSION_TYPE_SUBQUERY),
             m_subqueryId(subqueryId), m_paramIdxs(paramIdxs),
-            m_tveParams(tveParams), m_tveParamsSize(0),
+            m_tveParams(tveParams),
             m_parameterContainer(NULL)
     {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
         m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
-        if (m_tveParams.get() != NULL) {
-            m_tveParamsSize = m_tveParams->size();
-        }
-        assert(m_paramIdxs.size() == m_tveParamsSize);
+        assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
+            (m_tveParams.get() != NULL && m_paramIdxs.size() == m_tveParams->size()));
     }
 
     SubqueryExpression::~SubqueryExpression() {
@@ -59,7 +57,8 @@ namespace voltdb {
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
         // Substitute parameters
         if (m_tveParams.get() != NULL) {
-            for (int i = 0; i < m_tveParamsSize; ++i) {
+            int paramsCnt = m_tveParams->size();
+            for (int i = 0; i < paramsCnt; ++i) {
                 AbstractExpression* tveParam = (*m_tveParams)[i];
                 NValue param = tveParam->eval(tuple1, tuple2);
                 (*m_parameterContainer)[m_paramIdxs[i]] = param;
