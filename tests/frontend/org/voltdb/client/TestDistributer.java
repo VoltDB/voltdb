@@ -368,14 +368,14 @@ public class TestDistributer extends TestCase {
             ProcedureInvocation pi5 = new ProcedureInvocation(++handle, "i1", new Integer(1));
             ProcedureInvocation pi6 = new ProcedureInvocation(++handle, "i1", new Integer(1));
 
-            dist.queue(pi1, new ThrowingCallback(), true, 0);
+            dist.queue(pi1, new ThrowingCallback(), true, System.nanoTime(), 0);
             dist.drain();
             assertTrue(csl.m_exceptionHandled);
-            dist.queue(pi2, new ProcCallback(), true, 0);
-            dist.queue(pi3, new ProcCallback(), true, 0);
-            dist.queue(pi4, new ProcCallback(), true, 0);
-            dist.queue(pi5, new ProcCallback(), true, 0);
-            dist.queue(pi6, new ProcCallback(), true, 0);
+            dist.queue(pi2, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi3, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi4, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi5, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi6, new ProcCallback(), true, System.nanoTime(), 0);
 
             dist.drain();
             System.err.println("Finished drain.");
@@ -449,7 +449,7 @@ public class TestDistributer extends TestCase {
 
         //Check that we can send a ping and get a response ourselves
         SyncCallback sc = new SyncCallback();
-        dist.queue(new ProcedureInvocation(88, "@Ping"), sc, true, 0);
+        dist.queue(new ProcedureInvocation(88, "@Ping"), sc, true, System.nanoTime(), 0);
         sc.waitForResponse();
         assertEquals(ClientResponse.SUCCESS, sc.getResponse().getStatus());
 
@@ -460,7 +460,7 @@ public class TestDistributer extends TestCase {
             // this call should hang until the connection is closed,
             // then will be called with CONNECTION_LOST
             ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-            dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+            dist.queue(invocation, new TimeoutMonitorPCB(), true, System.nanoTime(), 0);
         } catch (NoConnectionsException e) {
             //Ok this is a little odd scheduling wise, would expect to at least be able to submit
             //the transaction before reaching a multi-second timeout, but such is life
@@ -518,7 +518,7 @@ public class TestDistributer extends TestCase {
         // this call should hang until the connection is closed,
         // then will be called with CONNECTION_LOST
         ProcedureInvocation invocation = new ProcedureInvocation(45, "@Ping");
-        dist.queue(invocation, new QueryTimeoutMonitor(), true, 10);
+        dist.queue(invocation, new QueryTimeoutMonitor(), true, System.nanoTime(), 10);
 
         // wait for callback
         latch.await();
