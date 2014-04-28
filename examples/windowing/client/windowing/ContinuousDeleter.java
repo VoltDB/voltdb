@@ -35,9 +35,17 @@ import org.voltdb.types.TimestampType;
 
 import windowing.WindowingApp.PartitionInfo;
 
+/**
+ *
+ *
+ */
 public class ContinuousDeleter implements Runnable {
 
+    // Global state
     final WindowingApp app;
+
+    // track failures for reporting
+    final AtomicLong failureCount = new AtomicLong(0);
 
     ContinuousDeleter(WindowingApp app) {
         this.app = app;
@@ -69,7 +77,11 @@ public class ContinuousDeleter implements Runnable {
                 totalTuplesNotDeleted.addAndGet(tuplesNotDeleted);
             }
             else {
-                System.err.println(clientResponse.getStatusString());
+                // Uncomment to see problems on the console
+                //System.err.println(clientResponse.getStatusString());
+
+                // Track failures in a simplistic way.
+                failureCount.incrementAndGet();
             }
             // failure cases don't increment partitionsUnfinished because it is desirable to wait
             // a bit before trying again
@@ -84,54 +96,62 @@ public class ContinuousDeleter implements Runnable {
         final CountDownLatch latch = new CountDownLatch((int) partitionCount * rounds);
         AtomicLong tuplesNotDeleted = null;
 
-        for (int round = 0; round < rounds; round++) {
-            final AtomicLong tuplesNotDeletedForRound = new AtomicLong(0);
+        try {
+            for (int round = 0; round < rounds; round++) {
+                final AtomicLong tuplesNotDeletedForRound = new AtomicLong(0);
 
-            TimestampType dateTarget = app.getTargetDate();
-            long rowTarget = app.getTargetRowsPerPartition();
+                TimestampType dateTarget = app.getTargetDate();
+                long rowTarget = app.getTargetRowsPerPartition();
 
-            for (PartitionInfo pinfo : currentPartitionInfo.values()) {
-                try {
-                    if (app.config.historyseconds > 0) {
-                        app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
-                                                 "DeleteAfterDate",
-                                                 pinfo.partitionKey,
-                                                 dateTarget,
-                                                 app.config.deletechunksize);
+                for (PartitionInfo pinfo : currentPartitionInfo.values()) {
+                    try {
+                        if (app.config.historyseconds > 0) {
+                            app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
+                                                     "DeleteAfterDate",
+                                                     pinfo.partitionKey,
+                                                     dateTarget,
+                                                     app.config.deletechunksize);
+                        }
+                        else /* if (app.config.maxrows > 0) */ {
+                            app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
+                                                     "DeleteOldestToTarget",
+                                                     pinfo.partitionKey,
+                                                     rowTarget,
+                                                     app.config.deletechunksize);
+                        }
+                    } catch (Exception e) {
+                        // Track failures in a simplistic way.
+                        failureCount.incrementAndGet();
+                        // Make sure the latch is released for this call, even if failed
+                        latch.countDown();
                     }
-                    else /* if (app.config.maxrows > 0) */ {
-                        app.client.callProcedure(new Callback(latch, tuplesNotDeletedForRound),
-                                                 "DeleteOldestToTarget",
-                                                 pinfo.partitionKey,
-                                                 rowTarget,
-                                                 app.config.deletechunksize);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    latch.countDown();
                 }
+
+                tuplesNotDeleted = tuplesNotDeletedForRound;
             }
 
-            tuplesNotDeleted = tuplesNotDeletedForRound;
-        }
-
-        try {
+            // Wait for all of the calls to return.
             latch.await();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+
+            long finalTuplesNotDeleted = tuplesNotDeleted.get();
+            if (tuplesNotDeleted.get() > 0) {
+                double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) app.getPartitionCount();
+                int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / app.config.deletechunksize);
+                assert(desiredRounds > 0);
+                app.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
+                // Done once re-scheduled.
+                return;
+            }
+        }
+        catch (Throwable t) {
+            t.printStackTrace();
+            // Live dangerously and ignore this.
         }
 
-        long finalTuplesNotDeleted = tuplesNotDeleted.get();
-        if (tuplesNotDeleted.get() > 0) {
-            double avgOutstandingPerPartition = finalTuplesNotDeleted / (double) app.getPartitionCount();
-            int desiredRounds = (int) Math.ceil(avgOutstandingPerPartition / app.config.deletechunksize);
-            assert(desiredRounds > 0);
-            app.scheduler.execute(getRunnableForMulitpleRounds(desiredRounds));
-        }
-        else {
-            app.scheduler.schedule(this, app.config.deleteyieldtime, TimeUnit.MILLISECONDS);
-        }
+        // This is after the try/catch to ensure it gets scheduled again
+        // It's not a 'finally' block because this should only run if the other
+        // scheduling code above doesn't run.
+        app.scheduler.schedule(this, app.config.deleteyieldtime, TimeUnit.MILLISECONDS);
     }
 
     protected Runnable getRunnableForMulitpleRounds(final int rounds) {

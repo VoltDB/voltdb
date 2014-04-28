@@ -98,13 +98,14 @@ function client() {
     java -classpath client:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         windowing.WindowingApp \
         --displayinterval=5 \
-        --warmup=5 \
         --duration=120 \
         --servers=localhost:21212 \
-        --contestants=6 \
-        --maxvotes=2
-#        --latencyreport=true \
-#        --ratelimit=100000
+        --maxrows=0 \
+        --historyseconds=30 \
+        --inline=false \
+        --deletechunksize=100 \
+        --deleteyieldtime=100 \
+        --ratelimit=15000
 }
 
 function help() {

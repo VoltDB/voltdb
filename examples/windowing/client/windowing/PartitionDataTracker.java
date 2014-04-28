@@ -27,16 +27,24 @@ package windowing;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 
 import windowing.WindowingApp.PartitionInfo;
 
+/**
+ *
+ *
+ */
 public class PartitionDataTracker implements Runnable {
 
     // Global state
     final WindowingApp app;
+
+    // track failures for reporting
+    final AtomicLong failureCount = new AtomicLong(0);
 
     public PartitionDataTracker(WindowingApp app) {
         this.app = app;
@@ -44,71 +52,67 @@ public class PartitionDataTracker implements Runnable {
 
     @Override
     public void run() {
+        Map<Long, PartitionInfo> partitionData = new HashMap<Long, PartitionInfo>();
+
+        VoltTable partitionKeys = null, tableStats = null;
+
         try {
-            Map<Long, PartitionInfo> partitionData = new HashMap<Long, PartitionInfo>();
+            tableStats = app.client.callProcedure("@Statistics", "TABLE").getResults()[0];
+            partitionKeys = app.client.callProcedure("@GetPartitionKeys", "STRING").getResults()[0];
+        }
+        catch (IOException | ProcCallException e) {
+            // Track failures in a simplistic way.
+            failureCount.incrementAndGet();
 
-            VoltTable partitionKeys = null, tableStats = null;
+            // No worries. Will be scheduled again soon.
+            return;
+        }
 
-            try {
-                tableStats = app.client.callProcedure("@Statistics", "TABLE").getResults()[0];
-                partitionKeys = app.client.callProcedure("@GetPartitionKeys", "STRING").getResults()[0];
-            }
-            catch (IOException | ProcCallException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                return;
-            }
-
-            while (tableStats.advanceRow()) {
-                if (!tableStats.getString("TABLE_NAME").equalsIgnoreCase("timedata")) {
-                    continue;
-                }
-
-                PartitionInfo pinfo = new PartitionInfo();
-                long partitionId = tableStats.getLong("PARTITION_ID");
-                pinfo.tupleCount = tableStats.getLong("TUPLE_COUNT");
-                pinfo.partitionKey = null;
-
-                // If redundancy (k-safety) is enabled, this will put k+1 times per partition,
-                // but the tuple count will be the same so it will be ok.
-                partitionData.put(partitionId, pinfo);
+        while (tableStats.advanceRow()) {
+            if (!tableStats.getString("TABLE_NAME").equalsIgnoreCase("timedata")) {
+                continue;
             }
 
-            while (partitionKeys.advanceRow()) {
-                long partitionId = partitionKeys.getLong("PARTITION_ID");
-                PartitionInfo pinfo = partitionData.get(partitionId);
-                if (pinfo == null) {
-                    // The set of partitions from the two calls don't match.
-                    // Try again next time this is called... Maybe things
-                    // will have settled down.
-                    return;
-                }
+            PartitionInfo pinfo = new PartitionInfo();
+            long partitionId = tableStats.getLong("PARTITION_ID");
+            pinfo.tupleCount = tableStats.getLong("TUPLE_COUNT");
+            pinfo.partitionKey = null;
 
-                pinfo.partitionKey = partitionKeys.getString("PARTITION_KEY");
-            }
+            // If redundancy (k-safety) is enabled, this will put k+1 times per partition,
+            // but the tuple count will be the same so it will be ok.
+            partitionData.put(partitionId, pinfo);
+        }
 
-            // this is a sanity check to see that every partition has
-            // a partition value
-            boolean allMatched = true;
-            for (PartitionInfo pinfo : partitionData.values()) {
-                // a partition has a count, but no key
-                if (pinfo.partitionKey == null) {
-                    allMatched = false;
-                }
-            }
-            if (!allMatched) {
+        while (partitionKeys.advanceRow()) {
+            long partitionId = partitionKeys.getLong("PARTITION_ID");
+            PartitionInfo pinfo = partitionData.get(partitionId);
+            if (pinfo == null) {
                 // The set of partitions from the two calls don't match.
                 // Try again next time this is called... Maybe things
                 // will have settled down.
                 return;
             }
 
-            // atomically update the new map for the old one
-            app.updatePartitionInfoAndRedundancy(partitionData, tableStats.getRowCount() / partitionData.size());
+            pinfo.partitionKey = partitionKeys.getString("PARTITION_KEY");
         }
-        catch (Throwable t) {
-            t.printStackTrace();
-            throw t;
+
+        // this is a sanity check to see that every partition has
+        // a partition value
+        boolean allMatched = true;
+        for (PartitionInfo pinfo : partitionData.values()) {
+            // a partition has a count, but no key
+            if (pinfo.partitionKey == null) {
+                allMatched = false;
+            }
         }
+        if (!allMatched) {
+            // The set of partitions from the two calls don't match.
+            // Try again next time this is called... Maybe things
+            // will have settled down.
+            return;
+        }
+
+        // atomically update the new map for the old one
+        app.updatePartitionInfoAndRedundancy(partitionData, tableStats.getRowCount() / partitionData.size());
     }
 }

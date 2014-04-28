@@ -24,16 +24,26 @@
 package windowing;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 
+/**
+ * Runnable-implementer that fetches the maximum value in
+ * the 'timedata' table when asked. Prints out a message to
+ * the console when the maximum changes (or is initially set).
+ *
+ */
 public class MaxTracker implements Runnable {
 
     // Global state
     final WindowingApp app;
 
     long previousMax = Long.MIN_VALUE;
+
+    // track failures for reporting
+    final AtomicLong failureCount = new AtomicLong(0);
 
     MaxTracker(WindowingApp app) {
         this.app = app;
@@ -42,33 +52,35 @@ public class MaxTracker implements Runnable {
     @Override
     public void run() {
         try {
+            // Call a proc (syncronously) to get the maximum value.
+            // See ddl.sql for the actual SQL being run.
+            // Note this is a cross-partition transaction, but as
+            // of VoltDB 4.0, it should be fast as it's a read than
+            // only needs to make one round trip to all partitions.
             ClientResponse cr = app.client.callProcedure("MaxValue");
             long currentMax = cr.getResults()[0].asScalarLong();
-            long previousMaxCopy = previousMax;
 
-            synchronized(this) {
-                if (currentMax == previousMax) {
-                    return;
-                }
-                previousMax = currentMax;
+            if (currentMax == previousMax) {
+                return;
             }
+            previousMax = currentMax;
 
             // Output synchronized on global state to make this line not print in the middle
             // of other reporting lines.
             synchronized(app) {
-                if (previousMaxCopy == Long.MIN_VALUE) {
+                if (previousMax == Long.MIN_VALUE) {
                     System.out.printf("The initial maximum value for the dataset has been set to %d.\n\n",
                                       currentMax);
                 }
                 else {
                     System.out.printf("The maximum value for the dataset has changed from %d to %d.\n\n",
-                                      previousMaxCopy, currentMax);
+                                      previousMax, currentMax);
                 }
             }
         }
         catch (IOException | ProcCallException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            // track failures in a pretty simple way for the reporter task
+            failureCount.incrementAndGet();
         }
     }
 }

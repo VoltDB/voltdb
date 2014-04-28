@@ -32,6 +32,13 @@ import java.util.TreeMap;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 
+/**
+ * Periodically print a report of insert rates, latencies and failures,
+ * as well as average values of the 'val' column in the 'timedata' table
+ * over several moving windows. The delay between report printing is
+ * specified by the user in the configuration.
+ *
+ */
 public class Reporter implements Runnable {
 
     final WindowingApp app;
@@ -42,30 +49,65 @@ public class Reporter implements Runnable {
 
     @Override
     public void run() {
+        boolean success = true;
         Map<Integer, Long> averagesForWindows = new TreeMap<Integer, Long>();
+        // For several time windows, fetch the average value of 'val' for that
+        // time window.
+        // Note, this could be easily be combined into a stored proc and made
+        // a single transactional call if one wanted to.
+        // See ddl.sql for the actual SQL being run by the 'Average' procedure.
         for (int seconds : new int[] { 1, 5, 10, 30 }) {
             try {
                 ClientResponse cr = app.client.callProcedure("Average", seconds);
                 long average = cr.getResults()[0].asScalarLong();
                 averagesForWindows.put(seconds, average);
             } catch (IOException | ProcCallException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                // Note any failure for reporting later.
+                success = false;
             }
         }
 
+        // Lock protects other (well-behaved) printing from being interspersed with
+        // this report printing.
         synchronized(app) {
             long now = System.currentTimeMillis();
-            long time = Math.round((now - app.benchmarkStartTS) / 1000.0);
+            long time = Math.round((now - app.startTS) / 1000.0);
 
+            // Print out how long the processing has been running
             System.out.printf("%02d:%02d:%02d Report:\n", time / 3600, (time / 60) % 60, time % 60);
 
-            System.out.println("  Average values over time windows:");
-            for (Entry<Integer, Long> e : averagesForWindows.entrySet()) {
-                System.out.printf("    Average for past %2ds: %d\n", e.getKey(), e.getValue());
+            // If possible, print out the averages over several time windows.
+            if (success) {
+                System.out.println("  Average values over time windows:");
+                for (Entry<Integer, Long> e : averagesForWindows.entrySet()) {
+                    System.out.printf("    Average for past %2ds: %d\n", e.getKey(), e.getValue());
+                }
+            }
+            else {
+                System.out.println("  Unable to retrieve average values at this time.");
             }
 
+            // Let the inserter process print a one line report.
             app.inserter.printReport();
+
+            //
+            // FAILURE REPORTING FOR PERIODIC OPERATIONS
+            //
+            long partitionTrackerFailures = app.partitionTracker.failureCount.getAndSet(0);
+            if (partitionTrackerFailures > 0) {
+                System.out.printf("  Partition Tracker failed %d times since last report.\n",
+                                  partitionTrackerFailures);
+            }
+            long continuousDeleterFailures = app.deleter.failureCount.getAndSet(0);
+            if (continuousDeleterFailures > 0) {
+                System.out.printf("  Continuous Deleter failed %d times since last report.\n",
+                                  continuousDeleterFailures);
+            }
+            long maxTrackerFailures = app.maxTracker.failureCount.getAndSet(0);
+            if (maxTrackerFailures > 0) {
+                System.out.printf("  Max Tracker failed %d times since last report.\n",
+                                  maxTrackerFailures);
+            }
 
             System.out.println();
             System.out.flush();

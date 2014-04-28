@@ -40,6 +40,10 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.types.TimestampType;
 
+/**
+ *
+ *
+ */
 public class WindowingApp {
 
     // handy, rather than typing this out several times
@@ -127,7 +131,7 @@ public class WindowingApp {
 
     final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
 
-    final long benchmarkStartTS = System.currentTimeMillis();
+    final long startTS = System.currentTimeMillis();
 
     final ContinuousDeleter deleter;
     final PartitionDataTracker partitionTracker;
@@ -195,7 +199,7 @@ public class WindowingApp {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active, note if a server disconnects
-            final long benchmarkEndTime = benchmarkStartTS + (1000l * config.duration);
+            final long benchmarkEndTime = startTS + (1000l * config.duration);
             if (System.currentTimeMillis() < benchmarkEndTime) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
