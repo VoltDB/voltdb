@@ -150,7 +150,7 @@ public class Tokenizer extends AbstractTokenizer {
 			throw new SuperCsvException(
 						    String.format(
 								  "strictQuotes: quotes needed at line %d column %d. To proceed, " +
-                                  "either quote the column or remove --strictquotes",
+								  "either quote the column or remove --strictquotes",
 								  getLineNumber(), columns.size() + 1));
 		    }
 		    if( !surroundingSpacesNeedQuotes || currentColumn.length() > 0 ) {
@@ -217,7 +217,7 @@ public class Tokenizer extends AbstractTokenizer {
 			throw new SuperCsvException(
 						    String.format(
 								  "strictQuotes: quotes needed at line %d column %d. To proceed, " +
-                                  "either quote the column or remove --strictquotes",
+								  "either quote the column or remove --strictquotes",
 								  getLineNumber(), columns.size() + 1));
 		    }
 		    if( !surroundingSpacesNeedQuotes || currentColumn.length() > 0 ) {
@@ -263,7 +263,7 @@ public class Tokenizer extends AbstractTokenizer {
 		                String
 		                .format(
 		                        "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
-                                "See --columnsizelimit.",
+		                        "See --columnsizelimit.",
 		                        columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
 		    }
 		    sawNewLineInQuote = true;

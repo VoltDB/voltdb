@@ -35,15 +35,15 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
                              CSVLoaderErrorHandler errHandler) throws Exception
     {
-        m_loader = client.getNewBulkLoader(tableName, batchSize, new csvFailureCallback());
+        m_loader = client.getNewBulkLoader(tableName, batchSize, new CsvFailureCallback());
         m_errHandler = errHandler;
     }
 
-    public class csvFailureCallback implements BulkLoaderFailureCallBack {
+    public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             m_failedInsertCount.incrementAndGet();
-            m_errHandler.handle((CSVLineWithMetaData) rowHandle, response.getStatusString());
+            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response.getStatusString());
         }
     }
 

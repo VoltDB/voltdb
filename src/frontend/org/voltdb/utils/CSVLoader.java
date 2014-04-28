@@ -112,7 +112,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     //Errors we keep track only upto maxerrors
     final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
     @Override
-    public boolean handle(CSVLineWithMetaData metaData, String error)
+    public boolean handleError(CSVLineWithMetaData metaData, String error)
     {
         synchronized (m_errorInfo) {
             //Dont collect more than we want to report.
@@ -134,7 +134,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     }
 
     @Override
-    public boolean hasReachedLimit()
+    public boolean hasReachedErrorLimit()
     {
         return m_errorInfo.size() >= config.maxerrors;
     }
@@ -313,18 +313,18 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             long insertCount;
             long ackCount;
             long rowsQueued;
-            final CSVLoader csvLoader = new CSVLoader();
+            final CSVLoader errHandler = new CSVLoader();
             final CSVDataLoader dataLoader;
 
             if (config.useSuppliedProcedure) {
-                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, csvLoader);
+                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, csvLoader);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
-            CSVFileReader csvReader = new CSVFileReader(dataLoader, csvLoader);
+            CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
             Thread readerThread = new Thread(csvReader);
             readerThread.setName("CSVFileReader");
             readerThread.setDaemon(true);
@@ -350,7 +350,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                 m_log.debug("Rows Queued by Reader: " + rowsQueued);
             }
 
-            if (csvLoader.hasReachedLimit()) {
+            if (errHandler.hasReachedErrorLimit()) {
                 m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
                            + config.maxerrors);
             }
@@ -358,12 +358,12 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
-                    + ackCount + " rows (final)");
-            csvLoader.produceFiles(ackCount, insertCount);
+                       + ackCount + " rows (final)");
+            errHandler.produceFiles(ackCount, insertCount);
             close_cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
-                System.exit(csvLoader.m_errorInfo.isEmpty() ? 0 : -1);
+                System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);

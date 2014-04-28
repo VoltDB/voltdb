@@ -90,7 +90,7 @@ class CSVFileReader implements Runnable {
         List<String> lineList;
 
         while ((m_config.limitrows-- > 0)) {
-            if (m_errHandler.hasReachedLimit()) {
+            if (m_errHandler.hasReachedErrorLimit()) {
                 break;
             }
 
@@ -123,7 +123,7 @@ class CSVFileReader implements Runnable {
                     final CSVLineWithMetaData metaData =
                             new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
                                     m_totalLineCount.get() + 1);
-                    if (m_errHandler.handle(metaData, lineCheckResult)) {
+                    if (m_errHandler.handleError(metaData, lineCheckResult)) {
                         break;
                     }
                     continue;
@@ -139,7 +139,7 @@ class CSVFileReader implements Runnable {
                 final CSVLineWithMetaData metaData =
                         new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_totalLineCount.get() + 1);
-                if (m_errHandler.handle(metaData, e.getMessage())) {
+                if (m_errHandler.handleError(metaData, e.getMessage())) {
                     break;
                 }
             } catch (IOException ex) {

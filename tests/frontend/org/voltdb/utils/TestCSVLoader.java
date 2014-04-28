@@ -85,8 +85,6 @@ public class TestCSVLoader {
         String pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        //builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
-        //builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
 
         builder.addLiteralSchema(
                 "create table BLAH ("
@@ -190,9 +188,7 @@ public class TestCSVLoader {
         String[] myOptions = {
             "-f" + path_csv,
             "--reportdir=" + reportDir,
-            //"--table=BLAH",
             "--maxerrors=50",
-            //"-user",
             "--user=",
             "--password=",
             "--port=",
@@ -232,9 +228,7 @@ public class TestCSVLoader {
         String[] myOptions = {
             "-f" + path_csv,
             "--reportdir=" + reportDir,
-            //"--table=BLAH",
             "--maxerrors=50",
-            //"-user",
             "--user=",
             "--password=",
             "--port=",
@@ -276,9 +270,7 @@ public class TestCSVLoader {
         String[] myOptions = {
             "-f" + path_csv,
             "--reportdir=" + reportDir,
-            //"--table=BLAH",
             "--maxerrors=50",
-            //"-user",
             "--user=",
             "--password=",
             "--port=",
@@ -321,9 +313,7 @@ public class TestCSVLoader {
         String[] myOptions = {
             "-f" + path_csv,
             "--reportdir=" + reportDir,
-            //"--table=BLAH",
             "--maxerrors=50",
-            //"-user",
             "--user=",
             "--password=",
             "--port=",
@@ -352,11 +342,8 @@ public class TestCSVLoader {
     {
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
-                //"--table=BLAH",
                 "--maxerrors=50",
-                //"-user",
                 "--user=",
                 "--password=",
                 "--port=",
@@ -379,11 +366,8 @@ public class TestCSVLoader {
     {
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
-                //"--table=BLAH",
                 "--maxerrors=50",
-                //"-user",
                 "--user=",
                 "--password=",
                 "--port=",
@@ -411,11 +395,8 @@ public class TestCSVLoader {
         //you,"7777-12-25 14:35:26"
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
-                //"--table=BLAH",
                 "--maxerrors=50",
-                //"-user",
                 "--user=",
                 "--password=",
                 "--port=",
@@ -423,7 +404,6 @@ public class TestCSVLoader {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                //"--strictquotes",
                 "BlAh"
         };
         String []myData = {
@@ -442,7 +422,6 @@ public class TestCSVLoader {
     {
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=BLAH.insert",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -452,7 +431,6 @@ public class TestCSVLoader {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                //"--strictquotes",
                 "BLAH"
         };
         //Both \N and \\N as csv input are treated as NULL
@@ -551,11 +529,8 @@ public class TestCSVLoader {
     {
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
-                //"--table=BLAH",
                 "--maxerrors=50",
-                //"-user",
                 "--user=",
                 "--password=",
                 "--port=",
@@ -563,7 +538,6 @@ public class TestCSVLoader {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=10",
-                //"--strictquotes",
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();
@@ -592,11 +566,8 @@ public class TestCSVLoader {
     {
         String []myOptions = {
                 "-f" + path_csv,
-                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
-                //"--table=BLAH",
                 "--maxerrors=50",
-                //"-user",
                 "--user=",
                 "--password=",
                 "--port=",
@@ -605,7 +576,6 @@ public class TestCSVLoader {
                 "--escape=\\",
                 //Skip the whole file
                 "--skip=10000",
-                //"--strictquotes",
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();

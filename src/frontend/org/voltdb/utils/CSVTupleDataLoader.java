@@ -66,7 +66,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                                        + " for: " + m_csvLine.rawLine.toString());
                     System.exit(1);
                 }
-                m_errHandler.handle(m_csvLine, response.getStatusString());
+                m_errHandler.handleError(m_csvLine, response.getStatusString());
             }
             long currentCount = m_processedCount.incrementAndGet();
 
@@ -123,7 +123,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                 System.exit(1); // Seriously?
             }
         } catch (IOException ex) {
-            m_errHandler.handle(metaData, ex.toString());
+            m_errHandler.handleError(metaData, ex.toString());
         }
     }
 

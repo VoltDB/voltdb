@@ -25,7 +25,7 @@ public interface CSVLoaderErrorHandler {
      * @param error       The error message
      * @return true if we have reached limit....false to continue processing and reporting.
      */
-    public boolean handle(CSVLineWithMetaData metaData, String error);
+    public boolean handleError(CSVLineWithMetaData metaData, String error);
 
-    public boolean hasReachedLimit();
+    public boolean hasReachedErrorLimit();
 }
