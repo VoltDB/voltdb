@@ -160,6 +160,7 @@ public class SnapshotCompletionMonitor {
         String path = jsonObj.getString("path");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
+        boolean didSucceed = jsonObj.getBoolean("didSucceed");
         // A truncation request ID is not always provided. It's used for
         // snapshots triggered indirectly via ZooKeeper so that the
         // triggerer can recognize the snapshot when it finishes.
@@ -213,6 +214,7 @@ public class SnapshotCompletionMonitor {
                                 txnId,
                                 partitionTxnIdsMap,
                                 truncation,
+                                didSucceed,
                                 truncReqId,
                                 exportSequenceNumbers));
                 } catch (Exception e) {

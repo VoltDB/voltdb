@@ -322,6 +322,30 @@ public class TestIndexLimitSuite extends RegressionSuite {
 
     }
 
+    public void testENG6176_MIN_NULL() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TMIN.insert", 1, 1,    1);
+        client.callProcedure("TMIN.insert", 1, null, -5);
+        client.callProcedure("TMIN.insert", 1, 1,    null);
+        client.callProcedure("TMIN.insert", 1, -2,   0);
+
+        // Test simple index
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(A) FROM TMIN;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN;");
+        callWithExpectedResult(client, -5, "@AdHoc", "SELECT MIN(C) FROM TMIN;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE A > 0;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE A = 1;");
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(C) FROM TMIN WHERE A = 1 AND B = 1;");
+
+        // Test expression index
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ABS(B)) FROM TMIN;");
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ABS(B)) FROM TMIN WHERE A = 1;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE ABS(A) = 1;");
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ABS(B)) FROM TMIN WHERE ABS(A) = 1;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE ABS(A) = 1;");
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

@@ -218,7 +218,8 @@ public class StatsAgent extends OpsAgent
                     subselector,
                     c,
                     clientHandle,
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    obj);
             collectTopoStats(psr);
             return;
         }
@@ -228,7 +229,8 @@ public class StatsAgent extends OpsAgent
                     subselector,
                     c,
                     clientHandle,
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    obj);
             collectPartitionCount(psr);
             return;
         }
@@ -239,7 +241,8 @@ public class StatsAgent extends OpsAgent
                         subselector,
                         c,
                         clientHandle,
-                        System.currentTimeMillis());
+                        System.currentTimeMillis(),
+                        obj);
         distributeOpsWork(psr, obj);
             }
 
