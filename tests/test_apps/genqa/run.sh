@@ -77,6 +77,14 @@ function server() {
 }
 
 # run the voltdb server locally with mysql connector
+function server-kafka() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally with mysql connector
 function server-mysql() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
@@ -169,7 +177,7 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=900 \
+        --duration=10 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
@@ -222,6 +230,13 @@ function jdbc-benchmark() {
 function export-on-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportOnServerVerifier \
         $EXPORTDATAREMOTE \
+        4 \
+        $CLIENTLOG
+}
+
+function export-kafka-server-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:./lib/zkclient-0.3.jar:./lib/zookeeper-3.3.4.jar genqa.ExportKafkaOnServerVerifier \
+        kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
         4 \
         $CLIENTLOG
 }

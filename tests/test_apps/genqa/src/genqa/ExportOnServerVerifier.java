@@ -1476,7 +1476,7 @@ public class ExportOnServerVerifier {
         }
     }
 
-    ValidationErr verifyRow(String[] row) throws ValidationErr
+    public static ValidationErr verifyRow(String[] row) throws ValidationErr
     {
         if (row.length < 29)
         {
@@ -1629,7 +1629,7 @@ public class ExportOnServerVerifier {
         return null;
     }
 
-    private ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
+    public static ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
         System.err.println("ERROR: " + msg + " " + val + " " + exp);
         return new ValidationErr(msg, val, exp);
     }
