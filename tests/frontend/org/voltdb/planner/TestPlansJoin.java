@@ -572,6 +572,27 @@ public class TestPlansJoin extends PlannerTestCase {
         c0 = nli.getChild(0);
         assertTrue(c0 instanceof IndexScanPlanNode);
         assertTrue(((IndexScanPlanNode) c0).getTargetTableAlias().equalsIgnoreCase("Y"));
+
+        // Test safety guarding misapplication of ORDER BY optimization on indexed self-join,
+        // when ordering by combination of LHS and RHS columns.
+        // These MAY become valid optimization cases when ENG-4728 is done,
+        // using transitive equality to determine that the ORDER BY clause can be re-expressed
+        // as being based on only one of the two table scans.
+        pn = compile("select X.A, X.C FROM R4 X, R4 Y WHERE X.A = Y.A ORDER BY X.A, Y.C");
+        n = pn.getChild(0);
+        assertTrue(n instanceof ProjectionPlanNode);
+        n = n.getChild(0);
+        assertTrue(n instanceof OrderByPlanNode);
+        n = n.getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+
+        pn = compile("select X.A FROM R4 X, R4 Y WHERE X.A = Y.A ORDER BY Y.A, X.C");
+        n = pn.getChild(0);
+        assertTrue(n instanceof ProjectionPlanNode);
+        n = n.getChild(0);
+        assertTrue(n instanceof OrderByPlanNode);
+        n = n.getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
     }
 
     public void testMultiColumnJoin() {
@@ -621,7 +642,7 @@ public class TestPlansJoin extends PlannerTestCase {
         pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
         assertNotNull(pred);
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
-    }
+}
 
     public void testDistributedInnerJoin() {
         // JOIN replicated and one distributed table

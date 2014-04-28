@@ -235,17 +235,17 @@ class BaseGenerator:
     #                   |       |
     LABEL_PATTERN_GROUP =                    "label" # optional label for variables
     #                   |       |             |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" \
-                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(-?\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                       |                      |              |                        |                   |
-    #                       |                      |              |                        |       end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                                             "nullpct" # optional null percentage
-    #                       |                      |              |
-    MAX_VALUE_PATTERN_GROUP =                                    "max" # optional max (only for numeric values)
-    #                       |                      |
-    MIN_VALUE_PATTERN_GROUP =                     "min" # optional min (only for numeric values)
-    #                       |
-    TYPE_PATTERN_GROUP =   "type" # optional type for columns, values
+    TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
+    #                   |       |             |                      |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+                      r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                |                             |                   |
+    #                         |                |                             |       end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                               "nullpct" # optional null percentage
+    #                         |                |
+    MAX_VALUE_PATTERN_GROUP =                 "max" # optional max (only for numeric values)
+    #                         |
+    MIN_VALUE_PATTERN_GROUP ="min" # optional min (only for numeric values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
