@@ -35,7 +35,6 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -94,7 +93,8 @@ public class SnapshotScanAgent extends OpsAgent
                     subselector,
                     c,
                     clientHandle,
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    obj);
         distributeOpsWork(psr, obj);
     }
 
