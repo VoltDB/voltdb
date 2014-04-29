@@ -269,9 +269,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private Mailbox m_mb;
-    private void initiateSnapshotSave(final String requestId,
-                                      final long handle,
-                                      final Object params[])
+    private void initiateSnapshotSave(final long handle, final Object params[])
     {
         boolean success = true;
         VoltTable checkResult = SnapshotUtil.constructNodeResultsTable();
@@ -768,7 +766,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         });
         try {
             loggingLog.info("Initiating @SnapshotSave for log truncation");
-            initiateSnapshotSave(truncReqId, handle, new Object[]{jsObj.toString(4)});
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)});
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -878,7 +876,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
-            initiateSnapshotSave(requestId, handle, new Object[]{jsObj.toString(4)});
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)});
             return;
         }
     }
@@ -1034,8 +1032,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         }
                     });
 
-                    JSONObject jsonObj = new JSONObject(requestObj);
-                    initiateSnapshotSave(requestId, handle, new Object[]{requestObj});
+                    initiateSnapshotSave(handle, new Object[]{requestObj});
                 } catch (Exception e) {
                     try {
                         userSnapshotRequestExistenceCheck(true);
@@ -1305,7 +1302,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
             });
             SNAP_LOG.info("Requesting auto snapshot to path " + m_path + " nonce " + nonce);
-            initiateSnapshotSave(null, handle, new Object[]{jsObj.toString(4)});
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)});
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
