@@ -66,6 +66,12 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.index.IndexAVL;
@@ -83,8 +89,8 @@ import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.LobData;
+import org.hsqldb_voltpatches.types.Type;
 
 // fredt@users 20020130 - patch 491987 by jimbag@users - made optional
 // fredt@users 20020405 - patch 1.7.0 by fredt - quoted identifiers
@@ -281,6 +287,7 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
+    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
@@ -288,6 +295,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      *  Returns the HsqlName object fo the table
      */
+    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -295,6 +303,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
+    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -302,14 +311,17 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
+    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
+    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -325,6 +337,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -341,6 +354,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -416,6 +430,7 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -526,6 +541,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
+    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -1951,7 +1967,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 for (int j = 0; j < constraints.length; j++) {
                     constraints[j].checkCheckConstraint(session, this,
-                                                        (Object) data[i]);
+                                                        data[i]);
                 }
             }
 
@@ -2244,7 +2260,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav   = result.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2293,7 +2309,7 @@ public class Table extends TableBase implements SchemaObject {
         int             count = 0;
 
         while (nav.hasNext()) {
-            insertSys(store, (Object[]) nav.getNext());
+            insertSys(store, nav.getNext());
 
             count++;
         }
@@ -2310,7 +2326,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav = ins.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2597,6 +2613,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2606,6 +2623,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);
@@ -2653,9 +2671,11 @@ public class Table extends TableBase implements SchemaObject {
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
+        Map<String, String> autoGenNameMap = new HashMap<String, String>();
 
         // add table metadata
-        table.attributes.put("name", getName().name);
+        String tableName = getName().name;
+        table.attributes.put("name", tableName);
 
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
@@ -2672,7 +2692,8 @@ public class Table extends TableBase implements SchemaObject {
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         table.children.add(indexes);
         for (Index index : indexList) {
-            VoltXMLElement indexChild = index.voltGetIndexXML(session);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName);
+            autoGenNameMap.put(index.getName().name, indexChild.attributes.get("name"));
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -2680,11 +2701,45 @@ public class Table extends TableBase implements SchemaObject {
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
+        List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
         for (Constraint constraint : getConstraints()) {
             VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             if (constraintChild != null) {
+                String constraintName = constraintChild.attributes.get("index");
+                String autoGenName = autoGenNameMap.get(constraintName);
+                if (autoGenName != null) {
+                    constraintChild.attributes.put("index", autoGenName);
+                    String constName;
+                    if (autoGenName.startsWith("AUTOGEN_")) {
+                        constName = "AUTOGEN_CONST" + autoGenName.substring("AUTOGEN".length());
+                    }
+                    else {
+                        constName = autoGenName;
+                    }
+                    autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
+                    constraintChild.attributes.put("name", constName);
+                }
+                else {
+                    int const_type = constraint.getConstraintType();
+                    if (const_type == Constraint.PRIMARY_KEY || const_type == Constraint.UNIQUE
+                            || const_type == Constraint.LIMIT || const_type == Constraint.FOREIGN_KEY) {
+                        revisitList.add(constraintChild);
+                        continue;
+                    }
+                }
                 constraints.children.add(constraintChild);
             }
+        }
+
+        for (VoltXMLElement constraintChild : revisitList) {
+            String constraintName = constraintChild.attributes.get("index");
+            String autoGenName = autoGenNameMap.get(constraintName);
+            if (autoGenName != null) {
+                constraintChild.attributes.put("index", autoGenName);
+                String constName = "AUTOGEN_CONST" + autoGenName.substring("AUTOGEN".length());
+                autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
+            }
+            constraints.children.add(constraintChild);
         }
 
         return table;

@@ -182,6 +182,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {
 
         this.column     = column;
@@ -189,6 +190,7 @@ public class ExpressionColumn extends Expression {
         this.isWritable = isWritable;
     }
 
+    @Override
     SimpleName getSimpleName() {
 
         if (alias != null) {
@@ -206,6 +208,7 @@ public class ExpressionColumn extends Expression {
         return null;
     }
 
+    @Override
     String getAlias() {
 
         if (alias != null) {
@@ -237,6 +240,7 @@ public class ExpressionColumn extends Expression {
         return column.getName();
     }
 
+    @Override
     void collectObjectNames(Set set) {
 
         if (opType == OpTypes.SEQUENCE) {
@@ -254,6 +258,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     String getColumnName() {
 
         if (opType == OpTypes.COLUMN && column != null) {
@@ -263,6 +268,7 @@ public class ExpressionColumn extends Expression {
         return getAlias();
     }
 
+    @Override
     ColumnSchema getColumn() {
         return column;
     }
@@ -271,10 +277,12 @@ public class ExpressionColumn extends Expression {
         return schema;
     }
 
+    @Override
     RangeVariable getRangeVariable() {
         return rangeVariable;
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -373,6 +381,7 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         switch (opType) {
@@ -397,6 +406,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -412,9 +422,9 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangeVariable.rangePosition]
-                        .getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangeVariable.rangePosition]
+                    .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
 
@@ -426,8 +436,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -457,6 +467,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -486,7 +497,7 @@ public class ExpressionColumn extends Expression {
                     }
                 }
 
-                if (rangeVariable.tableAlias == null) {
+                if (rangeVariable == null || rangeVariable.tableAlias == null) {
                     return column.getName().getSchemaQualifiedStatementName();
                 } else {
                     StringBuffer sb = new StringBuffer();
@@ -524,6 +535,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -634,6 +646,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public OrderedHashSet getUnkeyedColumns(OrderedHashSet unresolvedSet) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -659,6 +672,7 @@ public class ExpressionColumn extends Expression {
     /**
      * collects all range variables in expression tree
      */
+    @Override
     void collectRangeVariables(RangeVariable[] rangeVariables, Set set) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -676,6 +690,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     Expression replaceAliasInOrderBy(Expression[] columns, int length) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -722,6 +737,7 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
+    @Override
     Expression replaceColumnReferences(RangeVariable range,
                                        Expression[] list) {
 
@@ -740,6 +756,7 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
+    @Override
     int findMatchingRangeVariableIndex(RangeVariable[] rangeVarArray) {
 
         for (int i = 0; i < rangeVarArray.length; i++) {
@@ -756,6 +773,7 @@ public class ExpressionColumn extends Expression {
     /**
      * return true if given RangeVariable is used in expression tree
      */
+    @Override
     boolean hasReference(RangeVariable range) {
 
         if (range == rangeVariable) {
@@ -773,6 +791,7 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {

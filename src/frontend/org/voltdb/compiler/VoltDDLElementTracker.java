@@ -131,7 +131,8 @@ public class VoltDDLElementTracker {
                     descriptor.getAuthGroups(),
                     descriptor.m_class,
                     partitionInfo,
-                    descriptor.m_language);
+                    descriptor.m_language,
+                    descriptor.m_scriptImpl);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(

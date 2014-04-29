@@ -91,7 +91,7 @@ public abstract class CatalogSchemaTools {
             }
 
             ret += add + spacer + catalog_col.getTypeName() + " " + col_type.toSQLString() +
-                    (col_type == VoltType.STRING &&
+                    ((col_type == VoltType.STRING || col_type == VoltType.VARBINARY) &&
                     catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() + ")" : "");
 
             // Default value
@@ -106,6 +106,7 @@ public abstract class CatalogSchemaTools {
             }
             else { // XXX: if (defaulttype != VoltType.VOLTFUNCTION) {
                 // TODO: Escape strings properly
+                defaultvalue = defaultvalue.replace("\'", "\'\'");
                 defaultvalue = "'" + defaultvalue + "'";
             }
             if (defaultvalue == null) {
@@ -167,7 +168,7 @@ public abstract class CatalogSchemaTools {
                     // Get the ConstraintType.
 
                     ret += add + spacer;
-                    if (!catalog_const.getTypeName().startsWith("SYS_")) {
+                    if (!catalog_const.getTypeName().startsWith("AUTOGEN_")) {
                         ret += "CONSTRAINT " + catalog_const.getTypeName() + " ";
                     }
                     if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
@@ -183,10 +184,27 @@ public abstract class CatalogSchemaTools {
                             }
                         }
                         String col_add = "";
-                        for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                            ret += col_add + catalog_colref.getColumn().getTypeName();
-                            col_add = ", ";
-                        } // FOR
+                        String exprStrings = new String();
+                        if (catalog_idx.getExpressionsjson() != null && !catalog_idx.getExpressionsjson().equals("")) {
+                            StmtTargetTableScan tableScan = new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName());
+                            try {
+                                List<AbstractExpression> expressions = AbstractExpression.fromJSONArrayString(catalog_idx.getExpressionsjson(), tableScan);
+                                String sep = "";
+                                for (AbstractExpression expr : expressions) {
+                                    exprStrings += sep + expr.explain(catalog_tbl.getTypeName());
+                                    sep = ",";
+                                }
+                            }
+                            catch (JSONException e) {
+                            }
+                            ret += col_add + exprStrings;
+                        }
+                        else {
+                            for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
+                                ret += col_add + catalog_colref.getColumn().getTypeName();
+                                col_add = ", ";
+                            } // FOR
+                        }
                         ret += ")";
                     }
                     else
@@ -220,6 +238,10 @@ public abstract class CatalogSchemaTools {
                                       "REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + fkey_columns + ")";
             }
             skip_constraints.add(catalog_const);
+        }
+
+        if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
+            ret += add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit());
         }
 
         if (viewQuery != null) {
@@ -361,9 +383,12 @@ public abstract class CatalogSchemaTools {
             // SQL Statement procedure
             ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS\n";
             String sqlStmt = proc.getStatements().get("SQL").getSqltext().trim();
-            if (sqlStmt.endsWith(";"))
-                sqlStmt = sqlStmt.substring(0, sqlStmt.length()-1);
-            ret += spacer + sqlStmt + ";\n";
+            if (sqlStmt.endsWith(";")) {
+                ret += spacer + sqlStmt + "\n";
+            }
+            else {
+                ret += spacer + sqlStmt + ";\n";
+            }
         }
         else if (proc.getLanguage().equals("JAVA")) {
             // Java Class
@@ -371,16 +396,19 @@ public abstract class CatalogSchemaTools {
         }
         else {
             // Groovy procedure
-            ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS ###\n";
-            ret += annot.scriptImpl + "\n### LANGUAGE GROOVY;\n";
+            ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS ###";
+            ret += annot.scriptImpl + "### LANGUAGE GROOVY;\n";
         }
         if (proc.getSinglepartition()) {
             if (annot != null && annot.classAnnotated) {
-                ret += "--Annotated Partioning Takes Precedence Over DDL Procedure Partitioning Statement\n--";
+                ret += "--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--";
             }
             ret += "PARTITION PROCEDURE " + proc.getTypeName() + " ON TABLE " +
                     proc.getPartitiontable().getTypeName() + " COLUMN " +
-                    proc.getPartitioncolumn().getTypeName() + ";\n\n";
+                    proc.getPartitioncolumn().getTypeName();
+            if (proc.getPartitionparameter() != 0)
+                ret += " PARAMETER " + String.valueOf(proc.getPartitionparameter());
+            ret += ";\n\n";
         }
         else {
             ret += "\n";

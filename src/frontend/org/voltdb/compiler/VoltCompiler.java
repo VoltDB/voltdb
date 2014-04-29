@@ -63,6 +63,7 @@ import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
@@ -122,6 +123,9 @@ public class VoltCompiler {
 
     // set of annotations by procedure name
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
+
+    private static final boolean VERIFY_CATALOG = true; //System.getProperties().containsKey("verifycatalog");
+
 
     String m_projectFileURL = null;
     String m_currentFilename = null;
@@ -289,7 +293,7 @@ public class VoltCompiler {
             m_class = clazz;
         }
 
-        ProcedureDescriptor(final ArrayList<String> authGroups, final Class<?> clazz, String partitionString, Language language) {
+        ProcedureDescriptor(final ArrayList<String> authGroups, final Class<?> clazz, final String partitionString, final Language language, final String scriptImpl) {
             assert(clazz != null);
             assert(partitionString != null);
 
@@ -300,7 +304,7 @@ public class VoltCompiler {
             m_partitionString = partitionString;
             m_builtInStmt = false;
             m_language = language;
-            m_scriptImpl = null;
+            m_scriptImpl = scriptImpl;
             m_class = clazz;
         }
 
@@ -503,6 +507,24 @@ public class VoltCompiler {
             }
         }
         jarOutput.put("autogen-ddl.sql", binDDL.getBytes(Constants.UTF8ENCODING));
+        if (VERIFY_CATALOG) {
+            final VoltCompiler autoGenCompiler = new VoltCompiler();
+            List<VoltCompilerReader> autogenReaderList = new ArrayList<VoltCompilerReader>(1);
+            autogenReaderList.add(new VoltCompilerJarFileReader(jarOutput, "autogen-ddl.sql"));
+            DatabaseType autoGenDatabase = getProjectDatabase(null);
+            InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
+            autoGenCompiler.m_currentFilename = "autogen-ddl.sql";
+            Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase,
+                    autogenReaderList, autoGenJarOutput);
+            CatalogDiffEngine diffEng = new CatalogDiffEngine(catalog, autoGenCatalog);
+            String diffCmds = diffEng.commands();
+            if (diffCmds != null) {
+                if (diffCmds.startsWith("set /clusters[cluster]/databases[database] schema \"")) {
+                    int inx = diffCmds.indexOf('"', "set /clusters[cluster]/databases[database] schema \"".length());
+                    assert(diffCmds.length() == inx+2);
+                }
+            }
+        }
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -1068,7 +1090,7 @@ public class VoltCompiler {
             // Throw compiler exception.
             String indexName = index.getTypeName();
             String keyword = "";
-            if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ) {
+            if (indexName.startsWith("AUTOGEN_IDX_PK")) {
                 indexName = "PRIMARY KEY";
                 keyword = "PRIMARY KEY";
             } else {

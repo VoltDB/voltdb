@@ -364,17 +364,17 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         boolean success = false;
         long start = System.currentTimeMillis();
         while (!success) {
-            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
+            if (System.currentTimeMillis() - start > 120000) fail("Took too long");
             success = true;
             results = client.callProcedure("@Statistics", "index", 0).getResults();
             System.out.println("Index results: " + results[0].toString());
             assertEquals(1, results.length);
             validateSchema(results[0], expectedTable);
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_W_PK_TREE_10018", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "W_PK_TREE", true);
             }
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_I_PK_TREE_10020", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "I_PK_TREE", true);
             }
             if (success) break;
         }

@@ -645,6 +645,7 @@ public class DDLCompiler {
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
             String sqlStatement = statementMatcher.group(3);
+            sqlStatement.trim();
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
@@ -1278,7 +1279,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
+                    if (indexName.startsWith("AUTOGEN_IDX_") == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1287,7 +1288,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                    if (indexName.startsWith("AUTOGEN_IDX_") == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1664,7 +1665,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith("SYS_IDX_") == false) {
+                if (index.getTypeName().startsWith("AUTOGEN_") == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());

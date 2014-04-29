@@ -693,8 +693,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
-            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
+        if (m_targetIndexName.startsWith("AUTOGEN_IDX_PK_") ||
             m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
             indexDescription = " using its primary key index";
         }

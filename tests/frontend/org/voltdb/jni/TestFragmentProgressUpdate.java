@@ -39,7 +39,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
-import org.voltdb.compiler.TestVoltCompiler;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -135,8 +134,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
-        TestVoltCompiler.verifyRegeneratedDatabaseDDL(catalog.getClusters().get("cluster").getDatabases().
-                get("database"));
     }
 
     private ExecutionEngine m_ee;

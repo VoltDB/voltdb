@@ -421,7 +421,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "T1",  "A" );
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "A", "C");
 
         // In future, turn the next block on when AdHoc multiple partitioned procedure are supported.
 /*
@@ -448,7 +448,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = lpn.get(1).getChild(0);
         checkSimpleSubSelects(pn, "T1",  "A", "C" );
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "A", "C");
 
         lpn = compileToFragments("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1 ");
         assertTrue(lpn.size() == 2);
@@ -461,7 +461,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "A", "C");
 */
     }
 
@@ -688,7 +688,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSimpleSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
 */
 
 
@@ -711,7 +711,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSimpleSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
 
 
         pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1 where A=3) T2 " +
@@ -729,7 +729,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSimpleSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
     }
 
 

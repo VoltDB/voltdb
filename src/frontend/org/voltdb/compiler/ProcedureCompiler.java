@@ -337,6 +337,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 info = ddlInfo;
             }
         }
+        else {
+            pa.classAnnotated = true;
+        }
         assert(info != null);
 
         // make sure multi-partition implies no partitoning info

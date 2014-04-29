@@ -55,7 +55,6 @@ import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestVoltCompiler extends TestCase {
@@ -76,47 +75,6 @@ public class TestVoltCompiler extends TestCase {
         File tjar = new File(testout_jar);
         tjar.delete();
     }
-
-    public static void verifyRegeneratedDDL(String ddlTextString) {
-        try {
-            // Write DDL to file
-            final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddlTextString);
-
-            // Compile DDL
-            VoltCompiler compiler = new VoltCompiler();
-            compiler.compileFromDDL("/tmp/build_from_generated_ddl_test.jar", schemaFile.getPath());
-            // Extract DDL from newly created build_from_generated_ddl_test.jar
-            final String regenDDL =
-                    VoltCompilerUtils.readFileFromJarfile("/tmp/build_from_generated_ddl_test.jar", "autogen-ddl.sql");
-            // Compare both DDLs for validity
-            assertTrue(ddlTextString.equals(regenDDL));
-         }
-        catch (VoltCompilerException e2) {
-        }
-        catch (IOException e) {
-        }
-        finally {
-            final File jar = new File("/tmp/build_from_generated_ddl_test.jar");
-            jar.delete();
-        }
-    }
-
-    public static void verifyRegeneratedJarDDL(String testJar) {
-        try {
-           // Extract DDL from catalog located at testJar
-            final String autogenDDL =
-                    VoltCompilerUtils.readFileFromJarfile(testJar, "autogen-ddl.sql");
-            verifyRegeneratedDDL(autogenDDL);
-        }
-        catch (IOException e) {
-        }
-    }
-
-    public static void verifyRegeneratedDatabaseDDL(Database db) {
-        String databaseDDL = CatalogSchemaTools.toSchema(db, new String[0]);
-        verifyRegeneratedDDL(databaseDDL);
-    }
-
 
     public void testBrokenLineParsing() throws IOException {
         final String simpleSchema1 =
@@ -157,8 +115,6 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
-
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testUTF8XMLFromHSQL() throws IOException {
@@ -438,7 +394,6 @@ public class TestVoltCompiler extends TestCase {
             //Will be empty because the deployment file initialization is what sets this value
             assertEquals("/tmp", schedule.getPath());
             assertEquals("woobar", schedule.getPrefix());
-            verifyRegeneratedJarDDL("/tmp/snapshot_settings_test.jar");
         } finally {
             final File jar = new File("/tmp/snapshot_settings_test.jar");
             jar.delete();
@@ -502,7 +457,6 @@ public class TestVoltCompiler extends TestCase {
             assertNotNull(connector.getTableinfo().getIgnoreCase("b"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
-            verifyRegeneratedJarDDL("/tmp/exportsettingstest.jar");
         } finally {
             final File jar = new File("/tmp/exportsettingstest.jar");
             jar.delete();
@@ -563,12 +517,11 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertTrue(success);
-        verifyRegeneratedJarDDL(nothing_jar);
     }
 
     public void testXMLFileWithDeprecatedElements() {
@@ -609,11 +562,11 @@ public class TestVoltCompiler extends TestCase {
             "</project>";
 
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
 
         assertFalse(success);
     }
@@ -634,9 +587,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -655,9 +608,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -682,7 +635,6 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
         assertTrue(success);
         assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
-        verifyRegeneratedJarDDL(nothing_jar);
     }
 
     public void testBadClusterConfig() throws IOException {
@@ -750,7 +702,6 @@ public class TestVoltCompiler extends TestCase {
         c2.execute(catalogContents);
 
         assertTrue(c2.serialize().equals(c1.serialize()));
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testProcWithBoxedParam() throws IOException {
@@ -902,7 +853,6 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testSeparateCatalogCompilation() throws IOException {
@@ -938,7 +888,6 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
         assertTrue(cat1.compareTo(cat2) == 0);
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     private Catalog compileCatalogFromProject(
@@ -1038,7 +987,6 @@ public class TestVoltCompiler extends TestCase {
 
         final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "autogen-ddl.sql");
         assertNotNull(sql);
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testXMLFileWithELEnabled() throws IOException {
@@ -1080,7 +1028,6 @@ public class TestVoltCompiler extends TestCase {
         c2.execute(catalogContents);
 
         assertTrue(c2.serialize().equals(c1.serialize()));
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testOverrideProcInfo() throws IOException {
@@ -1123,7 +1070,6 @@ public class TestVoltCompiler extends TestCase {
         final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testOverrideNonAnnotatedProcInfo() throws IOException {
@@ -1168,7 +1114,6 @@ public class TestVoltCompiler extends TestCase {
         final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testBadStmtProcName() throws IOException {
@@ -1246,7 +1191,6 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testGoodDdlStmtProcName() throws IOException {
@@ -1275,7 +1219,6 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testMaterializedView() throws IOException {
@@ -1309,7 +1252,6 @@ public class TestVoltCompiler extends TestCase {
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
 
@@ -1349,7 +1291,6 @@ public class TestVoltCompiler extends TestCase {
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
 
@@ -1392,7 +1333,6 @@ public class TestVoltCompiler extends TestCase {
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     //
@@ -1421,9 +1361,6 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertEquals(expectSuccess, success);
-        if (expectSuccess) {
-            verifyRegeneratedJarDDL(testout_jar);
-        }
         return compiler;
     }
 
@@ -2017,9 +1954,6 @@ public class TestVoltCompiler extends TestCase {
         if (!expectSuccess) {
             assertTrue(isFeedbackPresent(errorMsg, compiler.m_errors));
         }
-        else {
-            verifyRegeneratedJarDDL(testout_jar);
-        }
     }
 
     private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
@@ -2209,7 +2143,6 @@ public class TestVoltCompiler extends TestCase {
             final VoltCompiler compiler = new VoltCompiler();
             final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
             assertTrue(success);
-            verifyRegeneratedJarDDL(testout_jar);
         }
 
     public void test3324MPPlan() throws IOException {
@@ -2235,7 +2168,6 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(0, countStringsMatching(diagnostics, ".*\"SODECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
         // System.out.println("test3324MPPlan");
         // System.out.println(diagnostics);
-        verifyRegeneratedJarDDL("test3324.jar");
     }
 
     public void testBadDDLErrorLineNumber() throws IOException {
@@ -2746,7 +2678,6 @@ public class TestVoltCompiler extends TestCase {
                 );
         Procedure proc = db.getProcedures().get("Foo");
         assertNotNull(proc);
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
@@ -2765,7 +2696,6 @@ public class TestVoltCompiler extends TestCase {
                 );
         proc = db.getProcedures().get("Foo");
         assertNotNull(proc);
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
@@ -2786,7 +2716,6 @@ public class TestVoltCompiler extends TestCase {
                 );
         proc = db.getProcedures().get("Foo");
         assertNotNull(proc);
-        verifyRegeneratedDatabaseDDL(db);
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -2848,7 +2777,6 @@ public class TestVoltCompiler extends TestCase {
         final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
-        verifyRegeneratedJarDDL(testout_jar);
     }
 
     public void testValidNonAnnotatedProcedureDDL() throws Exception {
@@ -2879,7 +2807,6 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(success);
 
             final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-            verifyRegeneratedJarDDL(testout_jar);
 
             final Catalog c2 = new Catalog();
             c2.execute(catalogContents);
@@ -2953,7 +2880,6 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
             }
-            verifyRegeneratedDatabaseDDL(db);
         }
         else {
             assertFalse(String.format("Expected error (\"%s\")\nXML: %s\nDDL: %s", errorRegex, rolesElem, ddl), success);
@@ -3057,7 +2983,6 @@ public class TestVoltCompiler extends TestCase {
         CatalogMap<GroupRef> groups = proc.getAuthgroups();
         assertEquals(1, groups.size());
         assertNotNull(groups.get("r1"));
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
@@ -3069,7 +2994,6 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, groups.size());
         assertNotNull(groups.get("r1"));
         assertNotNull(groups.get("r2"));
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
@@ -3079,7 +3003,6 @@ public class TestVoltCompiler extends TestCase {
         groups = proc.getAuthgroups();
         assertEquals(1, groups.size());
         assertNotNull(groups.get("r1"));
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
@@ -3091,7 +3014,6 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, groups.size());
         assertNotNull(groups.get("r1"));
         assertNotNull(groups.get("r2"));
-        verifyRegeneratedDatabaseDDL(db);
 
         db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
@@ -3101,7 +3023,6 @@ public class TestVoltCompiler extends TestCase {
         groups = proc.getAuthgroups();
         assertEquals(1, groups.size());
         assertNotNull(groups.get("r1"));
-        verifyRegeneratedDatabaseDDL(db);
     }
 
     public void testBadCreateProcedureWithAllow() throws Exception {
@@ -3139,7 +3060,6 @@ public class TestVoltCompiler extends TestCase {
                 );
         assertNotNull(getConnectorTableInfoFor(db, "e1"));
         assertNotNull(getConnectorTableInfoFor(db, "e2"));
-        verifyRegeneratedDatabaseDDL(db);
     }
 
     public void testBadExportTable() throws Exception {
@@ -3208,7 +3128,6 @@ public class TestVoltCompiler extends TestCase {
 
         boolean success = compileFromDDL(compiler, testout_jar, schemaPath);
         assertTrue(success);
-        verifyRegeneratedJarDDL(testout_jar);
 
         success = compileFromDDL(compiler, testout_jar, schemaPath + "???");
         assertFalse(success);
