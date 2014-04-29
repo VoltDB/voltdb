@@ -105,6 +105,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
+
+    m_previousTable = NULL;
 }
 
 PersistentTable::~PersistentTable()
@@ -267,10 +269,20 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
         return ;
     }
+
     assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
+    if (m_tableStreamer != NULL &&
+            (m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX) ||
+            m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX_READ) )
+       ){
+        // There is an Elastic Index work going on and it should continue access the old table.
+        // Add one reference count to keep the original table.
+        emptyTable->setPreviousTable(this);
+        this->incrementRefcount();
+    }
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {

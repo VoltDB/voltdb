@@ -1554,7 +1554,8 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // Java engine will always poll a fully serialized table one more
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
-    PersistentTable *table = NULL;
+    PersistentTable *table = NULL, *currentTable = NULL;
+
     if (tableStreamTypeIsSnapshot(streamType)) {
         // If a completed table is polled, return 0 bytes serialized. The
         // Java engine will always poll a fully serialized table one more
@@ -1565,7 +1566,18 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     else if (tableStreamTypeIsValid(streamType)) {
         Table* found = getTable(tableId);
         if (found) {
-            table = dynamic_cast<PersistentTable*>(found);
+            PersistentTable * originalTable = dynamic_cast<PersistentTable*>(found);
+            if (tableStreamTypeNeededByTruncate(streamType)) {
+                // The on going TABLE STREAM needs the original table before the fist table truncate.
+                currentTable = originalTable;
+                int ct = 0;
+                while(originalTable->getPreviousTable() != NULL && ++ct < 1000) {
+                    originalTable = originalTable->getPreviousTable();
+                }
+                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the %d table before truncate",
+                        tableStreamTypeToString(streamType), ct);
+            }
+            table = originalTable;
         }
     }
     else {
@@ -1578,9 +1590,30 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         remaining = table->streamMore(outputStreams, streamType, retPositions);
 
         // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {
-            m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+        if (remaining <= 0) {
+            VOLT_DEBUG("tableStreamSerializeMore: finishes stream for type %s",
+                    tableStreamTypeToString(streamType));
+
+            if (tableStreamTypeIsSnapshot(streamType)) {
+                m_snapshottingTables.erase(tableId);
+                table->decrementRefcount();
+            } else if (tableStreamTypeNeededByTruncate(streamType)) {
+                // The on going TABLE STREAM of the original table before the first table truncate has finished.
+                // Reset all the previous table pointers to be NULL.
+                assert(currentTable != NULL);
+                PersistentTable * prev = currentTable;
+                currentTable->incrementRefcount();
+
+                while(prev != NULL) {
+                    currentTable = prev;
+                    prev = currentTable->getPreviousTable();
+                    currentTable->setPreviousTable(NULL);
+                    currentTable->decrementRefcount();
+                }
+
+                VOLT_DEBUG("tableStreamSerializeMore: type %s, null all the previous table pointers",
+                        tableStreamTypeToString(streamType));
+            }
         }
     }
 

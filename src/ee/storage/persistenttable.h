@@ -398,7 +398,18 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
+    PersistentTable * getPreviousTable() {
+        return m_previousTable;
+    }
+
+    void setPreviousTable(PersistentTable * tb) {
+        m_previousTable = tb;
+    }
+
   private:
+
+    // Zero allocation size uses defaults.
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -440,8 +451,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     bool checkNulls(TableTuple &tuple) const;
 
-    // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -528,6 +537,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
+
+    // The original table before the first truncate table
+    PersistentTable * m_previousTable;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

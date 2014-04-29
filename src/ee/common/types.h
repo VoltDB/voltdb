@@ -409,6 +409,11 @@ inline bool tableStreamTypeIsValid(TableStreamType streamType) {
     return streamType != TABLE_STREAM_NONE;
 }
 
+inline bool tableStreamTypeNeededByTruncate(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_ELASTIC_INDEX
+        || streamType == TABLE_STREAM_ELASTIC_INDEX_READ;
+}
+
 // ------------------------------------------------------------------
 // Statistics Selector Types
 // ------------------------------------------------------------------
