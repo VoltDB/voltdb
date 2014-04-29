@@ -60,14 +60,6 @@ public class Quiesce extends VoltSystemProcedure {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
                 context.getSiteProcedureConnection().quiesce();
-                try {
-                    int result = Runtime.getRuntime().exec("sync").waitFor();
-                    if (result != 0) {
-                        HOST_LOG.error("Quiesce sync invocation returned " + result);
-                    }
-                } catch (Exception e) {
-                    HOST_LOG.error(e);
-                }
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
                 return new DependencyPair(DEP_SITES, results);
