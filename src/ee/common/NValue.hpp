@@ -58,8 +58,8 @@ namespace voltdb {
 #define LONG_OBJECT_LENGTHLENGTH static_cast<char>(4)
 #define OBJECT_NULL_BIT static_cast<char>(1 << 6)
 #define OBJECT_NULL_INLINE_LENGTH static_cast<char>(0x80)
-#define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
-#define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
+#define OBJECT_CONTINUATION_BIT static_cast<char>(0x80)
+#define OBJECT_MAX_LENGTH_SHORT_LENGTH 127
 
 #define FULL_STRING_IN_MESSAGE_THRESHOLD 100
 
@@ -749,22 +749,21 @@ class NValue {
      * Set the length preceding value using the short or long representation depending
      * on what is necessary to represent the length.
      */
-    static void setObjectLengthToLocation(int32_t length, char *location) {
+    static char* serializeObjectLengthToLocation(int32_t length, char *location) {
         int32_t beNumber = htonl(length);
-        if (length < -1) {
-            throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
-        } else if (length == -1) {
-            location[0] = OBJECT_NULL_BIT;
-        } if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
-            location[0] = reinterpret_cast<char*>(&beNumber)[3];
-        } else {
-            char *pointer = reinterpret_cast<char*>(&beNumber);
-            location[0] = pointer[0];
-            location[0] |= OBJECT_CONTINUATION_BIT;
-            location[1] = pointer[1];
-            location[2] = pointer[2];
-            location[3] = pointer[3];
+        if (length <= -1) {
+            throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be <= -1");
         }
+        if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
+            location[0] = reinterpret_cast<char*>(&beNumber)[3];
+            return &location[1];
+        }
+        char *pointer = reinterpret_cast<char*>(&beNumber);
+        location[0] = pointer[0] | OBJECT_CONTINUATION_BIT;
+        location[1] = pointer[1];
+        location[2] = pointer[2];
+        location[3] = pointer[3];
+        return &location[4];
     }
 
     /*
@@ -2192,8 +2191,7 @@ class NValue {
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
-        setObjectLengthToLocation(length, storage);
-        storage += lengthLength;
+        storage = serializeObjectLengthToLocation(length, storage);
         setObjectValue(sref);
         return storage;
     }
@@ -2645,8 +2643,8 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 const int32_t minlength = lengthLength + objLength;
                 StringRef* sref = StringRef::create(minlength, dataPool);
                 char *copy = sref->get();
-                setObjectLengthToLocation(objLength, copy);
-                ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), objLength);
+                copy = serializeObjectLengthToLocation(objLength, copy);
+                ::memcpy(copy, getObjectValue_withoutNull(), objLength);
                 *reinterpret_cast<StringRef**>(storage) = sref;
             }
         }
@@ -2764,25 +2762,27 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
         if (isInlined) {
-            setObjectLengthToLocation(length, storage);
             if (length == OBJECTLENGTH_NULL) {
+                storage[0] = OBJECT_NULL_INLINE_LENGTH;
                 break;
             }
+            storage[0] = static_cast<char>(length);
             const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            ::memcpy( storage + lengthLength, data, length);
-        } else {
-            if (length == OBJECTLENGTH_NULL) {
-                *reinterpret_cast<void**>(storage) = NULL;
-                return;
-            }
-            const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            const int32_t minlength = lengthLength + length;
-            StringRef* sref = StringRef::create(minlength, dataPool);
-            char* copy = sref->get();
-            setObjectLengthToLocation( length, copy);
-            ::memcpy(copy + lengthLength, data, length);
-            *reinterpret_cast<StringRef**>(storage) = sref;
+            ::memcpy(storage + 1, data, length);
+            break;
         }
+
+        if (length == OBJECTLENGTH_NULL) {
+            *reinterpret_cast<StringRef**>(storage) = NULL;
+            break;
+        }
+        const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
+        const int32_t minlength = lengthLength + length;
+        StringRef* sref = StringRef::create(minlength, dataPool);
+        char* copy = sref->get();
+        copy = serializeObjectLengthToLocation(length, copy);
+        ::memcpy(copy, data, length);
+        *reinterpret_cast<StringRef**>(storage) = sref;
         break;
     }
     case VALUE_TYPE_DECIMAL: {
