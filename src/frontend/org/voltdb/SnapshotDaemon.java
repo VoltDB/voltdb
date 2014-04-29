@@ -298,12 +298,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
 
                 if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
-                    if (responses.size() != liveHosts.size()) {
-                        checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null, "FAILURE", "TIMED OUT CHECKING SNAPSHOT FEASIBILITY");
-                        success = false;
-                    }
                     break;
                 }
+            }
+
+            if (responses.size() != liveHosts.size()) {
+                checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null,
+                        "FAILURE", "TIMED OUT CHECKING SNAPSHOT FEASIBILITY");
+                success = false;
             }
 
             if (success) {
@@ -319,9 +321,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
         } catch (JSONException e) {
+            success = false;
             checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null, "FAILURE", "ERROR PARSING JSON");
             SNAP_LOG.warn("Error parsing JSON string: " + jsString, e);
         }
+
         if (!success) {
             final ClientResponseImpl failureResponse =
                     new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{checkResult}, null);
