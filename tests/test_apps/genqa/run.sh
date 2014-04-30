@@ -26,6 +26,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
+CLASSPATH="$CLASSPATH:./lib/zkclient-0.3.jar:./lib/zookeeper-3.3.4.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -177,7 +178,7 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=10 \
+        --duration=120 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
