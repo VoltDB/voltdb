@@ -29,6 +29,10 @@ import junit.framework.TestCase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Date;
+
 
 public class TestParameterConverter extends TestCase
 {
@@ -124,5 +128,20 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
         assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testNulls()
+    {
+        assertEquals(VoltType.NULL_TINYINT, ParameterConverter.tryToMakeCompatible(byte.class, VoltType.NULL_TINYINT));
+        assertEquals(VoltType.NULL_SMALLINT, ParameterConverter.tryToMakeCompatible(short.class, VoltType.NULL_SMALLINT));
+        assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, VoltType.NULL_INTEGER));
+        assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, VoltType.NULL_BIGINT));
+        assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(TimestampType.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Timestamp.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Date.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(java.sql.Date.class, VoltType.NULL_TIMESTAMP));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(String.class, VoltType.NULL_STRING_OR_VARBINARY));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(BigDecimal.class, VoltType.NULL_DECIMAL));
     }
 }
