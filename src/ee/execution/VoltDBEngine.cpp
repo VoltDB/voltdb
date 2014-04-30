@@ -1568,14 +1568,13 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         if (found) {
             PersistentTable * originalTable = dynamic_cast<PersistentTable*>(found);
             if (tableStreamTypeNeededByTruncate(streamType)) {
-                // The on going TABLE STREAM needs the original table before the fist table truncate.
                 currentTable = originalTable;
-                int ct = 0;
-                while(originalTable->getPreviousTable() != NULL && ++ct < 1000) {
-                    originalTable = originalTable->getPreviousTable();
+                // The ongoing TABLE STREAM needs the original table from the first table truncate.
+                if (originalTable->getPreTruncateTable() != NULL) {
+                    originalTable = originalTable->getPreTruncateTable();
                 }
-                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the %d table before truncate",
-                        tableStreamTypeToString(streamType), ct);
+                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                        tableStreamTypeToString(streamType));
             }
             table = originalTable;
         }
@@ -1601,17 +1600,11 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 // The on going TABLE STREAM of the original table before the first table truncate has finished.
                 // Reset all the previous table pointers to be NULL.
                 assert(currentTable != NULL);
-                PersistentTable * prev = currentTable;
-                currentTable->incrementRefcount();
+                PersistentTable * prev = currentTable->getPreTruncateTable();
+                currentTable->setPreTruncateTable(NULL);
+                prev->decrementRefcount();
 
-                while(prev != NULL) {
-                    currentTable = prev;
-                    prev = currentTable->getPreviousTable();
-                    currentTable->setPreviousTable(NULL);
-                    currentTable->decrementRefcount();
-                }
-
-                VOLT_DEBUG("tableStreamSerializeMore: type %s, null all the previous table pointers",
+                VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
                         tableStreamTypeToString(streamType));
             }
         }

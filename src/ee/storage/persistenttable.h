@@ -398,12 +398,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreviousTable() {
-        return m_previousTable;
+    PersistentTable * getPreTruncateTable() {
+        return m_preTruncateTable;
     }
 
-    void setPreviousTable(PersistentTable * tb) {
-        m_previousTable = tb;
+    void setPreTruncateTable(PersistentTable * tb) {
+        m_preTruncateTable = tb;
     }
 
   private:
@@ -538,8 +538,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
 
-    // The original table before the first truncate table
-    PersistentTable * m_previousTable;
+    // The original table from the first truncated table
+    PersistentTable * m_preTruncateTable;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

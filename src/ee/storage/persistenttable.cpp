@@ -106,7 +106,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
 
-    m_previousTable = NULL;
+    m_preTruncateTable = NULL;
 }
 
 PersistentTable::~PersistentTable()
@@ -274,14 +274,16 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
-    if (m_tableStreamer != NULL &&
-            (m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX) ||
-            m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX_READ) )
-       ){
+    if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
         // There is an Elastic Index work going on and it should continue access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setPreviousTable(this);
-        this->incrementRefcount();
+        PersistentTable * pre = this;
+        while (pre->getPreTruncateTable() != NULL) {
+            pre = pre->getPreTruncateTable();
+        }
+
+        emptyTable->setPreTruncateTable(pre);
+        pre->incrementRefcount();
     }
 
     // add matView
