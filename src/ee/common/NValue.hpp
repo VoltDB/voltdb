@@ -1514,10 +1514,11 @@ class NValue {
         return false;
     }
 
+    /**
+     * Assuming non-null NValue, validate the size of the varchar or varbinary
+     */
     static inline void checkTooNarrowVarcharAndVarbinary(ValueType type, const char* ptr,
             int32_t objLength, int32_t maxLength, bool isInBytes) {
-        assert(isNull() == false);
-
         if (maxLength == 0) {
             throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(type));
         }
