@@ -1573,7 +1573,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 if (originalTable->getPreTruncateTable() != NULL) {
                     originalTable = originalTable->getPreTruncateTable();
                 }
-                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                VOLT_INFO("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
                         tableStreamTypeToString(streamType));
             }
             table = originalTable;
@@ -1601,10 +1601,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 // Reset all the previous table pointers to be NULL.
                 assert(currentTable != NULL);
                 PersistentTable * prev = currentTable->getPreTruncateTable();
-                currentTable->setPreTruncateTable(NULL);
-                prev->decrementRefcount();
+                if (prev != NULL) {
+                    currentTable->setPreTruncateTable(NULL);
+                    prev->decrementRefcount();
+                }
 
-                VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
+                VOLT_INFO("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
                         tableStreamTypeToString(streamType));
             }
         }
