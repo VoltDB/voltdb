@@ -613,10 +613,20 @@ public abstract class VoltTableRow {
     public final java.sql.Timestamp getTimestampAsSqlTimestamp(int columnIndex) {
         final long timestamp = getTimestampAsLong(columnIndex);
         if (m_wasNull) return null;
-        java.sql.Timestamp result = new java.sql.Timestamp(timestamp/1000);
+        java.sql.Timestamp result;
+
         // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
         // must be scaled up to get the 9-digit (rounded) nanosecond value.
-        result.setNanos(((int) (timestamp % 1000000))*1000);
+        if (timestamp >= 0) {
+            result = new java.sql.Timestamp(timestamp/1000);
+            result.setNanos(((int) (timestamp % 1000000))*1000);
+        } else {
+            result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
+
+            int remaining = (int) (timestamp % 1000000);
+            result.setNanos((remaining+1000000) * 1000 );
+        }
+
         return result;
     }
 
