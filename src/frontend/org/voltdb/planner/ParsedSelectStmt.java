@@ -909,6 +909,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // parameters to the child select statement once the IN expression is
             // replaced with the EXISTS one
             expr = replaceExpressionsWithPve(selectStmt, expr, false);
+            // Finalize the expression. The subquery's own expressions are already finalized
+            // but not the expressions from the IN list
+            ExpressionUtil.finalizeValueTypes(expr);
 
             // Create new compare equal expression
             AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,

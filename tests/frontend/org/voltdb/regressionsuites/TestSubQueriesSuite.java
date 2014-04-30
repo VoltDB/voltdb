@@ -222,7 +222,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] { {1, 1}, {2, 1} });
 
             vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" T1 where " +
-                    "(ID, DEPT) IN (select DEPT, WAGE/10 from " + tb + ") ").getResults()[0];
+                    "(ID + 1 - 1, DEPT) IN (select DEPT, WAGE/10 from " + tb + ") ").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {1, 1}});
 
         }
