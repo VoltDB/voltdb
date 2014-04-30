@@ -60,7 +60,6 @@ public class ExportKafkaOnServerVerifier {
     public static long VALIDATION_REPORT_INTERVAL = 1000;
 
     private VoltKafkaConsumerConfig m_kafkaConfig;
-    private final List<Long> seenTxnIds = new ArrayList<>();
     private long expectedRows = 0;
     private final AtomicLong consumedRows = new AtomicLong(0);
 
@@ -151,7 +150,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifyFat() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic);
+        createAndConsumeKafkaStreams(m_topic, m_doneTopic, false);
     }
 
     /**
@@ -162,7 +161,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifySkinny() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic);
+        createAndConsumeKafkaStreams(m_topic, m_doneTopic, true);
     }
         
     public class ExportConsumer implements Runnable {
@@ -170,10 +169,12 @@ public class ExportKafkaOnServerVerifier {
         private final KafkaStream m_stream;
         private final boolean m_doneStream;
         private final CountDownLatch m_cdl;
+        private final boolean m_skinny;
 
-        public ExportConsumer(KafkaStream a_stream, boolean doneStream, CountDownLatch cdl) {
+        public ExportConsumer(KafkaStream a_stream, boolean doneStream, boolean skinny, CountDownLatch cdl) {
             m_stream = a_stream;
             m_doneStream = doneStream;
+            m_skinny = skinny;
             m_cdl = cdl;
         }
 
@@ -191,9 +192,12 @@ public class ExportKafkaOnServerVerifier {
                             System.out.println("EOS Consumed: " + smsg + " Expected Rows: " + row[6]);
                             expectedRows = Long.parseLong(row[6]);
                             break;
-                        } else {
-                            long rowTxnId = Long.parseLong(row[6]);
-                            seenTxnIds.add(rowTxnId);
+                        }
+                        consumedRows.incrementAndGet();
+                        if (m_skinny) {
+                            if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
+                                break;
+                            }
                         }
                         ExportOnServerVerifier.ValidationErr err = ExportOnServerVerifier.verifyRow(row);
                         if (err != null) {
@@ -211,7 +215,6 @@ public class ExportKafkaOnServerVerifier {
                                     ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                     ", while export record says " + partition);
                         }              
-                        consumedRows.incrementAndGet();
                         if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
                             break;
                         }
@@ -230,7 +233,7 @@ public class ExportKafkaOnServerVerifier {
     }
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
-    void createAndConsumeKafkaStreams(String topic, String doneTopic) throws Exception {
+    void createAndConsumeKafkaStreams(String topic, String doneTopic, boolean skinny) throws Exception {
         List<Future<Long>> doneFutures = new ArrayList<>();
         
         Map<String, Integer> topicCountMap = new HashMap<>();
@@ -244,7 +247,7 @@ public class ExportKafkaOnServerVerifier {
         CountDownLatch consumersLatch = new CountDownLatch(streams.size());
         for (final KafkaStream stream : streams) {
             System.out.println("Creating consumer for " + topic);
-            ExportConsumer consumer = new ExportConsumer(stream, false, consumersLatch);
+            ExportConsumer consumer = new ExportConsumer(stream, false, skinny, consumersLatch);
             executor.submit(consumer);
         }
 
@@ -260,7 +263,7 @@ public class ExportKafkaOnServerVerifier {
         // now launch all the threads
         for (final KafkaStream stream : doneStreams) {
             System.out.println("Creating consumer for " + doneTopic);
-            ExportConsumer consumer = new ExportConsumer(stream, true, null);
+            ExportConsumer consumer = new ExportConsumer(stream, true, true, null);
             Future<Long> f = ecs.submit(consumer, new Long(0));
             doneFutures.add(f);
         }
@@ -277,8 +280,8 @@ public class ExportKafkaOnServerVerifier {
         m_kafkaConfig.stop();
         executor.shutdownNow();
         executor.awaitTermination(1, TimeUnit.DAYS);
-        System.out.println("Seen Rows: " + seenTxnIds.size() + " Expected: " + expectedRows);
-        if (seenTxnIds.size() != expectedRows) {
+        System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows);
+        if (consumedRows.get() != expectedRows) {
             System.out.println("ERROR: Exported row count does not match consumed rows.");
         }
         //For shutdown hook to not stop twice.
@@ -286,7 +289,7 @@ public class ExportKafkaOnServerVerifier {
     }
 
     String m_topic = null;
-    String m_doneTopic = "voltdbexportEXPORT_DONE_TABLE";
+    final String m_doneTopic = "voltdbexportEXPORT_DONE_TABLE";
     String m_zookeeper = null;
 
     static {
