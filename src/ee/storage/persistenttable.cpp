@@ -217,6 +217,15 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
+    if (originalTable->m_tableStreamer != NULL) {
+        // Elastic Index may complete when undo Truncate
+        PersistentTable * prev = this->getPreTruncateTable();
+        if (prev != NULL) {
+            this->setPreTruncateTable(NULL);
+            prev->decrementRefcount();
+        }
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -248,6 +257,12 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
 
         originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+
+        PersistentTable * prev = this->getPreTruncateTable();
+        if (prev != NULL) {
+            this->setPreTruncateTable(NULL);
+            prev->decrementRefcount();
+        }
     }
 
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
