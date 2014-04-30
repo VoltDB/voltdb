@@ -155,11 +155,23 @@ public class JDBC4ClientConnection implements Closeable {
     {
         // Make client connections.
         ClientImpl clientTmp = (ClientImpl) ClientFactory.createClient(this.config);
+        // ENG-6231: Only fail if we can't connect to any of the provided servers.
+        boolean connectedAnything = false;
         for (String server : this.servers) {
-            clientTmp.createConnection(server);
+            try {
+                clientTmp.createConnection(server);
+                connectedAnything = true;
+            }
+            catch (UnknownHostException e) {
+            }
+            catch (IOException e) {
+            }
         }
 
-        // If no exception escaped this method it's a good client.
+        if (!connectedAnything) {
+            throw new IOException("Unable to connect to VoltDB cluster with servers: " + this.servers);
+        }
+
         this.client.set(clientTmp);
         this.users++;
         return clientTmp;
