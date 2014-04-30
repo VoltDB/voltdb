@@ -35,8 +35,15 @@ import org.voltdb.types.TimestampType;
  *
  * <p>This procedure basically combines TIMEDATA.insert with DeleteOldestToTarget.</p>
  *
- * <p>Note, there is a lot of redundant code among the stored procedures in
- * this example app. That's intentional to make each stand alone and be easier
+ * <p>One important thing to consider when developing procedures like this is
+ * that they be deterministic. This procedure may be applied simultaniously on
+ * many replica partitions, but since it will deterministically delete the same
+ * tuples if the database contents are identical, then it will be fine. Note:
+ * this is why VoltDB doesn't allow LIMIT in delete operators. All DML must
+ * be deterministic.</p>
+ *
+ * <p>Note, there is a lot of redundant code/comments among the stored procedures
+ * in this example app. That's intentional to make each stand alone and be easier
  * to follow. A production app might offer less choice or just reuse more code.</p>
  *
  */
@@ -51,6 +58,8 @@ public class InsertAndDeleteOldestToTarget extends VoltProcedure {
     public final SQLStmt getNthOldestTimestamp = new SQLStmt(
             "SELECT update_ts FROM timedata ORDER BY update_ts ASC OFFSET ? LIMIT 1;");
 
+    // Note this is identical in effect/performance to:
+    //   TRUNCATE TABLE timedata;
     public final SQLStmt deleteAll = new SQLStmt(
             "DELETE FROM timedata;");
 
@@ -64,12 +73,12 @@ public class InsertAndDeleteOldestToTarget extends VoltProcedure {
      * @param val Column value for tuple insertion.
      * @param update_ts Column value for tuple insertion.
      * @param maxTotalRows The desired number of rows per partition.
-     * @param maxRowsToDeletePerProc The upper limit on the number of rows to delete per transaction.
+     * @param targetMaxRowsToDelete The upper limit on the number of rows to delete per transaction.
      * @return The number of deleted rows.
      * @throws VoltAbortException on bad input.
      */
-    public long run(String uuid, long val, TimestampType update_ts, long maxTotalRows, long maxRowsToDeletePerProc) {
-        if (maxRowsToDeletePerProc <= 0) {
+    public long run(String uuid, long val, TimestampType update_ts, long maxTotalRows, long targetMaxRowsToDelete) {
+        if (targetMaxRowsToDelete <= 0) {
             throw new VoltAbortException("maxRowsToDeletePerProc must be > 0.");
         }
         if (maxTotalRows < 0) {
@@ -90,24 +99,25 @@ public class InsertAndDeleteOldestToTarget extends VoltProcedure {
         }
 
         // If asked to remove all rows, go ahead
-        if ((maxTotalRows == 0) && (count < maxRowsToDeletePerProc)) {
+        if ((maxTotalRows == 0) && (count < targetMaxRowsToDelete)) {
             voltQueueSQL(deleteAll, EXPECT_SCALAR_MATCH(count));
             voltExecuteSQL(true);
             return count;
         }
 
         // Figure out how many rows to try to delete.
-        long rowsToConsider = Math.min(count - maxTotalRows, maxRowsToDeletePerProc);
+        long rowsToConsider = Math.min(count - maxTotalRows, targetMaxRowsToDelete);
 
-        // Find the timestamp of the row at position N in the sorter order, where N is the chunk size
+        // Find the timestamp of the row at position N in the sorted order, where N is the chunk size
         voltQueueSQL(getNthOldestTimestamp, EXPECT_SCALAR, rowsToConsider);
         TimestampType newestToDiscard = voltExecuteSQL()[0].fetchRow(0).getTimestampAsTimestamp(0);
 
         // Delete all rows >= the timestamp found in the previous statement.
         // This will delete AT LEAST N rows, but since timestamps may be non-unique,
         //  it might delete more than N. In the worst case, it could delete all rows
-        //  if every row has an indentical timestamp value. It is guaranteed to make
+        //  if every row has an identical timestamp value. It is guaranteed to make
         //  progress. If we used strictly less than, it might not make progress.
+        // This is why the max rows to delete number is a target, not always a perfect max.
         voltQueueSQL(deleteOlderThanDate, EXPECT_SCALAR_LONG, newestToDiscard);
         long deletedCount = voltExecuteSQL(true)[0].asScalarLong();
 

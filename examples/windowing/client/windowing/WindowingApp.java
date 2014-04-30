@@ -45,7 +45,7 @@ import org.voltdb.types.TimestampType;
  *
  * <ol>
  * <li>Insert random, timestamped tuples at a high rate.</li>
- * <li>Continuously delete tuples that are either to old or over a table size limit.</li>
+ * <li>Continuously delete tuples that are either too old or over a table size limit.</li>
  * <li>Check for changes in the maximum value stored in the table.</li>
  * <li>Periodically compute an average of values over various time windows.</li>
  * </ol>
@@ -63,13 +63,11 @@ public class WindowingApp {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    private final AtomicLong totalDeletes = new AtomicLong(0);
     private final AtomicLong deletesSinceLastChecked = new AtomicLong(0);
 
     // these values are updated by the UpdatePartitionData class each time it is run
     private final AtomicReference<Map<Long, PartitionInfo>> partitionData =
             new AtomicReference<Map<Long, PartitionInfo>>(new HashMap<Long, PartitionInfo>());
-    private final AtomicLong redundancy = new AtomicLong(1);
     private final AtomicLong targetRowsPerPartition = new AtomicLong(Long.MAX_VALUE);
 
     /**
@@ -155,14 +153,6 @@ public class WindowingApp {
         return partitionData.get();
     }
 
-    long getPartitionCount() {
-        return partitionData.get().size();
-    }
-
-    long getRedundancy() {
-        return redundancy.get();
-    }
-
     long getTargetRowsPerPartition() {
         return targetRowsPerPartition.get();
     }
@@ -172,15 +162,17 @@ public class WindowingApp {
         return new TimestampType(targetTimestampMillis * 1000);
     }
 
-    void updatePartitionInfoAndRedundancy(Map<Long, PartitionInfo> partitionData, long redundancy) {
+    void updatePartitionInfo(Map<Long, PartitionInfo> partitionData) {
         this.partitionData.set(partitionData);
-        this.redundancy.set(redundancy);
         targetRowsPerPartition.set(config.maxrows / partitionData.size());
     }
 
     void addToDeletedTuples(long count) {
-        totalDeletes.addAndGet(count);
         deletesSinceLastChecked.addAndGet(count);
+    }
+
+    long getDeletesSinceLastChecked() {
+        return deletesSinceLastChecked.getAndSet(0);
     }
 
     void shutdown() {

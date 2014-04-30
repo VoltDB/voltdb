@@ -7,7 +7,7 @@ Overview
 App that does four simultaneous things on a single-table schema:
 
  - Insert random, timestamped tuples at a high rate.
- - Continuously delete tuples that are either to old or over a table size limit.
+ - Continuously delete tuples that are either too old or over a table size limit.
  - Check for changes in the maximum value stored in the table.
  - Periodically compute an average of values over various time windows.
 

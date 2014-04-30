@@ -95,17 +95,18 @@ function client-help() {
 # Disable the comments to get latency report
 function client() {
     srccompile
+    # Note that in the command below, maxrows and historyseconds can't both be non-zero.
     java -classpath client:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         windowing.WindowingApp \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --maxrows=0 \
-        --historyseconds=30 \
-        --inline=false \
-        --deletechunksize=100 \
-        --deleteyieldtime=100 \
-        --ratelimit=15000
+        --displayinterval=5 \              # how often to print the report
+        --duration=120 \                   # how long to run for
+        --servers=localhost:21212 \        # servers to connect to
+        --maxrows=0 \                      # set to nonzero to limit by rowcount
+        --historyseconds=30 \              # set to nonzero to limit by age
+        --inline=false \                   # set to true to delete co-txn with inserts
+        --deletechunksize=100 \            # target max number of rows to delete per txn
+        --deleteyieldtime=100 \            # time to wait between non-inline deletes
+        --ratelimit=15000                  # rate limit for random inserts
 }
 
 function help() {

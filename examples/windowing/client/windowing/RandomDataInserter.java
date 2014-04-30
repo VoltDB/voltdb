@@ -58,7 +58,7 @@ public class RandomDataInserter {
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
 
-    // Seed RNG with 0 for what predictability we can have in the async world...
+    // Seed PRNG with 0 for what predictability we can have in the async world...
     static final Random rand = new Random(0);
 
     RandomDataInserter(WindowingApp app, Client client) {

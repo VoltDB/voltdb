@@ -52,11 +52,14 @@ public class MaxTracker implements Runnable {
     @Override
     public void run() {
         try {
-            // Call a proc (syncronously) to get the maximum value.
+            // Call a proc (synchronously) to get the maximum value.
             // See ddl.sql for the actual SQL being run.
             // Note this is a cross-partition transaction, but as
-            // of VoltDB 4.0, it should be fast as it's a read than
+            // of VoltDB 4.0, it should be fast as it's a read that
             // only needs to make one round trip to all partitions.
+            //
+            // SQL BEING RUN:
+            //  SELECT MAX(val) FROM timedata;
             ClientResponse cr = app.client.callProcedure("MaxValue");
             long currentMax = cr.getResults()[0].asScalarLong();
 

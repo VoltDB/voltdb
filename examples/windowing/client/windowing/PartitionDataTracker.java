@@ -107,7 +107,7 @@ public class PartitionDataTracker implements Runnable {
             pinfo.partitionKey = partitionKeys.getString("PARTITION_KEY");
         }
 
-        // this is a sanity check to see that every partition has
+        // This is a sanity check to see that every partition has
         // a partition value
         boolean allMatched = true;
         for (PartitionInfo pinfo : partitionData.values()) {
@@ -124,6 +124,6 @@ public class PartitionDataTracker implements Runnable {
         }
 
         // atomically update the new map for the old one
-        app.updatePartitionInfoAndRedundancy(partitionData, tableStats.getRowCount() / partitionData.size());
+        app.updatePartitionInfo(partitionData);
     }
 }

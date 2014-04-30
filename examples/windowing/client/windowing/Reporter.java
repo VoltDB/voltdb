@@ -58,6 +58,10 @@ public class Reporter implements Runnable {
         // See ddl.sql for the actual SQL being run by the 'Average' procedure.
         for (int seconds : new int[] { 1, 5, 10, 30 }) {
             try {
+                // SQL BEING RUN:
+                //  SELECT SUM(sum_values) / SUM(count_values)
+                //  FROM agg_by_second
+                //  WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
                 ClientResponse cr = app.client.callProcedure("Average", seconds);
                 long average = cr.getResults()[0].asScalarLong();
                 averagesForWindows.put(seconds, average);
@@ -89,6 +93,9 @@ public class Reporter implements Runnable {
 
             // Let the inserter process print a one line report.
             app.inserter.printReport();
+
+            // Print out an update on how many tuples have been deleted.
+            System.out.printf("  Deleted %d tuples since last report\n", app.getDeletesSinceLastChecked());
 
             //
             // FAILURE REPORTING FOR PERIODIC OPERATIONS
