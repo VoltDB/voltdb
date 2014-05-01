@@ -219,11 +219,7 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
 
     if (originalTable->m_tableStreamer != NULL) {
         // Elastic Index may complete when undo Truncate
-        PersistentTable * prev = this->getPreTruncateTable();
-        if (prev != NULL) {
-            this->setPreTruncateTable(NULL);
-            prev->decrementRefcount();
-        }
+        this->unsetPreTruncateTable();
     }
 
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
@@ -258,11 +254,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
         originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
 
-        PersistentTable * prev = this->getPreTruncateTable();
-        if (prev != NULL) {
-            this->setPreTruncateTable(NULL);
-            prev->decrementRefcount();
-        }
+        this->unsetPreTruncateTable();
     }
 
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
@@ -292,13 +284,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
         // There is an Elastic Index work going on and it should continue access the old table.
         // Add one reference count to keep the original table.
-        PersistentTable * pre = this;
-        while (pre->getPreTruncateTable() != NULL) {
-            pre = pre->getPreTruncateTable();
-        }
-
-        emptyTable->setPreTruncateTable(pre);
-        pre->incrementRefcount();
+        emptyTable->setPreTruncateTable(this);
     }
 
     // add matView

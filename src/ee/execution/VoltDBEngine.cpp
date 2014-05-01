@@ -1540,6 +1540,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 "Expected at least one output stream in tableStreamSerializeMore(), received %d",
                 nBuffers);
     }
+
+    if (!tableStreamTypeIsValid(streamType)) {
+        // Failure
+        return -1;
+    }
+
     TupleOutputStreamProcessor outputStreams(nBuffers);
     for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
@@ -1562,8 +1568,14 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
+
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
+        }
     }
-    else if (tableStreamTypeIsValid(streamType)) {
+    else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
         if (found) {
             PersistentTable * originalTable = dynamic_cast<PersistentTable*>(found);
@@ -1573,42 +1585,27 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 if (originalTable->getPreTruncateTable() != NULL) {
                     originalTable = originalTable->getPreTruncateTable();
                 }
-                VOLT_INFO("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
                         tableStreamTypeToString(streamType));
             }
             table = originalTable;
         }
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            // The on going TABLE STREAM of the original table before the first table truncate has finished.
+            // Reset all the previous table pointers to be NULL.
+            assert(currentTable != NULL);
+            currentTable->unsetPreTruncateTable();
+
+            VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
+                    tableStreamTypeToString(streamType));
+        }
     }
     else {
-        // Failure.
-        return -1;
-    }
-
-    // Perform the streaming.
-    if (table != NULL) {
-        remaining = table->streamMore(outputStreams, streamType, retPositions);
-
-        // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0) {
-            VOLT_DEBUG("tableStreamSerializeMore: finishes stream for type %s",
-                    tableStreamTypeToString(streamType));
-
-            if (tableStreamTypeIsSnapshot(streamType)) {
-                m_snapshottingTables.erase(tableId);
-                table->decrementRefcount();
-            } else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
-                // The on going TABLE STREAM of the original table before the first table truncate has finished.
-                // Reset all the previous table pointers to be NULL.
-                assert(currentTable != NULL);
-                PersistentTable * prev = currentTable->getPreTruncateTable();
-                if (prev != NULL) {
-                    currentTable->setPreTruncateTable(NULL);
-                    prev->decrementRefcount();
-                }
-
-                VOLT_INFO("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
-                        tableStreamTypeToString(streamType));
-            }
+        Table* found = getTable(tableId);
+        if (found) {
+            table = dynamic_cast<PersistentTable*>(found);
+            remaining = table->streamMore(outputStreams, streamType, retPositions);
         }
     }
 
