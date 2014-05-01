@@ -86,6 +86,7 @@ if 'VOLTDB_HEAPMAX' in os.environ:
         java_opts.append('-Xmx%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
         if specifyMinimumHeapSize:
             java_opts.append('-Xms%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
+            java_opts.append('-XX:+AlwaysPreTouch')
     except ValueError:
         java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
 if 'VOLTDB_OPTS' in os.environ:
@@ -103,7 +104,6 @@ java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
 java_opts.append('-XX:+UseParNewGC')
-java_opts.append('-XX:+AlwaysPreTouch')
 java_opts.append('-XX:+UseConcMarkSweepGC')
 java_opts.append('-XX:+CMSParallelRemarkEnabled')
 java_opts.append('-XX:+UseTLAB')
