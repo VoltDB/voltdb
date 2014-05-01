@@ -470,13 +470,27 @@ public class TestJDBCQueries {
         }
 
         // THE TIMESTAMP BEFORE TIME
+        ts = new Timestamp(-10000);
+        ts.setNanos(999999000);
+        System.out.println("BEFORE TIME: " + ts.toString());
+        ins.setTimestamp(1, ts);
+        ins.setString(2, "beforetime1");
+        ins.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime1'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            Timestamp ts1 = rs.getTimestamp(1);
+            assertEquals(ts, ts1);
+        }
+
         ts = new Timestamp(-10100);
         ts.setNanos(800000000);
         System.out.println("BEFORE TIME: " + ts.toString());
         ins.setTimestamp(1, ts);
-        ins.setString(2, "beforetime");
+        ins.setString(2, "beforetime2");
         ins.executeUpdate();
-        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime'");
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime2'");
         ps.executeQuery();
         rs = ps.getResultSet();
         while (rs.next()) {
