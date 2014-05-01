@@ -46,7 +46,6 @@
 #include "common/value_defs.h"
 #include "utf8.h"
 #include "murmur3/MurmurHash3.h"
-#include "common/TupleSchema.h"
 
 namespace voltdb {
 
@@ -274,7 +273,8 @@ class NValue {
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
     static void deserializeFrom(
-        SerializeInput &input, Pool *dataPool, char *storage, TupleSchema::ColumnInfo *columnInfo);
+        SerializeInput &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
         // eliminate the potential NValue copy.
@@ -2739,10 +2739,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * heap. This is used to deserialize tables.
  */
 inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char *storage,
-        TupleSchema::ColumnInfo *columnInfo) {
-
-    const voltdb::ValueType type = columnInfo->getVoltType();
-    bool isInlined = columnInfo->inlined;
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
 
     switch (type) {
     case VALUE_TYPE_BIGINT:
@@ -2764,9 +2761,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     {
-        const int32_t maxLength = columnInfo->length;
         const int32_t length = input.readInt();
-        bool isInBytes = columnInfo->inBytes;
 
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
