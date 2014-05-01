@@ -83,20 +83,16 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
-# Asynchronous benchmark sample
 # Use this target for argument help
 function client-help() {
     srccompile
-    java -classpath client:$CLIENTCLASSPATH:obj windowing.WindowingApp --help
+    java -classpath client:$CLIENTCLASSPATH windowing.WindowingApp --help
 }
 
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
 function client() {
     srccompile
     # Note that in the command below, maxrows and historyseconds can't both be non-zero.
-    java -classpath client:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         windowing.WindowingApp \
         --displayinterval=5 \              # how often to print the report
         --duration=120 \                   # how long to run for

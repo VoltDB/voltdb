@@ -51,7 +51,7 @@ public class DeleteAfterDate extends VoltProcedure {
             "SELECT update_ts FROM timedata ORDER BY update_ts ASC OFFSET ? LIMIT 1;");
 
     final SQLStmt deleteOlderThanDate = new SQLStmt(
-            "DELETE FROM timedata WHERE update_ts <= ? and update_ts > FROM_UNIXTIME(0);");
+            "DELETE FROM timedata WHERE update_ts <= ?;");
 
     /**
      * Procedure main logic.
