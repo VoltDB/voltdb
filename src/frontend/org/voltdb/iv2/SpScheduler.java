@@ -46,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -159,16 +160,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
-            public void onDurability(ArrayList<Object> durableThings) {
-                synchronized (m_lock) {
-                    for (Object o : durableThings) {
-                        m_pendingTasks.offer((TransactionTask)o);
+            public void onDurability(final ArrayList<Object> durableThings) {
+                final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+                    @Override
+                    void run() {
+                        synchronized (m_lock) {
+                            for (Object o : durableThings) {
+                                m_pendingTasks.offer((TransactionTask)o);
 
-                        // Make sure all queued tasks for this MP txn are released
-                        if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
-                            offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                                // Make sure all queued tasks for this MP txn are released
+                                if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
+                                    offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                                }
+                            }
                         }
                     }
+                };
+                if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+                    m_tasks.offer(r);
+                } else {
+                    r.run();
                 }
             }
         };
