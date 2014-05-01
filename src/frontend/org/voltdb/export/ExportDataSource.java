@@ -439,13 +439,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
             if (buffer.capacity() > 8) {
+                final BBContainer cont = DBBPool.wrapBB(buffer);
                 if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
                     //What ack from future is known?
-                    exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset
-                            + " Buffer info: " + uso + " Size: " + buffer.capacity());
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
+                                + " Buffer info: " + uso + " Size: " + buffer.capacity());
+                    }
+                    cont.discard();
                     return;
                 }
-                final BBContainer cont = DBBPool.wrapBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
