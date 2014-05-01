@@ -25,7 +25,6 @@ import org.voltdb.StarvationTracker;
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerQueue
 {
-    public static final long SITE_SPIN_MICROS = Long.getLong("SITE_SPIN_MICROS", 0);
     private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
     private StarvationTracker m_starvationTracker;
 
@@ -44,15 +43,7 @@ public class SiteTaskerQueue
             return task;
         }
         try {
-            if (SITE_SPIN_MICROS > 0) {
-                task = m_tasks.poll(SITE_SPIN_MICROS, TimeUnit.MICROSECONDS);
-                if (task == null) {
-                    task = m_tasks.take();
-                }
-                return task;
-            } else {
-                return m_tasks.take();
-            }
+            return m_tasks.take();
         } finally {
             m_starvationTracker.endStarvation();
         }
