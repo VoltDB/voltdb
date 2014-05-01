@@ -497,7 +497,10 @@ public class CommandLine extends VoltDB.Configuration
         {
             cmdline.add("-server");
             cmdline.add("-XX:HeapDumpPath=/tmp");
-            cmdline.add(initialHeap);
+            if (!initialHeap.isEmpty()) {
+                cmdline.add(initialHeap);
+                cmdline.add("-XX:+AlwaysPreTouch");
+            }
         }
 
         if (m_isEnterprise)
