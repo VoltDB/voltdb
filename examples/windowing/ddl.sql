@@ -50,7 +50,7 @@ PARTITION PROCEDURE InsertAndDeleteOldestToTarget ON TABLE timedata COLUMN uuid;
 --
 -- Uses the materialized view so it has to scan fewer tuples. For example,
 -- If tuples are being inserted at a rate of 15k/sec and there are 4 partitions,
--- Then to compute the average for the last 10s, VoltDB would need to scan
+-- then to compute the average for the last 10s, VoltDB would need to scan
 -- 150k rows. In this case, it needs to scan 1 row per second times the number of
 -- partitions, or 40 rows. That's a tremendous advantage of pre-aggregating the
 -- table sums and counts by second.

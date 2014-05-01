@@ -1,6 +1,5 @@
 # Windowing Example Application #
 
-***
 
 ## Overview ##
 
@@ -16,7 +15,6 @@ Each class has a specific job and is scheduled to run periodically in a
 threadpool. All inter-task communication is done via the main instance of
 this class.
 
-***
 
 ## How to Run ##
 
@@ -60,11 +58,37 @@ Changing these settings changes the behavior of the app. The three key options t
 * The app won't start if both *historyseconds* and *maxrows* are non-zero. It wouldn't be too hard to support both constraints, but this functionality is omitted from this example avoid further complexity.
 * If *inline* mode is enabled, the app will delete rows in the same transaction that it inserts them in. If not enabled, the app will delete rows as an independant process from inserting rows. Both processes could even be broken into separate unix processes and run separately without much additional work.
 
-***
 
 ## What do the Queries Do? ##
 
-***
+There are two different queries being run by this app.
+
+### Tracking the Maximum Value ###
+
+The first query computes the maximum value in the table every 10 milliseconds. If the value has changed since the previous check, a line is printed to the console announcing the new maximum. Since the data in the app represents a moving window of tuples, the maximum can go up when large values are added, or it can go down when large values are deleted.
+
+There are two interesting things here. First, the query leverages an index to compute the maximum value without a scan. By default, indexes in VoltDB are tree-based and ordered. So "get the maximum value" is fast, but so is "get the top 10 values". Futhermore, there is ranking support built into the index, so often "get the 1234th largest value" and "given value X, find the ten adjacent values higher and lower than X" are also fast queries without scans. Any time you add an index to a column in a VoltDB table, you can access queries based on the sorted column values cheaply. Because VoltDB is ACID-compiliant, you can have multiple indexes and they will always be perfectly in sync with updates to the base table.
+
+Second, this query is a cross-partition query, asking for the maximum value across *all* rows, not just rows for a specific partition. What VoltDB is going to do under the covers is find the maximal value at each partition, then scan these collected values to find the largest. The actual computational work being done can likely still be measured in microseconds. 
+
+So what about the coordination overhead of a distributed, consistent read? We're happy to say that in VoltDB 4.0, we changed how distributed read transactions are coordinated. They still see an ACID, serializable view of the data, but there is no global block to start the transaction and there is no two-phase-commit to finish it. In this case, since the read can be satisifed in a single round trip to all partitions, there is no blocking anywhere during it's execution. Since it needs to execute at all partitions, this query's performance won't scale much as you add nodes, but we've benchmarked this kind of query in the tens of thousands of transactional reads per second. Our rate of 100 per second should have negligable impact on other workloads in the system.
+
+### Computing the Average Value Over Windows of Time ###
+
+The second kind of query computes the average values in the table over windows of time. Specifically, it looks at the last 1, 5, 10 and 30 seconds worth of values. 
+
+Lets say tuples are being inserted at a rate of 15k/sec and there are 4 partitions. To compute the average for the last 10 seconds, VoltDB would need to scan 150k rows. 150k is not outlandish for an in memory system, but it would likely still require many milliseconds of processing. Futhermore, these example numbers of 15k inserts/second and 10 second windows could easily be higher.
+
+By adding a materialized view to the schema, we can reduce the amount of work this query has to do by several orders of magitude while still having flexibily to query over these differing window sizes. The view pre-aggregates the sum of values and count of rows for each second at each partition. Using the materized view, the query can be answered by scanning 1 row for each of 10 seconds at N partitions. If you have 10 partitions, then this query will scan 100 rows instead of 150k. Here's the SQL to do that:
+
+    SELECT SUM(sum_values) / SUM(count_values)
+    FROM agg_by_second
+    WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
+
+Note that the reporting sends 5 different procedure calls to VoltDB to get the 5 different averages for the windows. Each of these calls are read-only, fast to execute, and require one round trip to all partitions, just like the max value query. Thus they benefit from the VoltDB 4.0 optimizations described in the previous section and can run at high rates with minimal impact to other workloads. In fact, all 5 queries could easily be bundled into the same round trip by building a Java procedure and making 5 calls to `voltQueueSQL(..)` followed by a single call to `voltExecuteSQL(..)`. That would send all 5 SQL statements to the partitions using the same round trip and would avoid any blocking.
+
+Currently, the distribution of random data is pretty boring, just a gaussian with a mean of zero. Therefore the average for all windows is close to zero, with less variance as the window gets bigger. That may be improved as we improve this example.
+
 
 ## How do the Deletes Work? ##
 
