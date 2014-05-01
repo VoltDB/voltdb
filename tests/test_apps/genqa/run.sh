@@ -26,7 +26,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
-CLASSPATH="$CLASSPATH:./lib/zkclient-0.3.jar:./lib/zookeeper-3.3.4.jar"
+CLASSPATH="$CLASSPATH:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -77,7 +77,7 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
-# run the voltdb server locally with mysql connector
+# run the voltdb server locally with kafka connector
 function server-kafka() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
@@ -236,10 +236,9 @@ function export-on-server-verify() {
 }
 
 function export-kafka-server-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:./lib/zkclient-0.3.jar:./lib/zookeeper-3.3.4.jar genqa.ExportKafkaOnServerVerifier \
-        kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
-        4 \
-        $CLIENTLOG
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
+        genqa.ExportKafkaOnServerVerifier kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
+        4 $CLIENTLOG
 }
 
 function help() {
