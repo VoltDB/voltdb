@@ -51,7 +51,7 @@ Near the bottom of the run.sh bash script is the section run when you type `run.
         --deletechunksize=100 \            # target max number of rows to delete per txn
         --deleteyieldtime=100 \            # time to wait between non-inline deletes
         --ratelimit=15000                  # rate limit for random inserts
-}
+
 
 Changing these settings changes the behavior of the app. The three key options that change the *mode* the app runs in are *maxrows*, *historyseconds* and *inline*. 
 
@@ -75,7 +75,7 @@ The easiest way to delete all rows that are older than 30s would be to run the f
 The issue with this query is that the number of rows to delete is unbounded. 
 A query that ended up deleted a half million rows might take hundreds of milliseconds, while using extra memory to store all of the necessary undo information to make that operation transactional.
 
-A better way to achieve the same goal is to use the "Nibble" pattern. Create a procedure that deletes a small number of rows that meet the deletion criteria, then call that procedure repeatedly until all desired rows are removed. This query will execute in bounded time and memory usage. The faster execution allows other operations to be run inbetween calls to the deleting procedure, allowing for workload concurrency. The easy way to do that might be add `LIMIT 1000` to the query above and call it repeatedly until it returns that it modified 0 tuples. 
+A better way to achieve the same goal is to use the "Nibble" pattern. Create a procedure that deletes a small number of rows that meet the deletion criteria, then call that procedure repeatedly until all desired rows are removed. This query will execute in bounded time and memory usage. The faster execution allows other operations to be run in-between calls to the deleting procedure, allowing for workload concurrency. The easy way to do that might be add `LIMIT 1000` to the query above and call it repeatedly until it returns that it modified 0 tuples. 
 
 VoltDB doesn't currently support "LIMIT" in DML (SQL that modifies tuples). This is primarily to enforce determinism. Since all queries may be run multiple times, they need to do exactly the same thing each time they are run. This applies to synchronous intra-cluster replication, command-log replay for recovery and even for WAN replication.
 
@@ -87,7 +87,7 @@ Then, we delete all rows with timestamps at least as old as the retrieved timest
 
 `DELETE FROM timedata WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30) AND update_ts <= ?;`
 
-This will always delete oldest tuples first, and it will always delete an identical set of tuples. Note that it migth delete more than 1000 tuples if the 1000th oldest timstamp is non-unique. In the worst case, this will delete all rows if all timestamps are identical. The alternative is to use strictly less than when comparing candidates to the 1000th oldest timstamp. That might delete 0 rows in the worst case. In this example we err on the side of making progress and consider millions of duplicate timestamps to be an outlier case.
+This will always delete oldest tuples first, and it will always delete an identical set of tuples. Note that it might delete more than 1000 tuples if the 1000th oldest timstamp is non-unique. In the worst case, this will delete all rows if all timestamps are identical. The alternative is to use strictly less than when comparing candidates to the 1000th oldest timstamp. That might delete 0 rows in the worst case. In this example we err on the side of making progress and consider millions of duplicate timestamps to be an outlier case.
 
 So if you look at the provided *DeleteAfterDate* procedure, you will see essentially this code, though the logic is a bit more complex and there is additional error code.
 
@@ -107,7 +107,7 @@ Let's assume we have 10 partitions. So if the table is partitioned on the UUID c
 
 Typically, we direct procedure invocations to partitions by assuming a paramter is of the same type as a partitioning column. We hash the value and send it to the appropriate partition for this hash. If you just want to send a procedure invocation to a specific partition, you can use the system procedure "@GetPartitionKeys". This system procedure returns one row for each partition, and each row will contain a partition id integer and a partitioning dummy value. This dummy value can be used as a parameter to send a procedure to the associated partition.
 
-So in this case, a call to "@GetPartitionKeys" will return 10 rows. We can call our nibbling delete procedure once for each returned row and it's dummy partitioning value. In this way, we can run our procedure over all 10 partitions, but there is no cross-partition transactional overhead.
+So in this case, a call to "@GetPartitionKeys" will return 10 rows. We can call our nibbling delete procedure once for each returned row and its dummy partitioning value. In this way, we can run our procedure over all 10 partitions, but there is no cross-partition transactional overhead.
 
 Note that this is safe to run even if the server's partition count is being elastically expanded. For a brief window, the new partition(s) may not be included, but if "@GetPartitionKeys" is called on a regular basis, that will only be temporary. The example code provided calls "@GetPartitionKeys" once per second.
 
