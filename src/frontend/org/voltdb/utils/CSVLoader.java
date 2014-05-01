@@ -25,7 +25,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.TreeMap;
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -36,6 +36,7 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a table.
@@ -52,7 +53,7 @@ import org.voltdb.client.ClientFactory;
  * maxerror and additional errors may occur. Only first maxerror indicated errors will be reported.
  *
  */
-public class CSVLoader {
+public class CSVLoader implements CSVLoaderErrorHandler {
 
     /**
      * Path of invalid row file that will be created.
@@ -68,13 +69,11 @@ public class CSVLoader {
     static String pathLogfile = "csvloaderLog.log";
     private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     private static CSVConfig config = null;
-    private static long latency = 0;
     private static long start = 0;
     private static boolean standin = false;
     private static BufferedWriter out_invaliderowfile;
     private static BufferedWriter out_logfile;
     private static BufferedWriter out_reportfile;
-    private static String insertProcedure = "";
     private static CsvPreference csvPreference = null;
     /**
      * default CSV separator
@@ -109,6 +108,37 @@ public class CSVLoader {
      * Used for testing only.
      */
     public static boolean testMode = false;
+
+    //Errors we keep track only upto maxerrors
+    final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+    @Override
+    public boolean handleError(CSVLineWithMetaData metaData, String error)
+    {
+        synchronized (m_errorInfo) {
+            //Dont collect more than we want to report.
+            if (m_errorInfo.size() >= config.maxerrors) {
+                return true;
+            }
+            if (!m_errorInfo.containsKey(metaData.lineNumber)) {
+                String rawLine;
+                if (metaData.rawLine == null) {
+                    rawLine = "Unknown line content";
+                } else {
+                    rawLine = metaData.rawLine.toString();
+                }
+                String[] info = {rawLine, error};
+                m_errorInfo.put(metaData.lineNumber, info);
+            }
+            return false;
+        }
+    }
+
+    @Override
+    public boolean hasReachedErrorLimit()
+    {
+        return m_errorInfo.size() >= config.maxerrors;
+    }
+
     /**
      * Configuration options.
      */
@@ -202,9 +232,9 @@ public class CSVLoader {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
-            if ((blank.equalsIgnoreCase("error")
-                    || blank.equalsIgnoreCase("null")
-                    || blank.equalsIgnoreCase("empty")) == false) {
+            if (!blank.equalsIgnoreCase("error") &&
+                !blank.equalsIgnoreCase("null") &&
+                !blank.equalsIgnoreCase("empty")) {
                 exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
@@ -283,55 +313,33 @@ public class CSVLoader {
             long insertCount;
             long ackCount;
             long rowsQueued;
+            final CSVLoader errHandler = new CSVLoader();
+            final CSVDataLoader dataLoader;
 
             if (config.useSuppliedProcedure) {
-                if (!CSVFileReader.initializeReader(cfg, csvClient, listReader)) {
-                    System.exit(-1);
-                }
-
-                CSVFileReader csvReader = new CSVFileReader();
-                Thread readerThread = new Thread(csvReader);
-                readerThread.setName("CSVFileReader");
-                readerThread.setDaemon(true);
-
-                readerThread.start();
-                readerThread.join();
-
-                readerTime = (csvReader.m_parsingTime) / 1000000;
-
-                insertTimeEnd = System.currentTimeMillis();
-
-                csvClient.drain();
-                csvClient.close();
-                insertCount = csvReader.m_processedCount.get();
-                ackCount = csvReader.m_acknowledgedCount.get();
-                rowsQueued = CSVFileReader.m_totalRowCount.get();
+                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
+            } else {
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
             }
-            else {
-                //CSVFileReaderBL.initializeReader(cfg, csvClient, listReader);
-                CSVFileReaderBL.m_config = cfg;
-                CSVFileReaderBL.m_csvClient = csvClient;
-                CSVFileReaderBL.m_listReader = listReader;
 
-                CSVFileReaderBL csvReader = new CSVFileReaderBL();
-                Thread readerThread = new Thread(csvReader);
-                readerThread.setName("CSVFileReader");
-                readerThread.setDaemon(true);
+            CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
-                //Wait for reader to finish.
-                readerThread.start();
-                readerThread.join();
+            CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
+            Thread readerThread = new Thread(csvReader);
+            readerThread.setName("CSVFileReader");
+            readerThread.setDaemon(true);
 
-                readerTime = (csvReader.m_parsingTime) / 1000000;
+            //Wait for reader to finish.
+            readerThread.start();
+            readerThread.join();
 
-                insertTimeEnd = System.currentTimeMillis();
+            insertTimeEnd = System.currentTimeMillis();
 
-                csvClient.close();
-                readerTime = (csvReader.m_parsingTime) / 1000000;
-                insertCount = csvReader.bulkLoader.getCompletedRowCount();
-                ackCount = insertCount - csvReader.m_failedInsertCount.get();
-                rowsQueued = CSVFileReaderBL.m_totalRowCount.get();
-            }
+            csvClient.close();
+            readerTime = (csvReader.m_parsingTime) / 1000000;
+            insertCount = dataLoader.getProcessedRows();
+            ackCount = insertCount - dataLoader.getFailedRows();
+            rowsQueued = CSVFileReader.m_totalRowCount.get();
 
             //Close the reader.
             try {
@@ -342,16 +350,20 @@ public class CSVLoader {
                 m_log.debug("Rows Queued by Reader: " + rowsQueued);
             }
 
+            if (errHandler.hasReachedErrorLimit()) {
+                m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
+                           + config.maxerrors);
+            }
+
             m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
-                    + ackCount + " rows (final)");
-            produceFiles(ackCount, insertCount);
-            boolean noerrors = config.useSuppliedProcedure ? CSVFileReader.m_errorInfo.isEmpty() : CSVFileReaderBL.m_errorInfo.isEmpty();
+                       + ackCount + " rows (final)");
+            errHandler.produceFiles(ackCount, insertCount);
             close_cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
-                System.exit(noerrors ? 0 : -1);
+                System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);
@@ -364,6 +376,7 @@ public class CSVLoader {
         if (config.file.equals("")) {
             standin = true;
         }
+        String insertProcedure;
         if (!config.table.equals("")) {
             insertProcedure = config.table.toUpperCase() + ".insert";
         } else {
@@ -382,13 +395,12 @@ public class CSVLoader {
             System.exit(-1);
         }
 
-        String myinsert = insertProcedure;
-        myinsert = myinsert.replaceAll("\\.", "_");
-        pathInvalidrowfile = config.reportdir + "csvloader_" + myinsert + "_"
+        insertProcedure = insertProcedure.replaceAll("\\.", "_");
+        pathInvalidrowfile = config.reportdir + "csvloader_" + insertProcedure + "_"
                 + "invalidrows.csv";
-        pathLogfile = config.reportdir + "csvloader_" + myinsert + "_"
+        pathLogfile = config.reportdir + "csvloader_" + insertProcedure + "_"
                 + "log.log";
-        pathReportfile = config.reportdir + "csvloader_" + myinsert + "_"
+        pathReportfile = config.reportdir + "csvloader_" + insertProcedure + "_"
                 + "report.log";
 
         try {
@@ -421,25 +433,24 @@ public class CSVLoader {
         return client;
     }
 
-    private static void produceFiles(long ackCount, long insertCount) {
-        Map<Long, String[]> errorInfo = config.useSuppliedProcedure?CSVFileReader.m_errorInfo:CSVFileReaderBL.m_errorInfo;
-        latency = System.currentTimeMillis() - start;
+    private void produceFiles(long ackCount, long insertCount) {
+        long latency = System.currentTimeMillis() - start;
         m_log.info("Elapsed time: " + latency / 1000F
                 + " seconds");
 
         int bulkflush = 300; // by default right now
         try {
             long linect = 0;
-            for (Long irow : errorInfo.keySet()) {
-                String info[] = errorInfo.get(irow);
+            for (Map.Entry<Long, String[]> irow : m_errorInfo.entrySet()) {
+                String info[] = irow.getValue();
                 if (info.length != 2) {
                     System.out.println("internal error, information is not enough");
                 }
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
-                String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
+                String message = "Invalid input on line " + irow.getKey() + ". " + info[1];
                 m_log.error(message);
-                out_logfile.write(message + "\n  " + info[1] + "\n");
+                out_logfile.write(message + "\n  Content: " + info[0] + "\n");
                 if (linect % bulkflush == 0) {
                     out_invaliderowfile.flush();
                     out_logfile.flush();
@@ -448,8 +459,7 @@ public class CSVLoader {
 
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
-                    + " seconds\n");
+            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
             long trueSkip;
             long totolLineCnt;
             long totalRowCnt;
@@ -458,8 +468,8 @@ public class CSVLoader {
                 totolLineCnt = CSVFileReader.m_totalLineCount.get();
                 totalRowCnt = CSVFileReader.m_totalRowCount.get();
             } else {
-                totolLineCnt = CSVFileReaderBL.m_totalLineCount.get();
-                totalRowCnt = CSVFileReaderBL.m_totalRowCount.get();
+                totolLineCnt = CSVFileReader.m_totalLineCount.get();
+                totalRowCnt = CSVFileReader.m_totalRowCount.get();
             }
 
             //get the actual number of lines skipped
@@ -482,7 +492,7 @@ public class CSVLoader {
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
             out_reportfile.write("Number of rows that could not be inserted: "
-                    + errorInfo.size() + "\n");
+                    + m_errorInfo.size() + "\n");
             out_reportfile.write("CSVLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
@@ -504,26 +514,8 @@ public class CSVLoader {
 
     private static void close_cleanup() throws IOException,
             InterruptedException {
-        if (config != null) {
-            if (config.useSuppliedProcedure) {
-                //Reset all this for tests which uses main to load csv data.
-                CSVFileReader.m_errorInfo.clear();
-                CSVFileReader.m_errored = false;
-                CSVFileReader.m_totalLineCount = new AtomicLong(0);
-                CSVFileReader.m_totalRowCount = new AtomicLong(0);
-            }
-            else {
-                //Reset all this for tests which uses main to load csv data.
-                CSVFileReaderBL.m_errorInfo.clear();
-                CSVFileReaderBL.m_errored = false;
-                CSVFileReaderBL.m_totalLineCount = new AtomicLong(0);
-                CSVFileReaderBL.m_totalRowCount = new AtomicLong(0);
-            }
-        }
-
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();
-
     }
 }
