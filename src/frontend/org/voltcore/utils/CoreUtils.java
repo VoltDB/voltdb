@@ -633,6 +633,8 @@ public class CoreUtils {
         }, interval, TimeUnit.MILLISECONDS);
     }
 
+    public static final int CORE_UTIL_LOCK_SPINS = Integer.getInteger("CORE_UTIL_LOCK_SPINS", 128);
+
     /*
      * Spinning lock adapted from LinkedTransferQueue.take() spin then block strategy
      *
@@ -644,7 +646,7 @@ public class CoreUtils {
      * http://creativecommons.org/publicdomain/zero/1.0/
      */
     public static void spinLock(ReentrantLock lock) {
-        int spins = 128;
+        int spins = CORE_UTIL_LOCK_SPINS;
         ThreadLocalRandom randomYields = null;
 
         for (;;) {
