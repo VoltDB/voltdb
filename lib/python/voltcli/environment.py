@@ -103,6 +103,7 @@ java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
 java_opts.append('-XX:+UseParNewGC')
+java_opts.append('-XX:+AlwaysPreTouch')
 java_opts.append('-XX:+UseConcMarkSweepGC')
 java_opts.append('-XX:+CMSParallelRemarkEnabled')
 java_opts.append('-XX:+UseTLAB')
