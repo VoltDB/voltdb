@@ -29,6 +29,7 @@ import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
@@ -439,7 +440,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "AUTOGEN_IDX_CT_TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", IndexAVL.AUTO_GEN_IDX_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,

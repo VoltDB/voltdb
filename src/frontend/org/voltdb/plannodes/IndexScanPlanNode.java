@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -693,7 +694,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("AUTOGEN_IDX_PK_") ||
+        if (m_targetIndexName.startsWith(IndexAVL.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
             m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
             indexDescription = " using its primary key index";
         }

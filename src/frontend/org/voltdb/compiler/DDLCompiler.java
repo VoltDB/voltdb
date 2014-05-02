@@ -39,6 +39,7 @@ import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
@@ -223,10 +224,7 @@ public class DDLCompiler {
             "\\s+" +                                // one or more spaces
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
-            "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
-            "\\s+" +                                //   one or more spaces
-            ".+)" +                                 //   end SELECT or DML statement
+            "(.+)" +                                // (3) SELECT or DML statement
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of DDL statement
             );
@@ -1279,7 +1277,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("AUTOGEN_IDX_") == false) {
+                    if (indexName.startsWith(IndexAVL.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1288,7 +1286,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("AUTOGEN_IDX_") == true) {
+                    if (indexName.startsWith(IndexAVL.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1665,7 +1663,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith("AUTOGEN_") == false) {
+                if (index.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());

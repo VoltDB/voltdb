@@ -17,10 +17,14 @@
 
 package org.voltdb.utils;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
@@ -104,10 +108,25 @@ public abstract class CatalogSchemaTools {
             else if (defaultvalue.toLowerCase().equals("null") && nullable) {
                 defaultvalue = null;
             }
-            else { // XXX: if (defaulttype != VoltType.VOLTFUNCTION) {
-                // TODO: Escape strings properly
-                defaultvalue = defaultvalue.replace("\'", "\'\'");
-                defaultvalue = "'" + defaultvalue + "'";
+            else {
+                if (col_type == VoltType.TIMESTAMP) {
+                    if (defaultvalue.startsWith("CURRENT_TIMESTAMP")) {
+                        defaultvalue = "CURRENT_TIMESTAMP";
+                    }
+                    else {
+                        assert(defaultvalue.matches("[0-9]+"));
+                        long epoch = Long.parseLong(defaultvalue);
+                        Date d = new Date(epoch / 1000);
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        defaultvalue = "\'" + sdf.format(d) + "." + String.valueOf(epoch % 1000000) + "\'";
+                    }
+                }
+                else {
+                    // XXX: if (defaulttype != VoltType.VOLTFUNCTION) {
+                    // TODO: Escape strings properly
+                    defaultvalue = defaultvalue.replace("\'", "\'\'");
+                    defaultvalue = "'" + defaultvalue + "'";
+                }
             }
             if (defaultvalue == null) {
                 ret += (!nullable ? " NOT NULL" : "");
@@ -168,7 +187,7 @@ public abstract class CatalogSchemaTools {
                     // Get the ConstraintType.
 
                     ret += add + spacer;
-                    if (!catalog_const.getTypeName().startsWith("AUTOGEN_")) {
+                    if (!catalog_const.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX)) {
                         ret += "CONSTRAINT " + catalog_const.getTypeName() + " ";
                     }
                     if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
@@ -213,7 +232,10 @@ public abstract class CatalogSchemaTools {
                     }
 
                 }
-                skip_indexes.add(catalog_idx);
+                if (catalog_idx.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX) ||
+                        catalog_idx.getTypeName().startsWith("MATVIEW_PK_")) {
+                    skip_indexes.add(catalog_idx);
+                }
 
             // Foreign Key
             } else if (const_type == ConstraintType.FOREIGN_KEY) {
@@ -381,8 +403,8 @@ public abstract class CatalogSchemaTools {
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
         if (!proc.getHasjava()) {
             // SQL Statement procedure
-            ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS\n";
-            String sqlStmt = proc.getStatements().get("SQL").getSqltext().trim();
+            ret = "CREATE PROCEDURE " + proc.getClassname() + roleNames + "\n" + spacer + "AS\n";
+            String sqlStmt = proc.getStatements().get("SQL").getSqltext();
             if (sqlStmt.endsWith(";")) {
                 ret += spacer + sqlStmt + "\n";
             }
@@ -396,7 +418,7 @@ public abstract class CatalogSchemaTools {
         }
         else {
             // Groovy procedure
-            ret = "CREATE PROCEDURE " + proc.getTypeName() + roleNames + "\n" + spacer + "AS ###";
+            ret = "CREATE PROCEDURE " + proc.getClassname() + roleNames + "\n" + spacer + "AS ###";
             ret += annot.scriptImpl + "### LANGUAGE GROOVY;\n";
         }
         if (proc.getSinglepartition()) {
@@ -440,9 +462,18 @@ public abstract class CatalogSchemaTools {
         }
         ret += "\n";
 
+        List<Table> viewList = new ArrayList<Table>();
         for (Table table : db.getTables()) {
             Object annotation = table.getAnnotation();
-            String viewQuery = annotation == null ? null : ((TableAnnotation)annotation).ddl;
+            if (annotation != null && ((TableAnnotation)annotation).ddl != null) {
+                viewList.add(table);
+                continue;
+            }
+            ret += CatalogSchemaTools.toSchema(table, null, CatalogUtil.isTableExportOnly(db, table));
+        }
+        // A View cannot preceed a table that it depends on in the DDL
+        for (Table table : viewList) {
+            String viewQuery = ((TableAnnotation)table.getAnnotation()).ddl;
             ret += CatalogSchemaTools.toSchema(table, viewQuery, CatalogUtil.isTableExportOnly(db, table));
         }
         ret += "\n";

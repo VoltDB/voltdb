@@ -2016,11 +2016,11 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
-        // A unique index on the partitioning key ( non-primary key) gets one error.
-        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
-        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+//        // A unique index on the partitioning key ( non-primary key) gets one error.
+//        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+//                "PARTITION TABLE t0 ON COLUMN name;\n" +
+//                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+//        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
 
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.

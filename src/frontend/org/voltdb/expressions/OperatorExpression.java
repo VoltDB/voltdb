@@ -152,6 +152,11 @@ public class OperatorExpression extends AbstractExpression {
         if (type == ExpressionType.OPERATOR_CAST) {
             return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
         }
+        if (type == ExpressionType.OPERATOR_CASE_WHEN) {
+            return "CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+                    m_right.m_left.explain(impliedTableName) + " ELSE " +
+                    m_right.m_right.explain(impliedTableName) + " END";
+        }
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";

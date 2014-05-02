@@ -64,7 +64,6 @@ public abstract class StatementCompiler {
         // Cleanup whitespace newlines for catalog compatibility
         // and to make statement parsing easier.
         stmt = stmt.replaceAll("\n", " ");
-        stmt = stmt.trim();
         compiler.addInfo("Compiling Statement: " + stmt);
 
         // determine the type of the query

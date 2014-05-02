@@ -53,6 +53,7 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -1090,7 +1091,7 @@ public class VoltCompiler {
             // Throw compiler exception.
             String indexName = index.getTypeName();
             String keyword = "";
-            if (indexName.startsWith("AUTOGEN_IDX_PK")) {
+            if (indexName.startsWith(IndexAVL.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
                 indexName = "PRIMARY KEY";
                 keyword = "PRIMARY KEY";
             } else {

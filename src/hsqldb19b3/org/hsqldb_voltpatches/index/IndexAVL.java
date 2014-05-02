@@ -1632,6 +1632,11 @@ public class IndexAVL implements Index {
 
     private org.hsqldb_voltpatches.Expression[]    exprs; // A VoltDB extension to support indexed expressions
     private boolean         isAssumeUnique;  // A VoltDB extension to allow unique index on partitioned table without partition column included.
+    static public String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
+    static public String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
+    static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONST_";
 
     /**
      * VoltDB-specific Expression Index Constructor supports indexed expressions
@@ -1680,20 +1685,20 @@ public class IndexAVL implements Index {
         String autoGenIndexName = null;
         if (indexName.startsWith("SYS_IDX_")) {
             if (indexName.startsWith("SYS_PK_", 8)) {
-                autoGenIndexName = "AUTOGEN_IDX_PK_" + tableName;
+                autoGenIndexName = AUTO_GEN_PRIMARY_KEY_PREFIX + tableName;
             }
             else if (indexName.startsWith("SYS_CT_", 8)) {
-                autoGenIndexName = "AUTOGEN_IDX_CT_" + tableName;
+                autoGenIndexName = AUTO_GEN_CONSTRAINT_PREFIX + tableName;
             }
             else {
                 if (indexName.length() == 13) {
                     // Raw SYS_IDX_XXXXX
-                    autoGenIndexName = "AUTOGEN_IDX_" + tableName;
+                    autoGenIndexName = AUTO_GEN_IDX_PREFIX + tableName;
                 }
                 else {
-                    // Explicit name wrapped by SYS_IDX_
-                    indexName = indexName.substring(8, indexName.length()-6);
-                    autoGenIndexName = "";
+                    // Explicitly named constraint wrapped by SYS_IDX_
+                    autoGenIndexName = AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + indexName.substring(8, indexName.length()-6);
+                    indexName = autoGenIndexName;
                 }
             }
         }
@@ -1725,7 +1730,7 @@ public class IndexAVL implements Index {
 
         Object[] columnList = getColumnNameList().toArray();
         if (columnList.length > 0) {
-            if (!autoGenIndexName.equals("")) {
+            if (!autoGenIndexName.equals("") && !autoGenIndexName.startsWith(AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
                 autoGenIndexName += "_" + StringUtils.join(columnList, "_");
                 if (exprs != null) {
                     autoGenIndexName += "_" + java.lang.Math.abs(exprHash % 100000);

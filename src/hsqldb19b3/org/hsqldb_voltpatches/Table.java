@@ -2710,8 +2710,8 @@ public class Table extends TableBase implements SchemaObject {
                 if (autoGenName != null) {
                     constraintChild.attributes.put("index", autoGenName);
                     String constName;
-                    if (autoGenName.startsWith("AUTOGEN_")) {
-                        constName = "AUTOGEN_CONST" + autoGenName.substring("AUTOGEN".length());
+                    if (autoGenName.startsWith(IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
+                        constName = autoGenName.substring(IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX.length());
                     }
                     else {
                         constName = autoGenName;
@@ -2736,7 +2736,7 @@ public class Table extends TableBase implements SchemaObject {
             String autoGenName = autoGenNameMap.get(constraintName);
             if (autoGenName != null) {
                 constraintChild.attributes.put("index", autoGenName);
-                String constName = "AUTOGEN_CONST" + autoGenName.substring("AUTOGEN".length());
+                String constName = IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + autoGenName.substring(IndexAVL.AUTO_GEN_PREFIX.length());
                 autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
             }
             constraints.children.add(constraintChild);
