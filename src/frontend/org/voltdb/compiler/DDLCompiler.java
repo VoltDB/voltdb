@@ -1424,7 +1424,7 @@ public class DDLCompiler {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
                         String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
                                 "will be enforced as byte counts rather than UTF8 character counts. " +
-                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)",
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
                                 name, table.getTypeName(),
                                 VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
                         m_compiler.addWarn(msg);
