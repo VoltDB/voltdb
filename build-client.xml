@@ -214,6 +214,7 @@ JAVA COMPILATION
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   jsr166y/**/*.java
+                  io/netty_voltpatches/NinjaKeySet.java
 
                   org/voltcore/logging/Level.java
                   org/voltcore/logging/VoltLogger.java

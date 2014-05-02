@@ -86,6 +86,7 @@ if 'VOLTDB_HEAPMAX' in os.environ:
         java_opts.append('-Xmx%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
         if specifyMinimumHeapSize:
             java_opts.append('-Xms%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
+            java_opts.append('-XX:+AlwaysPreTouch')
     except ValueError:
         java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
 if 'VOLTDB_OPTS' in os.environ:

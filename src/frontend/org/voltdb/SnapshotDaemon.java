@@ -48,6 +48,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -55,6 +56,8 @@ import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
@@ -66,6 +69,7 @@ import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
@@ -265,73 +269,93 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
+    private static final long INITIATION_RESPONSE_TIMEOUT_MS = 20 * 60 * 1000;
+    // Tracks when the last @SnapshotSave call was issued.
+    // Prevents two @SnapshotSave calls being issued back to back.
+    // This is reset when a response is received for the initiation.
+    private Pair<Long, Boolean> m_lastInitiationTs = null;
     private Mailbox m_mb;
-    private void initiateSnapshotSave(final String requestId,
-                                      final long handle,
-                                      final Object params[])
+    private void initiateSnapshotSave(final long handle, final Object params[], boolean blocking)
     {
-        // TRAIL [TruncSnap:11] initiate is in a retriable code block
-        Callable<Object> work = new Callable<Object>() {
-            @Override
-            public Object call() throws Exception
-            {
-                final String jsString = String.class.cast(params[0]);
+        boolean success = true;
+        VoltTable checkResult = SnapshotUtil.constructNodeResultsTable();
+        final String jsString = String.class.cast(params[0]);
+
+        if (m_lastInitiationTs != null) {
+            final long elapsedMs = System.currentTimeMillis() - m_lastInitiationTs.getFirst();
+            // Blocking snapshot may take a long time to finish, don't time it out if it's blocking
+            if (!m_lastInitiationTs.getSecond() && elapsedMs > INITIATION_RESPONSE_TIMEOUT_MS) {
+                SNAP_LOG.warn(String.format("A snapshot was initiated %d minutes ago and hasn't received a response yet.",
+                        TimeUnit.MILLISECONDS.toMinutes(elapsedMs)));
+                m_lastInitiationTs = null;
+            } else {
+                checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null,
+                        "FAILURE", "SNAPSHOT IN PROGRESS");
+                success = false;
+            }
+        }
+
+        if (success) {
+            try {
                 final JSONObject jsObj = new JSONObject(jsString);
-                final String format = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
                 boolean initiateSnapshot;
-                VoltTable checkResult = null;
 
-                // Only do file check if this snapshot actually writes to files, stream snapshots don't
-                if (SnapshotFormat.getEnumIgnoreCase(format).isFileBased()) {
-                    // Do scan work on all known live hosts
-                    VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
-                    List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
-                    for (int hostId : liveHosts) {
-                        m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
+                // Do scan work on all known live hosts
+                VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
+                List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                for (int hostId : liveHosts) {
+                    m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
+                }
+
+                // Wait for responses from all hosts for a certain amount of time
+                Map<Integer, VoltTable> responses = Maps.newHashMap();
+                final long timeoutMs = 10 * 1000; // 10s timeout
+                final long endTime = System.currentTimeMillis() + timeoutMs;
+                SnapshotCheckResponseMessage response;
+                while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
+                    // ignore responses to previous requests
+                    if (jsObj.getString("path").equals(response.getPath()) &&
+                        jsObj.getString("nonce").equals(response.getNonce())) {
+                        responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                     }
 
-                    // Wait for responses from all hosts for a certain amount of time
-                    Map<Integer, VoltTable> responses = Maps.newHashMap();
-                    final long timeoutMs = 10 * 1000; // 10s timeout
-                    final long endTime = System.currentTimeMillis() + timeoutMs;
-                    SnapshotCheckResponseMessage response;
-                    while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
-                        // ignore responses to previous requests
-                        if (jsObj.getString("path").equals(response.getPath()) &&
-                            jsObj.getString("nonce").equals(response.getNonce())) {
-                            responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
-                        }
-
-                        if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
-                            break;
-                        }
+                    if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
+                        break;
                     }
+                }
 
-                    // Retry if timed out
-                    if (responses.size() != liveHosts.size()) {
-                        throw new CoreUtils.RetryException();
-                    }
+                if (responses.size() != liveHosts.size()) {
+                    checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null,
+                            "FAILURE", "TIMED OUT CHECKING SNAPSHOT FEASIBILITY");
+                    success = false;
+                }
+
+                if (success) {
                     // TRAIL [TruncSnap:12] all participating nodes have initiated successfully
                     // Call @SnapshotSave if check passed, return the failure otherwise
                     checkResult = VoltTableUtil.unionTables(responses.values());
-                    initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[] {checkResult});
-                } else {
-                    initiateSnapshot = true;
-                }
+                    initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[]{checkResult});
 
-                if (initiateSnapshot) {
-                    m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
-                } else if (requestId != null) {
-                    final ClientResponseImpl failureResponse =
-                            new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{checkResult}, null);
-                    saveResponseToZKAndReset(requestId, failureResponse);
+                    if (initiateSnapshot) {
+                        m_lastInitiationTs = Pair.of(System.currentTimeMillis(), blocking);
+                        m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+                    } else {
+                        success = false;
+                    }
                 }
-
-                return null;
+            } catch (JSONException e) {
+                success = false;
+                checkResult.addRow(CoreUtils.getHostIdFromHSId(m_mb.getHSId()), CoreUtils.getHostnameOrAddress(), null, "FAILURE", "ERROR PARSING JSON");
+                SNAP_LOG.warn("Error parsing JSON string: " + jsString, e);
             }
-        };
+        }
 
-        CoreUtils.retryHelper(VoltDB.instance().getSES(true), m_es, work, 3, 10, TimeUnit.SECONDS, 1, TimeUnit.HOURS);
+        if (!success) {
+            final ClientResponseImpl failureResponse =
+                    new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{checkResult}, null);
+            failureResponse.setClientHandle(handle);
+            processClientResponse(Callables.returning(failureResponse));
+        }
     }
 
     private void saveResponseToZKAndReset(String requestId, ClientResponseImpl response) throws Exception
@@ -675,6 +699,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             @Override
             public void clientCallback(ClientResponse clientResponse)
                     throws Exception {
+                m_lastInitiationTs = null;
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS){
                     loggingLog.warn(
                             "Attempt to initiate a truncation snapshot was not successful: " +
@@ -770,7 +795,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         });
         try {
             loggingLog.info("Initiating @SnapshotSave for log truncation");
-            initiateSnapshotSave(truncReqId, handle, new Object[]{jsObj.toString(4)});
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, false);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -836,6 +861,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             String jsonString = new String(data, "UTF-8");
             final JSONObject jsObj = new JSONObject(jsonString);
             final String requestId = jsObj.getString("requestId");
+            final boolean blocking = jsObj.getBoolean("block");
             /*
              * Going to reuse the request object, remove the requestId
              * field now that it is consumed
@@ -847,6 +873,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 @Override
                 public void clientCallback(ClientResponse clientResponse) {
+                    m_lastInitiationTs = null;
                     try {
                         /*
                          * If there is an error then we are done.
@@ -880,7 +907,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
-            initiateSnapshotSave(requestId, handle, new Object[]{jsObj.toString(4)});
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
             return;
         }
     }
@@ -940,6 +967,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_procedureCallbacks.put(handle, new ProcedureCallback() {
                         @Override
                         public void clientCallback(ClientResponse clientResponse) {
+                            m_lastInitiationTs = null;
                             try {
                                 /*
                                  * If there is an error then we are done
@@ -1036,8 +1064,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         }
                     });
 
-                    JSONObject jsonObj = new JSONObject(requestObj);
-                    initiateSnapshotSave(requestId, handle, new Object[]{requestObj});
+                    initiateSnapshotSave(handle, new Object[]{requestObj}, false);
                 } catch (Exception e) {
                     try {
                         userSnapshotRequestExistenceCheck(true);
@@ -1241,6 +1268,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (m_state == State.STARTUP) {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
+            RateLimitedLogger.tryLogForMessage("Blocked in scanning", System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO);
             return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);
@@ -1301,11 +1329,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 public void clientCallback(final ClientResponse clientResponse)
                         throws Exception
                 {
+                    m_lastInitiationTs = null;
                     processClientResponsePrivate(clientResponse);
                 }
 
             });
-            initiateSnapshotSave(null, handle, new Object[]{jsObj.toString(4)});
+            SNAP_LOG.info("Requesting auto snapshot to path " + m_path + " nonce " + nonce);
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, false);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -1334,6 +1364,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
 
         });
+        SNAP_LOG.info("Initiating snapshot scan of " + m_path);
         m_initiator.initiateSnapshotDaemonWork("@SnapshotScan", handle, params);
     }
 
@@ -1815,7 +1846,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
-        if (!event.truncationSnapshot) {
+        if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
         }
         final CountDownLatch latch = new CountDownLatch(1);

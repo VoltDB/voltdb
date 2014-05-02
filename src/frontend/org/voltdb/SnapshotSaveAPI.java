@@ -359,6 +359,7 @@ public class SnapshotSaveAPI
             stringer.object();
             stringer.key("txnId").value(txnId);
             stringer.key("isTruncation").value(isTruncation);
+            stringer.key("didSucceed").value(false);
             stringer.key("hostCount").value(-1);
             stringer.key("path").value(path);
             stringer.key("nonce").value(nonce);

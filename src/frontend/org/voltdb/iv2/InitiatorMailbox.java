@@ -23,23 +23,23 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
-import com.google_voltpatches.common.base.Supplier;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.messaging.DumpMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+
+import com.google_voltpatches.common.base.Supplier;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -52,7 +52,7 @@ import org.voltdb.messaging.RejoinMessage;
 public class InitiatorMailbox implements Mailbox
 {
     static final boolean LOG_TX = false;
-    private static final boolean SCHEDULE_IN_SITE_THREAD;
+    public static final boolean SCHEDULE_IN_SITE_THREAD;
     static {
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
@@ -421,8 +421,8 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    public void notifyOfSnapshotNonce(String nonce) {
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
-        m_joinProducer.notifyOfSnapshotNonce(nonce);
+        m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 }

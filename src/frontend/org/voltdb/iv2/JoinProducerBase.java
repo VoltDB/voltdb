@@ -82,7 +82,7 @@ public abstract class JoinProducerBase extends SiteTasker {
         @Override
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
-            if (event.nonce.equals(m_snapshotNonce)) {
+            if (event.nonce.equals(m_snapshotNonce) && event.didSucceed) {
                 getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
                             + "Snapshot txnId is: " + event.multipartTxnId);
                 deregister();
@@ -96,7 +96,9 @@ public abstract class JoinProducerBase extends SiteTasker {
                 m_future.set(event);
             } else {
                 getLogger().debug(m_whoami
-                        + " observed completion of irrelevant snapshot nonce: "
+                        + " observed completion of "
+                        + (event.didSucceed ? "succeeded" : "failed")
+                        + " snapshot: "
                         + event.nonce);
             }
             return null;
@@ -192,11 +194,11 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     protected abstract VoltLogger getLogger();
 
-    public void notifyOfSnapshotNonce(String nonce) {
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (nonce.equals(m_snapshotNonce)) {
             getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
             if (m_taskLog != null) {
-                m_taskLog.enableRecording();
+                m_taskLog.enableRecording(snapshotSpHandle);
             }
         }
     }

@@ -117,6 +117,9 @@ public:
     // cast as big int and peek at value. this is used by
     // index code that need a real number from a tuple.
     static inline int64_t peekAsBigInt(const NValue value) {
+        if (value.isNull()) {
+            return INT64_NULL;
+        }
         return value.castAsBigIntAndGetValue();
     }
 

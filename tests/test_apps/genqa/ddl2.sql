@@ -72,3 +72,9 @@ PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
 EXPORT TABLE export_skinny_partitioned_table2
 ;
 
+CREATE TABLE export_done_table
+(
+  txnid                     BIGINT        NOT NULL
+);
+PARTITION TABLE export_done_table ON COLUMN txnid
+;

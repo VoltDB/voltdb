@@ -17,7 +17,6 @@
 
 package org.voltcore.utils;
 
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A class for retrieving an estimated indication of the current time.
@@ -30,9 +29,17 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class EstTime {
 
-    static final AtomicLong m_now = new AtomicLong(System.currentTimeMillis());
+    static volatile long m_now = System.currentTimeMillis();
+
+    static {
+        try {
+            Class.forName("org.voltcore.utils.EstTimeUpdater");
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
 
     public static long currentTimeMillis() {
-        return m_now.get();
+        return m_now;
     }
 }

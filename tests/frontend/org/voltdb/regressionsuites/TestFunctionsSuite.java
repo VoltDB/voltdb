@@ -2083,6 +2083,187 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(null, result.getString(1));
         assertEquals(null, result.getString(2));
+
+        // Edge case: UTF-8 string can have Upper and Lower cases
+        String grussen = "grüßEN";
+        cr = client.callProcedure("P1.insert", 4, grussen, 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        // Turn on this test case when EE supports the locale CASE conversion
+//        if (isHSQL()) {
+//            assertEquals(grussen, result.getString(1));
+//            assertEquals(grussen, result.getString(2));
+//        } else {
+//            assertEquals("GRÜSSEN", result.getString(1));
+//            assertEquals("grüßen", result.getString(2));
+//        }
+    }
+
+    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Trim");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(0));
+
+        cr = client.callProcedure("TRIM_SPACE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("VoltDB   ", result.getString(2));
+        assertEquals("  VoltDB",  result.getString(3));
+        assertEquals("  VoltDB",  result.getString(4));
+        assertEquals("VoltDB",  result.getString(5));
+        assertEquals("VoltDB",  result.getString(6));
+
+
+        cr = client.callProcedure("TRIM_ANY", " ", " ", " ", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("  VoltDB",  result.getString(2));
+        assertEquals("VoltDB",  result.getString(3));
+
+        try {
+            cr = client.callProcedure("TRIM_ANY", "", "", "", 1);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("data exception"));
+            assertTrue(ex.getMessage().contains("trim error"));
+        }
+
+        // Test TRIM with other character
+        cr = client.callProcedure("P1.insert", 2, "vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "v", "B", "B", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDBBB", result.getString(1));
+        assertEquals("vVoltD", result.getString(2));
+        assertEquals("vVoltD", result.getString(3));
+
+        // Multiple character trim, Hsql does not support
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "vV", "BB", "Vv", 2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB", result.getString(1));
+            assertEquals("vVoltDB", result.getString(2));
+            assertEquals("vVoltDBBB", result.getString(3));
+        }
+
+        // Test null trim character
+        cr = client.callProcedure("TRIM_ANY", null, null, null, 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+        assertEquals(null, result.getString(2));
+        assertEquals(null, result.getString(3));
+
+
+        // Test non-ASCII trim_char
+        cr = client.callProcedure("P1.insert", 3, "贾vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "v", "贾", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB", result.getString(1));
+        assertEquals("贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        if (!isHSQL()) {
+            // Complete match
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB", "贾vVoltDBBB", "贾vVoltDBBB", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("", result.getString(1));
+            assertEquals("", result.getString(2));
+            assertEquals("", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB_TEST", "贾vVoltDBBB贾vVoltDBBB", "贾vVoltDBBBT", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾vVoltDBBB", result.getString(1));
+            assertEquals("贾vVoltDBBB", result.getString(2));
+            assertEquals("贾vVoltDBBB", result.getString(3));
+        }
+
+        // Complicated test
+        cr = client.callProcedure("P1.insert", 4, "贾贾vVoltDBBB贾贾贾", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // UTF-8 hex, 贾: 0xe8 0xb4 0xbe, 辴: 0xe8 0xbe 0xb4
+        cr = client.callProcedure("TRIM_ANY", "辴", "辴", "辴", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "贾", "贾", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "贾辴", "贾辴", "贾辴", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾贾vV", "贾贾", "B贾贾贾", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾", result.getString(2));
+            assertEquals("贾贾vVoltDBB", result.getString(3));
+        }
+
+        cr = client.callProcedure("P1.insert", 5, "vVoltADBDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
     }
 
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2114,6 +2295,242 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
+    }
+
+    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Replace");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("REPLACE", "o", "XX", 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("fXXXX", result.getString(1));
+
+        result = client.callProcedure("REPLACE", "o", null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        if (isHSQL()) {
+            // NULL means empty string for Hsql
+            assertEquals("f", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
+
+        result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        if (isHSQL()) {
+            // NULL means not change for the original string for Hsql
+            assertEquals("foo", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
+
+        result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("Vo", result.getString(1));
+
+        // UTF-8 String
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("REPLACE", "鑫", "XX", 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XX@VoltDB", result.getString(1));
+    }
+
+    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Overlay");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "Jia", 4, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia_", 4, 1, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia_VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4.9, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        // Test NULL results
+        result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", null, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "Jia", 4, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJialtDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "J", 4, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJVoltDB", result.getString(1));
+
+
+        // Test UTF-8 OVERLAY
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia@VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 8, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 9, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 7, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJiaB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 8, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "_", 3, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫_VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", " at ", 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾 at ltDB", result.getString(1));
+
+
+        result = client.callProcedure("OVERLAY", "XinJia", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "石宁", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+        // Hsql has bugs on string(substring) index
+        if (!isHSQL()) {
+            result = client.callProcedure("OVERLAY", "XinJia", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDB石宁", result.getString(1));
+
+            // various start argument tests
+            // start from 0, not 1, but treat it at least 1
+            result = client.callProcedure("OVERLAY", "XinJia", 100, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+            // various length argument
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 0, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia鑫@VoltDB", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 10, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia", result.getString(1));
+
+
+            // Negative tests
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument -10"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument 0"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 1, -1, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, negative length argument -1"));
+            }
+        }
+    }
+
+    // Unicode character to UTF8 string character
+    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test CHAR");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        // Hsql has wrong answers.
+        if (isHSQL()) return;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("CHAR", 36158, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾", result.getString(1));
+
+        result = client.callProcedure("CHAR", 37995, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("鑫", result.getString(1));
+
+        String voltDB = "VoltDB";
+
+        for (int i = 0; i < voltDB.length(); i++) {
+            char ch = voltDB.charAt(i);
+            result = client.callProcedure("CHAR", (int)ch, 1).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(String.valueOf(ch), result.getString(1));
+        }
+
+        result = client.callProcedure("CHAR", null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2725,7 +3142,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
         project.addStmtProcedure("LOWER_UPPER", "select id, LOWER(DESC), UPPER(DESC) from P1 where id = ?");
+
+        project.addStmtProcedure("TRIM_SPACE", "select id, LTRIM(DESC), TRIM(LEADING ' ' FROM DESC), " +
+                "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
+        project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM DESC), TRIM(TRAILING ? FROM DESC), " +
+                "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
+
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
+
+        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 

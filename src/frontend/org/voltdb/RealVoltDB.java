@@ -153,7 +153,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         "                Changes to this file will be overwritten. Copy it elsewhere if you",
         "                want to use it as a starting point for a custom configuration. -->",
         "<deployment>",
-        "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
+        "   <cluster hostcount=\"1\" />",
         "   <httpd enabled=\"true\">",
         "      <jsonapi enabled=\"true\" />",
         "   </httpd>",
@@ -166,9 +166,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.2";
+    static final String m_defaultVersionString = "4.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -492,8 +492,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 Class<?> elasticJoinCoordClass =
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger);
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, m_catalogContext.cluster.getVoltroot());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(m_deployment.getCluster().getKfactor());
                 } catch (Exception e) {

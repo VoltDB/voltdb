@@ -353,4 +353,33 @@ public class TestClientFeatures extends TestCase {
         addrs = client.getConnectedHostList();
         assertEquals(0, addrs.size());
     }
+
+    public void testBackpressureTimeout() throws Exception {
+        final ClientImpl client = (ClientImpl)ClientFactory.createClient();
+        client.createConnection("localhost");
+        client.backpressureBarrier(System.nanoTime(), TimeUnit.DAYS.toNanos(1));
+        client.m_listener.backpressure(true);
+
+        long start = System.nanoTime();
+        assertTrue(client.backpressureBarrier(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(200)));
+        long delta = System.nanoTime() - start;
+        assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(200));
+        assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
+
+        start = System.nanoTime();
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(20);
+                    client.m_listener.backpressure(false);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+        assertFalse(client.backpressureBarrier(System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
+        assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
+        assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(20));
+    }
 }
