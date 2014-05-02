@@ -477,7 +477,6 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
         assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
         assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
         assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
