@@ -327,7 +327,7 @@ public abstract class VoltTypeUtil {
             result = new java.sql.Timestamp(timestamp/1000);
             result.setNanos(((int) (timestamp % 1000000))*1000);
         } else {
-            result = new java.sql.Timestamp(timestamp/1000 - 1000);
+            result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
 
             int remaining = (int) (timestamp % 1000000);
             result.setNanos((remaining+1000000) * 1000 );
