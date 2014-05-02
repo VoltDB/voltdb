@@ -20,7 +20,7 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
+import org.voltdb.VoltDB;
 
 /**
  * This class is built to create a single in-memory database
@@ -104,6 +104,9 @@ public class HSQLInterface {
         } catch (HsqlException e) {
             e.printStackTrace();
         }
+
+        // specifically set the timezone to UTC
+        VoltDB.setDefaultTimezone();
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
