@@ -75,8 +75,8 @@ class TableTupleExportTest : public Test {
         columnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH * 2);
         columnAllowNull.push_back(allownull);
 
-        m_schema = TupleSchema::createTupleSchema(
-            columnTypes, columnLengths, columnAllowNull, true /* allow inlined strs */);
+        m_schema = TupleSchema::createTupleSchemaForTest(
+            columnTypes, columnLengths, columnAllowNull);
     }
 
     ~TableTupleExportTest() {

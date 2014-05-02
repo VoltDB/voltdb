@@ -105,6 +105,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
+
+    m_preTruncateTable = NULL;
 }
 
 PersistentTable::~PersistentTable()
@@ -215,6 +217,11 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
+    if (originalTable->m_tableStreamer != NULL) {
+        // Elastic Index may complete when undo Truncate
+        this->unsetPreTruncateTable();
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -238,6 +245,18 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
 
+    if (originalTable->m_tableStreamer != NULL) {
+        std::stringstream message;
+        message << "Transfering table stream after truncation of table ";
+        message << name() << " partition " << originalTable->m_tableStreamer->getPartitionID() << '\n';
+        std::string str = message.str();
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
+
+        originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+
+        this->unsetPreTruncateTable();
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -257,10 +276,16 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
         return ;
     }
+
     assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
+    if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is an Elastic Index work going on and it should continue access the old table.
+        // Add one reference count to keep the original table.
+        emptyTable->setPreTruncateTable(this);
+    }
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
@@ -1019,16 +1044,7 @@ bool PersistentTable::activateStream(
      */
     assert(m_tableStreamer == NULL || partitionId == m_tableStreamer->getPartitionID());
     if (m_tableStreamer == NULL) {
-        std::stringstream message;
-        message << "Activating table stream for table " << tableId << " partition " << partitionId << std::endl;
-        std::string str = message.str();
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
         m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
-    } else {
-        std::stringstream message;
-        message << "Table streamer already existed for table " << tableId << " partition " << partitionId << std::endl;
-        std::string str = message.str();
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
     }
 
     std::vector<std::string> predicateStrings;
@@ -1082,7 +1098,8 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
         char errMsg[1024];
-        snprintf(errMsg, 1024, "No table streamer for table %s.", name().c_str());
+        snprintf(errMsg, 1024, "No table streamer of Type %s for table %s.",
+                tableStreamTypeToString(streamType).c_str(), name().c_str());
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
 
         return TABLE_STREAM_SERIALIZATION_ERROR;

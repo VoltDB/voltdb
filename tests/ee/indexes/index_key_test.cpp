@@ -41,7 +41,7 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_BIGINT);
     std::vector<int32_t> columnLengths(1, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(1, true);
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
     voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
@@ -88,7 +88,7 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     std::vector<voltdb::ValueType> columnTypes(2, voltdb::VALUE_TYPE_BIGINT);
     std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(2, true);
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
 
     voltdb::IntsKey<2>::KeyComparator comparator(keySchema);
@@ -141,7 +141,7 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     std::vector<voltdb::ValueType> columnTypes(2, voltdb::VALUE_TYPE_BIGINT);
     std::vector<int32_t> columnLengths(2, NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
     std::vector<bool> columnAllowNull(2, true);
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
 
     voltdb::IntsKey<2>::KeyComparator comparator(keySchema);
@@ -194,7 +194,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
     voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
@@ -252,7 +252,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
     voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
@@ -323,7 +323,7 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
     voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
@@ -362,7 +362,7 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
     columnTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
     columnLengths.push_back(30);
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::GenericKey<40>::KeyComparator comparator(keySchema);
     voltdb::GenericKey<40>::KeyHasher hasher(keySchema);
@@ -409,7 +409,7 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
     columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
-    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
     voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
 

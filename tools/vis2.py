@@ -48,11 +48,15 @@ def get_stats(hostname, port, days):
     conn.close()
 
     # keyed on app name, value is a list of runs sorted chronologically
+    maxdate = datetime.datetime(1970,1,1,0,0,0)
+    mindate = datetime.datetime(2038,1,19,0,0,0)
     stats = dict()
     run_stat_keys = ['app', 'nodes', 'branch', 'date', 'tps', 'lat95', 'lat99']
     for row in resp.tables[0].tuples:
         group = (row[0],row[1])
         app_stats = []
+        maxdate = max(maxdate, row[3])
+        mindate = min(mindate, row[3])
         if group not in stats:
             stats[group] = app_stats
         else:
@@ -60,26 +64,26 @@ def get_stats(hostname, port, days):
         run_stats = dict(zip(run_stat_keys, row))
         app_stats.append(run_stats)
 
-    return stats
+    return (stats, mindate, maxdate)
 
 class Plot:
     DPI = 100.0
 
-    def __init__(self, title, xlabel, ylabel, filename, w, h, ndays):
+    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax):
         self.filename = filename
-        self.ndays = ndays
         self.legends = {}
-        w = w == None and 1200 or w
-        h = h == None and 400 or h
+        w = w == None and 2000 or w
+        h = h == None and 1000 or h
+        self.xmax = xmax
+        self.xmin = xmin
+
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title(title)
-        plt.xticks(fontsize=10)
-        plt.yticks(fontsize=10)
-        plt.tick_params(axis='y', labelleft=True, labelright=True)
-        plt.ylabel(ylabel, fontsize=10)
-        plt.xlabel(xlabel, fontsize=10)
+        plt.tick_params(axis='x', which='major', labelsize=16)
+        plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
+        plt.grid(True)
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend):
@@ -89,18 +93,20 @@ class Plot:
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
+        loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
+        self.ax.xaxis.set_major_locator(loc)
+        self.ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(n=7))
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        #xmax = datetime.datetime.today().toordinal()
-        #plt.xlim((xmax-self.ndays, xmax))
-        plt.legend(prop={'size': 10}, loc=2)
+        plt.xlim((self.xmin.toordinal(), self.xmax.toordinal()))
+        plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, series):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate):
     global mc
     plot_data = dict()
     for run in data:
@@ -118,7 +124,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series):
     if len(plot_data) == 0:
         return
 
-    pl = Plot(title, xlabel, ylabel, filename, width, height, 1)
+    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
     for b,bd in plot_data.items():
         for k,v in bd.items():
             v = sorted(v, key=lambda x: x[0])
@@ -239,7 +245,9 @@ def main():
         height = int(sys.argv[5])
 
     # show all the history
-    stats = get_stats(STATS_SERVER, 21212, ndays)
+    (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
+    mindate = (mindate).replace(hour=0, minute=0, second=0, microsecond=0)
+    maxdate = (maxdate + datetime.timedelta(days=1)).replace(minute=0, hour=0, second=0, microsecond=0)
 
     root_path = path
     filenames = []              # (appname, latency, throughput)
@@ -268,10 +276,12 @@ def main():
             title = app + " " + r[1]
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0])
+            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
 
         fns.append(iorder)
         filenames.append(tuple(fns))
+
+    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

@@ -7,7 +7,7 @@ from fabric_ssh_config import getSSHInfoForHost
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
-defaultlicensedays = 37 #default trial license in kit = 30 days + 1 week
+defaultlicensedays = 45 #default trial license length
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
@@ -198,6 +198,8 @@ if len(sys.argv) == 3:
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
+build_errors=False
+
 versionCentos = "unknown"
 versionMac = "unknown"
 releaseDir = "unknown"
@@ -208,72 +210,90 @@ MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
-with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-    versionCentos = checkoutCode(voltdbTreeish, proTreeish)
-    if oneOff:
-        releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
-            (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
-    else:
-        releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
-    makeReleaseDir(releaseDir)
-    print "VERSION: " + versionCentos
-    buildCommunity()
-    copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
-    buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
-    makeTrialLicense()
-    copyTrialLicenseToReleaseDir(releaseDir)
-    if versionHasZipTarget():
-        makeEnterpriseZip()
-        copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
+try:
+    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+        versionCentos = checkoutCode(voltdbTreeish, proTreeish)
+        if oneOff:
+            releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
+                (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
+        else:
+            releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
+        makeReleaseDir(releaseDir)
+        print "VERSION: " + versionCentos
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        buildPro()
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        makeTrialLicense()
+        copyTrialLicenseToReleaseDir(releaseDir)
+        if versionHasZipTarget():
+            makeEnterpriseZip()
+            copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
+except Exception as e:
+    print "Coult not build LINUX kit: " + str(e)
+    build_errors=True
 
+try:
 # build kits on the mini
-with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-    versionMac = checkoutCode(voltdbTreeish, proTreeish)
-    assert versionCentos == versionMac
-    buildCommunity()
-    copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-    buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+        versionMac = checkoutCode(voltdbTreeish, proTreeish)
+        assert versionCentos == versionMac
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        buildPro()
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+except Exception as e:
+    print "Coult not build MAC kit: " + str(e)
+    build_errors=True
 
 # build debian kit
-with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
-    debbuilddir = "%s/deb_build/" % builddir
-    run("rm -rf " + debbuilddir)
-    run("mkdir -p " + debbuilddir)
+try:
+    with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
+        debbuilddir = "%s/deb_build/" % builddir
+        run("rm -rf " + debbuilddir)
+        run("mkdir -p " + debbuilddir)
 
-    with cd(debbuilddir):
-        put ("tools/voltdb-install.py",".")
+        with cd(debbuilddir):
+            put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
-        put("%s/%s" % (releaseDir, commbld),".")
-        run ("sudo python voltdb-install.py -D " + commbld)
-        get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("sudo python voltdb-install.py -D " + commbld)
+            get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
-        put("%s/%s" % (releaseDir, entbld),".")
-        run ("sudo python voltdb-install.py -D " + entbld)
-        get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("sudo python voltdb-install.py -D " + entbld)
+            get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
+except Exception as e:
+    print "Coult not build debian kit: " + str(e)
+    build_errors=True
 
-# build rpm kit
-with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-    rpmbuilddir = "%s/rpm_build/" % builddir
-    run("rm -rf " + rpmbuilddir)
-    run("mkdir -p " + rpmbuilddir)
+try:
+    # build rpm kit
+    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+        rpmbuilddir = "%s/rpm_build/" % builddir
+        run("rm -rf " + rpmbuilddir)
+        run("mkdir -p " + rpmbuilddir)
 
-    with cd(rpmbuilddir):
-        put ("tools/voltdb-install.py",".")
+        with cd(rpmbuilddir):
+            put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
-        put("%s/%s" % (releaseDir, commbld),".")
-        run ("python2.6 voltdb-install.py -R " + commbld)
-        get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("python2.6 voltdb-install.py -R " + commbld)
+            get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
-        put("%s/%s" % (releaseDir, entbld),".")
-        run ("python2.6 voltdb-install.py -R " + entbld)
-        get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("python2.6 voltdb-install.py -R " + entbld)
+            get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+
+except Exception as e:
+    print "Coult not build rpm kit: " + str(e)
+    build_errors=True
 
 computeChecksums(releaseDir)
+exit (build_errors)
 #archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
 #backupReleaseDir(releaseDir, archiveDir, versionCentos)

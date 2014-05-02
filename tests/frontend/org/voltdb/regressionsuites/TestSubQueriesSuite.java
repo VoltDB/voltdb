@@ -38,29 +38,29 @@ public class TestSubQueriesSuite extends RegressionSuite {
         super(name);
     }
 
-
-    private final String[] procs = {"R1.insert", "R2.insert", /* "P1.insert", "P2.insert", "P3.insert"*/};
-    private final String [] tbs =  {"R1","R2"/*,"P1","P2","P3"*/};
-
     private void loadData(Client client) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = null;
 
+        String [] tbsData =  {"R1","R2","P1","P2","P3"};
+
         // Empty data from table.
-        for (String tb: tbs) {
+        for (String tb: tbsData) {
             cr = client.callProcedure("@AdHoc", "delete from " + tb);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
 
-        // Insert records into the table.
-        for (String tb: procs) {
-                                      // id, wage, dept, tm
-            cr = client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 2,  20,  1 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 3,  30,  1 , "2013-07-18 10:40:01.123457");
-            cr = client.callProcedure(tb, 4,  40,  2 , "2013-08-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+            // Insert records into the table.
+            String proc = tb + ".insert";
+            // id, wage, dept, tm
+            cr = client.callProcedure(proc, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            cr = client.callProcedure(proc, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            cr = client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
         }
     }
+
+    private final String[] procs = {"R1.insert", "R2.insert", /* "P1.insert", "P2.insert", "P3.insert"*/};
+    private final String [] tbs =  {"R1","R2"/*,"P1","P2","P3"*/};
 
     /**
      * Simple sub-query
@@ -190,8 +190,47 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
                         {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
             }
-        }
 
+            vt = client.callProcedure("@AdHoc",
+                    "select T2.id " +
+                    "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
+                    "ORDER BY T2.id").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
+                    {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
+        }
+    }
+
+    public void testSubSelects_from_replicated() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc",
+                "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
+                "where T1.ID = P1.ID and T1.ID < 4 order by P1.ID;").getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] { {1,10}, {2, 20}, {3, 30}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
+                "where T1.ID = P1.ID and T1.ID = 3 order by P1.ID;").getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] { {3, 30}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
+                "where T1.ID = P1.ID and P1.ID = 3 order by P1.ID;").getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] { {3, 30}});
+
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
+                "where T1.ID = P1.WAGE / 10 order by P1.ID;").getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] { {1, 10}, {2, 20}, {3, 30}, {4, 40}, {5, 50}});
     }
 
 

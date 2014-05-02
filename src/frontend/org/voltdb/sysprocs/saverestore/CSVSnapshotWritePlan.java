@@ -26,10 +26,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CSVSnapshotFilter;
 import org.voltdb.SimpleFileSnapshotDataTarget;
@@ -39,7 +41,6 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -66,15 +67,15 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
     static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     @Override
-    protected boolean createSetupInternal(
+    public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result,
+            final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
-            long timestamp) throws IOException
+            long timestamp)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -88,12 +89,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         List<Long> sitesToInclude = CSVSnapshotWritePlan.computeDedupedLocalSites(txnId, tracker);
         // If there's no work to do on this host, just claim success and get out:
         if (sitesToInclude.isEmpty() && !tracker.isFirstHost()) {
-            return false;
+            return null;
         }
-
-        NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, null, timestamp,
-                context.getNumberOfPartitions());
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         final AtomicInteger numTables = new AtomicInteger(tables.size());
@@ -106,7 +103,6 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                     SnapshotFormat.CSV,
                     tables.toArray(new Table[0]));
 
-        SnapshotDataTarget sdt = null;
         boolean noTargetsCreated = true;
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
@@ -127,49 +123,28 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                 continue;
             }
 
-            File saveFilePath = null;
-            saveFilePath = SnapshotUtil.constructFileForTable(
-                    table,
-                    file_path,
-                    file_nonce,
-                    SnapshotFormat.CSV,
-                    context.getHostId());
+            List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
+            filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
 
-            try {
-                sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated());
-
-                m_targets.add(sdt);
-                final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(),
-                        numTables, snapshotRecord);
-                sdt.setOnCloseHandler(onClose);
-
-                List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
-                filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
-
-                final SnapshotTableTask task =
+            final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
-                            sdt,
                             filters.toArray(new SnapshotDataFilter[filters.size()]),
                             null,
                             false);
 
-                if (table.getIsreplicated()) {
-                    replicatedSnapshotTasks.add(task);
-                } else {
-                    partitionedSnapshotTasks.add(task);
-                }
-
-                noTargetsCreated = false;
-                result.addRow(context.getHostId(),
-                        hostname,
-                        table.getTypeName(),
-                        "SUCCESS",
-                        "");
-            } catch (IOException ex) {
-                handleTargetCreationError(sdt, context, file_nonce, hostname, table.getTypeName(),
-                        ex, result);
+            if (table.getIsreplicated()) {
+                replicatedSnapshotTasks.add(task);
+            } else {
+                partitionedSnapshotTasks.add(task);
             }
+
+            noTargetsCreated = false;
+            result.addRow(context.getHostId(),
+                    CoreUtils.getHostnameOrAddress(),
+                    table.getTypeName(),
+                    "SUCCESS",
+                    "");
         }
 
         if (noTargetsCreated) {
@@ -181,7 +156,73 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         // one node, we can go ahead and distribute them across all of the sites on that node.
         placePartitionedTasks(partitionedSnapshotTasks, sitesToInclude);
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
-        return noTargetsCreated;
+
+        // All IO work will be deferred and be run on the dedicated snapshot IO thread
+        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
+                exportSequenceNumbers, timestamp, numTables, snapshotRecord,
+                partitionedSnapshotTasks, replicatedSnapshotTasks);
+    }
+
+    private Callable<Boolean> createDeferredSetup(final String file_path,
+                                                  final String file_nonce,
+                                                  final long txnId,
+                                                  final Map<Integer, Long> partitionTransactionIds,
+                                                  final SystemProcedureExecutionContext context,
+                                                  final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                  final long timestamp,
+                                                  final AtomicInteger numTables,
+                                                  final SnapshotRegistry.Snapshot snapshotRecord,
+                                                  final ArrayList<SnapshotTableTask> partitionedSnapshotTasks,
+                                                  final ArrayList<SnapshotTableTask> replicatedSnapshotTasks)
+    {
+        return new Callable<Boolean>() {
+            @Override
+            public Boolean call() throws Exception
+            {
+                NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
+                        txnId, partitionTransactionIds, context, exportSequenceNumbers, null, timestamp,
+                        context.getNumberOfPartitions());
+
+                for (SnapshotTableTask task : replicatedSnapshotTasks) {
+                    final SnapshotDataTarget target = createDataTargetForTable(file_path, file_nonce,
+                            context.getHostId(), numTables, snapshotRecord, task.m_table);
+                    task.setTarget(target);
+                }
+
+                for (SnapshotTableTask task : partitionedSnapshotTasks) {
+                    final SnapshotDataTarget target = createDataTargetForTable(file_path, file_nonce,
+                            context.getHostId(), numTables, snapshotRecord, task.m_table);
+                    task.setTarget(target);
+                }
+
+                return true;
+            }
+        };
+    }
+
+    private SnapshotDataTarget createDataTargetForTable(String file_path,
+                                                        String file_nonce,
+                                                        int hostId,
+                                                        AtomicInteger numTables,
+                                                        SnapshotRegistry.Snapshot snapshotRecord,
+                                                        Table table)
+            throws IOException
+    {
+        SnapshotDataTarget sdt;
+        File saveFilePath = SnapshotUtil.constructFileForTable(
+                table,
+                file_path,
+                file_nonce,
+                SnapshotFormat.CSV,
+                hostId);
+
+        sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated());
+
+        m_targets.add(sdt);
+        final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
+        sdt.setOnCloseHandler(onClose);
+
+        return sdt;
     }
 
     static private List<Long> computeDedupedLocalSites(long txnId, SiteTracker tracker)

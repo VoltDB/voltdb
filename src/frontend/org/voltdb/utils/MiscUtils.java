@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -60,6 +62,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final String licenseFileName = "license.xml";
 
     /**
      * Simple code to copy a file from one place to another...
@@ -186,12 +189,6 @@ public class MiscUtils {
         // verify the license file exists.
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
-            String canonicalName = "path unknown?";
-            try {
-                canonicalName = licenseFile.getCanonicalPath();
-            } catch (IOException ioexc) {}
-            hostLog.fatal("Unable to open license file: " + pathToLicense + " (" + canonicalName + ")");
-            hostLog.fatal("Please contact sales@voltdb.com to request a license.");
             return null;
         }
 
@@ -215,6 +212,43 @@ public class MiscUtils {
             return null;
         }
 
+        return licenseApi;
+    }
+
+    /**
+     * Instantiate the license api impl based on enterprise/community editions
+     * For enterprise edition, look in default locations ./, ~/, jar file directory
+     * @return a valid API for community and pro editions, or null on error.
+     */
+    public static LicenseApi licenseApiFactory()
+    {
+        String licensePath = System.getProperty("user.dir") + "/" + licenseFileName;
+        LicenseApi licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        if (licenseApi == null) {
+            try {
+                // Get location of jar file
+                String jarLoc = VoltDB.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                // Strip of file name
+                int lastSlashOff = jarLoc.lastIndexOf("/");
+                if (lastSlashOff == -1) {
+                    // Jar is at root directory
+                    licensePath = "/" + licenseFileName;
+                }
+                else {
+                    licensePath = jarLoc.substring(0, lastSlashOff+1) + licenseFileName;
+                }
+                licenseApi = MiscUtils.licenseApiFactory(licensePath);
+            }
+            catch (URISyntaxException e) {
+            }
+        }
+        if (licenseApi == null) {
+            licensePath = System.getProperty("user.home") + "/" + licenseFileName;
+            licenseApi = MiscUtils.licenseApiFactory(licensePath);
+        }
+        if (licenseApi != null) {
+            hostLog.info("Searching for license file located " + licensePath);
+        }
         return licenseApi;
     }
 

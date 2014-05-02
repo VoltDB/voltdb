@@ -166,17 +166,18 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
         pmp.countdownProgress();
+
+        // populate output table's temp tuple with outer table's values
+        // probably have to do this at least once - avoid doing it many
+        // times per outer tuple
+        joined.setNValues(0, outer_tuple, 0, outer_cols);
+
         // did this loop body find at least one match for this tuple?
         bool match = false;
         // For outer joins if outer tuple fails pre-join predicate
         // (join expression based on the outer table only)
         // it can't match any of inner tuples
         if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
-
-            // populate output table's temp tuple with outer table's values
-            // probably have to do this at least once - avoid doing it many
-            // times per outer tuple
-            joined.setNValues(0, outer_tuple, 0, outer_cols);
 
             TableIterator iterator1 = inner_table->iterator();
             while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {

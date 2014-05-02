@@ -22,11 +22,11 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -40,6 +40,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_tempFile;
     private final File m_file;
     private final FileChannel m_fc;
+    private final RandomAccessFile m_ras;
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
     private boolean m_needsFinalClose;
@@ -76,20 +77,22 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
             File file, boolean needsFinalClose) throws IOException {
         m_file = file;
         m_tempFile = new File(m_file.getParentFile(), m_file.getName() + ".incomplete");
-        RandomAccessFile ras = new RandomAccessFile(m_tempFile, "rw");
-        m_fc = ras.getChannel();
+        m_ras = new RandomAccessFile(m_tempFile, "rw");
+        m_fc = m_ras.getChannel();
         m_needsFinalClose = needsFinalClose;
 
-        m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
+        m_es = CoreUtils.getListeningSingleThreadExecutor("Snapshot write thread for " + m_file);
         ScheduledFuture<?> syncTask = null;
         syncTask = DefaultSnapshotDataTarget.m_syncService.scheduleAtFixedRate(new Runnable() {
+            private long syncedBytes = 0;
             @Override
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
                 while (m_bytesSinceLastSync.get() > 1024 * 1024 * 4) {
                     try {
-                        m_fc.force(false);
+                        final long syncStart = syncedBytes;
+                        syncedBytes =  Bits.sync_file_range(SNAP_LOG, m_ras.getFD(), m_fc, syncStart, m_fc.position());
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
                             SNAP_LOG.error("Error syncing snapshot", e);

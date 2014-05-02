@@ -59,6 +59,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class, InnerProc.class };
 
+    static final int VARCHAR_VARBINARY_THRESHOLD = 100;
+
     public void testTicketEng2250_IsNull() throws Exception
     {
         System.out.println("STARTING testTicketEng2250_IsNull");
@@ -1421,35 +1423,148 @@ public class TestFixedSQLSuite extends RegressionSuite {
         //* enable for debugging */ System.out.println(vt);
     }
 
+    public void testVarcharByBytes() throws IOException, ProcCallException {
+        System.out.println("STARTING testing varchar by BYTES ......");
 
-    public void testENG5637() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+        String var;
+
+        var = "VO";
+        client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (0,'" + var + "')");
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharBYTES where id = 0").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+
+        if (isHSQL()) return;
+        var = "VOLT";
+        try {
+            client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            var.length(), var, 2)));
+        }
+
+        var = "贾鑫";
+        try {
+            // assert here that this two-character string decodes via UTF8 to a bytebuffer longer than 2 bytes.
+            assertEquals(2, var.length());
+            assertEquals(6, var.getBytes("UTF-8").length);
+            client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            6, var, 2)));
+        }
+
+        var = "Voltdb is great | Voltdb is great " +
+                "| Voltdb is great | Voltdb is great| Voltdb is great | Voltdb is great" +
+                "| Voltdb is great | Voltdb is great| Voltdb is great | Voltdb is great";
+        try {
+            client.callProcedure("VARCHARBYTES.insert", 2, null, var);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            var.length(), var.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
+        }
+
+        var = var.substring(0, 70);
+        client.callProcedure("VARCHARBYTES.insert", 2, null, var);
+        vt = client.callProcedure("@AdHoc", "select var80 from VarcharBYTES where id = 2").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+    }
+
+    public void testVarcharByCharacter() throws IOException, ProcCallException {
+        System.out.println("STARTING testing varchar by character ......");
+
+        Client client = getClient();
+        VoltTable vt = null;
+        String var;
+
+        var = "VO";
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (0,'" + var + "')");
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 0").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+        var = "V贾";
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (1,'" + var + "')");
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 1").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+        // It used to fail to insert if VARCHAR column is calculated by BYTEs.
+        var = "贾鑫";
+        client.callProcedure("@AdHoc", "Insert into VarcharTB (id, var2) VALUES (2,'" + var + "')");
+        vt = client.callProcedure("@AdHoc", "select var2 from VarcharTB where id = 2").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+        var = "VoltDB是一个以内存数据库为主要产品的创业公司.";
+        try {
+            client.callProcedure("VARCHARTB.insert", 3, var, null);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            if (isHSQL()) {
+                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+            } else {
+                assertTrue(ex.getMessage().contains(
+                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                                var.length(), var, 2)));
+                // var.length is 26;
+            }
+        }
+
+        // insert into
+        client.callProcedure("VARCHARTB.insert", 3, null, var);
+        vt = client.callProcedure("@AdHoc", "select var80 from VarcharTB where id = 3").getResults()[0];
+        validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+        // Test threshold
+        var += "它是Postgres和Ingres联合创始人Mike Stonebraker领导开发的下一代开源数据库管理系统。它能在现有的廉价服务器集群上实现每秒数百万次数据处理。" +
+                "VoltDB大幅降低了服务器资源 开销，单节点每秒数据处理远远高于其它数据库管理系统。";
+        try {
+            client.callProcedure("VARCHARTB.insert", 4, null, var);
+            fail();
+        } catch(Exception ex) {
+            System.err.println(ex.getMessage());
+            if (isHSQL()) {
+                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+            } else {
+                assertTrue(ex.getMessage().contains(
+                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                                var.length(), var.substring(0, 100), 80)));
+            }
+        }
+    }
+
+    public void testENG5637_VarcharVarbinaryErrorMessage() throws IOException, ProcCallException {
         System.out.println("STARTING testing error message......");
 
         if (isHSQL()) {
             return;
         }
         Client client = getClient();
-        int THRESHOLD = 100;
         // Test Varchar
 
         // Test AdHoc
         String var1 = "Voltdb is a great database product";
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, var1) VALUES(%d, '%s')", 2, var1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10"));
         }
 
-
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, var1) VALUES(%d, '%s' || 'abc')", 2, var1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "' || 'abc')");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains("Value ("+var1+"abc) is too wide for a constant varchar value of size 10"));
         }
-
 
         // Test inlined varchar with stored procedure
         try {
@@ -1458,7 +1573,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                             var1.length(), var1, 10)));
         }
 
@@ -1472,8 +1587,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR[\"%d\"] column.",
-                            174, var2.substring(0, THRESHOLD), 80)));
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                            174, var2.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
         // Test non-inlined varchar with stored procedure
@@ -1485,7 +1600,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                             86, var2, 80)));
         }
 
@@ -1497,17 +1612,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR[\"%d\"] column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                             var1.length(), var1, 10)));
         }
-
 
 
         // Test varbinary
         // Test AdHoc
         String bin1 = "1111111111111111111111000000";
         try {
-            client.callProcedure("@AdHoc", String.format("Insert into VARLENGTH (id, bin1) VALUES(%d, '%s')", 6, bin1));
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, bin1) VALUES (6,'" + bin1 + "')");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
@@ -1521,7 +1635,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
                             bin1.length()/2, 10)));
         }
 
@@ -1535,7 +1649,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
                             bin2.length() / 2, 80)));
         }
 
@@ -1547,7 +1661,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY[\"%d\"] column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
                             bin1.length()/2, 10)));
         }
 

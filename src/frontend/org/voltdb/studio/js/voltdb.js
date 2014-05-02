@@ -252,6 +252,7 @@ var IVoltDB = (function(){
                           , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
                           , '@GetPartitionKeys': { '1': ['varchar']}
                           , '@GC' : { '0' : [] }
+                          , '@StopNode' : { '1' : ['int'] }
                         };
         return this;
     }

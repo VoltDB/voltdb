@@ -28,8 +28,8 @@ INSERT INTO @dmltable VALUES (@insertvals)
 -- ticket 231
 SELECT -8, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg] + 5   )        > @comparableconstant
 SELECT -7, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg]       ) + 5    > @comparableconstant
-SELECT -6, @optionalfn(A._variable[numeric] + 5   )        NUMSUM FROM @fromtables A ORDER BY NUMSUM
-SELECT -5, @optionalfn(A._variable[numeric]       ) + 5    NUMSUM FROM @fromtables A ORDER BY NUMSUM
+SELECT -6, @optionalfn(A._variable[#arg numeric] + 5   )        NUMSUM FROM @fromtables A ORDER BY NUMSUM
+SELECT -5, @optionalfn(A._variable[#arg numeric]       ) + 5    NUMSUM FROM @fromtables A ORDER BY NUMSUM
 SELECT -4, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg] + 5.25)        > @comparableconstant
 SELECT -3, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg]       ) + 5.25 > @comparableconstant
 SELECT -2, @optionalfn(A._variable[numeric] + 5.25)        NUMSUM FROM @fromtables A ORDER BY NUMSUM
@@ -99,10 +99,10 @@ UPDATE @dmltable A SET @updatecolumn = @updatesource @aftermath WHERE @optionalf
 -- Save more exhaustive LIKE testing for advanced-strings.sql.
 -- This is mostly just to catch the error of applying different forms of LIKE to non-strings.
 -- TODO: migrate likely-to-error-out cases like this to their own template/suite
-SELECT * FROM @fromtables A WHERE A._variable[@columntype] _maybe LIKE 'abc%'
-SELECT * FROM @fromtables A WHERE A._variable[@columntype] _maybe LIKE '%'
-SELECT * FROM @fromtables A WHERE A._variable[@columntype] _maybe LIKE '%' ESCAPE '!' 
-SELECT * FROM @fromtables A WHERE A._variable[@columntype] _maybe LIKE '!%' ESCAPE '!' 
+SELECT * FROM @fromtables Q26 WHERE Q26._variable[@columntype] _maybe LIKE 'abc%'
+SELECT * FROM @fromtables Q27 WHERE Q27._variable[@columntype] _maybe LIKE '%'
+SELECT * FROM @fromtables Q28 WHERE Q28._variable[@columntype] _maybe LIKE '%' ESCAPE '!' 
+SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' ESCAPE '!' 
 
 ----SELECT * FROM @fromtables A WHERE _inoneint
 ----SELECT * FROM @fromtables A WHERE _inpairofints
@@ -113,12 +113,12 @@ SELECT * FROM @fromtables A WHERE A._variable[@columntype] _maybe LIKE '!%' ESCA
 
 --- Test CASE WHEN
 --- CASE WHEN with expression
-SELECT * FROM @fromtables A WHERE CASE WHEN A._variable[@columntype] _cmp @comparableconstant THEN A._variable[@columntype] ELSE A._variable[@columntype] * 10  END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables A WHERE CASE WHEN A._variable[@columntype] _cmp @comparableconstant THEN A._variable[@columntype] END _cmp @comparableconstant + 10
-SELECT _variable[@comparabletype], CASE WHEN A._variable[@columntype] _cmp @comparableconstant THEN A._variable[@columntype] ELSE A._variable[@columntype] * 10 END FROM @fromtables WHERE @columnpredicate
-SELECT _variable[@comparabletype], CASE WHEN A._variable[@columntype] _cmp @comparableconstant THEN A._variable[@columntype] END FROM @fromtables WHERE @columnpredicate
+SELECT * FROM @fromtables Q34    WHERE CASE WHEN Q34._variable[@columntype] _cmp @comparableconstant THEN Q34._variable[@columntype]     ELSE Q34._variable[@columntype] * 10 END _cmp @comparableconstant + 10
+SELECT * FROM @fromtables Q35    WHERE CASE WHEN Q35._variable[@columntype] _cmp @comparableconstant THEN Q35._variable[@columntype]                                          END _cmp @comparableconstant + 10
+SELECT _variable[@comparabletype] Q36, CASE WHEN   A._variable[@columntype] _cmp @comparableconstant THEN   A._variable[@columntype]     ELSE   A._variable[@columntype] * 10 END FROM @fromtables WHERE @columnpredicate
+SELECT _variable[@comparabletype] Q37, CASE WHEN   A._variable[@columntype] _cmp @comparableconstant THEN   A._variable[@columntype]                                          END FROM @fromtables WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT * FROM @fromtables A WHERE CASE A._variable[@columntype] WHEN @comparableconstant THEN A._variable[@columntype] * 2 ELSE A._variable[@columntype] * 10  END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables A WHERE CASE A._variable[@columntype] WHEN @comparableconstant THEN A._variable[@columntype] * 2 END _cmp @comparableconstant + 10
-SELECT _variable[@comparabletype], CASE A._variable[@columntype] WHEN  @comparableconstant THEN A._variable[@columntype] * 2 ELSE A._variable[@columntype] * 10  END  FROM @fromtables WHERE @columnpredicate
-SELECT _variable[@comparabletype], CASE A._variable[@columntype] WHEN  @comparableconstant THEN A._variable[@columntype] * 2 END  FROM @fromtables WHERE @columnpredicate
+SELECT * FROM @fromtables Q38    WHERE CASE      Q38._variable[@columntype] WHEN @comparableconstant THEN Q38._variable[@columntype] * 2 ELSE Q38._variable[@columntype] * 10 END _cmp @comparableconstant + 10
+SELECT * FROM @fromtables Q39    WHERE CASE      Q39._variable[@columntype] WHEN @comparableconstant THEN Q39._variable[@columntype] * 2                                      END _cmp @comparableconstant + 10
+SELECT _variable[@comparabletype] Q40, CASE        A._variable[@columntype] WHEN @comparableconstant THEN   A._variable[@columntype] * 2 ELSE   A._variable[@columntype] * 10 END FROM @fromtables A WHERE @columnpredicate
+SELECT _variable[@comparabletype] Q41, CASE        A._variable[@columntype] WHEN @comparableconstant THEN   A._variable[@columntype] * 2                                      END FROM @fromtables A WHERE @columnpredicate

@@ -405,14 +405,14 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public boolean containSubSelects() {
+    public boolean containsPartitionedTablesFromSubSelects() {
         boolean result = false;
         if (m_leftNode != null) {
-            result = result || m_leftNode.containSubSelects();
+            result = result || m_leftNode.containsPartitionedTablesFromSubSelects();
         }
         if (result) return result;
         if (m_rightNode != null) {
-            result = result || m_rightNode.containSubSelects();
+            result = result || m_rightNode.containsPartitionedTablesFromSubSelects();
         }
 
         return result;

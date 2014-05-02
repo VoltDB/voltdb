@@ -26,14 +26,13 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.utils.CatalogUtil;
-
 import junit.framework.TestCase;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.CatalogUtil;
 
 public class TestDefaultDeployment extends TestCase {
 
@@ -67,6 +66,6 @@ public class TestDefaultDeployment extends TestCase {
         assertTrue(dflt != null);
 
         assertTrue(dflt.getCluster().getHostcount() == 1);
-        assertTrue(dflt.getCluster().getSitesperhost() == 2);
+        assertTrue(dflt.getCluster().getSitesperhost() == 8);
     }
 }

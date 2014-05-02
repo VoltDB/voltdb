@@ -19,16 +19,18 @@ package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
-
-import com.google_voltpatches.common.base.Supplier;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -40,7 +42,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
 
-    private final LinkedTransferQueue<Runnable> m_taskQueue = new LinkedTransferQueue<Runnable>();
+    private final LinkedBlockingQueue<Runnable> m_taskQueue = new LinkedBlockingQueue<Runnable>();
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
     private long m_taskThreadId = 0;
@@ -62,7 +64,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     },
                     "MpInitiator deliver", 1024 * 128);
 
-    private final LinkedTransferQueue<Runnable> m_sendQueue = new LinkedTransferQueue<Runnable>();
+    private final LinkedBlockingQueue<Runnable> m_sendQueue = new LinkedBlockingQueue<Runnable>();
     private final Thread m_sendThread = new Thread(null,
                     new Runnable() {
                         @Override
