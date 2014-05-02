@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.StarvationTracker;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
@@ -43,7 +44,7 @@ public class SiteTaskerQueue
             return task;
         }
         try {
-            return m_tasks.take();
+            return CoreUtils.queueSpinTake(m_tasks);
         } finally {
             m_starvationTracker.endStarvation();
         }

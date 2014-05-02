@@ -668,4 +668,28 @@ public class CoreUtils {
             }
         }
     }
+
+    public static final long QUEUE_SPIN_MICROSECONDS =
+            TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("QUEUE_SPIN_MICROS", 0));
+
+    public static <T> T queueSpinTake(BlockingQueue<T> queue) throws InterruptedException {
+        if (QUEUE_SPIN_MICROSECONDS > 0) {
+            T retval = null;
+            long nanos = -1;
+            ThreadLocalRandom randomYields = null;
+            for (;;) {
+                if ((retval = queue.poll()) != null) return retval;
+                if (nanos == -1) {
+                    nanos = System.nanoTime();
+                    randomYields = ThreadLocalRandom.current();
+                } else if (System.nanoTime() - nanos > QUEUE_SPIN_MICROSECONDS) {
+                    return queue.take();
+                } else if (randomYields.nextInt(64) == 0) {
+                    Thread.yield();
+                }
+            }
+        } else {
+            return queue.take();
+        }
+    }
 }
