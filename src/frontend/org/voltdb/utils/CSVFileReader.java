@@ -17,147 +17,83 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.common.Constants;
 
 /**
  *
  * This is a single thread reader which feeds the lines after validating syntax
- * to correct Partition Processors. In case of MP table or user supplied procedure
- * we use just one processor.
+ * to CSVDataLoader.
  *
  */
 class CSVFileReader implements Runnable {
+    private static final String COLUMN_COUNT_ERROR =
+            "Incorrect number of columns. %d found, %d expected. Please check the table schema " +
+            "and the line content";
+    private static final String BLANK_ERROR =
+            "A blank value is detected in column %d while \"--blank error\" is used. " +
+            "To proceed, either fill in the blank column or use \"--blank {null|empty}\".";
+    private static final String WHITESPACE_ERROR =
+            "Whitespace detected in column %d while --nowhitespace is used. " +
+            "To proceed, either remove the whitespaces from the column or remove --nowhitespace.";
 
     static AtomicLong m_totalRowCount = new AtomicLong(0);
     static AtomicLong m_totalLineCount = new AtomicLong(0);
-    static CSVLoader.CSVConfig m_config;
-    static Client m_csvClient;
-    static ICsvListReader m_listReader;
-    static boolean m_errored = false;
+    static CSVLoader.CSVConfig m_config = null;
+    static Client m_csvClient = null;
+    static ICsvListReader m_listReader = null;
     long m_parsingTime = 0;
-    private static final Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
+    private static final Map<VoltType, String> m_blankStrings = new EnumMap<VoltType, String>(VoltType.class);
     private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
-    private static String m_insertProcedure = "";
-    static int m_columnCnt;
-    //Types of columns
-    static List<VoltType> m_typeList = new ArrayList<VoltType>();
-    final AtomicLong m_processedCount = new AtomicLong(0);
-    final AtomicLong m_acknowledgedCount = new AtomicLong(0);
-    final int m_reportEveryNRows = 10000;
+    private final CSVDataLoader m_loader;
+    private final CSVLoaderErrorHandler m_errHandler;
+    private final VoltType[] m_columnTypes;
+    private final int m_columnCount;
 
     static {
-        m_blankValues.put(VoltType.TINYINT, "0");
-        m_blankValues.put(VoltType.SMALLINT, "0");
-        m_blankValues.put(VoltType.INTEGER, "0");
-        m_blankValues.put(VoltType.BIGINT, "0");
-        m_blankValues.put(VoltType.FLOAT, "0.0");
-        m_blankValues.put(VoltType.TIMESTAMP, null);
-        m_blankValues.put(VoltType.STRING, "");
-        m_blankValues.put(VoltType.DECIMAL, "0.0");
-        m_blankValues.put(VoltType.VARBINARY, "");
+        m_blankStrings.put(VoltType.TINYINT, "0");
+        m_blankStrings.put(VoltType.SMALLINT, "0");
+        m_blankStrings.put(VoltType.INTEGER, "0");
+        m_blankStrings.put(VoltType.BIGINT, "0");
+        m_blankStrings.put(VoltType.FLOAT, "0.0");
+        m_blankStrings.put(VoltType.TIMESTAMP, null);
+        m_blankStrings.put(VoltType.STRING, "");
+        m_blankStrings.put(VoltType.DECIMAL, "0.0");
+        m_blankStrings.put(VoltType.VARBINARY, "");
     }
-    //Errors we keep track only upto maxerrors
-    final static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
 
-    public static boolean initializeReader(CSVLoader.CSVConfig config, Client csvClient, ICsvListReader reader)
-            throws IOException, ProcCallException, InterruptedException {
-        VoltTable procInfo;
+    public static void initializeReader(CSVLoader.CSVConfig config, Client csvClient, ICsvListReader reader) {
         m_config = config;
         m_csvClient = csvClient;
         m_listReader = reader;
-
-        // -p mode where user specified a procedure name could be standard CRUD or written from scratch.
-        boolean isProcExist = false;
-        m_insertProcedure = m_config.procedure;
-        procInfo = csvClient.callProcedure("@SystemCatalog",
-                "PROCEDURECOLUMNS").getResults()[0];
-        while (procInfo.advanceRow()) {
-            if (m_insertProcedure.matches((String) procInfo.get(
-                    "PROCEDURE_NAME", VoltType.STRING))) {
-                m_columnCnt++;
-                isProcExist = true;
-                String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
-                m_typeList.add(VoltType.typeFromString(typeStr));
-            }
-        }
-        if (isProcExist == false) {
-            //csvloader will exit
-            m_log.error("No matching insert procedure available");
-            return false;
-        }
-        return true;
     }
 
-    //Callback for single row procedure invoke called for rows in failed batch.
-    public class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
-        final CSVLineWithMetaData m_csvLine;
-
-        public PartitionSingleExecuteProcedureCallback(CSVLineWithMetaData csvLine) {
-            m_csvLine = csvLine;
-        }
-
-        //one insert at a time callback
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS) {
-                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
-                    System.out.println("Fatal Response from server for: " + response.getStatusString()
-                            + " for: " + m_csvLine.rawLine.toString());
-                    System.exit(1);
-                }
-                String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
-                if (synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
-                    m_errored = true;
-                    return;
-                }
-                m_log.error(response.getStatusString());
-                return;
-            }
-            long currentCount = m_acknowledgedCount.incrementAndGet();
-
-            if (currentCount % m_reportEveryNRows == 0) {
-                m_log.info("Inserted " + currentCount + " rows");
-            }
-        }
+    public CSVFileReader(CSVDataLoader loader, CSVLoaderErrorHandler errorHandler)
+    {
+        m_loader = loader;
+        m_errHandler = errorHandler;
+        m_columnTypes = m_loader.getColumnTypes();
+        m_columnCount = m_columnTypes.length;
     }
 
     @Override
     public void run() {
         List<String> lineList;
-        ClientImpl clientImpl = (ClientImpl) m_csvClient;
-        int sleptTimes = 0;
-        while (!clientImpl.isHashinatorInitialized() && sleptTimes < 120) {
-            try {
-                Thread.sleep(500);
-                sleptTimes++;
-            } catch (InterruptedException ex) {
-                ;
-            }
-        }
-        m_log.debug("Client Initialization Done.");
 
         while ((m_config.limitrows-- > 0)) {
-            if (m_errored) {
+            if (m_errHandler.hasReachedErrorLimit()) {
                 break;
             }
+
             try {
                 //Initial setting of m_totalLineCount
                 if (m_listReader.getLineNumber() == 0) {
@@ -176,105 +112,83 @@ class CSVFileReader implements Runnable {
                     break;
                 }
                 m_totalRowCount.incrementAndGet();
-                int currLineNumber = m_listReader.getLineNumber();
 
-                String[] correctedLine = lineList.toArray(new String[lineList.size()]);
+                if (lineList.size() == 0) {
+                    continue;
+                }
 
+                String[] lineValues = lineList.toArray(new String[0]);
                 String lineCheckResult;
-                if ((lineCheckResult = checkparams_trimspace(correctedLine, m_columnCnt)) != null) {
-                    String[] info = {lineList.toString(), lineCheckResult};
-                    if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
-                        m_errored = true;
+                if ((lineCheckResult = checkparams_trimspace(lineValues)) != null) {
+                    final CSVLineWithMetaData metaData =
+                            new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                                    m_totalLineCount.get() + 1);
+                    if (m_errHandler.handleError(metaData, lineCheckResult)) {
                         break;
                     }
                     continue;
                 }
 
-                CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
-                        currLineNumber);
-
-                try {
-                    PartitionSingleExecuteProcedureCallback cbmt =
-                            new PartitionSingleExecuteProcedureCallback(lineData);
-                    if (m_csvClient.callProcedure(cbmt, m_insertProcedure, (Object[]) correctedLine)) {
-                        m_processedCount.incrementAndGet();
-                    } else {
-                        m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
-                        System.exit(1);
-                    }
-                } catch (IOException ex) {
-                    String[] info = {lineList.toString(), ex.toString()};
-                    m_errored = synchronizeErrorInfo(currLineNumber, info);
-                    return;
-                }
+                CSVLineWithMetaData lineData =
+                        new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                                m_listReader.getLineNumber());
+                m_loader.insertRow(lineData, lineValues);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
-                m_log.error("Failed to process CSV line: " + e);
-                String[] info = {e.getMessage(), ""};
-                if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
+                final CSVLineWithMetaData metaData =
+                        new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                                m_totalLineCount.get() + 1);
+                if (m_errHandler.handleError(metaData, e.getMessage())) {
                     break;
                 }
             } catch (IOException ex) {
                 m_log.error("Failed to read CSV line from file: " + ex);
                 break;
+            } catch (InterruptedException e) {
+                m_log.error("CSVLoader interrupted: " + e);
+                break;
             }
         }
 
-        //Did we hit the maxerror ceiling?
-        if (m_errorInfo.size() >= m_config.maxerrors) {
-            m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
-                    + m_config.maxerrors);
+        //Now wait for processors to see endOfData and count down. After that drain to finish all callbacks
+        try {
+            m_log.debug("Waiting for CSVDataLoader to finish.");
+            m_loader.close();
+            m_log.debug("CSVDataLoader Done.");
+        } catch (Exception ex) {
+            m_log.warn("Stopped processing because of connection error. "
+                    + "A report will be generated with what we processed so far. Error: " + ex);
         }
     }
 
-    /**
-     * Add errors to be reported.
-     *
-     * @param errLineNum
-     * @param info
-     * @return true if we have reached limit....false to continue processing and reporting.
-     */
-    public static boolean synchronizeErrorInfo(long errLineNum, String[] info) {
-        synchronized (m_errorInfo) {
-            //Dont collect more than we want to report.
-            if (m_errorInfo.size() >= m_config.maxerrors) {
-                return true;
-            }
-            if (!m_errorInfo.containsKey(errLineNum)) {
-                m_errorInfo.put(errLineNum, info);
-            }
-            return false;
+    private String checkparams_trimspace(String[] lineValues) {
+        if (lineValues.length != m_columnCount) {
+            return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
         }
-    }
 
-    private String checkparams_trimspace(String[] slot, int columnCnt) {
-        if (slot.length != columnCnt) {
-            return "Error: Incorrect number of columns. " + slot.length
-                    + " found, " + columnCnt + " expected.";
-        }
-        for (int i = 0; i < slot.length; i++) {
+        for (int i = 0; i<lineValues.length; i++) {
             //supercsv read "" to null
-            if (slot[i] == null) {
+            if (lineValues[i] == null) {
                 if (m_config.blank.equalsIgnoreCase("error")) {
-                    return "Error: blank item";
+                    return String.format(BLANK_ERROR, i + 1);
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    slot[i] = m_blankValues.get(m_typeList.get(i));
+                    lineValues[i] = m_blankStrings.get(m_columnTypes[i]);
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
             else {
                 if (m_config.nowhitespace
-                        && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {
-                    return "Error: White Space Detected in nowhitespace mode.";
+                        && (lineValues[i].charAt(0) == ' ' || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
+                    return String.format(WHITESPACE_ERROR, i + 1);
                 } else {
-                    slot[i] = slot[i].trim();
+                    lineValues[i] = lineValues[i].trim();
                 }
                 // treat NULL, \N and "\N" as actual null value
-                if (slot[i].equals("NULL")
-                        || slot[i].equals(Constants.CSV_NULL)
-                        || slot[i].equals(Constants.QUOTED_CSV_NULL)) {
-                    slot[i] = null;
+                if (lineValues[i].equals("NULL")
+                        || lineValues[i].equals(Constants.CSV_NULL)
+                        || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
+                    lineValues[i] = null;
                 }
             }
         }

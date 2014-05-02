@@ -19,9 +19,8 @@ package org.voltdb;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-
-import org.voltdb.sysprocs.SystemInformation;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.sysprocs.SystemInformation;
 
 /**
  * Agent responsible for collecting SystemInformation on this host.
@@ -60,7 +59,8 @@ public class SystemInformationAgent extends OpsAgent
                 subselector,
                 c,
                 clientHandle,
-                System.currentTimeMillis());
+                System.currentTimeMillis(),
+                obj);
             collectSystemInformationDeployment(psr);
             return;
         }
@@ -71,7 +71,8 @@ public class SystemInformationAgent extends OpsAgent
                     subselector,
                     c,
                     clientHandle,
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    obj);
         distributeOpsWork(psr, obj);
     }
 

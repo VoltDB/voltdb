@@ -994,7 +994,7 @@ public class AsyncBenchmark {
     }
 
     public static String dateformat(long ctime) {
-        return DateFormatUtils.format(ctime, "MM/dd/yyyy HH:mm:ss");
+        return DateFormatUtils.format(ctime, "yyyy-MM-dd HH:mm:ss,SSS");
     }
 
     public static long getTime() {

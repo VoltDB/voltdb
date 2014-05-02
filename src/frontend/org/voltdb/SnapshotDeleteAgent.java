@@ -77,7 +77,8 @@ public class SnapshotDeleteAgent extends OpsAgent
                     subselector,
                     c,
                     clientHandle,
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    obj);
         distributeOpsWork(psr, obj);
     }
 
