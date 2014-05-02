@@ -46,17 +46,12 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  * code of <code>offer</code>. If offering makes other messages available, they
  * must be retrieved by calling poll() until it returns null.
  *
- * End of log handling: If the local partition reaches end of log first, all MPs
- * blocked waiting for sentinels will be made safe, future MP fragments will
- * also be safe automatically. If the MPI reaches end of log first, and there is
+ * End of log handling: There is no per-partition end of log message any more,
+ * only the MPI will send end of log message. If the MPI reaches end of log, and there is
  * an outstanding sentinel in the sequencer, then all SPs blocked after this
- * sentinel will be made safe (can be polled). There cannot be any fragments in
+ * sentinel will be drained. There cannot be any fragments in
  * the replay sequencer when the MPI EOL arrives, because the MPI will only send
- * EOLs when it has finished all previous MP work. NOTE: Once MPI end of log
- * message is received, NONE of the SPs polled from the sequencer can be
- * executed, the poller must make sure that a failure response is returned
- * appropriately instead. However, SPs rejected by offer() can always be
- * executed.
+ * EOLs when it has finished all previous MP work.
  *
  * NOTE: messages are sequenced according to the transactionId passed in to the
  * offer() method. This transaction id may differ from the value stored in the
@@ -91,10 +86,6 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            // ENG-4218 fix makes this condition go away
-            if (m_eolReached) {
-                return m_firstFragment != null;
-            }
             return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
@@ -160,10 +151,7 @@ public class ReplaySequencer
     // lastSeenTxnId tracks the last seen txnId for this partition
     long m_lastSeenTxnId = Long.MIN_VALUE;
 
-    // has reached end of log for this partition, release any MP Txns for
-    // replay if this is true.
-    boolean m_eolReached = false;
-    // has reached end of log for the MPI, no more MP fragments will come,
+    // has reached end of log for the MPI, no more fragments or SPs will come,
     // release all txns.
     boolean m_mpiEOLReached = false;
     // some combination of conditions has occurred which will result in no
@@ -288,10 +276,6 @@ public class ReplaySequencer
                 if (head.hasSentinel() && m_mpiEOLReached) {
                     m_mustDrain = true;
                 }
-                else if (!head.hasSentinel() && m_eolReached) {
-                    // We have a fragment and will never get the sentinel
-                    // ENG-4218 will fill this in at some point
-                }
             }
         }
     }
@@ -302,32 +286,8 @@ public class ReplaySequencer
         ReplayEntry found = m_replayEntries.get(inTxnId);
 
         if (in instanceof Iv2EndOfLogMessage) {
-            if (((Iv2EndOfLogMessage) in).isMP()) {
-                m_mpiEOLReached = true;
-            } else {
-                m_eolReached = true;
-            }
+            m_mpiEOLReached = true;
             return true;
-        }
-
-        /*
-         * End-of-log reached. Only FragmentTaskMessage and
-         * CompleteTransactionMessage can arrive at this partition once EOL is
-         * reached.
-         *
-         * If the txn is found, meaning that found is not null, then this might
-         * be the first fragment, it needs to get through in order to free any
-         * txns queued behind it.
-         *
-         * If the txn is not found, then there will be no matching sentinel to
-         * come later, and there will be no SP txns after this MP, so release
-         * the first fragment immediately.
-         *
-         * ENG-4218 will want to change this to queue an MP fragment which we
-         * can't sequence properly so that we can drain() it appropriately later
-         */
-        if (m_eolReached && found == null) {
-            return false;
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
@@ -412,11 +372,10 @@ public class ReplaySequencer
     public void dump(long hsId)
     {
         final String who = CoreUtils.hsIdToString(hsId);
-        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s%s",
+        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
                                  who,
                                  m_lastPolledFragmentTxnId, TxnEgo.txnIdToString(m_lastPolledFragmentTxnId),
                                  m_lastSeenTxnId, TxnEgo.txnIdToString(m_lastSeenTxnId),
-                                 m_eolReached ? "EOL, " : "",
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {

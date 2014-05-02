@@ -121,6 +121,16 @@ public class AsyncCompilerAgent {
                     if (result.errorMsg != null) {
                         hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
                     }
+                    // Log something useful about catalog upgrades when they occur.
+                    if (result instanceof CatalogChangeResult) {
+                        CatalogChangeResult ccr = (CatalogChangeResult)result;
+                        if (ccr.upgradedFromVersion != null) {
+                            hostLog.info(String.format(
+                                    "In order to update the application catalog it was "
+                                    + "automatically upgraded from version %s.",
+                                    ccr.upgradedFromVersion));
+                        }
+                    }
                     w.completionHandler.onCompletion(result);
                 }
                 catch (Exception e) {

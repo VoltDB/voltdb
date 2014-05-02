@@ -136,4 +136,11 @@ public interface ClientResponse {
      * @return Time in milliseconds the procedure took to roundtrip from the client to the server
      */
     public int getClientRoundtrip();
+
+    /**
+     * Get the amount of time it took to run the transaction through the Client API, database, and back to the
+     * callback.
+     * @return Time in nanoseconds the procedure took to roundtrip from the client to the server
+     */
+    public long getClientRoundtripNanos();
 }

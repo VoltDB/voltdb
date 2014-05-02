@@ -513,7 +513,7 @@ public class StatementSession extends Statement {
             case StatementTypes.START_TRANSACTION :
                 startTransaction = true;
 
-            // fall through
+            // $FALL-THROUGH$
             case StatementTypes.SET_TRANSACTION : {
                 try {
                     if (parameters[0] != null) {

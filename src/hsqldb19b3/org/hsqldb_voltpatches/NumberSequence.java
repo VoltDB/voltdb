@@ -34,10 +34,10 @@ package org.hsqldb_voltpatches;
 import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
  * Maintains a sequence of numbers.
@@ -119,7 +119,7 @@ public final class NumberSequence implements SchemaObject {
                     break;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 throw Error.error(ErrorCode.X_42565);
         }

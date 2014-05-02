@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.net.SocketHubAppender;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -48,6 +50,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -357,7 +360,6 @@ public class SystemInformation extends VoltSystemProcedure
 
         // version
         vt.addRow(hostId, "VERSION", VoltDB.instance().getVersionString());
-
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
         if (path != null && !path.startsWith("http"))
@@ -372,6 +374,12 @@ public class SystemInformation extends VoltSystemProcedure
 
         String cluster_state = VoltDB.instance().getMode().toString();
         vt.addRow(hostId, "CLUSTERSTATE", cluster_state);
+        // INITIALIZED, used by VEM to determine the spinny icon state.
+        org.voltdb.OperationMode mode = VoltDB.instance().getMode();
+        String areInitialized = Boolean.toString(!VoltDB.instance().rejoining() &&
+                (mode == org.voltdb.OperationMode.RUNNING ||
+                        mode == org.voltdb.OperationMode.PAUSED));
+        vt.addRow(hostId, "INITIALIZED", areInitialized);
 
         String replication_role = VoltDB.instance().getReplicationRole().toString();
         vt.addRow(hostId, "REPLICATIONROLE", replication_role);
@@ -382,6 +390,16 @@ public class SystemInformation extends VoltSystemProcedure
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
         vt.addRow(hostId, "IV2ENABLED", "true");
+        long startTimeMs = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
+        vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
+        vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
+
+        SocketHubAppender hubAppender =
+            (SocketHubAppender) Logger.getRootLogger().getAppender("hub");
+        int port = 0;
+        if (hubAppender != null)
+            port = hubAppender.getPort();
+        vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
 
         return vt;
     }
@@ -399,9 +417,8 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
 
         String http_enabled = "false";
-        int http_port = cluster.getHttpdportno();
-        if (http_port != -1)
-        {
+        int http_port = VoltDB.instance().getConfig().m_httpPort;
+        if (http_port != -1 && http_port != Integer.MAX_VALUE) {
             http_enabled = "true";
             results.addRow("httpport", Integer.toString(http_port));
         }
@@ -453,7 +470,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
 
-        results.addRow("adminport", Integer.toString(cluster.getAdminport()));
+        results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
         String adminstartup = "false";
         if (cluster.getAdminstartup())
         {

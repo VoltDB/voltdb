@@ -203,7 +203,7 @@ def run_csvloader(schema, data_file):
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
             # report duration in milliseconds for stats collector
-            print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
+            print >>sf, "%s,%f,%d,0,0,0,0,0,0,0,0,0,0" % (schema, avg*1000.0, rowcount)
     return (rowcount, avg, stddev)
 
 def get_table_row_count(table_name):

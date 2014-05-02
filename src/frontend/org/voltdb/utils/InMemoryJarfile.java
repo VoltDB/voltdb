@@ -28,8 +28,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -189,9 +191,15 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     public byte[] put(String key, File value) throws IOException {
         byte[] bytes = null;
 
+        int bytesRead = 0;
         bytes = new byte[(int) value.length()];
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(value));
-        int bytesRead = in.read(bytes);
+        try {
+            bytesRead = in.read(bytes);
+        }
+        finally {
+            in.close();
+        }
         assert(bytesRead != -1);
 
         return put(key, bytes);
@@ -225,6 +233,13 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         // prevent this from being publicly called
         JarLoader() {}
 
+        /**
+         * @return The InMemoryJarFile instance owning this loader.
+         */
+        public InMemoryJarfile getInMemoryJarfile() {
+            return InMemoryJarfile.this;
+        }
+
         @Override
         public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
             // try the fast cache first
@@ -252,6 +267,19 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             // default to parent
             //System.out.println("deferring to parent.");
             return getParent().loadClass(className);
+        }
+
+        /**
+         * For a given class, find all
+         */
+        public String[] getInnerClassesForClass(String className) {
+            List<String> matches = new ArrayList<>();
+            for (String potential : m_classNames) {
+                if (potential.startsWith(className + ".")) {
+                    matches.add(potential);
+                }
+            }
+            return matches.toArray(new String[0]);
         }
     }
 

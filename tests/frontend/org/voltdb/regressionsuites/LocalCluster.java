@@ -110,6 +110,10 @@ public class LocalCluster implements VoltServerConfig {
     private Map<String, String> m_additionalProcessEnv = null;
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    private String m_voltdbroot = "";
+
+    private String[] m_versionOverrides = null;
+    private String[] m_versionCheckRegexOverrides = null;
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -302,6 +306,7 @@ public class LocalCluster implements VoltServerConfig {
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -312,6 +317,7 @@ public class LocalCluster implements VoltServerConfig {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     null, true, snapshotPath, ppdPrefix);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -330,6 +336,7 @@ public class LocalCluster implements VoltServerConfig {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     adminPort, adminOnStartup);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -342,6 +349,12 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
+    }
+
+    public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {
+        templateCmdLine.pathToDeployment(pathToDeployment);
+        m_voltdbroot = pathToVoltDBRoot;
+        m_compiled = true;
     }
 
     public void setHostCount(int hostCount)
@@ -391,6 +404,12 @@ public class LocalCluster implements VoltServerConfig {
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
+        if ((m_versionOverrides != null) && (m_versionOverrides.length > 0)) {
+            assert(m_versionOverrides[0] != null);
+            assert(m_versionCheckRegexOverrides[0] != null);
+            cmdln.m_versionStringOverrideForTest = m_versionOverrides[0];
+            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[0];
+        }
 
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
@@ -420,25 +439,28 @@ public class LocalCluster implements VoltServerConfig {
                     continue;
                 }
                 synchronized(pipeToFile) {
-                    // if eof, then no point in waiting around
-                    if (pipeToFile.m_eof.get())
-                        continue;
-
                     // if process is dead, no point in waiting around
-                    if (isProcessDead(pipeToFile.getProcess()))
+                    if (isProcessDead(pipeToFile.getProcess())) {
+                        // dead process means the other pipes won't start,
+                        // so bail here
+                        return false;
+                    }
+
+                    // if eof, then no point in waiting around
+                    if (pipeToFile.m_eof.get()) {
                         continue;
+                    }
 
                     // if not eof, then wait for statement of readiness
                     if (pipeToFile.m_witnessedReady.get() != true) {
                         try {
                             // use a timeout to prevent a forever hang
-                            pipeToFile.wait(1000);
+                            pipeToFile.wait(250);
                         }
                         catch (InterruptedException ex) {
                             log.error(ex.toString(), ex);
                         }
                         allReady = false;
-                        break;
                     }
                 }
             }
@@ -536,7 +558,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
             // this error case should only be from a timeout
-            if (!allReady) {
+            else if (!allReady) {
                 throw new RuntimeException(
                         "One or more external processes failed to complete initialization.");
             }
@@ -646,12 +668,21 @@ public class LocalCluster implements VoltServerConfig {
                 subroot = m_subRoots.get(hostId);
             }
             cmdln.voltFilePrefix(subroot.getPath());
+            cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
+
+            if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+                assert(m_versionOverrides[hostId] != null);
+                assert(m_versionCheckRegexOverrides[hostId] != null);
+                cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+                cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            }
 
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
             String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
             for (String element : cmdlnList) {
+                assert(element != null);
                 cmdLineFull += " " + element;
             }
             log.info(cmdLineFull);
@@ -800,6 +831,13 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
             setPortsFromConfig(hostId, rejoinCmdLn);
 
+            if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+                assert(m_versionOverrides[hostId] != null);
+                assert(m_versionCheckRegexOverrides[hostId] != null);
+                rejoinCmdLn.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+                rejoinCmdLn.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            }
+
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
             for (String element : rejoinCmdLnStr) {
@@ -886,7 +924,7 @@ public class LocalCluster implements VoltServerConfig {
         } else {
             log.info("Recovering process exited before recovery completed");
             try {
-                silentShutdownSingleHost(hostId, true);
+                silentKillSingleHost(hostId, true);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -914,13 +952,13 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal();
     }
 
-    public void shutDownSingleHost(int hostNum) throws InterruptedException
+    public void killSingleHost(int hostNum) throws InterruptedException
     {
-        log.info("Shutting down " + hostNum);
-        silentShutdownSingleHost(hostNum, false);
+        log.info("Killing " + hostNum);
+        silentKillSingleHost(hostNum, false);
     }
 
-    private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
+    private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
         //PipeToFile ptf = null;
         EEProcess eeProc = null;
@@ -1141,6 +1179,16 @@ public class LocalCluster implements VoltServerConfig {
         return templateCmdLine.target() == BackendTarget.HSQLDB_BACKEND;
     }
 
+    public void setOverridesForHotfix(String[] versions, String[] regexOverrides) {
+        assert(versions != null);
+        assert(regexOverrides != null);
+        assert(versions.length == regexOverrides.length);
+
+        m_versionOverrides = versions;
+        m_versionCheckRegexOverrides = regexOverrides;
+    }
+
+    @Override
     public void setMaxHeap(int heap) {
         templateCmdLine.setMaxHeap(heap);
     }
@@ -1257,5 +1305,16 @@ public class LocalCluster implements VoltServerConfig {
      */
     public void setExpectedToInitialize(boolean expectedToInitialize) {
         this.m_expectedToInitialize = expectedToInitialize;
+    }
+
+    /**
+     * @param watcher watcher to attach to active output pipes
+     */
+    public void setOutputWatcher(OutputWatcher watcher) {
+        for (PipeToFile pipe : m_pipes) {
+            if (pipe != null) {
+                pipe.setWatcher(watcher);
+            }
+        }
     }
 }

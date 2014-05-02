@@ -342,19 +342,27 @@ public class RangeVariableResolver {
                                       joinExpressions[i], true);
             }
 
-            //if (rangeVariables[i].hasIndexCondition() && inExpressions[i] != null) {
-
-            // Line above commented by voltdb and replaced with the line below the comment.
-            // Basically turn off some weird rewriting of in expressions based on index support
-            // for the query. This makes it simpler to parse on the VoltDB side, at the
-            // expense of HSQL performance.
-
+            // A VoltDB extension to disable
+            // Turn off some weird rewriting of in expressions based on index support for the query.
+            // This makes it simpler to parse on the VoltDB side,
+            // at the expense of HSQL performance.
+            // Also fixed an apparent join/where confusion?
             if (inExpressions[i] != null) {
                 if (!flags[i] && isOuter) {
                     rangeVariables[i].addJoinCondition(inExpressions[i]);
                 } else {
                     rangeVariables[i].addWhereCondition(inExpressions[i]);
                 }
+            /* disable 7 lines ...
+            if (rangeVariables[i].hasIndexCondition()
+                    && inExpressions[i] != null) {
+                if (!flags[i] && isOuter) {
+                    rangeVariables[i].addWhereCondition(inExpressions[i]);
+                } else {
+                    rangeVariables[i].addJoinCondition(inExpressions[i]);
+                }
+            ... disabled 7 lines */
+            // End of VoltDB extension
 
                 inExpressions[i] = null;
 
@@ -362,9 +370,11 @@ public class RangeVariableResolver {
             }
         }
 
-        // voltdb thinks this will never be called because of the change made to the block above
         if (inExpressionCount != 0) {
-            assert(false); // assert added by voltdb
+            // A VoltDB extension to disable
+            // This will never be called because of the change made to the block above
+            assert(false);
+            // End of VoltDB extension
             setInConditionsAsTables();
         }
     }
@@ -432,7 +442,7 @@ public class RangeVariableResolver {
                         continue;
                     }
 
-                // fall through
+                // $FALL-THROUGH$
                 case OpTypes.IS_NULL : {
                     int colIndex = e.getLeftNode().getColumnIndex();
 

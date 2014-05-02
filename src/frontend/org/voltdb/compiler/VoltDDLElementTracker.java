@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -41,7 +42,7 @@ public class VoltDDLElementTracker {
             new HashMap<String, ProcedureDescriptor>();
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
-    String[] m_extraClassses = new String[0];
+    final Set<String> m_extraClassses = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -77,8 +78,8 @@ public class VoltDDLElementTracker {
     /**
      * Add additional non-procedure classes for the jar.
      */
-    void addExtraClasses(String[] classNames) {
-        m_extraClassses = classNames;
+    void addExtraClasses(Set<String> classNames) {
+        m_extraClassses.addAll(classNames);
     }
 
     /**

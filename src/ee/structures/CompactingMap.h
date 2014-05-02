@@ -194,7 +194,7 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 CompactingMap<Key, Data, Compare, hasRank>::CompactingMap(bool unique, Compare comper)
     : m_count(0),
       m_root(&NIL),
-      m_allocator(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount)), 10000),
+      m_allocator(static_cast<int>(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount))), static_cast<int>(10000)),
       m_unique(unique),
       m_comper(comper)
   {

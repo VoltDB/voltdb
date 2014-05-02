@@ -785,7 +785,7 @@ public class Scanner {
                     }
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 boolean result = scanUndelimitedIdentifier();
 
@@ -1055,7 +1055,7 @@ public class Scanner {
 
                 token.dataType = Type.SQL_NUMERIC;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_NUMERIC :
                 try {
                     BigDecimal decimal = new BigDecimal(token.tokenString);
@@ -2391,7 +2391,7 @@ public class Scanner {
                     throw Error.error(errorCode);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
         }
 

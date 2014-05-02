@@ -25,7 +25,6 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -49,8 +48,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
-
-import com.google_voltpatches.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -400,6 +397,40 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(cluster.getSecurityenabled());
     }
 
+    public void testSecurityProvider() throws Exception
+    {
+        final String secOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
+            "</deployment>";
+
+        final String secOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\" provider=\"kerberos\"/>" +
+            "</deployment>";
+
+        final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOff.getPath(), true, false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        Database db = cluster.getDatabases().get("database");
+        assertTrue(cluster.getSecurityenabled());
+        assertEquals("hash", db.getSecurityprovider());
+
+        setUp();
+        final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOn.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        db = cluster.getDatabases().get("database");
+        assertTrue(cluster.getSecurityenabled());
+        assertEquals("kerberos", db.getSecurityprovider());
+    }
+
     public void testUserRoles() throws Exception {
         final String depRole = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
@@ -597,57 +628,11 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testCatalogVersionCheck() {
-        // really old version shouldn't work
-        assertFalse(CatalogUtil.isCatalogCompatible("0.3"));
-
         // non-sensical version shouldn't work
-        try {
-            CatalogUtil.isCatalogCompatible("nonsense");
-            fail("No exception thrown when bad version string given");
-        }
-        catch (IllegalArgumentException ex) {
-            //
-        }
-
-        // one minor version older than the min supported
-        int[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
-
-        for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
-            if (minCompatibleVersion[i] != 0) {
-                minCompatibleVersion[i]--;
-                break;
-            }
-        }
-        ArrayList<Integer> arrayList = new ArrayList<Integer>();
-        for (int part : minCompatibleVersion) {
-            arrayList.add(part);
-        }
-        String version = Joiner.on('.').join(arrayList);
-        assertNotNull(version);
-        assertFalse(CatalogUtil.isCatalogCompatible(version));
-
-        // one minor version newer than the current version
-        final String currentVersion = VoltDB.instance().getVersionString();
-        int[] parseCurrentVersion = MiscUtils.parseVersionString(currentVersion);
-        parseCurrentVersion[parseCurrentVersion.length - 1]++;
-        arrayList = new ArrayList<Integer>();
-        for (int part : parseCurrentVersion) {
-            arrayList.add(part);
-        }
-        String futureVersion = Joiner.on('.').join(arrayList);
-        assertFalse(CatalogUtil.isCatalogCompatible(futureVersion));
-
-        // longer version string
-        String longerVersion = currentVersion + ".2";
-        assertFalse(CatalogUtil.isCatalogCompatible(longerVersion));
-
-        // shorter version string
-        int[] longVersion = MiscUtils.parseVersionString("2.3.1");
-        int[] shortVersion = MiscUtils.parseVersionString("2.3");
-        assertEquals(-1, MiscUtils.compareVersions(shortVersion, longVersion));
+        assertFalse(CatalogUtil.isCatalogVersionValid("nonsense"));
 
         // current version should work
-        assertTrue(CatalogUtil.isCatalogCompatible(VoltDB.instance().getVersionString()));
+        assertTrue(CatalogUtil.isCatalogVersionValid(VoltDB.instance().getVersionString()));
     }
 
     // I'm not testing the legacy behavior here, just IV2
@@ -742,11 +727,23 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
-        final String withBuiltinExport =
+        final String withBuiltinFileExport =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export enabled='true' target='file'>"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withBuiltinKafkaExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='kafka'>"
                 + "        <configuration>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
@@ -766,7 +763,7 @@ public class TestCatalogUtil extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler();
         String x[] = {tmpDdl.getAbsolutePath()};
-        Catalog cat = compiler.compileCatalog(null, x);
+        Catalog cat = compiler.compileCatalogFromDDL(x);
 
         long crc = CatalogUtil.compileDeploymentAndGetCRC(cat, bad_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
@@ -781,7 +778,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
-        Catalog cat2 = compiler.compileCatalog(null, x);
+        Catalog cat2 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat2, good_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
@@ -797,10 +794,10 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
 
         // This is to test previous deployment with builtin export functionality.
-        final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinExport);
+        final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinFileExport);
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBuiltin));
 
-        Catalog cat3 = compiler.compileCatalog(null, x);
+        Catalog cat3 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat3, builtin_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
@@ -812,6 +809,23 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_deployment.getExport().getTarget(), ServerExportEnum.FILE);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
+
+        //Check kafka option.
+        final File tmpKafkaBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinKafkaExport);
+        DeploymentType builtin_kafkadeployment = CatalogUtil.getDeployment(new FileInputStream(tmpKafkaBuiltin));
+
+        Catalog cat4 = compiler.compileCatalogFromDDL(x);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(cat4, builtin_kafkadeployment, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+
+        db = cat4.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("0");
+        assertNotNull(catconn);
+
+        assertTrue(builtin_kafkadeployment.getExport().isEnabled());
+        assertEquals(builtin_kafkadeployment.getExport().getTarget(), ServerExportEnum.KAFKA);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
     }
 }

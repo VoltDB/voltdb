@@ -73,9 +73,6 @@ public class AdHocPlannedStatement {
         assert(core != null);
         assert(core.aggregatorFragment != null);
 
-        // nondet => readonly
-        assert((core.isNonDeterministic == false) || (core.readOnly == true));
-
         // dml => !readonly
         assert((core.isReplicatedTableDML == false) || (core.readOnly == false));
 

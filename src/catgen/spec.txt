@@ -29,6 +29,8 @@ end
 begin Systemsettings  "Container for deployment systemsettings element"
   int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
   int snapshotpriority "The priority of snapshot work"
+  int elasticPauseTime "Maximum pause time for rebalancing"
+  int elasticThroughput "Target throughput in megabytes for elasticity"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"
@@ -40,6 +42,7 @@ begin Database          "A set of schema, procedures and other metadata that tog
   Procedure* procedures "The set of stored procedures/transactions for this database"
   Connector* connectors  "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  string securityprovider "The security provider used to authenticate users"
 end
 
 begin CommandLog "Configuration for a command log"
@@ -125,6 +128,7 @@ begin Table                   "A table (relation) in the database"
   MaterializedViewInfo* views "Information about materialized views based on this table's content"
   Table? materializer         "If this is a materialized view, this field stores the source table"
   string signature            "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit              "A maximum number of rows in a table"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"
@@ -158,7 +162,6 @@ begin Statement             "A parameterized SQL statement embedded in a stored 
   int paramnum              ""
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
-  Column* output_columns    "The set of columns in the output table"
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
@@ -218,6 +221,7 @@ begin Column                    "A table column"
   MaterializedViewInfo? matview "If part of a materialized view, ref of view info"
   int aggregatetype             "If part of a materialized view, represents aggregate type"
   Column? matviewsource         "If part of a materialized view, represents source column"
+  bool inbytes                  "If a varchar column and size was specified in bytes"
 end
 
 begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"

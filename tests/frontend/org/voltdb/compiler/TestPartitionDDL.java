@@ -169,7 +169,7 @@ public class TestPartitionDDL extends TestCase {
             ByteArrayOutputStream ss = new ByteArrayOutputStream();
             PrintStream ps = new PrintStream(ss);
             if (success) {
-                compiler.summarizeSuccess(null, ps);
+                compiler.summarizeSuccess(null, ps, testout_jar);
             }
             else {
                 compiler.summarizeErrors(null, ps);

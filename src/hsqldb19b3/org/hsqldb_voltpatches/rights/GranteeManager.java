@@ -35,18 +35,18 @@ import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.SqlInvariants;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.Collection;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.Set;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 
 /**
  * Contains a set of Grantee objects, and supports operations for creating,

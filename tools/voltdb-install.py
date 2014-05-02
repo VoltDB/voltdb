@@ -434,6 +434,7 @@ actions = (
     Action('management/*.sh',         'usr/share/voltdb/management'),
     Action('management/*.xml',        'usr/share/voltdb/management'),
     Action('management/*.properties', 'usr/share/voltdb/management'),
+    Action('third_party/python',      'usr/share/voltdb/third_party/python'),
     Action('voltdb/log4j*',           'usr/share/voltdb/voltdb'),
     Action('voltdb/*',                'usr/lib/voltdb'),
     Action('*',                       'usr/share/voltdb', recursive = False),

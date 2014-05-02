@@ -31,7 +31,8 @@ public enum ConstraintType {
     CHECK        (3),
     PRIMARY_KEY  (4),
     NOT_NULL     (5),
-    PARTITIONING (6);
+    PARTITIONING (6),
+    LIMIT        (7);
 
     ConstraintType(int val) {
         assert (this.ordinal() == val) :

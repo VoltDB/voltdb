@@ -149,14 +149,6 @@ AbstractExpression *
 ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
-    /*printf("left: %s\n", left_optimized->debug("").c_str());
-    fflush(stdout);
-    printf("right: %s\n", right_optimized->debug("").c_str());
-    fflush(stdout);*/
-
-    //printf("%s\n", right_optimized->debug().c_str());
-    //fflush(stdout);
-
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);

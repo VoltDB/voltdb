@@ -39,7 +39,7 @@ public class PlannerStatsCollector extends StatsSource {
     /**
      * Record timings every N invocations
      */
-    final int m_collectionFrequency = 20;
+    final long m_collectionFrequency = 20;
 
     /**
      * Flag indicating cache disposition of a planned statement.
@@ -124,12 +124,19 @@ public class PlannerStatsCollector extends StatsSource {
     long m_failures = 0;
     long m_lastFailures = 0;
 
+
+    /**
+     * Count of the number of invocations = m_cache1Hits + m_cache2Hits + m_cacheMisses + m_failures;
+     */
+    long m_invocations = 0;
+    long m_lastInvocations = 0;
+
     /**
      * Calculate the invocation count based on the cache hit/miss counts.
      * @return  invocation count
      */
     long getInvocations() {
-        return m_cache1Hits + m_cache2Hits + m_cacheMisses + m_failures;
+        return m_invocations;
     }
 
     /**
@@ -137,7 +144,7 @@ public class PlannerStatsCollector extends StatsSource {
      * @return  last invocation count
      */
     long getLastInvocations() {
-        return m_lastCache1Hits + m_lastCache2Hits + m_lastCacheMisses + m_lastFailures;
+        return m_lastInvocations;
     }
 
     /**
@@ -165,6 +172,8 @@ public class PlannerStatsCollector extends StatsSource {
         m_cache1Level = eeCacheSize;
         m_cache1Hits += hits;
         m_cacheMisses += misses;
+
+        m_invocations += hits + misses;
         m_partitionId = partitionId;
     }
 
@@ -221,6 +230,7 @@ public class PlannerStatsCollector extends StatsSource {
             m_failures++;
             break;
         }
+        m_invocations++;
 
         m_partitionId = partitionId;
     }
@@ -272,6 +282,8 @@ public class PlannerStatsCollector extends StatsSource {
 
             failureCount = m_failures - m_lastFailures;
             m_lastFailures = m_failures;
+
+            m_lastInvocations = m_invocations;
         }
 
         rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);

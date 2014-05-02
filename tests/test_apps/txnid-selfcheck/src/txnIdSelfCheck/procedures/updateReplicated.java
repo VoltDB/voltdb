@@ -54,7 +54,6 @@ public class updateReplicated extends VoltProcedure
         voltQueueSQL(selectStmt);
         voltQueueSQL(deleteStmt, EXPECT_SCALAR_LONG);
         VoltTable previousResult = voltExecuteSQL()[0];
-        previousResult.advanceRow();
 
         // some percent of this will rollback
         if (rand.nextDouble() < 0.1) {
@@ -63,7 +62,7 @@ public class updateReplicated extends VoltProcedure
         }
 
         // rid in the table should be smaller than the current rid
-        if (previousResult.getLong("rid") >= rid) {
+        if (previousResult.advanceRow() && previousResult.getLong("rid") >= rid) {
             setAppStatusCode((byte) AbortStatus.OUT_OF_ORDER.ordinal());
             throw new VoltAbortException("updateReplicated may be executed out of order, " +
                                          "previous rid " + previousResult.getLong("rid") +

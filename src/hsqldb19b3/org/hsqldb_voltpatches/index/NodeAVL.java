@@ -66,12 +66,12 @@
 
 package org.hsqldb_voltpatches.index;
 
-import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.RowAVLDisk;
-import org.hsqldb_voltpatches.lib.IntLookup;
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.persist.CachedObject;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
+import org.hsqldb_voltpatches.lib.IntLookup;
 
 // fredt@users 20020221 - patch 513005 by sqlbob@users (RMP)
 // fredt@users 20020920 - path 1.7.1 - refactoring to cut mamory footprint

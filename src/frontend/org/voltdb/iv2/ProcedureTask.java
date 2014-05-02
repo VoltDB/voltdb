@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
@@ -94,7 +95,7 @@ abstract public class ProcedureTask extends TransactionTask
                     RateLimitedLogger.tryLogForMessage(
                             error + " This log message is rate limited to once every 60 seconds.",
                             System.currentTimeMillis(),
-                            60 * 1000,
+                            60, TimeUnit.SECONDS,
                             hostLog,
                             Level.WARN);
                     response.setResults(
@@ -105,12 +106,17 @@ abstract public class ProcedureTask extends TransactionTask
                     return response;
                 }
 
-                // Check partitioning of the invocation
+                // Check partitioning of single-partition and n-partition transactions.
                 if (runner.checkPartition(m_txnState, siteConnection.getCurrentHashinator())) {
                     runner.setupTransaction(m_txnState);
-                    cr = runner.call(task.getParameters());
+                    cr = runner.call(callerParams);
 
                     m_txnState.setHash(cr.getHash());
+                    //Don't pay the cost of returning the result tables for a replicated write
+                    //With reads don't apply the optimization just in case
+//                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {
+//                        cr.dropResultTable();
+//                    }
 
                     response.setResults(cr);
                     // record the results of write transactions to the transaction state

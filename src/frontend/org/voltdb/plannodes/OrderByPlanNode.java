@@ -48,8 +48,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
      */
     protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
 
-    private boolean m_orderingByUniqueColumns = false;
-
     public OrderByPlanNode() {
         super();
     }
@@ -80,33 +78,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
                                     "sort direction at position " + ctr);
             }
         }
-    }
-
-    /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return child's value
-     */
-    @Override
-    public boolean isOrderDeterministic() {
-        AbstractPlanNode child = m_children.get(0);
-        if (child.isContentDeterministic()) {
-            if (orderingByUniqueColumns()) {
-                return true;
-            }
-            m_nondeterminismDetail = "insufficient ordering criteria.";
-        } else {
-            m_nondeterminismDetail = m_children.get(0).nondeterminismDetail();
-        }
-        return false;
-    }
-
-    private boolean orderingByUniqueColumns() {
-        return m_orderingByUniqueColumns;
-    }
-
-    public void setOrderingByUniqueColumns() {
-        m_orderingByUniqueColumns = true;
     }
 
     /**

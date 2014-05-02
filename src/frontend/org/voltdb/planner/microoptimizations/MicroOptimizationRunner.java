@@ -33,7 +33,6 @@ public class MicroOptimizationRunner {
         optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new SeqScansToUniqueTreeScans());
         optimizations.add(new ReplaceWithIndexLimit());
-        // optimizations.add(new PushdownReceiveDominators());
     }
 
     public static List<CompiledPlan> applyAll(CompiledPlan plan,
@@ -47,7 +46,7 @@ public class MicroOptimizationRunner {
 
         for (MicroOptimization opt : optimizations) {
             // skip optimizations that don't apply at this determinism level
-            if (!opt.shouldRun(detMode)) {
+            if (!opt.shouldRun(detMode, plan.hasDeterministicStatement())) {
                 continue;
             }
 

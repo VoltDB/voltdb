@@ -130,7 +130,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 new byte[20],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 false,
-                false,
                 true,
                 paramTypes,
                 0);

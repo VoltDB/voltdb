@@ -76,11 +76,6 @@ public:
     std::vector<int32_t>& getChildIds();
     const std::vector<AbstractPlanNode*>& getChildren() const;
 
-    void addParent(AbstractPlanNode* parent);
-    std::vector<AbstractPlanNode*>& getParents();
-    std::vector<int32_t>& getParentIds();
-    const std::vector<AbstractPlanNode*>& getParents() const;
-
     // ------------------------------------------------------------------
     // INLINE PLANNODE METHODS
     // ------------------------------------------------------------------
@@ -198,8 +193,6 @@ protected:
     //
     std::vector<AbstractPlanNode*> m_children;
     std::vector<int32_t> m_childIds;
-    std::vector<AbstractPlanNode*> m_parents;
-    std::vector<int32_t> m_parentIds;
     //
     // We also keep a pointer to this node's executor so that we can
     // reference it quickly

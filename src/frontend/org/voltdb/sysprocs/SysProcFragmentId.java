@@ -50,6 +50,8 @@ public class SysProcFragmentId
     public static final long PF_plannerAggregator = 23;
 
     // @Shutdown
+    public static final long PF_shutdownSync = 26;
+    public static final long PF_shutdownSyncDone = 27;
     public static final long PF_shutdownCommand = 28;
     public static final long PF_procedureDone = 29;
 
@@ -58,14 +60,6 @@ public class SysProcFragmentId
 
     // @SnapshotSave
     /*
-     * Once per host confirm the file is accessible
-     */
-    public static final long PF_saveTest = 40;
-    /*
-     * Agg test results
-     */
-    public static final long PF_saveTestResults = 41;
-    /*
      * Create and distribute tasks and targets to each EE
      */
     public static final long PF_createSnapshotTargets = 42;
@@ -73,20 +67,14 @@ public class SysProcFragmentId
      * Confirm the targets were successfully created
      */
     public static final long PF_createSnapshotTargetsResults = 43;
-    /*
-     * Quiesce the export data as part of the snapshot
-     */
-    public static final long PF_snapshotSaveQuiesce = 44;
-    /*
-     * Aggregate the results of snapshot quiesce
-     */
-    public static final long PF_snapshotSaveQuiesceResults = 45;
 
     public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
+        return (fragId == PF_createSnapshotTargets);
+    }
 
-        return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
-                fragId == PF_snapshotSaveQuiesce);
+    public static boolean isFirstSnapshotFragment(byte[] planHash) {
+        return isSnapshotSaveFragment(planHash);
     }
 
     //This method exists because there is no procedure name in fragment task message
@@ -96,6 +84,7 @@ public class SysProcFragmentId
         return (fragId == PF_prepBalancePartitions  ||
                 fragId == PF_balancePartitions ||
                 fragId == PF_balancePartitionsData ||
+                fragId == PF_balancePartitionsClearIndex ||
                 fragId == PF_distribute);
     }
 
@@ -163,13 +152,16 @@ public class SysProcFragmentId
     public static final long PF_systemInformationOverviewAggregate = 193;
 
     // @Update application catalog
-    public static final long PF_updateCatalog = 210;
-    public static final long PF_updateCatalogAggregate = 211;
+    public static final long PF_updateCatalogSync = 210;
+    public static final long PF_updateCatalogSyncAggregate = 211;
+    public static final long PF_updateCatalog = 212;
+    public static final long PF_updateCatalogAggregate = 213;
 
     public static boolean isCatalogUpdateFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
-        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
+        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate ||
+                fragId == PF_updateCatalogSync || fragId == PF_updateCatalogSyncAggregate);
     }
 
     // @BalancePartitions
@@ -178,6 +170,8 @@ public class SysProcFragmentId
     public static final long PF_balancePartitions = 230;
     public static final long PF_balancePartitionsAggregate = 231;
     public static final long PF_balancePartitionsData = 232;
+    public static final long PF_balancePartitionsClearIndex = 233;
+    public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;

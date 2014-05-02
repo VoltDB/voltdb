@@ -159,7 +159,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public int displaySize() {
 
         switch (typeCode) {
@@ -202,13 +201,11 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public int getJDBCTypeCode() {
         return typeCode == Types.SQL_BIGINT ? Types.BIGINT
                                             : typeCode;
     }
 
-    @Override
     public String getJDBCClassName() {
 
         switch (typeCode) {
@@ -233,7 +230,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public String getNameString() {
 
         switch (typeCode) {
@@ -270,7 +266,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public String getFullNameString() {
 
         switch (typeCode) {
@@ -283,7 +278,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public String getDefinition() {
 
         switch (typeCode) {
@@ -310,12 +304,10 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public boolean isNumberType() {
         return true;
     }
 
-    @Override
     public boolean isIntegralType() {
 
         switch (typeCode) {
@@ -334,7 +326,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public boolean isExactNumberType() {
 
         switch (typeCode) {
@@ -349,7 +340,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public int precedenceDegree(Type other) {
 
         if (other.isNumberType()) {
@@ -361,7 +351,6 @@ public final class NumberType extends Type {
         return Integer.MIN_VALUE;
     }
 
-    @Override
     public Type getAggregateType(Type other) {
 
         if (this == other) {
@@ -445,7 +434,6 @@ public final class NumberType extends Type {
      *  For ADD/SUBTRACT/DIVIDE, the scale is the larger of the two<br>
      *  For MULTIPLY, the scale is the sum of the two scales<br>
      */
-    @Override
     public Type getCombinedType(Type other, int operation) {
 
         if (other.typeCode == Types.SQL_ALL_TYPES) {
@@ -454,10 +442,13 @@ public final class NumberType extends Type {
 
         switch (operation) {
 
-            /* VOLTDB dropped this special case handling of ADD -- wasn't sql compliant ...
+            // A VoltDB extension to be more sql compliant
+            // drop this special case handling of ADD
+            /* disable 2 lines ...
             case OpTypes.ADD :
                 break;
-            ... VOLTDB dropped this special case handling of ADD */
+            ... disabled 2 lines */
+            // End of VoltDB extension
 
             case OpTypes.MULTIPLY :
                 if (other.isIntervalType()) {
@@ -523,7 +514,6 @@ public final class NumberType extends Type {
                              newScale);
     }
 
-    @Override
     public int compare(Object a, Object b) {
 
         if (a == b) {
@@ -567,7 +557,7 @@ public final class NumberType extends Type {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_BIGINT : {
                 if (b instanceof Long) {
                     long longa = ((Number) a).longValue();
@@ -596,7 +586,7 @@ public final class NumberType extends Type {
                 }
             }
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_REAL :
             case Types.SQL_FLOAT :
             case Types.SQL_DOUBLE : {
@@ -624,7 +614,6 @@ public final class NumberType extends Type {
     }
 
     /** @todo - review usage to see if range enforcement / java type conversion is necessary */
-    @Override
     public Object convertToTypeLimits(SessionInterface session, Object a) {
 
         if (a == null) {
@@ -665,7 +654,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public Object convertToType(SessionInterface session, Object a,
                                 Type otherType) {
 
@@ -721,7 +709,7 @@ public final class NumberType extends Type {
                 a = ((ClobData) a).getSubString(
                     session, 0L, (int) ((ClobData) a).length(session));
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE : {
@@ -770,7 +758,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public Object convertToTypeJDBC(SessionInterface session, Object a,
                                     Type otherType) {
 
@@ -792,7 +779,6 @@ public final class NumberType extends Type {
     /**
      * Converts a value to this type
      */
-    @Override
     public Object convertToDefaultType(SessionInterface session, Object a) {
 
         if (a == null) {
@@ -1157,7 +1143,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public String convertToString(Object a) {
 
         if (a == null) {
@@ -1188,20 +1173,19 @@ public final class NumberType extends Type {
                 if (Double.isNaN(value)) {
                     return "0E0/0E0";
                 }
-
-                // START of VoltDB patch to comply literally with the SQL standard requirement
+                // A VoltDB extension to comply literally with the SQL standard requirement
                 // that 0.0 be represented as a special cased "0E0"
                 // and NOT "0.0E0" as HSQL had been giving.
                 if (value == 0.0) {
                     return "0E0";
                 }
-                // END of VoltDB patch.
+                // End of VoltDB extension
 
                 String s = Double.toString(value);
 
                 // ensure the engine treats the value as a DOUBLE, not DECIMAL
                 if (s.indexOf('E') < 0) {
-                    // START of VoltDB patch to ALWAYS use proper E notation,
+                    // A VoltDB extension to ALWAYS use proper E notation,
                     // with a proper single-non-zero-digit integer part.
                     // HSQL originally just had: s = s.concat("E0");
                     int decimalOffset = s.indexOf('.');
@@ -1259,7 +1243,10 @@ public final class NumberType extends Type {
                         }
                     }
                     s = optionalSign + s.charAt(leadingNonZeroOffset) + "." + decimalPart + "E" + exponent;
-                    // END of VoltDB patch to use proper E notation,
+                    /* disable 1 line ...
+                    s = s.concat("E0");
+                    ... disabled 1 line */
+                    // End of VoltDB extension
                 }
 
                 return s;
@@ -1273,7 +1260,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public String convertToSQLString(Object a) {
 
         if (a == null) {
@@ -1283,7 +1269,6 @@ public final class NumberType extends Type {
         return convertToString(a);
     }
 
-    @Override
     public boolean canConvertFrom(Type otherType) {
 
         if (otherType.typeCode == Types.SQL_ALL_TYPES) {
@@ -1305,7 +1290,6 @@ public final class NumberType extends Type {
         return false;
     }
 
-    @Override
     public int compareToTypeRange(Object o) {
 
         if (!(o instanceof Number)) {
@@ -1357,7 +1341,6 @@ public final class NumberType extends Type {
         return 0;
     }
 
-    @Override
     public Object add(Object a, Object b, Type otherType) {
 
         if (a == null || b == null) {
@@ -1405,7 +1388,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public Object subtract(Object a, Object b, Type otherType) {
 
         if (a == null || b == null) {
@@ -1452,7 +1434,6 @@ public final class NumberType extends Type {
         throw Error.runtimeError(ErrorCode.U_S0500, "NumberType");
     }
 
-    @Override
     public Object multiply(Object a, Object b) {
 
         if (a == null || b == null) {
@@ -1477,13 +1458,16 @@ public final class NumberType extends Type {
                 BigDecimal abd = (BigDecimal) a;
                 BigDecimal bbd = (BigDecimal) b;
 
-                // VOLTDB changed for fixed decimal scale ... return abd.multiply(bbd);
+                // A VoltDB extension to use fixed decimal scale ...
                 BigDecimal cbd = abd.multiply(bbd);
                 // This replicates VoltDecimalHelper.setDefaultScale(cbd);
                 // without the library dependency.
                 return cbd.setScale(12 /* == VoltDecimalHelper.kDefaultScale*/,
                                     java.math.RoundingMode.HALF_EVEN);
-                // ... VOLTDB changed
+                /* disable 1 line ...
+                return abd.multiply(bbd);
+                ... disabled 1 line */
+                // End of VoltDB extension
             }
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
@@ -1504,7 +1488,6 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public Object divide(Object a, Object b) {
 
         if (a == null || b == null) {
@@ -1568,13 +1551,11 @@ public final class NumberType extends Type {
         }
     }
 
-    @Override
     public Object absolute(Object a) {
         return isNegative(a) ? negate(a)
                              : a;
     }
 
-    @Override
     public Object negate(Object a) {
 
         if (a == null) {
@@ -1814,10 +1795,17 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_CEILING);
 
+                // A VoltDB extension to disable over-sensitive error chacking.
                 return value;
+                /* disable 3 lines ...
+                if (JavaSystem.precision(value) > precision) {
+                    throw Error.error(ErrorCode.X_22003);
+                }
+                ... disabled 3 lines */
+                // End of VoltDB extension
             }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 return a;
         }
@@ -1847,10 +1835,17 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_FLOOR);
 
+                // A VoltDB extension to disable over-sensitive error chacking.
                 return value;
+                /* disable 3 lines ...
+                if (JavaSystem.precision(value) > precision) {
+                    throw Error.error(ErrorCode.X_22003);
+                }
+                ... disabled 3 lines */
+                // End of VoltDB extension
             }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 return a;
         }
@@ -1893,7 +1888,9 @@ public final class NumberType extends Type {
 
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
+            // A VoltDB extension to ?support FLOAT as alis to DOUBLE?
             case Types.SQL_FLOAT :
+            // End of VoltDB extension
                 return SQL_DOUBLE;
 
             case Types.SQL_NUMERIC :

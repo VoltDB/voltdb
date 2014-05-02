@@ -31,9 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 // fredt@users 20020420 - patch523880 by leptipre@users - VIEW support - modified
@@ -224,7 +222,7 @@ public class View extends TableDerived {
         // filter schemaObjectNames
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -234,7 +232,7 @@ public class View extends TableDerived {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetTableXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session) throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = super.voltGetTableXML(session);
 
@@ -242,4 +240,5 @@ public class View extends TableDerived {
         table.attributes.put("query", statement);
         return table;
     }
+    /**********************************************************************/
 }

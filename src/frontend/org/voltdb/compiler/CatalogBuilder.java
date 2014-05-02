@@ -418,7 +418,7 @@ public class CatalogBuilder {
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
-                compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
+                compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream, jarPath);
             } else {
                 compiler.summarizeErrors(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
             }

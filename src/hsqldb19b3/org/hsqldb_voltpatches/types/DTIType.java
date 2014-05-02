@@ -35,10 +35,10 @@ import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
+import org.hsqldb_voltpatches.Session;
 
 /**
  * Common elements for Type instances for DATETIME and INTERVAL.<p>
@@ -272,7 +272,7 @@ public abstract class DTIType extends Type {
                     }
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_INTERVAL_YEAR :
             case Types.SQL_INTERVAL_MONTH :
             case Types.SQL_INTERVAL_DAY :

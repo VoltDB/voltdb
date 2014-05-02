@@ -40,6 +40,12 @@ import org.hsqldb_voltpatches.lib.HsqlTimer;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
+// A VoltDB extension to disable a package dependency
+/* disable 2 lines ...
+import org.hsqldb_voltpatches.server.Server;
+import org.hsqldb_voltpatches.server.ServerConstants;
+... disabled 2 lines */
+// End of VoltDB extension
 import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
@@ -161,6 +167,24 @@ public class DatabaseManager {
                           : db.sessionManager.getSession(sessionId);
     }
 
+    /**
+     * Used by server to open or create a database
+     */
+
+// loosecannon1@users 1.7.2 patch properties on the JDBC URL
+    // A VoltDB extension to disable a package dependency
+    /* disable 9 lines ...
+    public static int getDatabase(String type, String path, Server server,
+                                  HsqlProperties props) {
+
+        Database db = getDatabase(type, path, props);
+
+        registerServer(server, db);
+
+        return db.databaseID;
+    }
+    ... disabled 9 lines */
+    // End of VoltDB extension
     /**
      * This has to be improved once a threading model is in place.
      * Current behaviour:
@@ -324,6 +348,8 @@ public class DatabaseManager {
         Object  key  = path;
         HashMap databaseMap;
 
+        notifyServers(database);
+
         if (type == DatabaseURL.S_FILE) {
             databaseMap = fileDatabaseMap;
             key         = filePathToKey(path);
@@ -344,6 +370,93 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Maintains a map of servers to sets of databases.
+     * Servers register each of their databases.
+     * When a database is shutdown, all the servers accessing it are notified.
+     * The database is then removed form the sets for all servers and the
+     * servers that have no other database are removed from the map.
+     */
+    static HashMap serverMap = new HashMap();
+
+    /**
+     * Deregisters a server completely.
+     */
+    public static void deRegisterServer(Server server) {
+        serverMap.remove(server);
+    }
+
+    /**
+     * Deregisters a server as serving a given database. Not yet used.
+     */
+    private static void deRegisterServer(Server server, Database db) {
+
+        Iterator it = serverMap.values().iterator();
+
+        for (; it.hasNext(); ) {
+            HashSet databases = (HashSet) it.next();
+
+            databases.remove(db);
+
+            if (databases.isEmpty()) {
+                it.remove();
+            }
+        }
+    }
+
+    /**
+     * Registers a server as serving a given database.
+     */
+    private static void registerServer(Server server, Database db) {
+
+        if (!serverMap.containsKey(server)) {
+            serverMap.put(server, new HashSet());
+        }
+
+        HashSet databases = (HashSet) serverMap.get(server);
+
+        databases.add(db);
+    }
+
+    /**
+     * Notifies all servers that serve the database that the database has been
+     * shutdown.
+     */
+    private static void notifyServers(Database db) {
+
+        Iterator it = serverMap.keySet().iterator();
+
+        for (; it.hasNext(); ) {
+            Server  server    = (Server) it.next();
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            if (databases.contains(db)) {
+// A VoltDB extension to disable a package dependency
+/* disable 2 lines ...
+                server.notify(ServerConstants.SC_DATABASE_SHUTDOWN,
+                              db.databaseID);
+... disabled 2 lines */
+// End of VoltDB extension
+            }
+        }
+    }
+
+    static boolean isServerDB(Database db) {
+
+        Iterator it = serverMap.keySet().iterator();
+
+        for (; it.hasNext(); ) {
+            Server  server    = (Server) it.next();
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            if (databases.contains(db)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // Timer
     private static final HsqlTimer timer = new HsqlTimer();
 
@@ -361,4 +474,9 @@ public class DatabaseManager {
             return path;
         }
     }
+    /************************* Volt DB Extensions *************************/
+    /** Minimal stub to locally resolve Server class references. */
+    private static class Server {
+    }
+    /**********************************************************************/
 }

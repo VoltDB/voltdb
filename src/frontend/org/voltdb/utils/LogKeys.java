@@ -89,7 +89,6 @@ public enum LogKeys {
 
     //COMPILER
     compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost,
-    compiler_VoltCompiler_FailedToCompileXML,
     compiler_VoltCompiler_CatalogPath,
     compiler_VoltCompiler_NoSuchAlgorithm,
 

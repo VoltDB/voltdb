@@ -197,18 +197,20 @@ public class RepairLog
             return;
         }
 
-        Iterator<RepairLog.Item> it;
+        Deque<RepairLog.Item> deq = null;
         if (isSP) {
-            it = m_logSP.iterator();
+            deq = m_logSP;
         }
         else {
-            it = m_logMP.iterator();
+            deq = m_logMP;
         }
 
-        while (it.hasNext()) {
-            RepairLog.Item item = it.next();
+        RepairLog.Item item = null;
+        while ((item = deq.peek()) != null) {
             if (item.canTruncate(handle)) {
-                it.remove();
+                deq.poll();
+            } else {
+                break;
             }
         }
     }

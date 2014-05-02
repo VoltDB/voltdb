@@ -316,7 +316,7 @@ public class JDBCParameterMetaData
      * as such, the parameter expression resolution mechanism has been
      * upgraded to provide the precise FQN for SQL function and stored
      * procedure arguments, rather than the more generic
-     * org.hsqldb.JavaObject class that is used internally to represent
+     * org.hsqldb_voltpatches.JavaObject class that is used internally to represent
      * and transport objects whose class is not in the standard mapping.
      */
     String[] classNames;

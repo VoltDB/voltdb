@@ -130,7 +130,7 @@ class ConnectionDialogCommon {
             try {
                 plugTypes = (Vector) Class.forName(
                     System.getProperty(
-                        "org.hsqldb.util.ConnectionTypeClass")).newInstance();
+                        "org.hsqldb_voltpatches.util.ConnectionTypeClass")).newInstance();
             } catch (Exception e) {
                 ;
             }
@@ -209,10 +209,10 @@ class ConnectionDialogCommon {
 
             // reached end of file -- this is not clean but it works
         } catch (ClassNotFoundException cnfe) {
-            throw new IOException("Unrecognized class type "
+            throw (IOException) new IOException("Unrecognized class type "
                                                 + cnfe.getMessage());
         } catch (ClassCastException cce) {
-            throw new IOException("Unrecognized class type "
+            throw (IOException) new IOException("Unrecognized class type "
                                                 + cce.getMessage());
         } catch (Throwable t) {}
         finally {

@@ -108,8 +108,6 @@
 using namespace std;
 namespace voltdb {
 
-const int64_t AD_HOC_FRAG_ID = -1;
-
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(0),
       m_allTuplesScanned(0),
@@ -118,7 +116,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tuplesProcessedSinceReport(0),
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedTable(NULL),
-      m_lastAccessedPlanNodeName(NULL),
       m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
@@ -167,7 +164,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit)
+                         int64_t tempTableMemoryLimit,
+                         int32_t compactionThreshold)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -176,6 +174,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -331,6 +330,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
+    m_tuplesProcessedSinceReport = 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -360,6 +360,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         // at the end of each frag, rollup and reset counters
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
+        m_tuplesProcessedSinceReport = 0;
     }
 
     m_stringPool.purge();
@@ -654,22 +655,29 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         int32_t type = outerIter->second->type();
         std::string name = outerIter->second->name();
         bool nullable = outerIter->second->nullable();
+        bool inBytes = outerIter->second->inbytes();
 
         if (t2->columnName(index).compare(name)) {
             return false;
         }
 
-        if (t2->schema()->columnAllowNull(index) != nullable) {
+        const TupleSchema::ColumnInfo *columnInfo = t2->schema()->getColumnInfo(index);
+
+        if (columnInfo->allowNull != nullable) {
             return false;
         }
 
-        if (t2->schema()->columnType(index) != type) {
+        if (columnInfo->getVoltType() != type) {
             return false;
         }
 
         // check the size of types where size matters
         if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+            if (columnInfo->length != size) {
+                return false;
+            }
+            if (columnInfo->inBytes != inBytes) {
+                assert(type == VALUE_TYPE_VARCHAR);
                 return false;
             }
         }
@@ -707,7 +715,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
                                                                  catalogTable->path(),
-                                                                 catalogTable->signature());
+                                                                 catalogTable->signature(),
+                                                                 m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {
@@ -781,6 +790,13 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 // call above should rebuild them all anyway
                 continue;
             }
+
+            //
+            // Same schema, but TUPLE_LIMIT may change.
+            // Because there is no table rebuilt work next, no special need to take care of
+            // the new tuple limit.
+            //
+            persistenttable->setTupleLimit(catalogTable->tuplelimit());
 
             //////////////////////////////////////////
             // find all of the indexes to add
@@ -1524,6 +1540,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 "Expected at least one output stream in tableStreamSerializeMore(), received %d",
                 nBuffers);
     }
+
+    if (!tableStreamTypeIsValid(streamType)) {
+        // Failure
+        return -1;
+    }
+
     TupleOutputStreamProcessor outputStreams(nBuffers);
     for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
@@ -1539,32 +1561,47 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
     PersistentTable *table = NULL;
+
     if (tableStreamTypeIsSnapshot(streamType)) {
         // If a completed table is polled, return 0 bytes serialized. The
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
+
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
+        }
     }
-    else if (tableStreamTypeIsValid(streamType)) {
+    else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
-        if (found) {
-            table = dynamic_cast<PersistentTable*>(found);
+        if (!found) {
+            return -1;
+        }
+        PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
+        assert(currentTable != NULL);
+        // The ongoing TABLE STREAM needs the original table from the first table truncate.
+        PersistentTable * originalTable = currentTable->currentPreTruncateTable();
+
+        VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                tableStreamTypeToString(streamType));
+
+        remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            // The on going TABLE STREAM of the original table before the first table truncate has finished.
+            // Reset all the previous table pointers to be NULL.
+            currentTable->unsetPreTruncateTable();
+            VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
+                    tableStreamTypeToString(streamType));
         }
     }
     else {
-        // Failure.
-        return -1;
-    }
-
-    // Perform the streaming.
-    if (table != NULL) {
-        remaining = table->streamMore(outputStreams, streamType, retPositions);
-
-        // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {
-            m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+        Table* found = getTable(tableId);
+        if (found) {
+            table = dynamic_cast<PersistentTable*>(found);
+            remaining = table->streamMore(outputStreams, streamType, retPositions);
         }
     }
 
@@ -1711,6 +1748,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
+
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
@@ -1725,7 +1764,9 @@ void VoltDBEngine::reportProgessToTopend() {
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
-                                        *m_lastAccessedPlanNodeName,
+                                        (m_lastAccessedExec == NULL) ?
+                                        dummy_last_accessed_plan_node_name :
+                                        planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);

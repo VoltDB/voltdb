@@ -31,15 +31,15 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.ArrayUtil;
+import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.result.ResultConstants;
+import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.lib.HashMappedList;
+import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorLinkedList;
-import org.hsqldb_voltpatches.persist.PersistentStore;
-import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
-import org.hsqldb_voltpatches.types.Type;
 
 public class StatementResultUpdate extends StatementDML {
 

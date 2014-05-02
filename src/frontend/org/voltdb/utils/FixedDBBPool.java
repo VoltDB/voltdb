@@ -97,9 +97,10 @@ public class FixedDBBPool {
                 final Semaphore permits = m_permits.get(bufLenInBytes);
                 permits.acquire();
                 final BBContainer origin = DBBPool.allocateDirectAndPool(bufLenInBytes);
-                return new BBContainer(origin.b, origin.address) {
+                return new BBContainer(origin.b()) {
                     @Override
                     public void discard() {
+                        checkDoubleFree();
                         permits.release();
                         origin.discard();
                     }

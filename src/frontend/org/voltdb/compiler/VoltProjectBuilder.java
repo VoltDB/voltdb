@@ -69,6 +69,7 @@ import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -243,6 +244,8 @@ public class VoltProjectBuilder {
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
     boolean m_securityEnabled = false;
+    String m_securityProvider = SecurityProviderString.HASH.value();
+
     final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<String, ProcInfoData>();
 
     private String m_snapshotPath = null;
@@ -273,6 +276,19 @@ public class VoltProjectBuilder {
     private String m_elExportTarget = "file";
 
     private Integer m_deadHostTimeout = null;
+
+    private Integer m_elasticTargetThroughput = null;
+    private Integer m_elasticTargetPauseTime = null;
+
+    public VoltProjectBuilder setElasticTargetThroughput(int target) {
+        m_elasticTargetThroughput = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setElasticTargetPauseTime(int target) {
+        m_elasticTargetPauseTime = target;
+        return this;
+    }
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
         m_deadHostTimeout = deadHostTimeout;
@@ -455,6 +471,13 @@ public class VoltProjectBuilder {
 
     public void setSecurityEnabled(final boolean enabled) {
         m_securityEnabled = enabled;
+    }
+
+    public void setSecurityProvider(final String provider) {
+        if (provider != null && !provider.trim().isEmpty()) {
+            SecurityProviderString.fromValue(provider);
+            m_securityProvider = provider;
+        }
     }
 
     public void setSnapshotSettings(
@@ -678,7 +701,7 @@ public class VoltProjectBuilder {
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
-                compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
+                compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream, jarPath);
             } else {
                 compiler.summarizeErrors(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
             }
@@ -969,6 +992,12 @@ public class VoltProjectBuilder {
         SecurityType security = factory.createSecurityType();
         deployment.setSecurity(security);
         security.setEnabled(m_securityEnabled);
+        SecurityProviderString provider = SecurityProviderString.HASH;
+        if (m_securityEnabled) try {
+            provider = SecurityProviderString.fromValue(m_securityProvider);
+        } catch (IllegalArgumentException shouldNotHappenSeeSetter) {
+        }
+        security.setProvider(provider);
 
         // set the command log (which defaults to off)
         CommandLogType commandLogType = factory.createCommandLogType();
@@ -1019,6 +1048,12 @@ public class VoltProjectBuilder {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
             snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
+        }
+        if (m_elasticTargetThroughput != null || m_elasticTargetPauseTime != null) {
+            SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
+            if (m_elasticTargetThroughput != null) elastic.setThroughput(m_elasticTargetThroughput);
+            if (m_elasticTargetPauseTime != null) elastic.setDuration(m_elasticTargetPauseTime);
+            systemSettingType.setElastic(elastic);
         }
         deployment.setSystemsettings(systemSettingType);
 

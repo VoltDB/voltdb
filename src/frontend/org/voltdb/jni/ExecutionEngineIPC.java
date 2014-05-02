@@ -341,7 +341,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     boolean sync = header.get() == 1 ? true : false;
                     boolean isEndOfGeneration = header.get() == 1 ? true : false;
                     int length = header.getInt();
-                    ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length);
+                    ByteBuffer exportBuffer = ByteBuffer.allocate(length);
                     while (exportBuffer.hasRemaining()) {
                         final int read = m_socket.getChannel().read(exportBuffer);
                         if (read == -1) {
@@ -595,7 +595,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         // voltdbipc assumes host byte order everywhere
         // Arbitrarily set to 20MB when 10MB crashed for an arbitrarily scaled unit test.
         m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
-        m_dataNetwork = m_dataNetworkOrigin.b;
+        m_dataNetwork = m_dataNetworkOrigin.b();
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
@@ -792,6 +792,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
         } catch (final IOException exception) {
+            fser.discard();
             throw new RuntimeException(exception);
         }
 
@@ -818,6 +819,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(inputDepIds[i]);
         }
         m_data.put(fser.getBuffer());
+        fser.discard();
 
         try {
             m_data.flip();
@@ -1243,7 +1245,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 lengthBuffer.flip();
                 serialized[i] = lengthBuffer.getInt();
 
-                ByteBuffer view = outputBuffers.get(i).b.duplicate();
+                ByteBuffer view = outputBuffers.get(i).b().duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {
                     m_connection.m_socketChannel.read(view);

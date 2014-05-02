@@ -40,9 +40,11 @@ import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
@@ -52,6 +54,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -381,7 +384,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(builder.compile("/tmp/snapshot_settings_test.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true, false);
@@ -411,7 +414,7 @@ public class TestVoltCompiler extends TestCase {
             boolean success = project.compile("/tmp/exportsettingstest.jar");
             assertTrue(success);
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
 
@@ -444,7 +447,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true, false);
@@ -695,7 +698,7 @@ public class TestVoltCompiler extends TestCase {
 
         final Catalog c1 = compiler.getCatalog();
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -763,6 +766,64 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertFalse(success);
+    }
+
+    public void testDDLWithLongStringInCharacters() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
+        final String simpleSchema1 =
+            "create table books (cash integer default 23, " +
+            "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "The size of VARCHAR column TITLE in table BOOKS greater than " +
+                "262144 will be enforced as byte counts rather than UTF8 character counts. " +
+                "To eliminate this warning, specify \"VARCHAR(262154 BYTES)\"";
+        assertEquals(expectedMsg, warningMsg);
+        Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+        Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
+        assertTrue(var.getInbytes());
+    }
+
+    public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH + 10;
+        String simpleSchema1 =
+                "create table books (cash integer default 23, " +
+                        "title varbinary("+length+") , PRIMARY KEY(cash));";
+
+        String error1 = "VARBINARY column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema1, error1);
+
+        String simpleSchema2 =
+                "create table books (cash integer default 23, " +
+                        "title varchar("+length+") , PRIMARY KEY(cash));";
+
+        String error2 = "VARCHAR column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema2, error2);
     }
 
     public void testNullablePartitionColumn() throws IOException {
@@ -880,13 +941,42 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-        final Catalog catalog = compiler1.compileCatalog(projectPath);
+        final Catalog catalog = compileCatalogFromProject(compiler1, projectPath);
         final String cat1 = catalog.serialize();
         final boolean success = compiler2.compileWithProjectXML(projectPath, testout_jar);
-        final String cat2 = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         assertTrue(success);
         assertTrue(cat1.compareTo(cat2) == 0);
+    }
+
+    private Catalog compileCatalogFromProject(
+            final VoltCompiler compiler,
+            final String projectPath)
+    {
+        try {
+            return compiler.compileCatalogFromProject(projectPath);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return null;
+        }
+    }
+
+    private boolean compileFromDDL(
+            final VoltCompiler compiler,
+            final String jarPath,
+            final String... schemaPaths)
+    {
+        try {
+            return compiler.compileFromDDL(jarPath, schemaPaths);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testDDLTableTooManyColumns() throws IOException {
@@ -955,7 +1045,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
 
-        final String sql = VoltCompiler.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
+        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
         assertNotNull(sql);
     }
 
@@ -992,7 +1082,7 @@ public class TestVoltCompiler extends TestCase {
         //System.out.println("PRINTING Catalog 1");
         //System.out.println(c1.serialize());
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1032,7 +1122,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1076,7 +1166,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1218,7 +1308,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1257,7 +1347,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1299,7 +1389,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1808,7 +1898,6 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
-
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
@@ -2013,12 +2102,59 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMatView()
     {
         // Test MatView.
-        String ddl = "";
-        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+        String ddl;
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total, sumwage) " +
+                "as select num, count(*), sum(wage) from t group by num; \n" +
+
+                "create view my_view2 (num, total, sumwage) " +
+                "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
+        checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+    }
+
+    public void testDDLCompilerTableLimit()
+    {
+        String ddl;
+
+        // test failed cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
+        checkDDLErrorMessage(ddl, "unexpected token: XX");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);";
+        checkDDLErrorMessage(ddl, "incompatible data type in operation");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);";
+        checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
+        checkDDLErrorMessage(ddl, "Too many table limit constraints for table T");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT Rows 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
+
+
+        // Test success cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table t(id integer not null, num integer," +
+                "LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
     }
 
     public void testPartitionOnBadType() {
@@ -2693,7 +2829,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -2730,7 +2866,7 @@ public class TestVoltCompiler extends TestCase {
 
             assertTrue(success);
 
-            final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+            final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
             final Catalog c2 = new Catalog();
             c2.execute(catalogContents);
@@ -3050,13 +3186,13 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        boolean success = compileFromDDL(compiler, testout_jar, schemaPath);
         assertTrue(success);
 
-        success = compiler.compileFromDDL(testout_jar, schemaPath + "???");
+        success = compileFromDDL(compiler, testout_jar, schemaPath + "???");
         assertFalse(success);
 
-        success = compiler.compileFromDDL(testout_jar);
+        success = compileFromDDL(compiler, testout_jar);
         assertFalse(success);
     }
 

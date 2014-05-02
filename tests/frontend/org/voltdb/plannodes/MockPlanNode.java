@@ -33,7 +33,6 @@ public class MockPlanNode extends AbstractPlanNode
     String m_tableName;
     String[] m_columnNames;
     boolean m_isOrderDeterministic = false;
-    boolean m_isContentDeterministic = true;
 
     MockPlanNode(String tableName, String[] columnNames)
     {
@@ -91,38 +90,15 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return previously cached value.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        return m_isContentDeterministic;
-    }
-
-    /**
      * Write accessor for order determinism flag and optional description.
      * Also ensures consistency of content determinism flag (true -> true).
      */
     public void setOrderDeterminism(boolean b, String explanation) {
         m_isOrderDeterministic = b;
         if (m_isOrderDeterministic) {
-            m_isContentDeterministic = true;
             m_nondeterminismDetail = null;
         }
         else {
-            m_nondeterminismDetail = explanation;
-        }
-    }
-
-    /**
-     * Write accessor for content determinism flag and optional description.
-     * Also ensures consistency of order determinism flag (false -> false).
-     */
-    public void setContentDeterminism(boolean b, String explanation) {
-        m_isContentDeterministic = b;
-        if (!m_isContentDeterministic) {
-            m_isOrderDeterministic = false;
             m_nondeterminismDetail = explanation;
         }
     }

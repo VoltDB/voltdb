@@ -35,6 +35,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.lib.Collection;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;

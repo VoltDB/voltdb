@@ -119,7 +119,7 @@ public abstract class StatementCompiler {
         // Check order determinism before accessing the detail which it caches.
         boolean orderDeterministic = plan.isOrderDeterministic();
         catalogStmt.setIsorderdeterministic(orderDeterministic);
-        boolean contentDeterministic = plan.isContentDeterministic();
+        boolean contentDeterministic = orderDeterministic || ! plan.hasLimitOrOffset();
         catalogStmt.setIscontentdeterministic(contentDeterministic);
         String nondeterminismDetail = plan.nondeterminismDetail();
         catalogStmt.setNondeterminismdetail(nondeterminismDetail);
@@ -135,25 +135,6 @@ public abstract class StatementCompiler {
             catalogParam.setIndex(i);
         }
 
-        // Output Columns
-        int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
-            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            catColumn.setNullable(false);
-            catColumn.setIndex(index);
-            if (col.getColumnAlias() != null && !col.getColumnAlias().equals(""))
-            {
-                catColumn.setName(col.getColumnAlias());
-            }
-            else
-            {
-                catColumn.setName(col.getColumnName());
-            }
-            catColumn.setType(col.getType().getValue());
-            catColumn.setSize(col.getSize());
-            index++;
-        }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
 
         // output the explained plan to disk (or caller) for debugging

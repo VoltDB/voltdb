@@ -55,7 +55,6 @@ public class ExpressionValue extends Expression {
         valueData = o;
     }
 
-    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -72,7 +71,6 @@ public class ExpressionValue extends Expression {
         }
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -96,9 +94,7 @@ public class ExpressionValue extends Expression {
         }
     }
 
-    @Override
     public Object getValue(Session session) {
         return valueData;
     }
-
 }

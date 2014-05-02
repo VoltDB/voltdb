@@ -278,7 +278,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
-    ProgressMonitorProxy pmp(m_engine, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this, inner_table);
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while ((limit == -1 || tuple_ctr < limit) && outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",

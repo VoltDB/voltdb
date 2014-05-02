@@ -165,7 +165,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
-    ProgressMonitorProxy pmp(m_engine);
+    ProgressMonitorProxy pmp(m_engine, this);
     while (iterator.next(tuple))
     {
         pmp.countdownProgress();

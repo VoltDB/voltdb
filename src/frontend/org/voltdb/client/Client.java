@@ -24,6 +24,9 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+
 /**
  *  <p>
  *  A <code>Client</code> that connects to one or more nodes in a volt cluster
@@ -204,7 +207,9 @@ public interface Client {
      * to the database</p>
      *
      * @throws InterruptedException if this blocking call is interrupted.
+     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
      */
+    @Deprecated
     public void backpressureBarrier() throws InterruptedException;
 
     /**
@@ -240,7 +245,9 @@ public interface Client {
      * immediately if it is not possible to queue the procedure invocation due to backpressure.</p>
      *
      * @param blocking Whether you want procedure calls to block on backpressure.
+     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
      */
+    @Deprecated
     public void configureBlocking(boolean blocking);
 
     /**
@@ -249,7 +256,9 @@ public interface Client {
      *
      * @return true if {@link #callProcedure(ProcedureCallback, String, Object...)} will
      * block until backpressure ceases and false otherwise.
+     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
      */
+    @Deprecated
     public boolean blocking();
 
     /**
@@ -276,6 +285,8 @@ public interface Client {
      * <p>Write a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.</p>
      *
+     * <p>The format of this output is subject to change between versions</p>
+     *
      * <p>Format:
      * <ol>
      * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
@@ -285,6 +296,9 @@ public interface Client {
      * <li>Max measure round trip latency in ms.</li>
      * <li>95-percentile round trip latency estimate in ms.</li>
      * <li>99-percentile round trip latency estimate in ms.</li>
+     * <li>99.9-percentile round trip latency estimate in ms.</li>
+     * <li>99.99-percentile round trip latency estimate in ms.</li>
+     * <li>99.999-percentile round trip latency estimate in ms.</li>
      * </ol></p>
      *
      * @param stats {@link ClientStats} instance with relevant stats.
@@ -292,4 +306,16 @@ public interface Client {
      * @throws IOException on any file write error.
      */
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
+
+    /**
+     * <p>Creates a new instance of a VoltBulkLoader that is bound to this Client.
+     * Multiple instances of a VoltBulkLoader created by a single Client will share some
+     * resources, particularly if they are inserting into the same table.</p>
+     *
+     * @param name of table that bulk inserts are to be applied to.
+     * @param number of rows to collect for the table before starting a bulk insert.
+     * @param user defined callback procedure used for notification of failed inserts.
+     * @throws Exception if tableName can't be found in the catalog.
+     */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 }

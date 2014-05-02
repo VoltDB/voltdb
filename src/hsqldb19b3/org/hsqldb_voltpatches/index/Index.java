@@ -66,12 +66,9 @@
 
 package org.hsqldb_voltpatches.index;
 
-import org.hsqldb_voltpatches.Expression;
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
@@ -270,6 +267,8 @@ public interface Index extends SchemaObject {
     public int compareRowNonUnique(Object[] a, Object[] b,
                                    int fieldcount);
 
+    /************************* Volt DB Extensions *************************/
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -278,13 +277,14 @@ public interface Index extends SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    public VoltXMLElement voltGetIndexXML(Session session) throws HSQLParseException;
+    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session)
+        throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 
     /**
      * VoltDB added method to get a list of indexed expressions that contain one or more non-columns.
      * @return the list of expressions, or null if indexing only plain column value(s).
      */
-    public Expression[] getExpressions();
+    public org.hsqldb_voltpatches.Expression[] getExpressions();
 
     /**
      * VoltDB added method to allow unique index on partition table without partition key included.
@@ -292,5 +292,8 @@ public interface Index extends SchemaObject {
      */
     public boolean isAssumeUnique();
 
-    public Index setAssumeUnique(boolean assumeUnique);
+    Index setAssumeUnique(boolean assumeUnique);
+
+    Index withExpressions(org.hsqldb_voltpatches.Expression[] adjustExprs);
+    /**********************************************************************/
 }

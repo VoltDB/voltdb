@@ -114,3 +114,18 @@ CREATE TABLE P3 (
        PRIMARY KEY (P3_ID)
 );
 ---CREATE INDEX P3_IDX_P3NUM_TREE ON P2 (P3_NUM1,P3_NUM2);
+
+CREATE TABLE TMIN (
+       A INTEGER NOT NULL,
+       B INTEGER,
+       C INTEGER
+);
+create index idx1_TMIN_TREE on TMIN (B);
+create index idx2_TMIN_TREE on TMIN (A,B);
+create index idx3_TMIN_TREE on TMIN (A,B,C);
+
+create index idx4_TMIN_TREE on TMIN (ABS(B));
+create index idx5_TMIN_TREE on TMIN (A,ABS(B));
+create index idx6_TMIN_TREE on TMIN (ABS(A),B);
+
+

@@ -53,7 +53,6 @@ public class StatementSchemaDefinition extends StatementSchema {
         this.statements = statements;
     }
 
-    @Override
     public Result execute(Session session) {
 
         Result result = getResult(session);
@@ -65,10 +64,9 @@ public class StatementSchemaDefinition extends StatementSchema {
         return result;
     }
 
-    @Override
     Result getResult(Session session) {
 
-        schemaName = statements[0].getSchemaName();
+        schemaName = statements[0].getSchemalName();
 
         if (this.isExplain) {
             return Result.newSingleColumnStringResult("OPERATION",
@@ -189,9 +187,14 @@ public class StatementSchemaDefinition extends StatementSchema {
         }
 
         try {
+            // A VoltDB extension to disable 
             // Try not to explicitly throw an exception, just to catch and ignore it,
             // but accidents can happen, so keep the try/catch anyway.
             session.setSchemaNoThrow(oldSessionSchema.name);
+            /* disable 1 line ...
+            session.setSchema(oldSessionSchema.name);
+            ... disabled 1 line */
+            // End of VoltDB extension
         } catch (Exception e) {}
 
         return result;

@@ -7,7 +7,7 @@ from fabric_ssh_config import getSSHInfoForHost
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
-defaultlicensedays = 37 #default trial license in kit = 30 days + 1 week
+defaultlicensedays = 45 #default trial license length
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
@@ -40,6 +40,15 @@ def makeReleaseDir(releaseDir):
     os.makedirs(releaseDir)
     print "Created dir: " + releaseDir
 
+
+################################################
+# SEE IF HAS ZIP TARGET
+###############################################
+def versionHasZipTarget():
+    with settings(warn_only=True):
+        with cd(os.path.join(builddir,'pro')):
+                return run("ant -p -f mmt.xml | grep dist.pro.zip")
+
 ################################################
 # BUILD THE COMMUNITY VERSION
 ################################################
@@ -49,7 +58,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant clean default dist")
+        run("ant -Djmemcheck=NO_MEMCHECK clean default dist")
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -60,7 +69,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
@@ -70,6 +79,15 @@ def buildPro():
 def makeTrialLicense(days=30):
     with cd(builddir + "/pro/tools"):
         run("./make_trial_licenses.pl -t %d -W" % (days))
+
+################################################
+# MAKE AN ENTERPRISE ZIP FILE FOR SOME PARTNER UPLOAD SITES
+################################################
+
+def makeEnterpriseZip():
+    with cd(builddir + "/pro"):
+        run("VOLTCORE=../voltdb ant -f mmt.xml dist.pro.zip")
+
 
 ################################################
 # COPY FILES
@@ -99,6 +117,9 @@ def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
         "%s/license.xml" % (releaseDir))
 
+def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
+    get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
+        "%s/%s-voltdb-ent-%s.zip" % (releaseDir, operatingsys, version))
 
 ################################################
 # COMPUTE CHECKSUMS
@@ -177,79 +198,102 @@ if len(sys.argv) == 3:
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
-versionVolt5f = "unknown"
+build_errors=False
+
+versionCentos = "unknown"
 versionMac = "unknown"
 releaseDir = "unknown"
 
-# get ssh config
-volt5f = getSSHInfoForHost("volt5f")
-voltmini = getSSHInfoForHost("voltmini")
-volt12c = getSSHInfoForHost("volt12c")
+# get ssh config [key_filename, hostname]
+CentosSSHInfo = getSSHInfoForHost("volt5f")
+MacSSHInfo = getSSHInfoForHost("voltmini")
+UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
-with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
-    versionVolt5f = checkoutCode(voltdbTreeish, proTreeish)
-    if oneOff:
-        releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
-            (os.getenv('HOME'), versionVolt5f, voltdbTreeish, proTreeish)
-    else:
-        releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
-    makeReleaseDir(releaseDir)
-    print "VERSION: " + versionVolt5f
-    buildCommunity()
-    copyCommunityFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
-    buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
-    makeTrialLicense()
-    copyTrialLicenseToReleaseDir(releaseDir)
+try:
+    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+        versionCentos = checkoutCode(voltdbTreeish, proTreeish)
+        if oneOff:
+            releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
+                (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
+        else:
+            releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
+        makeReleaseDir(releaseDir)
+        print "VERSION: " + versionCentos
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        buildPro()
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        makeTrialLicense()
+        copyTrialLicenseToReleaseDir(releaseDir)
+        if versionHasZipTarget():
+            makeEnterpriseZip()
+            copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
+except Exception as e:
+    print "Coult not build LINUX kit: " + str(e)
+    build_errors=True
 
+try:
 # build kits on the mini
-with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
-    versionMac = checkoutCode(voltdbTreeish, proTreeish)
-    assert versionVolt5f == versionMac
-    buildCommunity()
-    copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-    buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+        versionMac = checkoutCode(voltdbTreeish, proTreeish)
+        assert versionCentos == versionMac
+        buildCommunity()
+        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+        buildPro()
+        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+except Exception as e:
+    print "Coult not build MAC kit: " + str(e)
+    build_errors=True
 
 # build debian kit
-with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
-    debbuilddir = "%s/deb_build/" % builddir
-    run("rm -rf " + debbuilddir)
-    run("mkdir -p " + debbuilddir)
+try:
+    with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
+        debbuilddir = "%s/deb_build/" % builddir
+        run("rm -rf " + debbuilddir)
+        run("mkdir -p " + debbuilddir)
 
-    with cd(debbuilddir):
-        put ("tools/voltdb-install.py",".")
+        with cd(debbuilddir):
+            put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
-        put("%s/%s" % (releaseDir, commbld),".")
-        run ("sudo python voltdb-install.py -D " + commbld)
-        get("voltdb_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("sudo python voltdb-install.py -D " + commbld)
+            get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
-        put("%s/%s" % (releaseDir, entbld),".")
-        run ("sudo python voltdb-install.py -D " + entbld)
-        get("voltdb-ent_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("sudo python voltdb-install.py -D " + entbld)
+            get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
+except Exception as e:
+    print "Coult not build debian kit: " + str(e)
+    build_errors=True
 
-# build rpm kit
-with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
-    rpmbuilddir = "%s/rpm_build/" % builddir
-    run("rm -rf " + rpmbuilddir)
-    run("mkdir -p " + rpmbuilddir)
+try:
+    # build rpm kit
+    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+        rpmbuilddir = "%s/rpm_build/" % builddir
+        run("rm -rf " + rpmbuilddir)
+        run("mkdir -p " + rpmbuilddir)
 
-    with cd(rpmbuilddir):
-        put ("tools/voltdb-install.py",".")
+        with cd(rpmbuilddir):
+            put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
-        put("%s/%s" % (releaseDir, commbld),".")
-        run ("python2.6 voltdb-install.py -R " + commbld)
-        get("voltdb-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
+            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, commbld),".")
+            run ("python2.6 voltdb-install.py -R " + commbld)
+            get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
-        put("%s/%s" % (releaseDir, entbld),".")
-        run ("python2.6 voltdb-install.py -R " + entbld)
-        get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
+            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
+            put("%s/%s" % (releaseDir, entbld),".")
+            run ("python2.6 voltdb-install.py -R " + entbld)
+            get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+
+except Exception as e:
+    print "Coult not build rpm kit: " + str(e)
+    build_errors=True
 
 computeChecksums(releaseDir)
-#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
-#backupReleaseDir(releaseDir, archiveDir, versionVolt5f)
+exit (build_errors)
+#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
+#backupReleaseDir(releaseDir, archiveDir, versionCentos)

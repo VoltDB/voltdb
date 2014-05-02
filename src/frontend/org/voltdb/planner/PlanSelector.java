@@ -310,7 +310,7 @@ public class PlanSelector implements Cloneable {
      * @param filename
      * @param filenameRenamed
      */
-    private void renameFile(String filename, String filenameRenamed) {
+    private static void renameFile(String filename, String filenameRenamed) {
         File file;
         File fileRenamed;
         file = new File(filename);

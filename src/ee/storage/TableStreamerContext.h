@@ -163,6 +163,13 @@ public:
      */
     virtual void updatePredicates(const std::vector<std::string> &predicateStrings);
 
+    virtual TableStreamerContext* cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+    {
+        // Derived classes that are not related to ongoing elastic rebalance
+        // do not need to be applied to the post-truncated copy of the table.
+        return NULL;
+    }
+
 protected:
 
     /**

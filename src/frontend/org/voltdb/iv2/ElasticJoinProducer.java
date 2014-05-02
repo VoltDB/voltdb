@@ -23,10 +23,10 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
@@ -38,18 +38,14 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
+    private static final VoltLogger JOINLOG = new VoltLogger("JOIN");
+
     // true if the site has received the first fragment task message
     private boolean m_receivedFirstFragment = false;
     // true if the site has notified the coordinator about the receipt of the first fragment
     // message
     private boolean m_firstFragResponseSent = false;
-
-    // data transfer snapshot completion monitor
-    private final SettableFuture<SnapshotCompletionEvent> m_snapshotCompletionMonitor =
-            SettableFuture.create();
 
     // a snapshot sink used to stream table data from multiple sources
     private final StreamSnapshotSink m_dataSink;
@@ -119,10 +115,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        String snapshotNonce = message.getSnapshotNonce();
-        SnapshotCompletionAction interest =
-                new SnapshotCompletionAction(snapshotNonce, m_snapshotCompletionMonitor);
-        interest.register();
+        registerSnapshotMonitor(message.getSnapshotNonce());
 
         long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
                                               message.getSnapshotBufferPool());
@@ -156,9 +149,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
+        boolean sourcesReady = false;
         RestoreWork restoreWork = m_dataSink.poll(m_snapshotBufferAllocator);
         if (restoreWork != null) {
             restoreBlock(restoreWork, siteConnection);
+            sourcesReady = true;
         }
 
         // The completion monitor may fire even if m_dataSink has not reached EOF in the case that there's no
@@ -195,7 +190,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         } else {
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
-            m_taskQueue.offer(this);
+            returnToTaskQueue(sourcesReady);
         }
     }
 
@@ -224,6 +219,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         m_taskLog = initializeTaskLog(voltroot, m_partitionId);
         return this;
+    }
+
+    @Override
+    protected VoltLogger getLogger() {
+        return JOINLOG;
     }
 
     @Override
@@ -270,12 +270,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    public void setEarliestTxnId(long txnId)
-    {
-        m_taskLog.setEarliestTxnId(txnId);
-    }
-
-    @Override
     public boolean isEmpty() throws IOException
     {
         return m_taskLog.isEmpty();
@@ -285,5 +279,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public void close() throws IOException
     {
         m_taskLog.close();
+    }
+
+    @Override
+    public void enableRecording(long snapshotSpHandle) {
+        //Implemented by the nest task log, it is enabled immediately on construction
     }
 }

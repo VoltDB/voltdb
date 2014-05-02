@@ -67,23 +67,27 @@ public class TestMurmur3 extends TestCase {
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);
         EELibraryLoader.loadExecutionEngineLibrary(true);
-        BBContainer c = DBBPool.allocateDirectWithAddress(4096);
-        c.b.order(ByteOrder.LITTLE_ENDIAN);
+        BBContainer c = DBBPool.allocateDirect(4096);
+        try {
+            c.b().order(ByteOrder.LITTLE_ENDIAN);
 
-        for (int ii = 0; ii < iterations; ii++) {
-            int bytesToFill = r.nextInt(maxLength + 1);
-            byte bytes[] = new byte[bytesToFill];
-            r.nextBytes(bytes);
-            c.b.clear();
-            c.b.put(bytes);
-            c.b.flip();
+            for (int ii = 0; ii < iterations; ii++) {
+                int bytesToFill = r.nextInt(maxLength + 1);
+                byte bytes[] = new byte[bytesToFill];
+                r.nextBytes(bytes);
+                c.b().clear();
+                c.b().put(bytes);
+                c.b().flip();
 
-            long nativeHash = DBBPool.getMurmur3128(c.address, 0, bytesToFill);
-            long javaHash =  MurmurHash3.hash3_x64_128(c.b, 0, bytesToFill, 0);
-            if (nativeHash != javaHash) {
-                fail("Failed in iteration " + ii + " native hash " + Long.toHexString(nativeHash) +
-                        " java hash " + Long.toHexString(javaHash) +" with bytes " + Encoder.base64Encode(bytes));
+                long nativeHash = DBBPool.getMurmur3128(c.address(), 0, bytesToFill);
+                long javaHash =  MurmurHash3.hash3_x64_128(c.b(), 0, bytesToFill, 0);
+                if (nativeHash != javaHash) {
+                    fail("Failed in iteration " + ii + " native hash " + Long.toHexString(nativeHash) +
+                            " java hash " + Long.toHexString(javaHash) +" with bytes " + Encoder.base64Encode(bytes));
+                }
             }
+        } finally {
+            c.discard();
         }
     }
 }

@@ -31,8 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.List;
-
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -257,7 +255,6 @@ public class StatementSchema extends Statement {
         }
     }
 
-    @Override
     public Result execute(Session session) {
 
         Result result = getResult(session);
@@ -947,16 +944,11 @@ public class StatementSchema extends Statement {
                 HsqlName name;
                 int[]    indexColumns;
                 boolean  unique;
-                // A VoltDB extension to support indexed expressions
-                List<Expression> indexExprs;
-                boolean  assumeUnique;
 
                 table        = (Table) arguments[0];
                 indexColumns = (int[]) arguments[1];
                 name         = (HsqlName) arguments[2];
                 unique       = ((Boolean) arguments[3]).booleanValue();
-                indexExprs   = (List<Expression>)arguments[4];
-                assumeUnique   = ((Boolean) arguments[5]).booleanValue();
 
                 try {
                     /*
@@ -974,14 +966,20 @@ public class StatementSchema extends Statement {
 
                     TableWorks tableWorks = new TableWorks(session, table);
 
+                    // A VoltDB extension to support indexed expressions
+                    @SuppressWarnings("unchecked")
+                    java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[4];
+                    boolean assumeUnique = ((Boolean) arguments[5]).booleanValue();
                     if (indexExprs != null) {
-                        // A VoltDB extension to support indexed expressions
                         tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique).setAssumeUnique(assumeUnique);
-
                         break;
                     }
-
-                    tableWorks.addIndex(indexColumns, name, unique).setAssumeUnique(assumeUnique);
+                    org.hsqldb_voltpatches.index.Index addedIndex = 
+                    // End of VoltDB extension
+                    tableWorks.addIndex(indexColumns, name, unique);
+                    // A VoltDB extension to support assume unique attribute
+                    addedIndex.setAssumeUnique(assumeUnique);
+                    // End of VoltDB extension
 
                     break;
                 } catch (HsqlException e) {
@@ -1187,12 +1185,10 @@ public class StatementSchema extends Statement {
         }
     }
 
-    @Override
     public boolean isAutoCommitStatement() {
         return true;
     }
 
-    @Override
     public String describe(Session session) {
         return sql;
     }

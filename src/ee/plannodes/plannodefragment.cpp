@@ -125,12 +125,6 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
         for (int zz = 0; zz < childIds.size(); zz++) {
             children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
         }
-
-        const std::vector<CatalogId> parentIds = (*node)->getParentIds();
-        std::vector<AbstractPlanNode*> &parents = (*node)->getParents();
-        for (int zz = 0; zz < parentIds.size(); zz++) {
-            parents.push_back(pnf->m_idToNodeMap[parentIds[zz]]);
-        }
     }
     pnf->loadFromJSONObject(obj);
 
@@ -148,12 +142,14 @@ PlanNodeFragment::loadFromJSONObject(PlannerDomValue obj)
         m_executionList.push_back(m_idToNodeMap[executeListArray.valueAtIndex(i).asInt()]);
     }
 
-    PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
-    for (int i = 0; i < parametersArray.arrayLen(); i++) {
-        PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
-        int index = parameterArray.valueAtIndex(0).asInt();
-        std::string typeString = parameterArray.valueAtIndex(1).asStr();
-        parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+    if (obj.hasKey("PARAMETERS")) {
+        PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
+        for (int i = 0; i < parametersArray.arrayLen(); i++) {
+            PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
+            int index = parameterArray.valueAtIndex(0).asInt();
+            std::string typeString = parameterArray.valueAtIndex(1).asStr();
+            parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+        }
     }
 }
 

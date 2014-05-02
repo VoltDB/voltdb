@@ -87,20 +87,26 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
+PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this, m_data.begin()),
+    m_iter(this),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
+    m_tupleLimit(tupleLimit),
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this)
 {
+    // this happens here because m_data might not be initialized above
+    m_iter.reset(m_data.begin());
+
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
+
+    m_preTruncateTable = NULL;
 }
 
 PersistentTable::~PersistentTable()
@@ -211,6 +217,11 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
+    if (originalTable->m_tableStreamer != NULL) {
+        // Elastic Index may complete when undo Truncate
+        this->unsetPreTruncateTable();
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -234,6 +245,18 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
 
+    if (originalTable->m_tableStreamer != NULL) {
+        std::stringstream message;
+        message << "Transfering table stream after truncation of table ";
+        message << name() << " partition " << originalTable->m_tableStreamer->getPartitionID() << '\n';
+        std::string str = message.str();
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
+
+        originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+
+        this->unsetPreTruncateTable();
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -253,10 +276,16 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
         return ;
     }
+
     assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
+    if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is an Elastic Index work going on and it should continue access the old table.
+        // Add one reference count to keep the original table.
+        emptyTable->setPreTruncateTable(this);
+    }
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
@@ -304,6 +333,14 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
+
+    if (fallible && visibleTupleCount() >= m_tupleLimit) {
+        char buffer [256];
+        snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
+                m_name.c_str(), m_tupleLimit);
+        throw ConstraintFailureException(this, source, buffer);
+    }
+
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -332,6 +369,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
+
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -948,7 +986,8 @@ std::string PersistentTable::debug() {
 void PersistentTable::onSetColumns() {
     m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        m_allowNulls[i] = m_schema->columnAllowNull(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
     }
 
     // Also clear some used block state. this structure doesn't have
@@ -1058,6 +1097,11 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
+        char errMsg[1024];
+        snprintf(errMsg, 1024, "No table streamer of Type %s for table %s.",
+                tableStreamTypeToString(streamType).c_str(), name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);

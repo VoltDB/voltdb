@@ -24,6 +24,7 @@
 #include "storage/tablefactory.h"
 #include <vector>
 #include <string>
+#include <math.h>
 
 using namespace voltdb;
 using namespace std;
@@ -36,20 +37,25 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
     columnNames.push_back("TUPLE_DATA_MEMORY");
     columnNames.push_back("STRING_DATA_MEMORY");
+    columnNames.push_back("TUPLE_LIMIT");
+    columnNames.push_back("PERCENT_FULL");
     return columnNames;
 }
 
 void TableStats::populateTableStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
-        vector<bool> &allowNull) {
-    StatsSource::populateBaseSchema(types, columnLengths, allowNull);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+        vector<bool> &allowNull,
+        vector<bool> &inBytes) {
+    StatsSource::populateBaseSchema(types, columnLengths, allowNull, inBytes);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT);  columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));  allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
 }
 
 Table*
@@ -64,11 +70,12 @@ TableStats::generateEmptyTableStatsTable()
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
+    vector<bool> columnInBytes;
     TableStats::populateTableStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull);
+                                         columnAllowNull, columnInBytes);
     TupleSchema *schema =
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
+                                       columnAllowNull, columnInBytes);
 
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
@@ -122,6 +129,7 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
+    int tupleLimit = m_table->tupleLimit();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
@@ -161,14 +169,20 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
-    tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-                      ValueFactory::
-                      getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
+    tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
+            ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+
+    bool hasTupleLimit = tupleLimit == INT_MAX ? false : true;
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
+            hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit): ValueFactory::getNullValue());
+    int32_t percentage = 0;
+    if (hasTupleLimit && tupleLimit > 0) {
+        percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
+    }
+    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
 }
 
 /**
@@ -178,8 +192,9 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
 void TableStats::populateSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
-        vector<bool> &allowNull) {
-    TableStats::populateTableStatsSchema(types, columnLengths, allowNull);
+        vector<bool> &allowNull,
+        vector<bool> &inBytes) {
+    TableStats::populateTableStatsSchema(types, columnLengths, allowNull, inBytes);
 }
 
 TableStats::~TableStats() {
