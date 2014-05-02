@@ -402,6 +402,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_preTruncateTable;
     }
 
+    PersistentTable * currentPreTruncateTable() {
+        if (m_preTruncateTable != NULL) {
+            return m_preTruncateTable;
+        }
+        return this;
+    }
+
     void setPreTruncateTable(PersistentTable * tb) {
         m_preTruncateTable = tb->getPreTruncateTable();
         m_preTruncateTable->incrementRefcount();

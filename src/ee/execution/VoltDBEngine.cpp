@@ -1560,7 +1560,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // Java engine will always poll a fully serialized table one more
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
-    PersistentTable *table = NULL, *currentTable = NULL;
+    PersistentTable *table = NULL;
 
     if (tableStreamTypeIsSnapshot(streamType)) {
         // If a completed table is polled, return 0 bytes serialized. The
@@ -1577,26 +1577,22 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
-        if (found) {
-            PersistentTable * originalTable = dynamic_cast<PersistentTable*>(found);
-            if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
-                currentTable = originalTable;
-                // The ongoing TABLE STREAM needs the original table from the first table truncate.
-                if (originalTable->getPreTruncateTable() != NULL) {
-                    originalTable = originalTable->getPreTruncateTable();
-                }
-                VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
-                        tableStreamTypeToString(streamType));
-            }
-            table = originalTable;
+        if (!found) {
+            return -1;
         }
-        remaining = table->streamMore(outputStreams, streamType, retPositions);
+        PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
+        assert(currentTable != NULL);
+        // The ongoing TABLE STREAM needs the original table from the first table truncate.
+        PersistentTable * originalTable = currentTable->currentPreTruncateTable();
+
+        VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                tableStreamTypeToString(streamType));
+
+        remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
             // The on going TABLE STREAM of the original table before the first table truncate has finished.
             // Reset all the previous table pointers to be NULL.
-            assert(currentTable != NULL);
             currentTable->unsetPreTruncateTable();
-
             VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
                     tableStreamTypeToString(streamType));
         }
