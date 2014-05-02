@@ -32,6 +32,7 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.types.TimestampType;
@@ -121,7 +122,7 @@ public class VoltDB {
         public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
-        public String m_pathToLicense = "license.xml";
+        public String m_pathToLicense = null;
 
         /** false if voltdb.so shouldn't be loaded (for example if JVM is
          *  started by voltrun).
@@ -325,8 +326,15 @@ public class VoltDB {
                         m_httpPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.startsWith("zkport")) {
-                    m_zkInterface = "127.0.0.1:" + args[++i].trim();
-                }  else if (arg.equals("externalinterface")) {
+                    //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
+                    String portStr = args[++i];
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                    } else {
+                        m_zkInterface = "127.0.0.1:" + portStr.trim();
+                    }
+                } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
@@ -694,6 +702,9 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        try {
+            OnDemandBinaryLogger.flush();
+        } catch (Throwable e) {}
 
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until

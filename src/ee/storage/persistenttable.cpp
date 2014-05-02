@@ -238,6 +238,16 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
 
+    if (originalTable->m_tableStreamer != NULL) {
+        std::stringstream message;
+        message << "Transfering table stream after truncation of table ";
+        message << name() << " partition " << originalTable->m_tableStreamer->getPartitionID() << '\n';
+        std::string str = message.str();
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
+
+        originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -1073,7 +1083,8 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
         char errMsg[1024];
-        snprintf(errMsg, 1024, "No table streamer for table %s.", name().c_str());
+        snprintf(errMsg, 1024, "No table streamer of Type %s for table %s.",
+                tableStreamTypeToString(streamType).c_str(), name().c_str());
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
 
         return TABLE_STREAM_SERIALIZATION_ERROR;

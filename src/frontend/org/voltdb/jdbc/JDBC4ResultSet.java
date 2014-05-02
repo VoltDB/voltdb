@@ -451,10 +451,12 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkColumnBounds(columnIndex);
         try
         {
-            long timestamp = table.getTimestampAsLong(columnIndex-1);
-            short micros = (short) (timestamp % 1000);
-            long millis = (timestamp - micros) / 1000;
-            return new Date(millis);
+            Timestamp ts = table.getTimestampAsSqlTimestamp(columnIndex-1);
+            Date result = null;
+            if (ts != null) {
+                result = new Date(ts.getTime());
+            }
+            return result;
         }
         catch(Exception x)
         {
@@ -831,10 +833,12 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkColumnBounds(columnIndex);
         try
         {
-            long timestamp = table.getTimestampAsLong(columnIndex-1);
-            short micros = (short) (timestamp % 1000);
-            long millis = (timestamp - micros) / 1000;
-            return new Time(millis);
+            Timestamp ts = table.getTimestampAsSqlTimestamp(columnIndex-1);
+            Time result = null;
+            if (ts != null) {
+                result = new Time(ts.getTime());
+            }
+            return result;
         }
         catch(Exception x)
         {
@@ -871,11 +875,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkColumnBounds(columnIndex);
         try
         {
-            long timestamp = table.getTimestampAsLong(columnIndex-1);
-            int micros = (int) (timestamp % 1000);
-            long millis = (timestamp - micros) / 1000;
-            Timestamp result = new Timestamp(millis);
-            result.setNanos(micros*1000);
+            Timestamp result = table.getTimestampAsSqlTimestamp(columnIndex-1);
             return result;
         }
         catch(Exception x)

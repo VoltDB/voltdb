@@ -42,15 +42,16 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import jsr166y.LinkedTransferQueue;
 
@@ -95,6 +96,11 @@ public class CoreUtils {
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
 
+    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
+        @Override
+        public void run() {}
+    };
+
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
      * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
@@ -108,22 +114,49 @@ public class CoreUtils {
                 1,
                 keepAlive,
                 TimeUnit.MILLISECONDS,
-                new LinkedTransferQueue<Runnable>(),
+                new LinkedBlockingQueue<Runnable>(),
                 CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
     }
 
     /**
      * Create an unbounded single threaded executor
      */
-    public static ListeningExecutorService getSingleThreadExecutor(String name) {
+    public static ExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return ste;
+    }
+
+    public static ExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
+        return ste;
+    }
+
+    /**
+     * Create an unbounded single threaded executor
+     */
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
-    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+    public static ListeningExecutorService getListeningSingleThreadExecutor(String name, int size) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -598,5 +631,65 @@ public class CoreUtils {
             }
 
         }, interval, TimeUnit.MILLISECONDS);
+    }
+
+    public static final int CORE_UTIL_LOCK_SPINS = Integer.getInteger("CORE_UTIL_LOCK_SPINS", 128);
+
+    /*
+     * Spinning lock adapted from LinkedTransferQueue.take() spin then block strategy
+     *
+     * Generally not something you want to be using for locks that protect
+     * large critical sections since the spinning is wasted.
+     *
+     * Written by Doug Lea with assistance from members of JCP JSR-166
+     * Expert Group and released to the public domain, as explained at
+     * http://creativecommons.org/publicdomain/zero/1.0/
+     */
+    public static void spinLock(ReentrantLock lock) {
+        int spins = CORE_UTIL_LOCK_SPINS;
+        ThreadLocalRandom randomYields = null;
+
+        for (;;) {
+            if (lock.tryLock()) {
+                return;
+            }
+
+            if (randomYields == null) {
+                randomYields = ThreadLocalRandom.current();
+            }
+            else if (spins > 0) {
+                --spins;
+                if (randomYields.nextInt(64) == 0)
+                    Thread.yield();
+            }
+            else {
+                lock.lock();
+                return;
+            }
+        }
+    }
+
+    public static final long QUEUE_SPIN_MICROSECONDS =
+            TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("QUEUE_SPIN_MICROS", 0));
+
+    public static <T> T queueSpinTake(BlockingQueue<T> queue) throws InterruptedException {
+        if (QUEUE_SPIN_MICROSECONDS > 0) {
+            T retval = null;
+            long nanos = -1;
+            ThreadLocalRandom randomYields = null;
+            for (;;) {
+                if ((retval = queue.poll()) != null) return retval;
+                if (nanos == -1) {
+                    nanos = System.nanoTime();
+                    randomYields = ThreadLocalRandom.current();
+                } else if (System.nanoTime() - nanos > QUEUE_SPIN_MICROSECONDS) {
+                    return queue.take();
+                } else if (randomYields.nextInt(64) == 0) {
+                    Thread.yield();
+                }
+            }
+        } else {
+            return queue.take();
+        }
     }
 }

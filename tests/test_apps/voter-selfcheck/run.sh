@@ -118,7 +118,7 @@ function secure-benchmark() {
         --ratelimit=100000 \
         --autotune=false \
         --username=myuser \
-        --password=voltdb \
+        --password=voltdbuser \
         --latencytarget=10
 }
 

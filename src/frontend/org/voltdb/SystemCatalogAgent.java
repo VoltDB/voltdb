@@ -18,7 +18,6 @@ package org.voltdb;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -56,7 +55,8 @@ public class SystemCatalogAgent extends OpsAgent
                 subselector,
                 c,
                 clientHandle,
-                System.currentTimeMillis());
+                System.currentTimeMillis(),
+                obj);
         collectSystemCatalog(psr);
         return;
     }

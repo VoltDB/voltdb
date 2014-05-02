@@ -157,6 +157,7 @@ public class NodeSchema
             TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
             tve.setValueType(col.getType());
             tve.setValueSize(col.getSize());
+            tve.setInBytes(col.getExpression().getInBytes());
             SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve);
             copy.addColumn(sc);
         }

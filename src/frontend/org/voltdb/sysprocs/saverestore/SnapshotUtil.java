@@ -43,7 +43,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -1345,7 +1345,7 @@ public class SnapshotUtil {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final SimpleClientResponseAdapter adapter =
                 new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
-        final LinkedTransferQueue<ClientResponse> responses = new LinkedTransferQueue<ClientResponse>();
+        final LinkedBlockingQueue<ClientResponse> responses = new LinkedBlockingQueue<ClientResponse>();
         adapter.registerCallback(clientHandle, new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
@@ -1453,7 +1453,7 @@ public class SnapshotUtil {
             @Override
             public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
             {
-                if (event.nonce.equals(nonce)) {
+                if (event.nonce.equals(nonce) && event.didSucceed) {
                     VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
                     result.set(event);
                 }

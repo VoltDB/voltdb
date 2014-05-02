@@ -17,8 +17,11 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.messaging.LocalMailbox;
+
+import java.util.concurrent.Callable;
 
 public abstract class SnapshotIOAgent extends LocalMailbox {
     public SnapshotIOAgent(HostMessenger hostMessenger, long hsId)
@@ -26,5 +29,6 @@ public abstract class SnapshotIOAgent extends LocalMailbox {
         super(hostMessenger, hsId);
     }
 
+    public abstract <T> ListenableFuture<T> submit(Callable<T> work);
     public abstract void shutdown() throws InterruptedException;
 }

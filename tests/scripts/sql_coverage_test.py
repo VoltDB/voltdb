@@ -98,7 +98,6 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
 #        print "999 Key = '%s', Val = '%s'" % (key, testConfigKits[key])
     if(host != defaultHost):
         # Flush database
-        client.onecmd("updatecatalog " + testConfigKit["flushCatalog"] + " " + testConfigKit["deploymentFile"])
         client.onecmd("updatecatalog " + testConfigKit["testCatalog"]  + " " + testConfigKit["deploymentFile"])
 
     statements_file = open(statements_path, "rb")
@@ -162,7 +161,8 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, submit_verbosely, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
+    subversion_generation, submit_verbosely, args, testConfigKit):
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
@@ -189,7 +189,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, True)
+    generator = SQLGenerator(config["schema"], template, subversion_generation, True)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -218,7 +218,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     # generated in this case.
     if "template-hsqldb" in config:
         template = config["template-hsqldb"]
-    generator = SQLGenerator(config["schema"], template, False)
+    generator = SQLGenerator(config["schema"], template, subversion_generation, False)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -262,9 +262,9 @@ def get_hostinfo(options):
             sys.exit(3)
     return (hostname, hostport)
 
-def create_catalogFile(voltcompiler, flush4projectFile, catalogFilename):
+def create_catalogFile(voltcompiler, projectFile, catalogFilename):
     catalogFile = "/tmp/" + catalogFilename + ".jar"
-    cmd = voltcompiler + " /tmp " + flush4projectFile + " " + catalogFile
+    cmd = voltcompiler + " /tmp " + projectFile + " " + catalogFile
     call(cmd, shell=True)
     if not os.path.exists(catalogFile):
         catalogFile = None
@@ -306,27 +306,12 @@ def create_deploymentFile(options):
 def create_testConfigKits(options, basedir):
     testConfigKits = {}
 
-    flushDDL = basedir + "/" + options.flush
-    if not os.path.exists(flushDDL):
-        print >> sys.stderr, "Cannot find the flush DDL file: '%s'!" % flushDDL
-        sys.exit(3)
-#    else:
-#        print "flushDDL = #%s#" % flushDDL
-
     voltcompiler = get_voltcompiler(basedir)
     if voltcompiler == None:
         print >> sys.stderr, "Cannot find the executable voltcompiler!"
         sys.exit(3)
     else:
         testConfigKits["voltcompiler"] = voltcompiler
-
-    flush4projectFile = create_projectFile(flushDDL, 'flush')
-    flushCatalog = create_catalogFile(voltcompiler, flush4projectFile, 'flush')
-    if flushCatalog == None:
-        print >> sys.stderr, "Cannot find the flush catalog jar file!"
-        sys.exit(3)
-    else:
-        testConfigKits["flushCatalog"] = flushCatalog
 
     deploymentFile = create_deploymentFile(options)
     if deploymentFile == None:
@@ -412,12 +397,13 @@ if __name__ == "__main__":
                       help="the number of partitions used in this test")
     parser.add_option("-p", "--port", dest="hostport",
                       help="the port number of the leader")
-    parser.add_option("-f", "--flush", dest="flush",
-                      help="the temporary DDL file used to flush databases")
     parser.add_option("-s", "--seed", dest="seed",
                       help="seed for random number generator")
     parser.add_option("-c", "--config", dest="config", default=None,
                       help="the name of the config to run")
+    parser.add_option("-S", "--subversion_generation", dest="subversion_generation",
+                      action="store_true", default=None,
+                      help="enable generation of additional subquery forms for select statements")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
@@ -460,9 +446,8 @@ if __name__ == "__main__":
     defaultHost = "localhost"
     defaultPort = 21212
     if(options.hostname != None and options.hostname != defaultHost):
-        # To set a dictionary with following 5 keys:
+        # To set a dictionary with following 4 keys:
         # testConfigKits["voltcompiler"]
-        # testConfigKits["flushCatalog"]
         # testConfigKits["deploymentFile"]
         # testConfigKits["hostname"]
         # testConfigKits["hostport"]
@@ -480,8 +465,9 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all, \
-                            options.generate_only, options.report_all, args, testConfigKits)
+        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
+                            options.generate_only, options.subversion_generation,
+                            options.report_all, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
         if result["mis"] != 0:

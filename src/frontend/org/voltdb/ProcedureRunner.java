@@ -271,7 +271,9 @@ public class ProcedureRunner {
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_systemProcedureContext;
-                for (int i=0; i < paramList.length; ++i) combinedParams[i+1] = paramList[i];
+                for (int i=0; i < paramList.length; ++i) {
+                    combinedParams[i+1] = paramList[i];
+                }
                 // swap the lists.
                 paramList = combinedParams;
             }
@@ -305,7 +307,7 @@ public class ProcedureRunner {
                 try {
                     if (m_language == Language.JAVA) {
                         if (HOST_TRACE_ENABLED) {
-                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + m_procMethod.getDeclaringClass().getName());
                         }
                         try {
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
@@ -373,16 +375,18 @@ public class ProcedureRunner {
             m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
-            if (results == null)
+            if (results == null) {
                 results = new VoltTable[0];
+            }
 
-            if (retval == null)
+            if (retval == null) {
                 retval = new ClientResponseImpl(
                         m_statusCode,
                         m_appStatusCode,
                         m_appStatusString,
                         results,
                         m_statusString);
+            }
 
             int hash = (int) m_inputCRC.getValue();
             if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
@@ -789,27 +793,28 @@ public class ProcedureRunner {
             }
             // this handles null values
             VoltType type = VoltType.get(stmtParamTypes[ii]);
-            if (type == VoltType.TINYINT)
+            if (type == VoltType.TINYINT) {
                 args[ii] = Byte.MIN_VALUE;
-            else if (type == VoltType.SMALLINT)
+            } else if (type == VoltType.SMALLINT) {
                 args[ii] = Short.MIN_VALUE;
-            else if (type == VoltType.INTEGER)
+            } else if (type == VoltType.INTEGER) {
                 args[ii] = Integer.MIN_VALUE;
-            else if (type == VoltType.BIGINT)
+            } else if (type == VoltType.BIGINT) {
                 args[ii] = Long.MIN_VALUE;
-            else if (type == VoltType.FLOAT)
+            } else if (type == VoltType.FLOAT) {
                 args[ii] = VoltType.NULL_FLOAT;
-            else if (type == VoltType.TIMESTAMP)
+            } else if (type == VoltType.TIMESTAMP) {
                 args[ii] = new TimestampType(Long.MIN_VALUE);
-            else if (type == VoltType.STRING)
+            } else if (type == VoltType.STRING) {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            else if (type == VoltType.VARBINARY)
+            } else if (type == VoltType.VARBINARY) {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            else if (type == VoltType.DECIMAL)
+            } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
-            else
+            } else {
                 throw new ExpectedProcedureException("Unknown type " + type +
                  " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
+            }
         }
 
         return ParameterSet.fromArrayNoCopy(args);
@@ -944,8 +949,9 @@ public class ProcedureRunner {
                     for (final Method m : methods) {
                         String name = m.getName();
                         if (name.equals("run")) {
-                            if (Modifier.isPublic(m.getModifiers()) == false)
+                            if (Modifier.isPublic(m.getModifiers()) == false) {
                                 continue;
+                            }
                             p.m_procMethod = m;
                             return m.getParameterTypes();
                         }
@@ -1010,8 +1016,9 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (isProcedureStackTraceElement(ste))
-               matches.add(ste);
+           if (isProcedureStackTraceElement(ste)) {
+            matches.add(ste);
+        }
        }
 
        byte status = ClientResponse.UNEXPECTED_FAILURE;
@@ -1037,8 +1044,9 @@ public class ProcedureRunner {
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
-           if (e.getCause() != null)
-               e = e.getCause();
+           if (e.getCause() != null) {
+            e = e.getCause();
+        }
        }
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
            status = ClientResponse.TXN_RESTART;
@@ -1094,11 +1102,12 @@ public class ProcedureRunner {
        }
        if (result instanceof VoltTable[]) {
            VoltTable[] retval = (VoltTable[]) result;
-           for (VoltTable table : retval)
-               if (table == null) {
+           for (VoltTable table : retval) {
+            if (table == null) {
                    Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
                    throw new InvocationTargetException(e);
                }
+        }
 
            return retval;
        }
@@ -1333,7 +1342,9 @@ public class ProcedureRunner {
 
        // create all the local work for the transaction
        for (int i = 0; i < state.m_depsForLocalTask.length; i++) {
-           if (state.m_depsForLocalTask[i] < 0) continue;
+           if (state.m_depsForLocalTask[i] < 0) {
+            continue;
+        }
            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
        }
 

@@ -526,7 +526,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn.getChild(1), "T2", "A");
         checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
 
-
         pn = compile("select T2.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -539,10 +538,9 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn.getChild(1), "T2", "A");
         checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
 
-
         // TODO(xin): hsql does not complain about the ambiguous column A, but use 'T1' as default.
         // FIX(xin): throw compiler exception for this query.
-        pn = compile("select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
+        pn = compile("select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2) T2 ");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         checkOutputSchema("T1", pn, "A");
@@ -553,6 +551,21 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn.getChild(0).getChild(0), "R1", "A");
         checkSimpleSubSelects(pn.getChild(1), "T2", "A");
         checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
+
+        // Quick tests of some past spectacular planner failures that sqlcoverage uncovered.
+
+        pn = compile("SELECT 1, * FROM (select * from R1) T1, R2 T2 WHERE T2.A < 3737632230784348203");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+
+        pn = compile("SELECT 2, * FROM (select * from R1) T1, R2 T2 WHERE CASE WHEN T2.A > 44 THEN T2.C END < 44 + 10");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+
+        pn = compile("SELECT -8, T2.C FROM (select * from R1) T1, R1 T2 WHERE (T2.C + 5 ) > 44");
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn instanceof ProjectionPlanNode);
     }
 
     public void testSubSelects_Simple_Joins() {
@@ -781,6 +794,8 @@ public class TestSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
 }

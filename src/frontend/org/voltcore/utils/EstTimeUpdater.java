@@ -17,26 +17,61 @@
 
 package org.voltcore.utils;
 
+import org.voltcore.logging.VoltLogger;
+
 public class EstTimeUpdater {
     //Report inconsistent update frequency at most every sixty seconds
     public static final long maxErrorReportInterval = 60 * 1000;
-    //Warn if estimated time upates are > 2 seconds apart (should be at most five millis)
-    public static final long maxTolerableUpdateDelta = 2000;
     public static long lastErrorReport = System.currentTimeMillis() - maxErrorReportInterval;
 
+    public static final int ESTIMATED_TIME_UPDATE_FREQUENCY = Integer.getInteger("ESTIMATED_TIME_UPDATE_FREQUENCY", 5);
+    public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
+
+    public static volatile boolean pause = false;
+
+    private static final Thread updater = new Thread("Estimated Time Updater") {
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
+                } catch (InterruptedException e) {}
+                if (pause) continue;
+                Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                if ( delta != null ) {
+                    new VoltLogger("HOST").warn("A VoltDB thread has not run for more than " + delta +
+                            " milliseconds. System resource contention could be" +
+                            " impacting VoltDB operations.");
+                }
+            }
+        }
+    };
+
+    static {
+        updater.setDaemon(true);
+        updater.start();
+    }
+
+    /**
+     * Don't call this unless you have paused the updater and intend to update yourself
+     * @param now
+     * @return
+     */
     public static Long update(final long now) {
-        final long estNow = EstTime.m_now.get();
+        final long estNow = EstTime.m_now;
         if (estNow == now) {
             return null;
         }
-        EstTime.m_now.lazySet(now);
+
+        EstTime.m_now = now;
+
         /*
          * Check if updating the estimated time was especially tardy.
          * I am concerned that the thread responsible for updating the estimated
          * time might be blocking on something and want to be able to log if
          * that happens
          */
-        if (now - estNow > 2000) {
+        if (now - estNow > ESTIMATED_TIME_WARN_INTERVAL) {
             /*
              * Only report the error every 60 seconds to cut down on log spam
              */

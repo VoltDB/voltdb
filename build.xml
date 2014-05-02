@@ -1839,20 +1839,17 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
-    <condition property="enableiv2" value="${enableiv2}" else="true">
-        <isset property="enableiv2"/>
-    </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>
         <isset property="env.VOLTBUILD"/>
     </condition>
-    <condition property="seed_arg" value="-s ${sql_coverage_seed}" else="">
+    <condition property="config_seed" value="-s ${sql_coverage_seed}" else="">
         <isset property="sql_coverage_seed"/>
     </condition>
-    <condition property="meta_config" value="${default_config}"
+    <condition property="config_suite" value="${default_config}"
                else="${regression_config}">
-        <isset property="sql_coverage_default"/>
+        <isset property="sql_coverage_suite"/>
     </condition>
-    <condition property="config_arg" value="-c ${sql_coverage_config}" else="">
+    <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
     <condition property="config_verbose" value="-r" else="">
@@ -1861,8 +1858,11 @@ TEST CASES
     <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
     </condition>
-    <condition property="generate_only" value="-g" else="">
-        <isset property="generate_only"/>
+    <condition property="config_genonly" value="-g" else="">
+        <isset property="sql_coverage_genonly"/>
+    </condition>
+    <condition property="config_subversion" value="-S" else="">
+        <isset property="sql_coverage_subversion"/>
     </condition>
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
@@ -1888,9 +1888,6 @@ TEST CASES
     <condition property="sitescount" value="-t ${sql_coverage_sites}" else="-t 3">
         <isset property="sql_coverage_sites"/>
     </condition>
-    <condition property="flushddl" value="-f ${sql_coverage_flushddl}" else="-f flush-DDL.sql">
-        <isset property="sql_coverage_flushddl"/>
-    </condition>
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
@@ -1912,12 +1909,11 @@ TEST CASES
     <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
-        <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
         <arg line='sql_coverage_test.py' />
-        <arg line="${seed_arg}" />
-        <arg line="${config_arg}" />
+        <arg line="${config_seed}" />
+        <arg line="${config_config}" />
         <arg line="${config_verbose}" />
-        <arg file="${meta_config}" />
+        <arg file="${config_suite}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
         <arg line="${hostname}" />
@@ -1925,8 +1921,8 @@ TEST CASES
         <arg line="${hostcount}" />
         <arg line="${kfactor}" />
         <arg line="${sitescount}" />
-        <arg line="${flushddl}" />
-        <arg line="${generate_only}" />
+        <arg line="${config_genonly}" />
+        <arg line="${config_subversion}" />
     </exec>
 </target>
 

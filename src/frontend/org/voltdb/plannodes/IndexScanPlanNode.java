@@ -85,8 +85,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
     // iteration after it had to initially settle for starting at "greater than a prefix key".
-    protected AbstractExpression m_initialExpression;
+    private AbstractExpression m_initialExpression;
 
+    // The predicate for underflow case using the index
     private AbstractExpression m_skip_null_predicate;
 
     // The overall index lookup operation type
@@ -136,6 +137,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate() {
+        // prepare position of non null key
         int searchKeySize = m_searchkeyExpressions.size();
         if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
             m_skip_null_predicate = null;
@@ -150,7 +152,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             nextKeyIndex = searchKeySize - 1;
         }
 
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        setSkipNullPredicate(nextKeyIndex);
+    }
+
+    public void setSkipNullPredicate(int nextKeyIndex) {
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -158,6 +163,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
@@ -165,27 +171,30 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                         col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
+                tve.setInBytes(col.getInbytes());
                 indexedExprs.add(tve);
             }
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
+                assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
-
         }
-        AbstractExpression expr;
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
         for (int i = 0; i < nextKeyIndex; i++) {
             AbstractExpression idxExpr = indexedExprs.get(i);
-            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+            AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                     idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
             exprs.add(expr);
         }
         AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
         exprs.add(expr);
+
         m_skip_null_predicate = ExpressionUtil.combine(exprs);
         m_skip_null_predicate.finalizeValueTypes();
     }

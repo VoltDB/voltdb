@@ -158,13 +158,12 @@ public:
         return context;
     }
 
+    virtual TableStreamerInterface* cloneForTruncatedTable(PersistentTableSurgeon &surgeon);
+
 private:
 
     class Stream
     {
-        friend class TableStreamer;
-        friend class ::CopyOnWriteTest;
-
     public:
 
         Stream(TableStreamType streamType,

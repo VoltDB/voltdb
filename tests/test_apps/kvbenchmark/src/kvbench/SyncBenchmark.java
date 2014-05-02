@@ -35,9 +35,8 @@
 package kvbench;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -110,7 +109,7 @@ public class SyncBenchmark {
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
 
-    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss,SSS");
+    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
     private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -238,7 +237,7 @@ public class SyncBenchmark {
 
     static class CsvLogger implements AutoCloseable {
         final PrintWriter m_writer;
-        final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS");
+        final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
 
         public CsvLogger(String csvFN) {
             Preconditions.checkArgument(csvFN != null && !csvFN.trim().isEmpty(),"file name is null or empty");
@@ -246,7 +245,7 @@ public class SyncBenchmark {
             PrintWriter pw = null;
             try {
                 // 'true' to flush the buffer every println/printf
-                pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fh)), true);
+                pw = new PrintWriter(new FileWriter(fh), true);
             } catch (IOException ioex) {
                 Throwables.propagate(ioex);
             }
@@ -425,8 +424,8 @@ public class SyncBenchmark {
 
         // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
         // log merger correlate correctly
-        System.out.println(LOG_DF.format(new Date(stats.getEndTimestamp())));
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
+        System.out.printf(" Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),

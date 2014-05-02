@@ -655,6 +655,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         int32_t type = outerIter->second->type();
         std::string name = outerIter->second->name();
         bool nullable = outerIter->second->nullable();
+        bool inBytes = outerIter->second->inbytes();
 
         if (t2->columnName(index).compare(name)) {
             return false;
@@ -673,6 +674,10 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         // check the size of types where size matters
         if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
             if (columnInfo->length != size) {
+                return false;
+            }
+            if (columnInfo->inBytes != inBytes) {
+                assert(type == VALUE_TYPE_VARCHAR);
                 return false;
             }
         }

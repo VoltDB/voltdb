@@ -102,7 +102,7 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public boolean containSubSelects() {
+    public boolean containsSubSelects() {
         return true;
     }
 }

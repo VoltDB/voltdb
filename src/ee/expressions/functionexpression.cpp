@@ -238,6 +238,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_CEILING:
             ret = new UnaryFunctionExpression<FUNC_CEILING>((*arguments)[0]);
             break;
+        case FUNC_CHAR:
+            ret = new UnaryFunctionExpression<FUNC_CHAR>((*arguments)[0]);
+            break;
         case FUNC_CHAR_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
             break;
@@ -332,6 +335,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SPACE:
             ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
             break;
+        case FUNC_FOLD_LOWER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_LOWER>((*arguments)[0]);
+            break;
+        case FUNC_FOLD_UPPER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_UPPER>((*arguments)[0]);
+            break;
         case FUNC_SQRT:
             ret = new UnaryFunctionExpression<FUNC_SQRT>((*arguments)[0]);
             break;
@@ -371,6 +380,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
+            break;
+        case FUNC_TRIM_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_CHAR>(*arguments);
+            break;
+        case FUNC_REPLACE:
+            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+            break;
+        case FUNC_OVERLAY_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
             break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
