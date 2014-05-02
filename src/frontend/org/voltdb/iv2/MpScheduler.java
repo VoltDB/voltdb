@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -43,6 +42,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.collect.Maps;
 
 public class MpScheduler extends Scheduler
 {
@@ -71,7 +72,7 @@ public class MpScheduler extends Scheduler
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks, getCurrentTxnId());
         m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
@@ -153,6 +154,7 @@ public class MpScheduler extends Scheduler
      * @return true if the message can be delivered directly to the scheduler,
      * false if the message was a duplicate
      */
+    @Override
     public boolean sequenceForReplay(VoltMessage message)
     {
         boolean canDeliver = true;

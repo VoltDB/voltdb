@@ -153,7 +153,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
@@ -389,6 +389,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private long getMaxTaskedSpHandle() {
+        return m_pendingTasks.getMaxTaskedSpHandle();
+    }
+
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -443,7 +447,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 newSpHandle = message.getTxnId();
                 setMaxSeenTxnId(newSpHandle);
-            } else if (m_isLeader) {
+            } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
@@ -459,7 +463,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         0,
                         m_uniqueIdGenerator.partitionId);
                 //Don't think it wise to make a new one for a short circuit read
-                newSpHandle = getCurrentTxnId();
+                newSpHandle = getMaxTaskedSpHandle();
             }
 
             // Need to set the SP handle on the received message
@@ -681,7 +685,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // borrows do not advance the sp handle. The handle would
         // move backwards anyway once the next message is received
         // from the SP leader.
-        long newSpHandle = getCurrentTxnId();
+        long newSpHandle = getMaxTaskedSpHandle();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -733,8 +737,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
-            TxnEgo ego = advanceTxnEgo();
-            newSpHandle = ego.getTxnId();
+            if (!message.isReadOnly()) {
+                TxnEgo ego = advanceTxnEgo();
+                newSpHandle = ego.getTxnId();
+            } else {
+                newSpHandle = getMaxTaskedSpHandle();
+            }
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
