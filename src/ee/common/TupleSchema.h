@@ -22,10 +22,11 @@
 #include <cstring>
 #include <stdint.h>
 #include <string>
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include <iostream>
 #include <vector>
+
+#include "common/FatalException.hpp"
+#include "common/types.h"
 
 #define UNINLINEABLE_OBJECT_LENGTH 64
 #define UNINLINEABLE_CHARACTER_LENGTH 16
