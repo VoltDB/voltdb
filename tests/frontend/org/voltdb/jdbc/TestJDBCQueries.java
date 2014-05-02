@@ -424,15 +424,20 @@ public class TestJDBCQueries {
     @Test
     public void testGetTimestamp() throws Exception
     {
+        Timestamp ts;
+        PreparedStatement ps;
+        ResultSet rs;
+
         PreparedStatement ins = conn.prepareStatement("insert into T_TIMESTAMP values (?, ?)");
+
         // Bad reported input
-        Timestamp ts = Timestamp.valueOf("2014-03-23 05:12:08.156000");
+        ts = Timestamp.valueOf("2014-03-23 05:12:08.156000");
         ins.setTimestamp(1, ts);
         ins.setString(2, "badinput");
         ins.executeUpdate();
-        PreparedStatement ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='badinput'");
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='badinput'");
         ps.executeQuery();
-        ResultSet rs = ps.getResultSet();
+        rs = ps.getResultSet();
         while (rs.next()) {
             assertEquals(ts, rs.getTimestamp(1));
             assertEquals(new Date(ts.getTime()), rs.getDate(1));
@@ -463,20 +468,35 @@ public class TestJDBCQueries {
             assertEquals(null, rs.getDate(1));
             assertEquals(null, rs.getTime(1));
         }
+
         // THE TIMESTAMP BEFORE TIME
-        //Timestamp ts = new Timestamp(-10000);
-        //ts.setNanos(999999000);
-        //System.out.println("BEFORE TIME: " + ts.toString());
-        //ins.setTimestamp(1, ts);
-        //ins.setString(2, "beforetime");
-        //ins.executeUpdate();
-        //PreparedStatement ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime'");
-        //ps.executeQuery();
-        //ResultSet rs = ps.getResultSet();
-        //while (rs.next()) {
-        //    Timestamp ts1 = rs.getTimestamp(1);
-        //    assertEquals(ts, ts1);
-        //}
+        ts = new Timestamp(-10000);
+        ts.setNanos(999999000);
+        System.out.println("BEFORE TIME: " + ts.toString());
+        ins.setTimestamp(1, ts);
+        ins.setString(2, "beforetime1");
+        ins.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime1'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            Timestamp ts1 = rs.getTimestamp(1);
+            assertEquals(ts, ts1);
+        }
+
+        ts = new Timestamp(-10100);
+        ts.setNanos(800000000);
+        System.out.println("BEFORE TIME: " + ts.toString());
+        ins.setTimestamp(1, ts);
+        ins.setString(2, "beforetime2");
+        ins.executeUpdate();
+        ps = conn.prepareStatement("select ID from T_TIMESTAMP where VALUE='beforetime2'");
+        ps.executeQuery();
+        rs = ps.getResultSet();
+        while (rs.next()) {
+            Timestamp ts1 = rs.getTimestamp(1);
+            assertEquals(ts, ts1);
+        }
     }
 
 }
