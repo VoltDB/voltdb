@@ -290,12 +290,11 @@ public class ParameterConverter {
                 else return value;
             }
         }
-        // null sigil
-        else if (param == VoltType.NULL_STRING_OR_VARBINARY) {
-            return nullValueForType(expectedClz);
-        }
-        // null sigil
-        else if (param == VoltType.NULL_DECIMAL) {
+        // null sigils. (ning - if we're not checking if the sigil matches the expected type,
+        // why do we have three sigils for three types??)
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
 

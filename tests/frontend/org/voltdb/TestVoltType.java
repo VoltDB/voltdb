@@ -181,6 +181,20 @@ public class TestVoltType extends TestCase {
             caught = true;
         }
         assertTrue(caught);
+
+        // Test timestamp before epoch
+        usec = -923299922232L;
+        ts1 = new TimestampType(usec);
+        assertEquals(usec, ts1.getTime());
+        ts1string = ts1.toString();
+        ts1prime = new TimestampType(ts1string);
+        assertEquals(usec, ts1prime.getTime());
+
+
+        date = "1966-06-24 10:30:26.123012";
+        ts3 = new TimestampType(date);
+        assertEquals(date, ts3.toString());
+
     }
 
     /* Compare some values that differ by microseconds and by full millis */

@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -372,6 +373,10 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            waitForStreamedAllocatedMemoryZero(clientRef.get());
+            System.out.println("Writing export count as: " + TrackingResults.get(0));
+            //Write to export table to get count to be expected on other side.
+            clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
             writer.close(true);
 
             // Now print application results:
@@ -542,4 +547,39 @@ public class AsyncExportClient
         System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
     }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
+
+        VoltTable stats = null;
+        System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            boolean passedThisTime = true;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                if (ttype.equals("StreamedTable")) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        System.out.println(stats);
+    }
+
 }
