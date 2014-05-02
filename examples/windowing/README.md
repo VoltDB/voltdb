@@ -61,7 +61,7 @@ Changing these settings changes the behavior of the app. The three key options t
 
 ## What do the Queries Do? ##
 
-There are two additional queries being run by this app.
+There are two primary kinds of read operations being run by this app.
 
 ### Tracking the Maximum Value ###
 
