@@ -460,6 +460,8 @@ enum TaskType {
 // Utility functions.
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);
+std::string tableStreamTypeToString(TableStreamType type);
+
 bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
 

@@ -185,6 +185,7 @@ public class MaterializedViewFixInfo {
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
             tve.setOrigStmtId(mvTableScan.getStatementId());
+            tve.setInBytes(mvCol.getInbytes());
 
             mvDDLGroupbyColumnNames.add(colName);
 

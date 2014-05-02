@@ -31,6 +31,7 @@ public interface SnapshotCompletionInterest {
         public final long multipartTxnId;
         public final Map<Integer, Long> partitionTxnIds;
         public final boolean truncationSnapshot;
+        public final boolean didSucceed;
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
 
@@ -40,6 +41,7 @@ public interface SnapshotCompletionInterest {
                 final long multipartTxnId,
                 final Map<Integer, Long> partitionTxnIds,
                 final boolean truncationSnapshot,
+                final boolean didSucceed,
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
             this.path = path;
@@ -47,11 +49,22 @@ public interface SnapshotCompletionInterest {
             this.multipartTxnId = multipartTxnId;
             this.partitionTxnIds = partitionTxnIds;
             this.truncationSnapshot = truncationSnapshot;
+            this.didSucceed = didSucceed;
             this.requestId = requestId;
             this.exportSequenceNumbers = exportSequenceNumbers;
         }
     }
 
+    /**
+     * Here's what I think the contract is. This method will be called on all finished snapshots,
+     * regardless of whether or not the snapshot succeeded, as long as all nodes have done the
+     * work. If node failures happened during the snapshot, this won't fire.
+     *
+     * To determine if the snapshot actually succeeded, check event.didSucceed.
+     *
+     * @param event
+     * @return
+     */
     public CountDownLatch snapshotCompleted(
             SnapshotCompletionEvent event);
 }

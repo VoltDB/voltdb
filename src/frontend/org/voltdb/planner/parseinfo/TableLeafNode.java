@@ -93,7 +93,7 @@ public class TableLeafNode extends JoinNode {
     }
 
     @Override
-    public boolean containSubSelects() {
+    public boolean containsSubSelects() {
         return false;
     }
 }

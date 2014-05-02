@@ -86,8 +86,8 @@ NValue getRandomValue(ValueType type) {
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 16);
-            char characters[17];
+            int length = (rand() % 10);
+            char characters[11];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
@@ -113,7 +113,6 @@ NValue getRandomValue(ValueType type) {
     }
     throw exception();
 }
-
 
 string getTypeName(ValueType type) {
     string ret;
@@ -171,6 +170,32 @@ string getTypeName(ValueType type) {
     }
     return (ret);
 }
+
+std::string tableStreamTypeToString(TableStreamType type) {
+    switch (type) {
+      case TABLE_STREAM_SNAPSHOT: {
+          return "TABLE_STREAM_SNAPSHOT";
+      }
+      case TABLE_STREAM_ELASTIC_INDEX: {
+          return "TABLE_STREAM_ELASTIC_INDEX";
+      }
+      case TABLE_STREAM_ELASTIC_INDEX_READ: {
+          return "TABLE_STREAM_ELASTIC_INDEX_READ";
+      }
+      case TABLE_STREAM_ELASTIC_INDEX_CLEAR: {
+          return "TABLE_STREAM_ELASTIC_INDEX_CLEAR";
+      }
+      case TABLE_STREAM_RECOVERY: {
+          return "TABLE_STREAM_RECOVERY";
+      }
+      case TABLE_STREAM_NONE: {
+          return "TABLE_STREAM_NONE";
+      }
+      default:
+          return "INVALID";
+    }
+}
+
 
 string valueToString(ValueType type)
 {

@@ -60,6 +60,7 @@
 #include <sys/types.h>
 #include <sys/sysinfo.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
 #ifndef __USE_GNU
@@ -1319,6 +1320,27 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
     return 0;
 #endif
 }
+
+/*
+ * Class:     org_voltdb_utils_PosixAdvise
+ * Method:    sync_file_range
+ * Signature: (JJJI)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1range
+  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
+#ifdef LINUX
+#ifndef __NR_sync_file_range
+#error VoltDB server requires that your kernel headers define __NR_sync_file_range.
+#endif
+    return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
+                   static_cast<unsigned int>(advice));
+#elif MACOSX
+    return -1;
+#else
+    return fdatasync(static_cast<int>(fd));
+#endif
+}
+
 
 /*
  * Class:     org_voltdb_utils_PosixAdvise

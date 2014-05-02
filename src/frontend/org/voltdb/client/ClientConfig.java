@@ -17,6 +17,9 @@
 
 package org.voltdb.client;
 
+import javax.security.auth.Subject;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -39,6 +42,7 @@ public class ClientConfig {
     long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
+    Subject m_subject = null;
 
     /**
      * <p>Configuration for a client with no authentication credentials that will
@@ -259,5 +263,31 @@ public class ClientConfig {
                     "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
         }
         m_autoTuneTargetInternalLatency = targetLatency;
+    }
+
+    /**
+     * <p>Enable Kerberos authentication with the provided subject credentials<p>
+     * @param subject
+     */
+    public void enableKerberosAuthentication(final Subject subject) {
+        m_subject = subject;
+    }
+
+    /**
+     * <p>Use the provided JAAS login context entry key to get the authentication
+     * credentials held by the caller<p>
+     *
+     * @param loginContextEntryKey JAAS login context config entry designation
+     */
+    public void enableKerberosAuthentication(final String loginContextEntryKey) {
+       try {
+           LoginContext lc = new LoginContext(loginContextEntryKey);
+           lc.login();
+           m_subject = lc.getSubject();
+       } catch (SecurityException ex) {
+           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
+       } catch (LoginException ex) {
+           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
+       }
     }
 }

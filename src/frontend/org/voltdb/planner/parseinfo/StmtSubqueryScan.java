@@ -138,6 +138,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setColumnIndex(idx.intValue());
         expr.setValueType(schemaCol.getType());
         expr.setValueSize(schemaCol.getSize());
+        expr.setInBytes(schemaCol.getExpression().getInBytes());
     }
 
 }

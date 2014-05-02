@@ -30,8 +30,6 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.primitives.Ints;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -48,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -58,7 +57,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
+import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -159,16 +160,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
-            public void onDurability(ArrayList<Object> durableThings) {
-                synchronized (m_lock) {
-                    for (Object o : durableThings) {
-                        m_pendingTasks.offer((TransactionTask)o);
+            public void onDurability(final ArrayList<Object> durableThings) {
+                final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+                    @Override
+                    void run() {
+                        synchronized (m_lock) {
+                            for (Object o : durableThings) {
+                                m_pendingTasks.offer((TransactionTask)o);
 
-                        // Make sure all queued tasks for this MP txn are released
-                        if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
-                            offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                                // Make sure all queued tasks for this MP txn are released
+                                if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
+                                    offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                                }
+                            }
                         }
                     }
+                };
+                if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+                    m_tasks.offer(r);
+                } else {
+                    r.run();
                 }
             }
         };
@@ -542,6 +553,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!msg.isReadOnly()) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
+            //Durability future is always null for sync command logging
+            //the transaction will be delivered again by the CL for execution once durable
+            //Async command logging has to offer the task immediately with a Future for backpressure
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
@@ -668,7 +682,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+                VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
         }
         else {
@@ -742,7 +756,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
-                msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
+                //Trigger reserialization so the new handle is used
+                msg.setStateForDurability(msg.getInitiateTask(), msg.getInvolvedPartitions());
             }
 
             /*
@@ -831,6 +846,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);
+            //Durability future is always null for sync command logging
+            //the transaction will be delivered again by the CL for execution once durable
+            //Async command logging has to offer the task immediately with a Future for backpressure
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
@@ -904,7 +922,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+                VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
@@ -915,31 +933,32 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        CompleteTransactionMessage msg = message;
         if (m_isLeader) {
-            CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
+            msg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
-            replmsg.setSpHandle(getCurrentTxnId());
+            msg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
-                m_mailbox.send(m_sendToHSIds, replmsg);
+                m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
-            setMaxSeenTxnId(message.getSpHandle());
+            setMaxSeenTxnId(msg.getSpHandle());
         }
-        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
         if (txn != null)
         {
-            Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
+            Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
+                new CompleteTransactionTask(txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
             // If this is a restart, then we need to leave the transaction state around
-            if (!message.isRestart()) {
-                m_outstandingTxns.remove(message.getTxnId());
+            if (!msg.isRestart()) {
+                m_outstandingTxns.remove(msg.getTxnId());
             }
         }
     }
@@ -1021,7 +1040,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
-        if (event.truncationSnapshot) {
+        if (event.truncationSnapshot && event.didSucceed) {
             synchronized(m_lock) {
                 writeIv2ViableReplayEntry();
             }

@@ -16,10 +16,12 @@
  */
 package org.voltdb;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
@@ -61,6 +63,8 @@ public interface VoltDBInterface
      * @return
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
+
+    boolean isMpSysprocSafeToExecute(long txnId);
 
     public void startSampler();
 
@@ -112,6 +116,16 @@ public interface VoltDBInterface
      * @return true if the VoltDB is running.
      */
     public boolean isRunning();
+
+    /**
+     * Halt a node used by @StopNode
+     */
+    public void halt();
+
+    /**
+     * @return The number of milliseconds the cluster has been up
+     */
+    public long getClusterUptime();
 
     /**
      * Notify RealVoltDB that recovery is complete
@@ -207,4 +221,6 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
+
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }

@@ -276,20 +276,6 @@ public class DDLCompiler {
             );
 
     /**
-     * Check that the classname pattern from import class is valid.
-     */
-    static final Pattern validClassMatcherWildcardPattern = Pattern.compile(
-            "\\A" +                                 // (start statement)
-            "[\\p{L}\\*]+" +                        // (first part starts with char or *)
-            "[\\p{L}\\d\\*]*" +                     // (followed by any number of word chars or *)
-            "(\\." +                                // (optionally repeat with . separators)
-            "[\\p{L}\\*]+" +                        //  (first part starts with char or *)
-            "[\\p{L}\\d\\*]*" +                     //  (followed by any number of word chars or *)
-            ")*" +                                  // (end repeat)
-            "\\z"                                   // (end statement)
-            );
-
-    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -541,6 +527,55 @@ public class DDLCompiler {
     }
 
     /**
+     * Checks whether or not the start of the given identifier is java (and
+     * thus DDL) compliant. An identifier may start with: _ [a-zA-Z] $ *
+     * and contain subsequent characters including: _ [0-9a-zA-Z] $ *
+     * @param identifier the identifier to check
+     * @param statement the statement where the identifier is
+     * @return the given identifier unmodified
+     * @throws VoltCompilerException when it is not compliant
+     */
+    private String checkIdentifierWithWildcard(
+            final String identifier, final String statement
+            ) throws VoltCompilerException {
+
+        assert identifier != null && ! identifier.trim().isEmpty();
+        assert statement != null && ! statement.trim().isEmpty();
+
+        int loc = 0;
+        do {
+            if ( ! Character.isJavaIdentifierStart(identifier.charAt(loc)) && identifier.charAt(loc)!= '*') {
+                String msg = "Unknown indentifier in DDL: \"" +
+                        statement.substring(0,statement.length()-1) +
+                        "\" contains invalid identifier \"" + identifier + "\"";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+            loc++;
+            while (loc < identifier.length() && identifier.charAt(loc) != '.') {
+                if (! Character.isJavaIdentifierPart(identifier.charAt(loc)) && identifier.charAt(loc)!= '*') {
+                    String msg = "Unknown indentifier in DDL: \"" +
+                            statement.substring(0,statement.length()-1) +
+                            "\" contains invalid identifier \"" + identifier + "\"";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                loc++;
+            }
+            if (loc < identifier.length() && identifier.charAt(loc) == '.') {
+                loc++;
+                if (loc >= identifier.length()) {
+                    String msg = "Unknown indentifier in DDL: \"" +
+                            statement.substring(0,statement.length()-1) +
+                            "\" contains invalid identifier \"" + identifier + "\"";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+            }
+        }
+        while( loc > 0 && loc < identifier.length());
+
+        return identifier;
+    }
+
+    /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
@@ -753,12 +788,7 @@ public class DDLCompiler {
                 String classNameStr = statementMatcher.group(1);
 
                 // check that the match pattern is a valid match pattern
-                Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
-                if (!wildcardMatcher.matches()) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid IMPORT CLASS match expression: '%s'",
-                            classNameStr)); // remove trailing semicolon
-                }
+                checkIdentifierWithWildcard(classNameStr, statement);
 
                 ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
                 if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
@@ -1361,10 +1391,15 @@ public class DDLCompiler {
         // need to set other column data here (default, nullable, etc)
         column.setName(name);
         column.setIndex(index);
-
         column.setType(type.getValue());
-        column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        column.setNullable(Boolean.valueOf(nullable));
         int size = type.getMaxLengthInBytes();
+
+        boolean inBytes = false;
+        if (node.attributes.containsKey("bytes")) {
+            inBytes = Boolean.valueOf(node.attributes.get("bytes"));
+        }
+
         // Require a valid length if variable length is supported for a type
         if (type == VoltType.STRING || type == VoltType.VARBINARY) {
             if (sizeString == null) {
@@ -1380,11 +1415,23 @@ public class DDLCompiler {
                 size = MAX_ROW_SIZE / MAX_COLUMNS;
             } else {
                 int userSpecifiedSize = Integer.parseInt(sizeString);
-                if (userSpecifiedSize < 0 || userSpecifiedSize > VoltType.MAX_VALUE_LENGTH) {
+                if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw m_compiler.new VoltCompilerException(msg);
                 }
+                if (!inBytes && type == VoltType.STRING) {
+                    if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+                        String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
+                                "will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)",
+                                name, table.getTypeName(),
+                                VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
+                        m_compiler.addWarn(msg);
+                        inBytes = true;
+                    }
+                }
+
                 if (userSpecifiedSize > 0) {
                     size = userSpecifiedSize;
                 } else {
@@ -1397,7 +1444,9 @@ public class DDLCompiler {
                 }
             }
         }
+        column.setInbytes(inBytes);
         column.setSize(size);
+
 
         column.setDefaultvalue(defaultvalue);
         if (defaulttype != null)

@@ -924,7 +924,7 @@ public class LocalCluster implements VoltServerConfig {
         } else {
             log.info("Recovering process exited before recovery completed");
             try {
-                silentShutdownSingleHost(hostId, true);
+                silentKillSingleHost(hostId, true);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -952,13 +952,13 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal();
     }
 
-    public void shutDownSingleHost(int hostNum) throws InterruptedException
+    public void killSingleHost(int hostNum) throws InterruptedException
     {
-        log.info("Shutting down " + hostNum);
-        silentShutdownSingleHost(hostNum, false);
+        log.info("Killing " + hostNum);
+        silentKillSingleHost(hostNum, false);
     }
 
-    private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
+    private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
         //PipeToFile ptf = null;
         EEProcess eeProc = null;

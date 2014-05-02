@@ -22,12 +22,15 @@
 #include <cstring>
 #include <stdint.h>
 #include <string>
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include <iostream>
 #include <vector>
 
+#include "common/FatalException.hpp"
+#include "common/types.h"
+
 #define UNINLINEABLE_OBJECT_LENGTH 64
+#define UNINLINEABLE_CHARACTER_LENGTH 16
+#define MAX_BYTES_PER_UTF8_CHARACTER 4
 
 namespace voltdb {
 
@@ -46,6 +49,8 @@ public:
         char allowNull;
         bool inlined;      // Stored inside the tuple or outside the tuple.
 
+        bool inBytes;
+
         const ValueType getVoltType() const {
             return static_cast<ValueType>(type);
         }
@@ -55,7 +60,13 @@ public:
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
     /** Static factory method to create a TupleSchema object with a fixed number of columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings);
+
+    static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
+            const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
+
+    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
+            const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull,
+            const std::vector<bool> columnInBytes);
     /** Static factory method fakes a copy constructor */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
 
@@ -95,9 +106,6 @@ public:
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
-    /** Returns a flag indicating whether strings will be inlined in this schema **/
-    bool allowInlinedObjects() const;
-
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
@@ -134,7 +142,8 @@ private:
         but it's important to set this data for all columns before any use. Note, the "length"
         param may not be read in some places for some types (like integers), so make sure it
         is correct, or the code will act all wonky. */
-    void setColumnMetaData(uint16_t index, ValueType type, int32_t length, bool allowNull, uint16_t &uninlinedObjectColumnIndex);
+    void setColumnMetaData(uint16_t index, ValueType type, int32_t length, bool allowNull,
+            uint16_t &uninlinedObjectColumnIndex, bool inBytes);
 
     /*
      * Returns the number of string columns that can't be inlined.
@@ -142,15 +151,14 @@ private:
     static uint16_t countUninlineableObjectColumns(
             std::vector<ValueType> columnTypes,
             std::vector<int32_t> columnSizes,
-            bool allowInlinedObjects);
+            std::vector<bool> columnInBytes);
 
     // can't (shouldn't) call constructors or destructor
     // prevents TupleSchema from being created on the stack
     TupleSchema() {}
     TupleSchema(const TupleSchema &ts) {};
     ~TupleSchema() {}
-    //Whether this schema allows strings to be inlined
-    bool m_allowInlinedObjects;
+
     // number of columns
     uint16_t m_columnCount;
     uint16_t m_uninlinedObjectColumnCount;
@@ -181,10 +189,6 @@ inline uint32_t TupleSchema::tupleLength() const {
     // index "m_count" has the offset for the end of the tuple
     // index "m_count-1" has the offset for the last column
     return getColumnInfo(m_columnCount)->offset;
-}
-
-inline bool TupleSchema::allowInlinedObjects() const {
-    return m_allowInlinedObjects;
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {

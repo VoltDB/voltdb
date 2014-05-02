@@ -40,9 +40,11 @@ import junit.framework.TestCase;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
@@ -764,6 +766,63 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertFalse(success);
+    }
+
+    public void testDDLWithLongStringInCharacters() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
+        final String simpleSchema1 =
+            "create table books (cash integer default 23, " +
+            "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        assertTrue(warningMsg.contains("The size of VARCHAR column TITLE in table BOOKS greater than " +
+                "262144 will be enforced as byte counts rather than UTF8 character counts. " +
+                "To eliminate this warning, specify \"VARCHAR(262154 BYTES)"));
+        Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+        Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
+        assertTrue(var.getInbytes());
+    }
+
+    public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
+        int length = VoltType.MAX_VALUE_LENGTH + 10;
+        String simpleSchema1 =
+                "create table books (cash integer default 23, " +
+                        "title varbinary("+length+") , PRIMARY KEY(cash));";
+
+        String error1 = "VARBINARY column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema1, error1);
+
+        String simpleSchema2 =
+                "create table books (cash integer default 23, " +
+                        "title varchar("+length+") , PRIMARY KEY(cash));";
+
+        String error2 = "VARCHAR column size for column BOOKS.TITLE is > "
+                + VoltType.MAX_VALUE_LENGTH+" char maximum.";
+        checkDDLErrorMessage(simpleSchema2, error2);
     }
 
     public void testNullablePartitionColumn() throws IOException {

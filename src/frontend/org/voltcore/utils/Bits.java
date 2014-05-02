@@ -17,7 +17,13 @@
 
 package org.voltcore.utils;
 
+import java.io.FileDescriptor;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.PosixAdvise;
 
 /**
  * Utility class for accessing a variety of com.sun.misc.Unsafe stuff
@@ -34,6 +40,7 @@ public final class Bits {
                 return java.security.AccessController.doPrivileged
                         (new java.security
                                 .PrivilegedExceptionAction<sun.misc.Unsafe>() {
+                            @Override
                             public sun.misc.Unsafe run() throws Exception {
                                 java.lang.reflect.Field f = sun.misc
                                         .Unsafe.class.getDeclaredField("theUnsafe");
@@ -82,12 +89,35 @@ public final class Bits {
         byte checksum = 0;
         for (int ii = 0; ii < numPages; ii++) {
             checksum ^= Bits.unsafe.getByte(address);
-            address += checksum;
+            address += PAGE_SIZE;
         }
         //This store will never actually occur, but the compiler doesn't care
         //for the purposes of dead code elimination
         if (unused != 0) {
             unused = checksum;
         }
+    }
+
+    public static long sync_file_range(VoltLogger logger, FileDescriptor fd, FileChannel fc, long syncStart, long positionAtSync) throws IOException {
+        //Don't start writeback on the currently appending page to avoid
+        //issues with stables pages, hence we move the end back one page
+        long syncedBytes = ((positionAtSync / Bits.pageSize()) - 1) * Bits.pageSize();
+        if (PosixAdvise.SYNC_FILE_RANGE_SUPPORTED) {
+            final long retval = PosixAdvise.sync_file_range(fd,
+                                                            syncStart,
+                                                            syncedBytes - syncStart,
+                                                            PosixAdvise.SYNC_FILE_RANGE_SYNC);
+            if (retval != 0) {
+                logger.error("Error sync_file_range snapshot data: " + retval);
+                logger.error(
+                        "Params offset " + syncedBytes +
+                        " length " + (syncedBytes - syncStart) +
+                        " flags " + PosixAdvise.SYNC_FILE_RANGE_SYNC);
+                fc.force(false);
+            }
+        } else {
+            fc.force(false);
+        }
+        return syncedBytes;
     }
 }
