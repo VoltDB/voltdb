@@ -51,9 +51,9 @@ import org.voltdb.iv2.TxnEgo;
  * This verifier connects to kafka zk and consumes messsages from 2 topics
  * 1. Table data related
  * 2. End of Data topic to which client write when all export data is pushed.
- * 
+ *
  * Each row is verified and row count is matched at the end.
- * 
+ *
  */
 public class ExportKafkaOnServerVerifier {
 
@@ -64,7 +64,7 @@ public class ExportKafkaOnServerVerifier {
     private final AtomicLong consumedRows = new AtomicLong(0);
 
     private static class VoltKafkaConsumerConfig {
-        final String m_zkhost;        
+        final String m_zkhost;
         final ConsumerConfig consumerConfig;
         final ConsumerConfig doneConsumerConfig;
         final ConsumerConnector consumer;
@@ -80,15 +80,15 @@ public class ExportKafkaOnServerVerifier {
             props.put("group.id", m_groupId);
             props.put("auto.commit.interval.ms", "1000");
             props.put("auto.commit.enable", "true");
-            props.put("fetch.size", "10240"); // Use smaller size than default.  
+            props.put("fetch.size", "10240"); // Use smaller size than default.
             props.put("auto.offset.reset", "smallest");
             props.put("queuedchunks.max", "1000");
             props.put("backoff.increment.ms", "1500");
             props.put("consumer.timeout.ms", "120000");
-            
+
             consumerConfig = new ConsumerConfig(props);
             consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
-            
+
             //Certain properties in done consumer are different.
             props.remove("consumer.timeout.ms");
             props.put("group.id", m_groupId + "-done");
@@ -97,15 +97,15 @@ public class ExportKafkaOnServerVerifier {
             doneConsumerConfig = new ConsumerConfig(props);
             doneConsumer = kafka.consumer.Consumer.createJavaConsumerConnector(doneConsumerConfig);
         }
-        
+
         public void stop() {
             doneConsumer.commitOffsets();
-            doneConsumer.shutdown();            
+            doneConsumer.shutdown();
             consumer.commitOffsets();
             consumer.shutdown();
             tryCleanupZookeeper();
         }
-        
+
         void tryCleanupZookeeper() {
             try {
                 ZkClient zk = new ZkClient(m_zkhost);
@@ -113,12 +113,12 @@ public class ExportKafkaOnServerVerifier {
                 zk.deleteRecursive(dir);
                 dir = "/consumers/" + m_groupId + "-done";
                 zk.deleteRecursive(dir);
-                zk.close();            
+                zk.close();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
         }
-        
+
     }
 
     ExportKafkaOnServerVerifier() {
@@ -131,7 +131,7 @@ public class ExportKafkaOnServerVerifier {
         System.out.println("Zookeeper is: " + m_zookeeper);
         //Topic
         m_topic = args[1]; //"voltdbexportEXPORT_PARTITIONED_TABLE";
-        
+
         boolean skinny = false;
         if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
             skinny = Boolean.parseBoolean(args[3].trim().toLowerCase());
@@ -163,7 +163,7 @@ public class ExportKafkaOnServerVerifier {
     {
         createAndConsumeKafkaStreams(m_topic, m_doneTopic, true);
     }
-        
+
     public class ExportConsumer implements Runnable {
 
         private final KafkaStream m_stream;
@@ -214,7 +214,7 @@ public class ExportKafkaOnServerVerifier {
                             System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
                                     ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                     ", while export record says " + partition);
-                        }              
+                        }
                         if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
                             break;
                         }
@@ -228,14 +228,14 @@ public class ExportKafkaOnServerVerifier {
                 if (m_cdl != null) {
                     m_cdl.countDown();
                 }
-            }       
+            }
         }
     }
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
     void createAndConsumeKafkaStreams(String topic, String doneTopic, boolean skinny) throws Exception {
         List<Future<Long>> doneFutures = new ArrayList<>();
-        
+
         Map<String, Integer> topicCountMap = new HashMap<>();
         topicCountMap.put(topic, 1);
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = m_kafkaConfig.consumer.createMessageStreams(topicCountMap);
@@ -267,7 +267,7 @@ public class ExportKafkaOnServerVerifier {
             Future<Long> f = ecs.submit(consumer, new Long(0));
             doneFutures.add(f);
         }
-                
+
         System.out.println("All Consumer Creation Done...Waiting for EOS");
         // Now wait for any executorservice2 completion.
         ecs.take().get();
