@@ -547,7 +547,7 @@ public class AsyncExportClient
         System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
     }
-    
+
     /**
      * Wait for export processor to catch up and have nothing to be exported.
      *
@@ -581,5 +581,5 @@ public class AsyncExportClient
         System.out.println("Passed is: " + passed);
         System.out.println(stats);
     }
-    
+
 }
