@@ -47,9 +47,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import jsr166y.LinkedTransferQueue;
 
@@ -629,5 +631,65 @@ public class CoreUtils {
             }
 
         }, interval, TimeUnit.MILLISECONDS);
+    }
+
+    public static final int CORE_UTIL_LOCK_SPINS = Integer.getInteger("CORE_UTIL_LOCK_SPINS", 128);
+
+    /*
+     * Spinning lock adapted from LinkedTransferQueue.take() spin then block strategy
+     *
+     * Generally not something you want to be using for locks that protect
+     * large critical sections since the spinning is wasted.
+     *
+     * Written by Doug Lea with assistance from members of JCP JSR-166
+     * Expert Group and released to the public domain, as explained at
+     * http://creativecommons.org/publicdomain/zero/1.0/
+     */
+    public static void spinLock(ReentrantLock lock) {
+        int spins = CORE_UTIL_LOCK_SPINS;
+        ThreadLocalRandom randomYields = null;
+
+        for (;;) {
+            if (lock.tryLock()) {
+                return;
+            }
+
+            if (randomYields == null) {
+                randomYields = ThreadLocalRandom.current();
+            }
+            else if (spins > 0) {
+                --spins;
+                if (randomYields.nextInt(64) == 0)
+                    Thread.yield();
+            }
+            else {
+                lock.lock();
+                return;
+            }
+        }
+    }
+
+    public static final long QUEUE_SPIN_MICROSECONDS =
+            TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("QUEUE_SPIN_MICROS", 0));
+
+    public static <T> T queueSpinTake(BlockingQueue<T> queue) throws InterruptedException {
+        if (QUEUE_SPIN_MICROSECONDS > 0) {
+            T retval = null;
+            long nanos = -1;
+            ThreadLocalRandom randomYields = null;
+            for (;;) {
+                if ((retval = queue.poll()) != null) return retval;
+                if (nanos == -1) {
+                    nanos = System.nanoTime();
+                    randomYields = ThreadLocalRandom.current();
+                } else if (System.nanoTime() - nanos > QUEUE_SPIN_MICROSECONDS) {
+                    return queue.take();
+                } else if (randomYields.nextInt(64) == 0) {
+                    Thread.yield();
+                }
+            }
+        } else {
+            return queue.take();
+        }
     }
 }

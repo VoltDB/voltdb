@@ -27,9 +27,11 @@ public class PosixAdvise {
 
     public static final boolean FALLOCATE_SUPPORTED;
     public static final boolean SYNC_FILE_RANGE_SUPPORTED;
+    public static final boolean ENABLE_FADVISE_DONTNEED;
     static {
         SYNC_FILE_RANGE_SUPPORTED = System.getProperty("os.name").equalsIgnoreCase("linux") ;
         FALLOCATE_SUPPORTED = System.getProperty("os.name").equalsIgnoreCase("linux") ;
+        ENABLE_FADVISE_DONTNEED = Boolean.getBoolean("ENABLE_FADVISE_DONTNEED");
     }
 
     /*
@@ -64,6 +66,7 @@ public class PosixAdvise {
 
     public static native long fadvise(long fd, long offset, long size, int advice);
     public static long fadvise(FileDescriptor fd, long offset, long size, int advice) {
+        if (advice == POSIX_FADV_DONTNEED && !ENABLE_FADVISE_DONTNEED) return 0;
         final long filedescriptor = SharedSecrets.getJavaIOFileDescriptorAccess().get(fd);
         return fadvise(filedescriptor, offset, size, advice);
     }
