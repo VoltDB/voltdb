@@ -74,7 +74,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final StreamSnapshotAckReceiver m_ackReceiver;
 
     // Skip all subsequent writes if one fails
-    private final AtomicReference<Exception> m_writeFailed = new AtomicReference<Exception>();
+    private final AtomicReference<IOException> m_writeFailed = new AtomicReference<IOException>();
+    // true if the failure is already reported to the SnapshotSiteProcessor, prevent throwing
+    // the same exception multiple times.
+    private boolean m_failureReported = false;
 
     // number of sent, but un-acked buffers
     final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
@@ -242,8 +245,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
                 SendWork work = e.getValue();
                 if ((now - work.m_ts) > m_writeTimeout) {
-                    RuntimeException exception =
-                        new RuntimeException(String.format(
+                    IOException exception =
+                        new IOException(String.format(
                             "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
                             (now - work.m_ts) / 1000));
                     rejoinLog.error(exception.getMessage());
@@ -398,7 +401,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 if (chunkC != null) {
                     chunkC.discard();
                 }
-                return null;
+
+                if (m_failureReported) {
+                    return null;
+                } else {
+                    m_failureReported = true;
+                    return Futures.immediateFailedFuture(m_writeFailed.get());
+                }
             }
 
             // cleanup and exit immediately if in failure mode
@@ -474,7 +483,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException, InterruptedException {
+        boolean hadFailureBeforeClose = m_writeFailed.get() != null;
+
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -505,6 +516,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         Runnable closeHandle = m_onCloseHandler.get();
         if (closeHandle != null) {
             closeHandle.run();
+        }
+
+        // If there was an error during close(), throw it so that the snapshot
+        // can be marked as failed.
+        if (!hadFailureBeforeClose && m_writeFailed.get() != null) {
+            throw m_writeFailed.get();
         }
     }
 

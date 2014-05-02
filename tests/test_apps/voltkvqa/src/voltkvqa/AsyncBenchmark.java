@@ -141,6 +141,9 @@ public class AsyncBenchmark {
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 120;
 
+        @Option(desc = "Max number of puts. This does not count any preloading or warmup and may not be reached if duration is too short.")
+        long maxputs = Long.MAX_VALUE;
+
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 0;
 
@@ -168,7 +171,6 @@ public class AsyncBenchmark {
         @Option(desc = "Fraction of ops that are gets (singlePartition vs multiPartition) " +
                 "and puts (singlePartition vs multiPartition).")
         double multisingleratio = 0; // By default, don't run multi-partition
-
 
         @Option(desc = "Size of keys in bytes.")
         int keysize = 32;
@@ -791,17 +793,18 @@ public class AsyncBenchmark {
             // If Volt is running on one node only, no need to run this test on multi-partition
             config.multisingleratio = 0;
 
-        // Run the benchmark loop for the requested duration
+        // Run the benchmark loop for the requested duration or txn count
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         long currentTime = System.currentTimeMillis();
         long diff = benchmarkEndTime - currentTime;
         int i = 1;
+        long putCount = 0;
 
         double mpRand;
         String msg = "";
-        while (benchmarkEndTime > currentTime) {
+        while (benchmarkEndTime > currentTime && putCount < config.maxputs) {
             if(debug && diff != 0 && diff%5000.00 == 0 && i%5 == 0) {
                 msg = "i = " + i + ", Time remaining in seconds: " + diff/1000l +
                       ", totalConnections = " + totalConnections.get();
@@ -837,6 +840,7 @@ public class AsyncBenchmark {
             }
             else {
                 // Put a key/value pair, asynchronously
+                putCount++;
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 mpRand = rand.nextDouble();
                 if(rand.nextDouble() < config.multisingleratio) {
@@ -990,7 +994,7 @@ public class AsyncBenchmark {
     }
 
     public static String dateformat(long ctime) {
-        return DateFormatUtils.format(ctime, "MM/dd/yyyy HH:mm:ss");
+        return DateFormatUtils.format(ctime, "yyyy-MM-dd HH:mm:ss,SSS");
     }
 
     public static long getTime() {

@@ -90,17 +90,20 @@ public abstract class OpsAgent
         private int expectedOpsResponses = 0;
         protected VoltTable[] aggregateTables = null;
         protected final long startTime;
+        private final JSONObject request;
         public PendingOpsRequest(
                 OpsSelector selector,
                 String subselector,
                 Connection c,
                 long clientData,
-                long startTime) {
+                long startTime,
+                JSONObject request) {
             this.startTime = startTime;
             //this.selector = selector;
             this.subselector = subselector;
             this.c = c;
             this.clientData = clientData;
+            this.request = request;
         }
     }
 
@@ -329,7 +332,12 @@ public abstract class OpsAgent
         if (por == null) {
             return;
         }
-        hostLog.warn("OPS request for " + m_name + ", " + requestId + " timed out, sending error to client");
+        String request = "Exception formatting request JSON";
+        try {
+            request = por.request.toString(4);
+        } catch (Throwable t) {}
+        hostLog.warn("OPS request for " + m_name + ", " + requestId +
+                     " timed out, sending error to client. Request:" + request);
 
         sendErrorResponse(por.c, ClientResponse.GRACEFUL_FAILURE,
                 "OPS request hit sixty second timeout before all responses were received",

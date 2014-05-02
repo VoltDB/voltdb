@@ -18,6 +18,7 @@
             <procedure class='genqa.procedures.JiggleExportMultiPartition' />
             <procedure class='genqa.procedures.WaitSinglePartition' />
             <procedure class='genqa.procedures.WaitMultiPartition' />
+            <procedure class='genqa.procedures.JiggleExportDoneTable' />
         </procedures>
         <classdependencies>
             <classdependency class="genqa.procedures.SampleRecord" />
@@ -31,6 +32,7 @@
             <tables>
                 <table name="export_partitioned_table" />
                 <table name="export_replicated_table" />
+                <table name="export_done_table" />
             </tables>
         </export>
     </database>
