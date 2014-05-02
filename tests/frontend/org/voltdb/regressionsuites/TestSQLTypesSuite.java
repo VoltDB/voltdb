@@ -40,6 +40,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
@@ -497,7 +498,29 @@ public class TestSQLTypesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
         result = cr.getResults();
         assertEquals(0, result[0].getRowCount());
-}
+    }
+
+    public void testPassingDateAndTimeObjectsBeforeEpochToStatements() throws Exception {
+        final Client client = this.getClient();
+
+        long microsecondsSinceEpoch = -1001003050L;
+        TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
+
+        // Add 1 more millis from epoch
+        java.sql.Timestamp ts_micro = VoltTypeUtil.getSqlTimestampFromMicrosSinceEpoch(microsecondsSinceEpoch);
+
+        client.callProcedure("Insert", "ALLOW_NULLS", 0, 0, 0, 0, 0,
+                             null, tst_micro, null,
+                             null, null, null, null, null, null);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", "Select A_TIMESTAMP from allow_nulls where pkey = 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(microsecondsSinceEpoch, vt.getTimestampAsLong(0));
+        assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
+        assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+
+    }
 
     // ENG-1276
     public void testPassingFloatToDoubleArg() throws Exception {
