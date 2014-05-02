@@ -22,6 +22,7 @@ import java.util.Deque;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.dtxn.TransactionState;
 
 public class TransactionTaskQueue
 {
@@ -57,8 +58,9 @@ public class TransactionTaskQueue
     synchronized boolean offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
-        if (!task.getTransactionState().isReadOnly()) {
-            m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, task.getTransactionState().m_spHandle);
+        TransactionState txnState = task.getTransactionState();
+        if (!txnState.isReadOnly()) {
+            m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
         }
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
