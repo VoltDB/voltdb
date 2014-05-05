@@ -89,20 +89,41 @@ function client-help() {
     java -classpath client:$CLIENTCLASSPATH windowing.WindowingApp --help
 }
 
+## USAGE FOR CLIENT TARGET ##
+# usage: windowing.WindowingApp
+#     --deletechunksize <arg>   Maximum number of rows to delete in one
+#                               transaction.
+#     --deleteyieldtime <arg>   Time to pause between deletes when there was
+#                               nothing to delete at last check.
+#     --displayinterval <arg>   Interval for performance feedback, in
+#                               seconds.
+#     --duration <arg>          Duration, in seconds.
+#     --historyseconds <arg>    Global maximum history targert. Zero if
+#                               using row count target.
+#     --inline <arg>            Run deletes in the same transaction as
+#                               inserts.
+#     --maxrows <arg>           Global maximum row target. Zero if using
+#                               history target.
+#     --password <arg>          Password for connection.
+#     --ratelimit <arg>         Maximum TPS rate for inserts.
+#     --servers <arg>           Comma separated list of the form
+#                               server[:port] to connect to.
+#     --user <arg>              User name for connection.
+
 function client() {
     srccompile
     # Note that in the command below, maxrows and historyseconds can't both be non-zero.
     java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         windowing.WindowingApp \
-        --displayinterval=5 \              # how often to print the report
-        --duration=120 \                   # how long to run for
-        --servers=localhost:21212 \        # servers to connect to
-        --maxrows=0 \                      # set to nonzero to limit by rowcount
-        --historyseconds=30 \              # set to nonzero to limit by age
-        --inline=false \                   # set to true to delete co-txn with inserts
-        --deletechunksize=100 \            # target max number of rows to delete per txn
-        --deleteyieldtime=100 \            # time to wait between non-inline deletes
-        --ratelimit=15000                  # rate limit for random inserts
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --maxrows=0 \
+        --historyseconds=30 \
+        --inline=false \
+        --deletechunksize=100 \
+        --deleteyieldtime=100 \
+        --ratelimit=15000
 }
 
 function help() {
