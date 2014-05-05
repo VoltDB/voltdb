@@ -18,9 +18,11 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.voltdb.VoltType;
@@ -137,6 +139,13 @@ public class PartitioningForStatement implements Cloneable{
      */
     private String m_fullColumnName;
 
+
+    private List<PartitioningForStatement> m_subqueriesPartitionings = new ArrayList<>();
+
+    public void addToSubqueriesPartitionsStatement(PartitioningForStatement pStmt) {
+        m_subqueriesPartitionings.add(pStmt);
+    }
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -194,6 +203,10 @@ public class PartitioningForStatement implements Cloneable{
         } else {
             m_inferredValue = ConstantValueExpression.extractPartitioningValue(valueType, constExpr);
         }
+    }
+
+    public void clonePartitionExpression(PartitioningForStatement pStmt) {
+        m_inferredExpression.add(pStmt.singlePartitioningExpression());
     }
 
     public Object getInferredPartitioningValue() {
@@ -299,7 +312,7 @@ public class PartitioningForStatement implements Cloneable{
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
      * This is only the case when they include equality comparisons between partition key columns.
-     * VoltDb will reject joins of multiple partitioned tables unless all their partition keys are
+     * VoltDB will reject joins of multiple partitioned tables unless all their partition keys are
      * constrained to be equal to each other.
      * Example: select * from T1, T2 where T1.ID = T2.ID
      * Additionally, in this case, there may be a constant equality filter on any of the columns,
@@ -373,6 +386,11 @@ public class PartitioningForStatement implements Cloneable{
                     // Only need one constant value.
                     break;
                 }
+            }
+        } else if (m_subqueriesPartitionings.size() == 1) {
+            PartitioningForStatement pStmt = m_subqueriesPartitionings.get(0);
+            if (!pStmt.requiresTwoFragments() && pStmt.getCountOfIndependentlyPartitionedTables() == 1) {
+                clonePartitionExpression(m_subqueriesPartitionings.get(0));
             }
         }
 

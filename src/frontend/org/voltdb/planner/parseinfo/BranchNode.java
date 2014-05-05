@@ -405,16 +405,31 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public boolean containsPartitionedTablesFromSubSelects() {
-        boolean result = false;
+    public boolean isValidSubselectReplicated() {
+        boolean isValid = true;
         if (m_leftNode != null) {
-            result = result || m_leftNode.containsPartitionedTablesFromSubSelects();
+            isValid = isValid && m_leftNode.isValidSubselectReplicated();
         }
-        if (result) return result;
+        if (!isValid) return isValid;
         if (m_rightNode != null) {
-            result = result || m_rightNode.containsPartitionedTablesFromSubSelects();
+            isValid = isValid && m_rightNode.isValidSubselectReplicated();
         }
 
-        return result;
+        return isValid;
     }
+
+    @Override
+    public boolean isValidSubselectPartitioned() {
+        boolean isValid = true;
+        if (m_leftNode != null) {
+            isValid = isValid && m_leftNode.isValidSubselectPartitioned();
+        }
+        if (!isValid) return isValid;
+        if (m_rightNode != null) {
+            isValid = isValid && m_rightNode.isValidSubselectPartitioned();
+        }
+
+        return isValid;
+    }
+
 }

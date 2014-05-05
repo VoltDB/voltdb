@@ -102,10 +102,16 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public boolean containsPartitionedTablesFromSubSelects() {
+    public boolean isValidSubselectReplicated() {
         if (m_subqueryScan.getIsReplicated()) {
-            return false;
+            return true;
         }
+        return false;
+    }
+
+    @Override
+    public boolean isValidSubselectPartitioned() {
         return true;
     }
+
 }
