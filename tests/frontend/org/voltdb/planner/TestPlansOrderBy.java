@@ -49,7 +49,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             boolean expectedAggregate)
     {
         AbstractPlanNode pn = compile(sql);
-        //System.out.println(pn.getChild(0).toJSONString());
+        //* to debug */ System.out.println(pn.getChild(0).toJSONString());
         //* to debug */ System.out.println(pn.getChild(0).toExplainPlanString());
         assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
@@ -244,8 +244,12 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
         // filter on indexed column on one table, prefix join constraint,
         // ORDER BY looking for 1 recovered spoiler -> no ORDER BY node
-        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 AND T.T_D0 = ?  " +
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 AND Tmanykeys.T_D0 = ?  " +
                 "ORDER BY Tmanykeys.T_D1 LIMIT ?");
+        // This query requires additional recognition of transitive equality to eliminate the ORDER BY.
+        // See ENG-4728.
+        //*See ENG-4728.*/ validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 AND T.T_D2 = ?  " +
+        //*See ENG-4728.*/        "ORDER BY Tmanykeys.T_D1 LIMIT ?");
         // ORDER BY is not recovered, but index is chosen for sorting purpose --> no ORDER BY node
         validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D1 = T.T_D2 AND T.T_D0 = ?  " +
                 "ORDER BY Tmanykeys.T_D0 LIMIT ?");
