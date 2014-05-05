@@ -210,7 +210,7 @@ public class TestClientInterface {
         }
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
-        String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCat = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);

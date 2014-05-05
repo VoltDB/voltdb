@@ -84,7 +84,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // load a catalog
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
 
         // create the catalog (that will be passed to the ClientInterface
         catalog = new Catalog();
