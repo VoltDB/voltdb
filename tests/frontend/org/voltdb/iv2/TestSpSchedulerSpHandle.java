@@ -33,8 +33,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.SnapshotCompletionMonitor;
-
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -46,6 +44,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -72,6 +71,7 @@ public class TestSpSchedulerSpHandle extends TestCase
         return queue;
     }
 
+    @Override
     public void setUp()
     {
         msgGen = new RandomMsgGenerator();
@@ -117,12 +117,12 @@ public class TestSpSchedulerSpHandle extends TestCase
         for (int i = 0; i < 4000; i++) {
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             dut.deliver(msg);
-            currentHandle = currentHandle.makeNext();
             // only non-reads should do checks, all others just keep moving
             // Capture the InitiateTaskMessage that gets sent to the replica so we can test it,
             // use it for response construction, etc.
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage)
             {
+                currentHandle = currentHandle.makeNext();
                 msgcount++;
                 ArgumentCaptor<TransactionInfoBaseMessage> replmsg =
                     ArgumentCaptor.forClass(TransactionInfoBaseMessage.class);

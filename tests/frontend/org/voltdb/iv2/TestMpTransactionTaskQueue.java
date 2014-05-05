@@ -23,7 +23,14 @@
 
 package org.voltdb.iv2;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -50,13 +57,14 @@ public class TestMpTransactionTaskQueue extends TestCase
     MpRoSitePool m_MPpool;
     MpTransactionTaskQueue m_dut;
 
+    @Override
     public void setUp()
     {
         m_writeQueue = mock(SiteTaskerQueue.class);
         m_MPpool = mock(MpRoSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
-        m_dut = new MpTransactionTaskQueue(m_writeQueue);
+        m_dut = new MpTransactionTaskQueue(m_writeQueue,TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
         m_dut.setMpRoSitePool(m_MPpool);
     }
 
