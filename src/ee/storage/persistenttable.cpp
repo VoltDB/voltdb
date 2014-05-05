@@ -105,6 +105,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
+
+    m_preTruncateTable = NULL;
 }
 
 PersistentTable::~PersistentTable()
@@ -215,6 +217,11 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
+    if (originalTable->m_tableStreamer != NULL) {
+        // Elastic Index may complete when undo Truncate
+        this->unsetPreTruncateTable();
+    }
+
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
@@ -246,6 +253,8 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_INFO, &str);
 
         originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
+
+        this->unsetPreTruncateTable();
     }
 
     std::vector<MaterializedViewMetadata *> views = originalTable->views();
@@ -267,10 +276,16 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
         return ;
     }
+
     assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
+    if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is an Elastic Index work going on and it should continue access the old table.
+        // Add one reference count to keep the original table.
+        emptyTable->setPreTruncateTable(this);
+    }
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
