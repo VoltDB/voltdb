@@ -17,10 +17,11 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.TimeZone;
+
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
-import org.voltdb.VoltDB;
 
 /**
  * This class is built to create a single in-memory database
@@ -106,7 +107,8 @@ public class HSQLInterface {
         }
 
         // specifically set the timezone to UTC
-        VoltDB.setDefaultTimezone();
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        sessionProxy.executeDirectStatement("SET SESSION TIME ZONE INTERVAL '00:00' HOUR TO MINUTE;");
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
