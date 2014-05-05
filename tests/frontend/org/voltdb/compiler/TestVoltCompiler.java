@@ -798,9 +798,10 @@ public class TestVoltCompiler extends TestCase {
         // Check warnings
         assertEquals(1, compiler.m_warnings.size());
         String warningMsg = compiler.m_warnings.get(0).getMessage();
-        assertTrue(warningMsg.contains("The size of VARCHAR column TITLE in table BOOKS greater than " +
+        String expectedMsg = "The size of VARCHAR column TITLE in table BOOKS greater than " +
                 "262144 will be enforced as byte counts rather than UTF8 character counts. " +
-                "To eliminate this warning, specify \"VARCHAR(262154 BYTES)"));
+                "To eliminate this warning, specify \"VARCHAR(262154 BYTES)\"";
+        assertEquals(expectedMsg, warningMsg);
         Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
