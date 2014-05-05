@@ -1,6 +1,8 @@
 Quick hacky description on running the long-running export test.
 
 - Build everything:
+-- If you are using eclipse or standalone build make sure zkclient jars is in classpath (not talking about voltzk)
+-- The jars are not in repo and must be downloaded and added.
 ./run.sh catalog
 
 TO RUN remote Export Client Test:
@@ -24,6 +26,16 @@ TO RUN onserver Export Client Test:
     ./run.sh async-export
     -- In 3, start the app client:
     ./run.sh export-on-server-verify
+
+TO RUN onserver Export to kafka Client Test:
+- You'll need 3(three) terminals:
+
+    -- In 1, run the server:
+    ./run.sh server
+    -- In 2, run the export client:
+    ./run.sh async-export
+    -- In 3, start the verifier client:
+    ./run.sh export-kafka-server-verify
 
 TO RUN onserver Export Client Test with custom class:
     -- In 1, run the server:

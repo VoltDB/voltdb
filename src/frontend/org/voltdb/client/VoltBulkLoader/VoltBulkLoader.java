@@ -28,7 +28,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
@@ -98,6 +102,9 @@ public class VoltBulkLoader {
     //Total number of partition processors including the MP processor.
     private int m_maxPartitionProcessors = -1;
 
+    private ScheduledThreadPoolExecutor m_ses = CoreUtils.getScheduledThreadPoolExecutor("Periodic-flush", 1, CoreUtils.SMALL_STACK_SIZE);
+    private ScheduledFuture<?> m_flush = null;
+
     // Dedicated thread for processing all failed batch rows inserted by this VoltBulkLoader instance
     FailedBatchProcessor m_failureProcessor = null;
     //Queue of batch entries where some rows failed.
@@ -120,6 +127,10 @@ public class VoltBulkLoader {
     final Stack m_availLoaderPairs;
     // LoaderPair currently being built by a PerPartitionTable organized by partitionId
     final LoaderSpecificRowCnt[] m_currBatchPair;
+
+    //Periodic flush is enabled by default with 60 second interval and initial delay
+    private static final int INITIAL_FLUSH_DELAY_SECONDS = 60;
+    private static final int FLUSH_DELAY_INTERVAL_SECONDS = 60;
 
     // Object maintains the running row count for each VoltBulkLoader in a given batch
     static class LoaderSpecificRowCnt {
@@ -311,7 +322,7 @@ public class VoltBulkLoader {
             }
         }
 
-        m_isMP = (m_partitionedColumnIndex == -1 ? true : false);
+        m_isMP = (m_partitionedColumnIndex == -1);
         // Dedicate a PartitionProcessor to MP tables
         m_maxPartitionProcessors = ((hostcount * sitesPerHost) / (kfactor + 1)) + 1;
 
@@ -330,7 +341,7 @@ public class VoltBulkLoader {
        }
 
        // The constructor for VoltBulkLoader is called holding synchronized for m_vblGlobals.
-        if (m_vblGlobals.m_TableNameToLoader.size()==0) {
+        if (m_vblGlobals.m_TableNameToLoader.isEmpty()) {
             // Set up the PartitionProcessors
             m_vblGlobals.m_spawnedPartitionProcessors = new ArrayList<Thread>(m_maxPartitionProcessors);
             m_vblGlobals.m_partitionProcessors = new PartitionProcessor[m_maxPartitionProcessors];
@@ -390,6 +401,35 @@ public class VoltBulkLoader {
         m_failedQueue = new LinkedBlockingQueue<VoltBulkLoaderRow>();
         m_failureProcessor = new FailedBatchProcessor();
         m_failureProcessor.start();
+
+        //Start flush timer 60 sec delay on 60 sec default interval.
+        m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                flush();
+            }
+        }, INITIAL_FLUSH_DELAY_SECONDS, FLUSH_DELAY_INTERVAL_SECONDS, TimeUnit.SECONDS);
+
+    }
+
+    /**
+     * Set periodic flush interval and initial delay in seconds.
+     *
+     * @param delay Initial delay in seconds
+     * @param seconds Interval in seconds
+     */
+    public void setFlushInterval(long delay, long seconds) {
+        if (m_flush != null) {
+            m_flush.cancel(false);
+        }
+        if (seconds > 0) {
+            m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    flush();
+                }
+            }, delay, seconds, TimeUnit.SECONDS);
+        }
     }
 
     void generateError(Object rowHandle, Object[] objectList, String errMessage) {
@@ -404,8 +444,9 @@ public class VoltBulkLoader {
     /**
      *  <p>Add new row to VoltBulkLoader table.</p>
      *
-     * @param caller supplied object used to distinguish failed insert attempts
-     * @param list of fields associated with a single row
+     * @param rowHandle supplied object used to distinguish failed insert attempts
+     * @param fieldList of fields associated with a single row
+     * @throws java.lang.InterruptedException
      */
     public void insertRow(Object rowHandle, Object... fieldList)  throws InterruptedException {
         int partitionId = 0;
@@ -477,6 +518,7 @@ public class VoltBulkLoader {
      * in all partitions of the table to the Client for insert. This call will wait until all
      * previously submitted rows (including retried failed batch rows) have been processed and
      * received responses from the Client.
+     * @throws java.lang.InterruptedException
      */
     public synchronized void drain() throws InterruptedException {
         // Wait for number of PerPartitionTables we are using and the Failure Processor
@@ -504,8 +546,15 @@ public class VoltBulkLoader {
      * Waits for all pending inserts to be acknowledged and then closes this instance of the
      * VoltBulkLoader. During and after the invocation of close(), calls to insertRow will get
      * an Exception. All other instances of VoltBulkLoader will continue to function.
+     * @throws java.lang.InterruptedException
      */
     public synchronized void close() throws InterruptedException {
+        //Stop the periodic flush as we will flush laster
+        if (m_flush != null) {
+            m_flush.cancel(false);
+        }
+        m_ses.shutdown();
+
         PerPartitionTable tmpTable;
         // Remove this VoltBulkLoader from the active set.
         synchronized (m_vblGlobals) {
