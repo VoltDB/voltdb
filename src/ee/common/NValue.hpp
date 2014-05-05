@@ -274,8 +274,8 @@ class NValue {
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
     static void deserializeFrom(
-        SerializeInput &input, const ValueType type, char *storage,
-        bool isInlined, const int32_t maxLength, Pool *dataPool);
+        SerializeInput &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
         // eliminate the potential NValue copy.
@@ -1480,7 +1480,8 @@ class NValue {
         }
         else {
             const int32_t objLength = getObjectLength_withoutNull();
-            checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
+            const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+            checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
             const char* sourceBytes;
             if (m_sourceInlined) {
                 sourceBytes = *reinterpret_cast<char *const *>(m_data) + 1;
@@ -1510,14 +1511,16 @@ class NValue {
         return false;
     }
 
-    void checkTooNarrowVarcharAndVarbinary(int32_t objLength, int32_t maxLength, bool isInBytes) const {
-        assert(isNull() == false);
-
+    /**
+     * Assuming non-null NValue, validate the size of the varchar or varbinary
+     */
+    static inline void checkTooNarrowVarcharAndVarbinary(ValueType type, const char* ptr,
+            int32_t objLength, int32_t maxLength, bool isInBytes) {
         if (maxLength == 0) {
-            throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
+            throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(type));
         }
 
-        if (m_valueType == VALUE_TYPE_VARBINARY) {
+        if (type == VALUE_TYPE_VARBINARY) {
             if (objLength > maxLength) {
                 char msg[1024];
                 snprintf(msg, 1024,
@@ -1526,9 +1529,7 @@ class NValue {
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                         msg);
             }
-        } else if (m_valueType == VALUE_TYPE_VARCHAR) {
-            const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-
+        } else if (type == VALUE_TYPE_VARCHAR) {
             if (isInBytes) {
                 if (objLength > maxLength) {
                     std::string inputValue;
@@ -1562,6 +1563,9 @@ class NValue {
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                         msg);
             }
+        } else {
+            throwFatalLogicErrorStreamed("NValue::checkTooNarrowVarcharAndVarbinary, "
+                    "Invalid object type " << valueToString(type));
         }
     }
 
@@ -2637,7 +2641,8 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             }
             else {
                 int32_t objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
+                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
 
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + objLength;
@@ -2704,7 +2709,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
 
             if (!isNull()) {
                 int objLength = getObjectLength_withoutNull();
-                checkTooNarrowVarcharAndVarbinary(objLength, maxLength, isInBytes);
+                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
             }
 
             // copy the StringRef pointers, even for NULL case.
@@ -2728,8 +2734,9 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
-                             char *storage, bool isInlined, const int32_t maxLength, Pool *dataPool) {
+inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
+
     switch (type) {
     case VALUE_TYPE_BIGINT:
     case VALUE_TYPE_TIMESTAMP:
@@ -2751,13 +2758,6 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
     case VALUE_TYPE_VARBINARY:
     {
         const int32_t length = input.readInt();
-        if (length > maxLength) {
-            char msg[1024];
-            snprintf(msg, 1024, "In NValue::deserializeFrom, Object exceeds specified size. Size is %d and max is %d", length, maxLength);
-            throw SQLException(
-                    SQLException::data_exception_string_data_length_mismatch,
-                    msg);
-        }
 
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
@@ -2768,6 +2768,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
             }
             storage[0] = static_cast<char>(length);
             const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
+            checkTooNarrowVarcharAndVarbinary(type, data, length, maxLength, isInBytes);
             ::memcpy(storage + 1, data, length);
             break;
         }
@@ -2778,6 +2779,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
         }
         const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
         const int32_t minlength = lengthLength + length;
+        checkTooNarrowVarcharAndVarbinary(type, data, length, maxLength, isInBytes);
         StringRef* sref = StringRef::create(minlength, dataPool);
         char* copy = sref->get();
         copy = serializeObjectLengthToLocation(length, copy);

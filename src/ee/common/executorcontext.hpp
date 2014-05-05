@@ -77,11 +77,17 @@ class ExecutorContext {
     void setupForTick(int64_t lastCommittedSpHandle)
     {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
+        if (m_spHandle < lastCommittedSpHandle) {
+            m_spHandle = lastCommittedSpHandle;
+        }
     }
 
     // data available via quiesce()
     void setupForQuiesce(int64_t lastCommittedSpHandle) {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
+        if (m_spHandle < lastCommittedSpHandle) {
+            m_spHandle = lastCommittedSpHandle;
+        }
     }
 
     // for test (VoltDBEngine::getExecutorContext())

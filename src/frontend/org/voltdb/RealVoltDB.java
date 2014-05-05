@@ -153,7 +153,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         "                Changes to this file will be overwritten. Copy it elsewhere if you",
         "                want to use it as a starting point for a custom configuration. -->",
         "<deployment>",
-        "   <cluster hostcount=\"1\" sitesperhost=\"2\" />",
+        "   <cluster hostcount=\"1\" />",
         "   <httpd enabled=\"true\">",
         "      <jsonapi enabled=\"true\" />",
         "   </httpd>",

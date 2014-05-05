@@ -11,6 +11,7 @@
         </schemas>
         <procedures>
             <procedure class='genqa2.procedures.JiggleExportSinglePartition' />
+            <procedure class='genqa2.procedures.JiggleExportDoneTable' />
         </procedures>
         <classdependencies>
             <classdependency class="genqa2.procedures.SampleRecord" />
@@ -22,6 +23,7 @@
         <export>
             <tables>
                 <table name="export_partitioned_table2" />
+                <table name="export_done_table" />
             </tables>
         </export>
     </database>

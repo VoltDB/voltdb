@@ -96,6 +96,12 @@ CREATE TABLE export_mirror_partitioned_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
+CREATE TABLE export_done_table
+(
+  txnid                     BIGINT        NOT NULL
+);
+PARTITION TABLE export_done_table ON COLUMN txnid
+;
 
 -- Replicated Table
 CREATE TABLE replicated_table

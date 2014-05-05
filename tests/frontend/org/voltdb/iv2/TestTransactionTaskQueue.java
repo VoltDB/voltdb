@@ -128,7 +128,7 @@ public class TestTransactionTaskQueue extends TestCase
         long localTxnId = 0;
         long mpTxnId = 0;
         SiteTaskerQueue task_queue = getSiteTaskerQueue();
-        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
+        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue,localTxnId);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
 

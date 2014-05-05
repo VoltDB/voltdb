@@ -492,12 +492,16 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
             cmdline.add("-ea");
             cmdline.add("-XX:MaxDirectMemorySize=2g");
+            cmdline.add("-XX:-UseSplitVerifier");
         }
         else
         {
             cmdline.add("-server");
             cmdline.add("-XX:HeapDumpPath=/tmp");
-            cmdline.add(initialHeap);
+            if (!initialHeap.isEmpty()) {
+                cmdline.add(initialHeap);
+                cmdline.add("-XX:+AlwaysPreTouch");
+            }
         }
 
         if (m_isEnterprise)
