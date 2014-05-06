@@ -82,6 +82,7 @@ public class DDLCompiler {
 
     static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+    static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     /**
      * Regex Description:
@@ -1311,13 +1312,23 @@ public class DDLCompiler {
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if ((t == VoltType.STRING) || (t == VoltType.VARBINARY)) {
+            if ((t == VoltType.STRING && c.getInbytes()) || (t == VoltType.VARBINARY)) {
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
-                            " has a maximum size of " + c.getSize() + " bytes" +
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
                             " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
                 }
                 maxRowSize += 4 + c.getSize();
+            }
+            else if (t == VoltType.STRING) {
+                if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " characters" +
+                            " but the maximum supported size is " +
+                            VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / MAX_BYTES_PER_UTF8_CHARACTER) +
+                            " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
+                }
+                maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
             } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
