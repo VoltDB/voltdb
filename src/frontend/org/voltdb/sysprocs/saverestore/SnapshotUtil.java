@@ -1296,6 +1296,10 @@ public class SnapshotUtil {
                 if (resp == null) {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    final String statusString = resp.getStatusString();
+                    if (statusString != null && statusString.contains("Failure while running system procedure @SnapshotSave")) {
+                        VoltDB.crashLocalVoltDB("Failed to initiate snapshot due to node failure, aborting", false, null);
+                    }
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
                                             + resp.getStatusString(), true, null);
                 }
