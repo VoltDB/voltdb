@@ -102,7 +102,8 @@ public class VoltBulkLoader {
     //Total number of partition processors including the MP processor.
     private int m_maxPartitionProcessors = -1;
 
-    private ScheduledThreadPoolExecutor m_ses = CoreUtils.getScheduledThreadPoolExecutor("Periodic-flush", 1, CoreUtils.SMALL_STACK_SIZE);
+    //Scheduled Executor for periodic flush by default no periodic flush is enabled. Kafka loader enables it
+    private final ScheduledThreadPoolExecutor m_ses = CoreUtils.getScheduledThreadPoolExecutor("Periodic-Flush", 1, CoreUtils.SMALL_STACK_SIZE);
     private ScheduledFuture<?> m_flush = null;
 
     // Dedicated thread for processing all failed batch rows inserted by this VoltBulkLoader instance
@@ -128,9 +129,6 @@ public class VoltBulkLoader {
     // LoaderPair currently being built by a PerPartitionTable organized by partitionId
     final LoaderSpecificRowCnt[] m_currBatchPair;
 
-    //Periodic flush is enabled by default with 60 second interval and initial delay
-    private static final int INITIAL_FLUSH_DELAY_SECONDS = 60;
-    private static final int FLUSH_DELAY_INTERVAL_SECONDS = 60;
 
     // Object maintains the running row count for each VoltBulkLoader in a given batch
     static class LoaderSpecificRowCnt {
@@ -402,25 +400,18 @@ public class VoltBulkLoader {
         m_failureProcessor = new FailedBatchProcessor();
         m_failureProcessor.start();
 
-        //Start flush timer 60 sec delay on 60 sec default interval.
-        m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                flush();
-            }
-        }, INITIAL_FLUSH_DELAY_SECONDS, FLUSH_DELAY_INTERVAL_SECONDS, TimeUnit.SECONDS);
-
     }
 
     /**
      * Set periodic flush interval and initial delay in seconds.
      *
      * @param delay Initial delay in seconds
-     * @param seconds Interval in seconds
+     * @param seconds Interval in seconds, passing <code>seconds <= 0</code> value will cancel periodic flush
      */
-    public void setFlushInterval(long delay, long seconds) {
+    public synchronized void setFlushInterval(long delay, long seconds) {
         if (m_flush != null) {
             m_flush.cancel(false);
+            m_flush = null;
         }
         if (seconds > 0) {
             m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
@@ -444,8 +435,8 @@ public class VoltBulkLoader {
     /**
      *  <p>Add new row to VoltBulkLoader table.</p>
      *
-     * @param rowHandle supplied object used to distinguish failed insert attempts
-     * @param fieldList of fields associated with a single row
+     * @param rowHandle User supplied object used to distinguish failed insert attempts
+     * @param fieldList List of fields associated with a single row insertion
      * @throws java.lang.InterruptedException
      */
     public void insertRow(Object rowHandle, Object... fieldList)  throws InterruptedException {

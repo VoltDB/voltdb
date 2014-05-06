@@ -36,8 +36,6 @@ public class CSVBulkDataLoader implements CSVDataLoader {
                              CSVLoaderErrorHandler errHandler) throws Exception
     {
         m_loader = client.getNewBulkLoader(tableName, batchSize, new CsvFailureCallback());
-        //Cancel periodic flush for csvloader
-        m_loader.setFlushInterval(0, 0);
         m_errHandler = errHandler;
     }
 

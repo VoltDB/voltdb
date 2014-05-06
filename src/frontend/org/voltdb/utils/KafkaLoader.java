@@ -67,7 +67,7 @@ public class KafkaLoader {
         Client client = getClient(c_config, serverlist);
 
         m_loader = client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
-
+        m_loader.setFlushInterval(m_config.flush, m_config.flush);
         final KafkaConsumerConnector consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.table);
         try {
             ExecutorService es = getConsumerExecutor(consumer, m_loader);
@@ -116,6 +116,9 @@ public class KafkaLoader {
         @Option(shortOpt = "z", desc = "kafka zookeeper to connect to.")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
+        @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
+        int flush = 10;
+
         /**
          * Batch size for processing batched operations.
          */
@@ -135,6 +138,9 @@ public class KafkaLoader {
         public void validate() {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
+            }
+            if (flush <= 0) {
+                exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
             }
             if (table.length() <= 0) {
                 exitWithMessageAndUsage("Table must be specified.");
