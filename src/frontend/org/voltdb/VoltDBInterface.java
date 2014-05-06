@@ -103,11 +103,11 @@ public interface VoltDBInterface
      * @param diffCommands The commands to update the current catalog to the new one.
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
      * @param currentTxnId  The transaction ID at which this method is called
-     * @param deploymentCRC The CRC of the deployment file
+     * @param deploymentHash The SHA-1 hash of the deployment file
      */
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
+            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

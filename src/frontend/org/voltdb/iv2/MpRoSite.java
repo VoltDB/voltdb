@@ -147,6 +147,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
+        @Override
+        public byte[] getCatalogHash() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public byte[] getDeploymentHash() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
         // Needed for Adhoc queries
         @Override
         public int getCatalogVersion() {
