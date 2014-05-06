@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -96,7 +97,8 @@ public abstract class CatalogSchemaTools {
 
             ret += add + spacer + catalog_col.getTypeName() + " " + col_type.toSQLString() +
                     ((col_type == VoltType.STRING || col_type == VoltType.VARBINARY) &&
-                    catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() + ")" : "");
+                    catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() +
+                    (catalog_col.getInbytes() ? " BYTES" : "") + ")" : "");
 
             // Default value
             String defaultvalue = catalog_col.getDefaultvalue();
@@ -118,7 +120,7 @@ public abstract class CatalogSchemaTools {
                         long epoch = Long.parseLong(defaultvalue);
                         Date d = new Date(epoch / 1000);
                         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                        defaultvalue = "\'" + sdf.format(d) + "." + String.valueOf(epoch % 1000000) + "\'";
+                        defaultvalue = "\'" + sdf.format(d) + "." + StringUtils.leftPad(String.valueOf(epoch % 1000000), 6, "0") + "\'";
                     }
                 }
                 else {

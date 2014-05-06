@@ -71,6 +71,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
@@ -517,13 +518,10 @@ public class VoltCompiler {
             autoGenCompiler.m_currentFilename = "autogen-ddl.sql";
             Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase,
                     autogenReaderList, autoGenJarOutput);
-            CatalogDiffEngine diffEng = new CatalogDiffEngine(catalog, autoGenCatalog);
+            CatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(catalog, autoGenCatalog);
             String diffCmds = diffEng.commands();
-            if (diffCmds != null) {
-                if (diffCmds.startsWith("set /clusters[cluster]/databases[database] schema \"")) {
-                    int inx = diffCmds.indexOf('"', "set /clusters[cluster]/databases[database] schema \"".length());
-                    assert(diffCmds.length() == inx+2);
-                }
+            if (diffCmds != null && !diffCmds.equals("")) {
+                assert(false);
             }
         }
 

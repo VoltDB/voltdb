@@ -35,6 +35,7 @@ import junit.framework.Test;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
+import org.hsqldb_voltpatches.index.IndexAVL;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
@@ -364,17 +365,17 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         boolean success = false;
         long start = System.currentTimeMillis();
         while (!success) {
-            if (System.currentTimeMillis() - start > 120000) fail("Took too long");
+            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
             success = true;
             results = client.callProcedure("@Statistics", "index", 0).getResults();
             System.out.println("Index results: " + results[0].toString());
             assertEquals(1, results.length);
             validateSchema(results[0], expectedTable);
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "W_PK_TREE", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "W_PK_TREE", true);
             }
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "I_PK_TREE", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "I_PK_TREE", true);
             }
             if (success) break;
         }
