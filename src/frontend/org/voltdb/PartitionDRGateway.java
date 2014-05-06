@@ -65,7 +65,12 @@ public class PartitionDRGateway {
     private static PartitionDRGateway tryToLoadProVersion()
     {
         try {
-            Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
+            Class<?> pdrgiClass = null;
+            if (Boolean.getBoolean("USE_DR_V2")) {
+                pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
+            } else {
+                pdrgiClass = Class.forName("org.voltdb.dr2.PartitionDRGatewayImpl");
+            }
             Constructor<?> constructor = pdrgiClass.getConstructor();
             Object obj = constructor.newInstance();
             return (PartitionDRGateway) obj;
