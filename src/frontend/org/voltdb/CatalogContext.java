@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -33,6 +32,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -60,7 +60,7 @@ public class CatalogContext {
     public final AuthSystem authSystem;
     public final int catalogVersion;
     private final long catalogCRC;
-    public final long deploymentCRC;
+    public final byte[] deploymentHash;
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
@@ -80,7 +80,7 @@ public class CatalogContext {
             long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
-            long deploymentCRC,
+            byte[] deploymentHash,
             int version,
             long prevCRC) {
         m_transactionId = transactionId;
@@ -113,7 +113,7 @@ public class CatalogContext {
         procedures = database.getProcedures();
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
-        this.deploymentCRC = deploymentCRC;
+        this.deploymentHash = deploymentHash;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
@@ -134,11 +134,12 @@ public class CatalogContext {
             byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
-            long deploymentCRC) {
+            byte[] deploymentHash)
+    {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
-        long realDepCRC = deploymentCRC > 0 ? deploymentCRC : this.deploymentCRC;
+        byte[] realDepCRC = deploymentHash != null ? deploymentHash : this.deploymentHash;
         // If there's no new catalog bytes, preserve the old one rather than
         // bashing it
         byte[] bytes = catalogBytes;
@@ -293,5 +294,17 @@ public class CatalogContext {
 
     public long getCatalogCRC() {
         return catalogCRC;
+    }
+
+    public byte[] getCatalogHash()
+    {
+        byte[] catalogHash = null;
+        try {
+            // IZZY: memoize the catalog hash in the catalog context sometime, maybe
+            catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(getCatalogJarBytes());
+        } catch (IOException ioe) {
+            // Should never happen
+        }
+        return catalogHash;
     }
 }

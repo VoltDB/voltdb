@@ -50,6 +50,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import jsr166y.LinkedTransferQueue;
 
@@ -629,5 +630,50 @@ public class CoreUtils {
             }
 
         }, interval, TimeUnit.MILLISECONDS);
+    }
+
+    public static final long LOCK_SPIN_MICROSECONDS = TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("LOCK_SPIN_MICROS", 0));
+
+    /*
+     * Spin on a ReentrantLock before blocking. Default behavior is not to spin.
+     */
+    public static void spinLock(ReentrantLock lock) {
+        if (LOCK_SPIN_MICROSECONDS > 0) {
+            long nanos = -1;
+            for (;;) {
+                if (lock.tryLock()) return;
+                if (nanos == -1) {
+                    nanos = System.nanoTime();
+                } else if (System.nanoTime() - nanos > LOCK_SPIN_MICROSECONDS) {
+                    lock.lock();
+                    return;
+                }
+            }
+        } else {
+            lock.lock();
+        }
+    }
+
+    public static final long QUEUE_SPIN_MICROSECONDS =
+            TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("QUEUE_SPIN_MICROS", 0));
+
+    /*
+     * Spin polling a blocking queue before blocking. Default behavior is not to spin.
+     */
+    public static <T> T queueSpinTake(BlockingQueue<T> queue) throws InterruptedException {
+        if (QUEUE_SPIN_MICROSECONDS > 0) {
+            T retval = null;
+            long nanos = -1;
+            for (;;) {
+                if ((retval = queue.poll()) != null) return retval;
+                if (nanos == -1) {
+                    nanos = System.nanoTime();
+                } else if (System.nanoTime() - nanos > QUEUE_SPIN_MICROSECONDS) {
+                    return queue.take();
+                }
+            }
+        } else {
+            return queue.take();
+        }
     }
 }

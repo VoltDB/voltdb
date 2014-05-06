@@ -655,7 +655,6 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
     tupleIn.readInt();
     for (int j = 0; j < m_schema->columnCount(); ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
-        const voltdb::ValueType type = columnInfo->getVoltType();
 
         /**
          * Hack hack. deserializeFrom is only called when we serialize
@@ -670,7 +669,8 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
          * serializing to tuple storage.
          */
         char *dataPtr = getWritableDataPtr(columnInfo);
-        NValue::deserializeFrom(tupleIn, type, dataPtr, columnInfo->inlined, columnInfo->length, dataPool);
+        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+                columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 }
 

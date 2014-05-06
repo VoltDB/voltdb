@@ -25,10 +25,6 @@
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
 
-
-    ALSO, if you change this, consider updating:
-        CatalogUtil.getDeploymentCRC()
-
   -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
