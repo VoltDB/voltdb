@@ -605,7 +605,7 @@ public class PlanAssembler {
         // for the whole plan
         compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
 
-        subqueryScan.setPartitioning(currentPartitioning);
+        m_partitioning.addPartitioningFromSubquery(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
                 compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
@@ -659,10 +659,12 @@ public class PlanAssembler {
          * the one required send/receive pair is already in the plan below the
          * inner side of a NestLoop join.
          */
-        if (m_partitioning.requiresTwoFragments()) {
 
-            if (m_parsedSelect.m_joinTree.containsPartitionedTablesFromSubSelects()) {
-                throw new PlanningErrorException("Subqueries on partitioned data are only supported in single partition stored procedures.");
+        JoinNode jroot = m_parsedSelect.m_joinTree;
+
+        if (m_partitioning.requiresTwoFragments()) {
+            if (!jroot.isReplicatedInSubselects() && !jroot.isReplicatedOutsideSubselects()) {
+                throw new PlanningErrorException("Subqueries from multiple partitioned table or join with partitioned table are not supported.");
             }
 
             boolean mvFixInfoCoordinatorNeeded = true;
