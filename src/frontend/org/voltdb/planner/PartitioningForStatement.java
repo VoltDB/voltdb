@@ -387,14 +387,41 @@ public class PartitioningForStatement implements Cloneable{
                     break;
                 }
             }
-        } else if (m_subqueriesPartitionings.size() == 1) {
-            PartitioningForStatement pStmt = m_subqueriesPartitionings.get(0);
-            if (!pStmt.requiresTwoFragments() && pStmt.getCountOfIndependentlyPartitionedTables() == 1) {
-                clonePartitionExpression(m_subqueriesPartitionings.get(0));
-            }
+        } else if (isValidSinglePartitionWithSubselects()) {
+            // Do Nothing
         }
 
         return m_countOfIndependentlyPartitionedTables;
+    }
+
+
+    private boolean isValidSinglePartitionWithSubselects() {
+        if (m_subqueriesPartitionings.size() == 0) {
+            return false;
+        }
+
+        PartitioningForStatement singlePartitionStmt = null;
+        int ct = 0;
+        for (PartitioningForStatement pStmt: m_subqueriesPartitionings) {
+            if (pStmt.requiresTwoFragments()) {
+                return false;
+            }
+            assert(pStmt.getCountOfIndependentlyPartitionedTables() <= 1);
+            // count sub-selects with partitioned tables
+            if (pStmt.getCountOfIndependentlyPartitionedTables() == 1) {
+                if (++ct > 1) {
+                    return false;
+                }
+                singlePartitionStmt = pStmt;
+            }
+        }
+
+        if (ct != 1) {
+            return false;
+        }
+
+        clonePartitionExpression(singlePartitionStmt);
+        return true;
     }
 
     /**
