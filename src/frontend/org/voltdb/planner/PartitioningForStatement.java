@@ -142,8 +142,8 @@ public class PartitioningForStatement implements Cloneable{
 
     private List<PartitioningForStatement> m_subqueriesPartitionings = new ArrayList<>();
 
-    public void addToSubqueriesPartitionsStatement(PartitioningForStatement pStmt) {
-        m_subqueriesPartitionings.add(pStmt);
+    public void addPartitioningFromSubquery(PartitioningForStatement partitioning) {
+        m_subqueriesPartitionings.add(partitioning);
     }
 
     /**
@@ -203,10 +203,6 @@ public class PartitioningForStatement implements Cloneable{
         } else {
             m_inferredValue = ConstantValueExpression.extractPartitioningValue(valueType, constExpr);
         }
-    }
-
-    public void clonePartitionExpression(PartitioningForStatement pStmt) {
-        m_inferredExpression.add(pStmt.singlePartitioningExpression());
     }
 
     public Object getInferredPartitioningValue() {
@@ -387,7 +383,7 @@ public class PartitioningForStatement implements Cloneable{
                     break;
                 }
             }
-        } else if (isValidSinglePartitionWithSubselects()) {
+        } else if (cloneSubqueryPartitionExpressionIfOnlyOne()) {
             // Do Nothing
         }
 
@@ -395,7 +391,7 @@ public class PartitioningForStatement implements Cloneable{
     }
 
 
-    private boolean isValidSinglePartitionWithSubselects() {
+    private boolean cloneSubqueryPartitionExpressionIfOnlyOne() {
         if (m_subqueriesPartitionings.size() == 0) {
             return false;
         }
@@ -420,7 +416,7 @@ public class PartitioningForStatement implements Cloneable{
             return false;
         }
 
-        clonePartitionExpression(singlePartitionStmt);
+        m_inferredExpression.add(singlePartitionStmt.singlePartitioningExpression());
         return true;
     }
 

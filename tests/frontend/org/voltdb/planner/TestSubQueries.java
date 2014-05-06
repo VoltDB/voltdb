@@ -519,19 +519,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(planNodes.size() == 1);
     }
 
-    public void testTry() {
-        List<AbstractPlanNode> planNodes;
-//        AbstractPlanNode pn;
-//        planNodes = compileToFragments("select * from p2 inner join R1 on R1.A = P2.C order by P2.D");
-//        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
-
-        planNodes = compileToFragments("select C, SD FROM " +
-                "(SELECT A, C, SUM(D) as SD FROM P1 GROUP BY A, C) T1 ");
-        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
-
-        assertTrue(planNodes.size() == 2);
-    }
-
     public void testSubSelects_Unsupported_Cases() {
         String errorMessage = "Every derived table must have its own alias.";
         failToCompile("select C FROM (SELECT C FROM R1)  ", errorMessage);

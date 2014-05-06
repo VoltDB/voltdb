@@ -102,7 +102,7 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public boolean isValidSubselectReplicated() {
+    public boolean isReplicatedInSubselects() {
         if (m_subqueryScan.getIsReplicated()) {
             return true;
         }
@@ -110,7 +110,7 @@ public class SubqueryLeafNode extends JoinNode{
     }
 
     @Override
-    public boolean isValidSubselectPartitioned() {
+    public boolean isReplicatedOutsideSubselects() {
         return true;
     }
 

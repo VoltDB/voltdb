@@ -605,7 +605,7 @@ public class PlanAssembler {
         // for the whole plan
         compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
 
-        m_partitioning.addToSubqueriesPartitionsStatement(currentPartitioning);
+        m_partitioning.addPartitioningFromSubquery(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
                 compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
@@ -663,7 +663,7 @@ public class PlanAssembler {
         JoinNode jroot = m_parsedSelect.m_joinTree;
 
         if (m_partitioning.requiresTwoFragments()) {
-            if (!jroot.isValidSubselectReplicated() && !jroot.isValidSubselectPartitioned()) {
+            if (!jroot.isReplicatedInSubselects() && !jroot.isReplicatedOutsideSubselects()) {
                 throw new PlanningErrorException("Subqueries from multiple partitioned table or join with partitioned table are not supported.");
             }
 

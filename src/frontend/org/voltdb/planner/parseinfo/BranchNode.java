@@ -405,31 +405,25 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public boolean isValidSubselectReplicated() {
-        boolean isValid = true;
-        if (m_leftNode != null) {
-            isValid = isValid && m_leftNode.isValidSubselectReplicated();
+    public boolean isReplicatedInSubselects() {
+        if (m_leftNode != null && ! m_leftNode.isReplicatedInSubselects()) {
+            return false;
         }
-        if (!isValid) return isValid;
-        if (m_rightNode != null) {
-            isValid = isValid && m_rightNode.isValidSubselectReplicated();
+        if (m_rightNode != null && ! m_rightNode.isReplicatedInSubselects()) {
+            return false;
         }
-
-        return isValid;
+        return true;
     }
 
     @Override
-    public boolean isValidSubselectPartitioned() {
-        boolean isValid = true;
-        if (m_leftNode != null) {
-            isValid = isValid && m_leftNode.isValidSubselectPartitioned();
+    public boolean isReplicatedOutsideSubselects() {
+        if (m_leftNode != null && ! m_leftNode.isReplicatedOutsideSubselects()) {
+            return false;
         }
-        if (!isValid) return isValid;
-        if (m_rightNode != null) {
-            isValid = isValid && m_rightNode.isValidSubselectPartitioned();
+        if (m_rightNode != null && ! m_rightNode.isReplicatedOutsideSubselects()) {
+            return false;
         }
-
-        return isValid;
+        return true;
     }
 
 }
