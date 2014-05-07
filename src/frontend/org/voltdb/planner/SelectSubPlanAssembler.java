@@ -65,7 +65,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param m_partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
+     * @param partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
     SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)

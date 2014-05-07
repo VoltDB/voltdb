@@ -1050,8 +1050,8 @@ class NValue {
             retval *= NValue::kMaxScaleFactor;
 
             double value = getDouble();
-            value -= (double)intValue; // isolate decimal part
-            value *= NValue::kMaxScaleFactor; // scale up to integer.
+            value -= static_cast<double>(intValue); // isolate decimal part
+            value *= static_cast<double>(NValue::kMaxScaleFactor); // scale up to integer.
             TTInt fracval((int64_t)value);
             retval += fracval;
             return retval;

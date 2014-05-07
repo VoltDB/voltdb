@@ -159,7 +159,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
             JarEntry entry = new JarEntry(e.getKey());
             entry.setSize(e.getValue().length);
-            entry.setTime(System.currentTimeMillis());
+            // Make the entry time the epoch so that the SHA-1 hash
+            // built by feeding all of the bytes to it returns the same
+            // hash for the same catalog.
+            // Maybe we ought to have a getSHA1() method that does the same
+            // thing as the getCRC() method below?
+            //
+            //entry.setTime(System.currentTimeMillis());
+            entry.setTime(0);
             jarOut.putNextEntry(entry);
             jarOut.write(e.getValue());
             jarOut.flush();

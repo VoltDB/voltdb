@@ -297,6 +297,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public byte[] getCatalogHash() {
+            return m_context.getCatalogHash();
+        }
+
+        @Override
+        public byte[] getDeploymentHash() {
+            return m_context.deploymentHash;
+        }
+
+        @Override
         public SiteTracker getSiteTrackerForSnapshot() {
             return VoltDB.instance().getSiteTrackerForSnapshot();
         }
