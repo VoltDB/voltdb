@@ -47,7 +47,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);

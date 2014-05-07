@@ -81,7 +81,7 @@ public class TestCatalogDiffs extends TestCase {
 
     protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
