@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-/*
- * This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
- */
-
-=======
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2014 VoltDB Inc.
  *
@@ -26,7 +19,6 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
->>>>>>> master
 package org.voltdb.catalog;
 
 import java.util.ArrayList;

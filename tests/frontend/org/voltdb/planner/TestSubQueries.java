@@ -467,15 +467,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "T1",  "A", "C");
         pn = pn.getChild(0);
-<<<<<<< HEAD
         checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "A", "C");
-*/
-    }
-=======
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
->>>>>>> master
 
         // Group by
         planNodes = compileToFragments("select C, SD FROM " +
@@ -504,11 +498,6 @@ public class TestSubQueries extends PlannerTestCase {
         planNodes = compileToFragments("select C FROM (SELECT C FROM P1 WHERE A > 3 ORDER BY C LIMIT 5) T1 ");
         assertTrue(planNodes.size() == 2);
 
-<<<<<<< HEAD
-        assertEquals(nlpn.getInlinePlanNodes().size(), 1);
-        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkIndexedSubSelects(pn, "P2", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "P2_PK_TREE", "A");
-=======
         planNodes = compileToFragments("select T1.C FROM (SELECT C FROM P1 WHERE A > 3 ORDER BY C LIMIT 5) T1, " +
                 "R1 WHERE T1.C > R1.C ");
         assertTrue(planNodes.size() == 2);
@@ -529,7 +518,6 @@ public class TestSubQueries extends PlannerTestCase {
         planNodes = compileToFragments("select C, SD FROM " +
                 "(SELECT C, SUM(D) as SD FROM P1 WHERE A = 3 GROUP BY C ORDER BY C LIMIT 5) T1 ");
         assertTrue(planNodes.size() == 1);
->>>>>>> master
     }
 
     public void testSubSelects_Unsupported_Cases() {
@@ -755,14 +743,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
-<<<<<<< HEAD
         checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
-*/
-=======
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
->>>>>>> master
 
 
         // More single partition detection
@@ -770,50 +753,14 @@ public class TestSubQueries extends PlannerTestCase {
                 "WHERE P1.A = P2.A AND P1.A = 3) T1 ");
         assertTrue(planNodes.size() == 1);
 
-<<<<<<< HEAD
-        pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 " +
-                "WHERE T1.A = T2.C ");
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
-        assertTrue(nlpn instanceof NestLoopPlanNode);
-        pn = nlpn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1", "A");
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "R1", "A");
-        pn = nlpn.getChild(1);
-        checkSeqScanSubSelects(pn, "T2", "C");
-        pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
-=======
         planNodes = compileToFragments("select T1.C FROM (SELECT P1.C FROM P1, P2 " +
                 "WHERE P1.A = P2.A AND P1.A = 3) T1, R1 where T1.C > R1.C ");
         assertTrue(planNodes.size() == 1);
->>>>>>> master
 
         planNodes = compileToFragments("select T1.C FROM (SELECT P1.C FROM P1, P2 " +
                 "WHERE P1.A = P2.A AND P1.A = 3) T1, (select C FROM R1) T2 where T1.C > T2.C ");
         assertTrue(planNodes.size() == 1);
 
-<<<<<<< HEAD
-        pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1 where A=3) T2 " +
-                "WHERE T1.A = T2.C ");
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
-        assertTrue(nlpn instanceof NestLoopPlanNode);
-        pn = nlpn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1", "A");
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "R1", "A");
-        pn = nlpn.getChild(1);
-        checkSeqScanSubSelects(pn, "T2", "C");
-        pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "C");
-=======
->>>>>>> master
     }
 
     public void testSubSelects_FromAllReplicated() {

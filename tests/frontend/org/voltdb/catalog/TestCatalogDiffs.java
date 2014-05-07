@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-/*
- * This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
-=======
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2014 VoltDB Inc.
  *
@@ -24,7 +19,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
->>>>>>> master
  */
 
 package org.voltdb.catalog;
@@ -60,12 +54,6 @@ public class TestCatalogDiffs extends TestCase {
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     protected String compile(String name, Class<?>... procList) {
-<<<<<<< HEAD
-        return  compileWithGroups(false, null, null, name, procList);
-    }
-
-    protected String compileWithGroups(boolean securityEnabled, GroupInfo[] gi, UserInfo[] ui, String name, Class<?>... procList) {
-=======
         return  compileWithGroups(false, null, null, null, name, procList);
     }
 
@@ -73,16 +61,11 @@ public class TestCatalogDiffs extends TestCase {
             boolean securityEnabled, String securityProvider,
             GroupInfo[] gi, UserInfo[] ui,
             String name, Class<?>... procList) {
->>>>>>> master
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
         builder.setSecurityEnabled(securityEnabled);
-<<<<<<< HEAD
-=======
-        builder.setSecurityProvider(securityProvider);
->>>>>>> master
 
         if (gi != null && gi.length > 0)
             builder.addGroups(gi);
@@ -97,11 +80,7 @@ public class TestCatalogDiffs extends TestCase {
 
     protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-<<<<<<< HEAD
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
-=======
         String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
->>>>>>> master
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -199,11 +178,7 @@ public class TestCatalogDiffs extends TestCase {
 
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true, true);
-<<<<<<< HEAD
-        String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
-=======
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -219,11 +194,7 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-<<<<<<< HEAD
-        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-=======
         String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -236,20 +207,12 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-<<<<<<< HEAD
-        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-=======
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catOriginal = catalogForJar(original);
 
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group1"});
-<<<<<<< HEAD
-        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-=======
         String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -262,19 +225,11 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-<<<<<<< HEAD
-        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-
-        // no users this time
-        String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
-=======
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no users this time
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -287,19 +242,11 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
-<<<<<<< HEAD
-        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-
-        // no groups or users this time
-        String updated = compileWithGroups(false, null, null, "base", BASEPROCS);
-=======
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no groups or users this time
         String updated = compileWithGroups(false, null, null, null, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -314,21 +261,13 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
-<<<<<<< HEAD
-        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-=======
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catOriginal = catalogForJar(original);
 
         // swap the user's group assignments
         ui[0] = new UserInfo("user1", "password", new String[] {"group2"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group1"});
-<<<<<<< HEAD
-        String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-=======
         String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -343,13 +282,6 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
-<<<<<<< HEAD
-        String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-
-        // just turn on security
-        String updated = compileWithGroups(true, gi, ui, "base", BASEPROCS);
-=======
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
@@ -374,7 +306,6 @@ public class TestCatalogDiffs extends TestCase {
 
         // just turn on security
         String updated = compileWithGroups(true, "kerberos", gi, ui, "base", BASEPROCS);
->>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff (catOriginal, catUpdated);
@@ -618,8 +549,6 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-<<<<<<< HEAD
-=======
     public void testModifyVarcharColumns() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         Catalog catOriginal, catUpdated;
@@ -690,7 +619,6 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
->>>>>>> master
     public void testAddNonNullityRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -734,10 +662,7 @@ public class TestCatalogDiffs extends TestCase {
 
         String report = verifyDiff(catOriginal, catUpdated);
         assert(report.contains("Table A has been modified."));
-<<<<<<< HEAD
-=======
         assert(report.contains("Procedure ProcedureA has been modified."));
->>>>>>> master
     }
 
     public void testAddUniqueCoveringTableIndex() throws IOException {

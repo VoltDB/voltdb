@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-/*
- * This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
- */
-
-=======
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2014 VoltDB Inc.
  *
@@ -26,7 +19,6 @@
             DO NOT MODIFY THIS SOURCE
             ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
 
->>>>>>> master
 package org.voltdb.catalog;
 
 import java.util.HashMap;
@@ -39,10 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.expressions.AbstractExpression;
-<<<<<<< HEAD
-=======
 import org.voltdb.utils.CatalogSizing;
->>>>>>> master
 
 public class CatalogDiffEngine {
 
@@ -236,12 +225,6 @@ public class CatalogDiffEngine {
      * to do live without failing or truncating any data.
      */
     private boolean checkIfColumnTypeChangeIsSupported(VoltType oldType, int oldSize,
-<<<<<<< HEAD
-                                                       VoltType newType, int newSize)
-    {
-        // increases in size are cool; shrinks not so much
-        if (oldType == newType) {
-=======
                                                        VoltType newType, int newSize,
                                                        boolean oldInBytes, boolean newInBytes)
     {
@@ -251,7 +234,6 @@ public class CatalogDiffEngine {
                 // varchar CHARACTER to varchar BYTES
                 return oldSize * 4 <= newSize;
             }
->>>>>>> master
             return oldSize <= newSize;
         }
 
@@ -497,11 +479,8 @@ public class CatalogDiffEngine {
         // Support modification of these specific fields
         if (suspect instanceof Database && field.equals("schema"))
             return true;
-<<<<<<< HEAD
-=======
         if (suspect instanceof Database && "securityprovider".equals(field))
             return true;
->>>>>>> master
         if (suspect instanceof Cluster && field.equals("securityEnabled"))
             return true;
         if (suspect instanceof Cluster && field.equals("adminstartup"))
@@ -553,11 +532,7 @@ public class CatalogDiffEngine {
                 if (nullable) return true;
                 restrictionQualifier = " from nullable to non-nullable";
             }
-<<<<<<< HEAD
-            else if (field.equals("type") || field.equals("size")) {
-=======
             else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
->>>>>>> master
                 int oldTypeInt = (Integer) prevType.getField("type");
                 int newTypeInt = (Integer) suspect.getField("type");
                 int oldSize = (Integer) prevType.getField("size");
@@ -566,13 +541,6 @@ public class CatalogDiffEngine {
                 VoltType oldType = VoltType.get((byte) oldTypeInt);
                 VoltType newType = VoltType.get((byte) newTypeInt);
 
-<<<<<<< HEAD
-                if (checkIfColumnTypeChangeIsSupported(oldType, oldSize, newType, newSize)) {
-                    return true;
-                }
-                if (oldTypeInt == newTypeInt) {
-                    restrictionQualifier = "narrowing from " + oldSize + " to " + newSize;
-=======
                 boolean oldInBytes = false, newInBytes = false;
                 if (oldType == VoltType.STRING) {
                     oldInBytes = (Boolean) prevType.getField("inbytes");
@@ -592,7 +560,6 @@ public class CatalogDiffEngine {
                     } else {
                         restrictionQualifier = "narrowing from " + oldSize + " to " + newSize;
                     }
->>>>>>> master
                 }
                 else {
                     restrictionQualifier = "from " + oldType.toSQLString() +
