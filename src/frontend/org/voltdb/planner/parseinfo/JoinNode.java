@@ -73,7 +73,9 @@ public abstract class JoinNode implements Cloneable {
     @Override
     abstract public Object clone();
 
-    abstract public boolean containsPartitionedTablesFromSubSelects();
+    abstract public boolean isReplicatedInSubselects();
+
+    abstract public boolean isReplicatedOutsideSubselects();
 
     public int getId() {
         return m_id;

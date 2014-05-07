@@ -190,7 +190,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
-    long m_depCRC = -1;
     String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
@@ -1208,6 +1207,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 if (deploymentBytesTemp != null) {
                     //Check crc if its a supplied deployment on command line.
                     //We will ignore the supplied or default deployment anyways.
+                    // TODO: Someday change this to use the SHA-1 hash
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         PureJavaCrc32 crc = new PureJavaCrc32();
                         crc.update(deploymentBytes);
@@ -1340,13 +1340,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true, true);
-            assert(depCRC != -1);
+            long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, true);
+            if (result < 0) {
+                hostLog.fatal("Error validating deployment file");
+                VoltDB.crashLocalVoltDB("Error validating deployment file");
+            }
+            byte[] deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
 
             m_catalogContext = new CatalogContext(
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
-                            catalog, null, depCRC, 0, -1);
+                            catalog, null, deploymentHash, 0, -1);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
             if (numberOfNodes <= 0) {
@@ -1911,7 +1915,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             int expectedCatalogVersion,
             long currentTxnId,
             long currentTxnUniqueId,
-            long deploymentCRC)
+            byte[] deploymentHash)
     {
         synchronized(m_catalogUpdateLock) {
             // A site is catching up with catalog updates
@@ -1953,7 +1957,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         newCatalogBytes,
                         diffCommands,
                         true,
-                        deploymentCRC);
+                        deploymentHash);
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
             m_txnIdToContextTracker.put(currentTxnId,
                     new ContextTracker(

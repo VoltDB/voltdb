@@ -1508,20 +1508,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn)
     {
         ParameterSet params = task.getParams();
+        // default catalogBytes to null, when passed along, will tell the
+        // catalog change planner that we want to use the current catalog.
         byte[] catalogBytes = null;
-        if (params.toArray()[0] instanceof String) {
-            catalogBytes = Encoder.hexDecode((String) params.toArray()[0]);
-        } else if (params.toArray()[0] instanceof byte[]) {
-            catalogBytes = (byte[]) params.toArray()[0];
-        } else {
-            // findbugs triggers a NPE alert here... and the
-            // policy check is pretty far away from here.
-            // assert and satisfy findbugs, and the casual reader.
-            assert false : "Expected to catch invalid parameters in UpdateCatalogAcceptancePolicy.";
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                    " Catalog content must be passed as string or byte[].",
-                    task.clientHandle);
+        Object catalogObj = params.toArray()[0];
+        if (catalogObj != null) {
+            if (catalogObj instanceof String) {
+                // treat an empty string as no catalog provided
+                String catalogString = (String) catalogObj;
+                if (!catalogString.isEmpty()) {
+                    catalogBytes = Encoder.hexDecode(catalogString);
+                }
+            } else if (catalogObj instanceof byte[]) {
+                // treat an empty array as no catalog provided
+                byte[] catalogArr = (byte[]) catalogObj;
+                if (catalogArr.length != 0) {
+                    catalogBytes = catalogArr;
+                }
+            }
         }
         String deploymentString = (String) params.toArray()[1];
         LocalObjectMessage work = new LocalObjectMessage(
@@ -2239,8 +2243,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.procName = "@UpdateApplicationCatalog";
                             task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0,
-                                           changeResult.worksWithElastic ? 1 : 0);
+                                           changeResult.requiresSnapshotIsolation ? 1 : 0,
+                                           changeResult.worksWithElastic ? 1 : 0,
+                                           changeResult.deploymentHash);
                             task.clientHandle = changeResult.clientHandle;
                             // DR stuff
                             task.type = changeResult.invocationType;

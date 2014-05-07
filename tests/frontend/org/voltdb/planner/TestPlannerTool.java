@@ -60,7 +60,7 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 
@@ -153,7 +153,7 @@ public class TestPlannerTool extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, c, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, null, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 
