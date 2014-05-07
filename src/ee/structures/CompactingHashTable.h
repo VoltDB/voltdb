@@ -18,6 +18,8 @@
 #ifndef COMPACTINGHASHTABLE_H_
 #define COMPACTINGHASHTABLE_H_
 
+#include "ContiguousAllocator.h"
+
 #include <cstdlib>
 #include <utility>
 #include <cassert>
@@ -26,7 +28,7 @@
 #include <cstring>
 #include <sys/mman.h>
 #include <boost/functional/hash.hpp>
-#include "ContiguousAllocator.h"
+#include <stdint.h>
 
 namespace voltdb {
 

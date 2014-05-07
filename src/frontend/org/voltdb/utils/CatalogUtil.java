@@ -127,51 +127,6 @@ public abstract class CatalogUtil {
      *
      * @param catalogBytes
      * @param log
-     * @return The serialized string of the catalog content.
-     * @throws Exception
-     *             If the catalog cannot be loaded because it's incompatible, or
-     *             if there is no version information in the catalog.
-     */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
-        assert(catalogBytes != null);
-
-        String serializedCatalog = null;
-        String voltVersionString = null;
-        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-
-        if (null == serializedCatalogBytes) {
-            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
-        }
-
-        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
-
-        // Get Volt version string
-        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
-        if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
-        }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
-        String[] buildInfoLines = buildInfo.split("\n");
-        if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
-        }
-        voltVersionString = buildInfoLines[0].trim();
-
-        // Check if it's compatible
-        if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
-                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
-        }
-
-        return serializedCatalog;
-    }
-
-    /**
-     * Load a catalog from the jar bytes.
-     *
-     * @param catalogBytes
-     * @param log
      * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or

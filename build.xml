@@ -735,9 +735,6 @@ CLEANING
     <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/DBBPool.java'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/.flagfile'"/>
-  </exec>
-  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf *.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
@@ -2215,8 +2212,8 @@ DBBPool.java preprocessing
 ***************************************
 -->
 
-<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate">
-    <delete file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate"
+        description="Use the gcc preprocessor to generate DBBPool.java with features enabled/disabled.">
     <exec dir='${src.gpl.dir}/org/voltcore/utils'
           executable='gcc'
           failonerror='true'>
@@ -2224,18 +2221,18 @@ DBBPool.java preprocessing
           <arg value='-CC'/>
           <arg value='-xc' />
           <arg value='-Wp,-P' />
-          <arg value='-traditional-cpp' />
+          <!-- -ffreestanding prevents gcc 4.8 generating comments to violate our license standards. -->
+          <arg value='-ffreestanding' />
           <arg value='-D${jmemcheck}' />
           <arg value='-o' />
           <arg value='DBBPool.java' />
           <arg value='DBBPool.java.template' />
     </exec>
-    <touch file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
 </target>
 
 <target name="dbbpool_gen_check" depends="">
     <uptodate property="dbbpool_gen_uptodate"
-              targetfile="${src.gpl.dir}/org/voltcore/utils/.flagfile">
+              targetfile="${src.gpl.dir}/org/voltcore/utils/DBBPool.java">
         <srcfiles file="${src.gpl.dir}/org/voltcore/utils/DBBPool.java.template" />
     </uptodate>
 </target>
