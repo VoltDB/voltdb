@@ -71,3 +71,11 @@ CREATE TABLE JUMBO_ROW (
  STRING2       VARCHAR(1048564),
  PRIMARY KEY (PKEY)
 );
+
+-- Table for super big rows that test max supported storage reached via multi-byte characters.
+CREATE TABLE JUMBO_ROW_UTF8 (
+ PKEY          INTEGER      NOT NULL,
+ STRING1       VARCHAR(262144),
+ STRING2       VARCHAR(262141),
+ PRIMARY KEY (PKEY)
+);

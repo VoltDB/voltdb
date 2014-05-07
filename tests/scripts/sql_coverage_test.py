@@ -123,7 +123,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        tables = None
+        table = None
         if client.response == None:
             print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
@@ -134,14 +134,16 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        if client.response.tables != None:
+        if client.response.tables:
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
-            tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-        else:
-            print "DEBUG: returned no table(s) from ?", statement["SQL"] ,"?"
+            table = normalize(client.response.tables[0], statement["SQL"])
+            if len(client.response.tables) > 1:
+                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] ,"?"
+        # else:
+            # print "WARNING: returned no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
-                      "Result": tables,
+                      "Result": table,
                       "Exception": str(client.response.exception)},
                      results_file)
     results_file.close()

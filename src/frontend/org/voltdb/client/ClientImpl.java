@@ -426,7 +426,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(catalogPath);
+        if (catalogPath != null) {
+            params[0] = ClientUtils.fileToBytes(catalogPath);
+        }
+        else {
+            params[0] = null;
+        }
         if (deploymentPath != null) {
             params[1] = new String(ClientUtils.fileToBytes(deploymentPath), Constants.UTF8ENCODING);
         }

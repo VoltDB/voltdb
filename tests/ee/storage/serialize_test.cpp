@@ -65,7 +65,6 @@
 #define TUPLES 20
 
 using namespace std;
-using namespace boost;
 using namespace voltdb;
 
 #define NUM_OF_COLUMNS 6

@@ -14,12 +14,14 @@
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
 
-{_mostmath |= " + "}
-{_mostmath |= " - "}
---{_mostmath |= " * "} --  Trying hard not to overflow or offend HSQL's sense of precision
-{_mostmath |= " / "}
-SELECT _variable[numeric] _mostmath 1.0001 AS BIG_MATH FROM @fromtables
-SELECT _variable[numeric] _mostmath 1 AS BIG_MATH FROM @fromtables
+{_plusorminus |= "+"}
+{_plusorminus |= "-"}
+-- Avoid multiplication-induced overflows and division-induced discrepencies with HSQL
+-- which does floating point math for integer division!
+-- SELECT _variable[numeric] _math        1.0001 AS BIG_MATH FROM @fromtables
+-- SELECT _variable[numeric] _math 1      AS BIG_MATH FROM @fromtables
+   SELECT _variable[numeric] _plusorminus 1.0001 AS BIG_MATH FROM @fromtables
+   SELECT _variable[numeric] _plusorminus 1      AS BIG_MATH FROM @fromtables
 
 
 -- alias fun
@@ -39,8 +41,8 @@ SELECT -1, _numfun(_variable[numeric]       ) + 5.25 NUMSUM FROM @fromtables ORD
 {_somecmps |= " = "}
 {_somecmps |= " > "}
 {_somecmps |= " <= "}
-   SELECT 3, * FROM @fromtables WHERE _numfun(_variable[numeric]) _somecmps (       (_variable[numeric]) _math     _value[int:1,10])
-   SELECT 4, * FROM @fromtables WHERE        (_variable[numeric]) _somecmps (_numfun(_variable[numeric]) _mostmath _value[int:1,10])
+   SELECT 3, * FROM @fromtables WHERE _numfun(_variable[numeric]) _somecmps (       (_variable[numeric]) _math        _value[int:1,10])
+   SELECT 4, * FROM @fromtables WHERE        (_variable[numeric]) _somecmps (_numfun(_variable[numeric]) _plusorminus _value[int:1,10])
 
 -- order by with generic expression
 SELECT _variable[#A numeric], _variable[#B numeric], _numfun(__[#A]) _math _numfun(__[#B]) AS FOO13 FROM @fromtables ORDER BY FOO13
@@ -49,14 +51,11 @@ SELECT _numfun(_variable[numeric] _math _numfun(_variable[numeric])) AS FOO14 FR
 -- ticket 232
 SELECT _variable[#A numeric] as FOO15 FROM @fromtables GROUP BY __[#A] ORDER BY __[#A]
 
-SELECT _numagg(_variable[#VA numeric]) AS Q20, _numagg(_numfun(__[#VA]) _mostmath _numfun(_variable[#VA numeric])) FROM @fromtables
+SELECT _numagg(_variable[#VA numeric]) AS Q20, _numagg(_numfun(__[#VA]) _plusorminus _numfun(_variable[#VA numeric])) FROM @fromtables
+SELECT _numagg(_variable[#VA numeric]) AS Q20, _numagg(_numfun(__[#VA]) _plusorminus _numfun(_variable[#VA numeric])) FROM @fromtables
 -- Avoid multiplication-induced overflows and division-induced discrepencies with HSQL -- which does floating point math for integer division!
---SELECT SUM(DISTINCT _numfun(_variable[numeric] _math        _numfun(_variable[numeric])) AS Q22 FROM @fromtables
-{_plusorminus |= "+"}
-{_plusorminus |= "-"}
-  SELECT SUM(DISTINCT _numfun(_variable[numeric] _plusorminus _numfun(_variable[numeric])) AS Q22 FROM @fromtables
-
-SELECT _numagg(_numfun(_variable[numeric])),   _numagg(_numfun(_variable[numeric])) AS Q23 FROM @fromtables
+-- SELECT SUM(DISTINCT _numfun(_variable[numeric] _math        _numfun(_variable[numeric])) AS Q22 FROM @fromtables
+   SELECT SUM(DISTINCT _numfun(_variable[numeric] _plusorminus _numfun(_variable[numeric])) AS Q22 FROM @fromtables
 
 -- additional select expression math
 SELECT _variable[#A numeric], _numfun(__[#A]) _math _variable[numeric]  AS Q27 FROM @fromtables

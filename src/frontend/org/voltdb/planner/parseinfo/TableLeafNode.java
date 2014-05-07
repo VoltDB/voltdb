@@ -93,7 +93,13 @@ public class TableLeafNode extends JoinNode {
     }
 
     @Override
-    public boolean containsPartitionedTablesFromSubSelects() {
-        return false;
+    public boolean isReplicatedInSubselects() {
+        return true;
     }
+
+    @Override
+    public boolean isReplicatedOutsideSubselects() {
+        return m_tableScan.getIsReplicated();
+    }
+
 }

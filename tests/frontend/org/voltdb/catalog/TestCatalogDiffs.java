@@ -1,6 +1,30 @@
+<<<<<<< HEAD
 /*
  * This file is part of VoltDB.
  * Copyright (C) 2008-2014 VoltDB Inc.
+=======
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2014 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+>>>>>>> master
  */
 
 package org.voltdb.catalog;
@@ -36,15 +60,29 @@ public class TestCatalogDiffs extends TestCase {
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     protected String compile(String name, Class<?>... procList) {
+<<<<<<< HEAD
         return  compileWithGroups(false, null, null, name, procList);
     }
 
     protected String compileWithGroups(boolean securityEnabled, GroupInfo[] gi, UserInfo[] ui, String name, Class<?>... procList) {
+=======
+        return  compileWithGroups(false, null, null, null, name, procList);
+    }
+
+    protected String compileWithGroups(
+            boolean securityEnabled, String securityProvider,
+            GroupInfo[] gi, UserInfo[] ui,
+            String name, Class<?>... procList) {
+>>>>>>> master
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
         builder.setSecurityEnabled(securityEnabled);
+<<<<<<< HEAD
+=======
+        builder.setSecurityProvider(securityProvider);
+>>>>>>> master
 
         if (gi != null && gi.length > 0)
             builder.addGroups(gi);
@@ -59,7 +97,11 @@ public class TestCatalogDiffs extends TestCase {
 
     protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
+<<<<<<< HEAD
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+=======
+        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+>>>>>>> master
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -157,7 +199,11 @@ public class TestCatalogDiffs extends TestCase {
 
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true, true);
+<<<<<<< HEAD
         String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
+=======
+        String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -173,7 +219,11 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
+<<<<<<< HEAD
         String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+=======
+        String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -186,12 +236,20 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
+<<<<<<< HEAD
         String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+=======
+        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catOriginal = catalogForJar(original);
 
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group1"});
+<<<<<<< HEAD
         String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+=======
+        String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -204,11 +262,19 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
+<<<<<<< HEAD
         String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no users this time
         String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
+=======
+        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // no users this time
+        String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -221,11 +287,19 @@ public class TestCatalogDiffs extends TestCase {
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
 
+<<<<<<< HEAD
         String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // no groups or users this time
         String updated = compileWithGroups(false, null, null, "base", BASEPROCS);
+=======
+        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // no groups or users this time
+        String updated = compileWithGroups(false, null, null, null, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -240,13 +314,21 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
+<<<<<<< HEAD
         String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+=======
+        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catOriginal = catalogForJar(original);
 
         // swap the user's group assignments
         ui[0] = new UserInfo("user1", "password", new String[] {"group2"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group1"});
+<<<<<<< HEAD
         String updated = compileWithGroups(false, gi, ui, "base", BASEPROCS);
+=======
+        String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);
@@ -261,11 +343,38 @@ public class TestCatalogDiffs extends TestCase {
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
         ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
 
+<<<<<<< HEAD
         String original = compileWithGroups(false, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
         // just turn on security
         String updated = compileWithGroups(true, gi, ui, "base", BASEPROCS);
+=======
+        String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // just turn on security
+        String updated = compileWithGroups(true, "hash", gi, ui, "base", BASEPROCS);
+        Catalog catUpdated = catalogForJar(updated);
+
+        verifyDiff (catOriginal, catUpdated);
+    }
+
+    public void testChangeSecurityProvider() throws IOException {
+        GroupInfo gi[] = new GroupInfo[2];
+        gi[0] = new GroupInfo("group1", true, true, true);
+        gi[1] = new GroupInfo("group2", true, true, true);
+
+        UserInfo ui[] = new UserInfo[2];
+        ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
+        ui[1] = new UserInfo("user2", "password", new String[] {"group2"});
+
+        String original = compileWithGroups(true, "hash", gi, ui, "base", BASEPROCS);
+        Catalog catOriginal = catalogForJar(original);
+
+        // just turn on security
+        String updated = compileWithGroups(true, "kerberos", gi, ui, "base", BASEPROCS);
+>>>>>>> master
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff (catOriginal, catUpdated);
@@ -509,6 +618,79 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
+<<<<<<< HEAD
+=======
+    public void testModifyVarcharColumns() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        Catalog catOriginal, catUpdated;
+        VoltProjectBuilder builder;
+        String report;
+
+         // start with a table
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
+        builder.compile(testDir + File.separator + "testVarchar0.jar");
+        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+
+        // change from character to bytes
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(20 BYTES), v2 varchar(5 BYTES) );");
+        builder.compile(testDir + File.separator + "testVarchar1.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar1.jar");
+        report = verifyDiff(catOriginal, catUpdated);
+        assert(report.contains("Table A has been modified."));
+
+        // size not satisfied
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(15 BYTES), v2 varchar(5 BYTES) );");
+        builder.compile(testDir + File.separator + "testVarchar2.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar2.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
+
+        // inline character to not in line bytes.
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(100 BYTES), v2 varchar(5 BYTES) );");
+        builder.compile(testDir + File.separator + "testVarchar3.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar3.jar");
+        report = verifyDiff(catOriginal, catUpdated);
+        assert(report.contains("Table A has been modified."));
+
+
+        // bytes to character
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
+        builder.compile(testDir + File.separator + "testVarchar0.jar");
+        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5) );");
+        builder.compile(testDir + File.separator + "testVarchar4.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar4.jar");
+        report = verifyDiff(catOriginal, catUpdated);
+        assert(report.contains("Table A has been modified."));
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(15) );");
+        builder.compile(testDir + File.separator + "testVarchar5.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar5.jar");
+        report = verifyDiff(catOriginal, catUpdated);
+        assert(report.contains("Table A has been modified."));
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(150) );");
+        builder.compile(testDir + File.separator + "testVarchar6.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        report = verifyDiff(catOriginal, catUpdated);
+        assert(report.contains("Table A has been modified."));
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(3) );");
+        builder.compile(testDir + File.separator + "testVarchar6.jar");
+        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+>>>>>>> master
     public void testAddNonNullityRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -552,6 +734,10 @@ public class TestCatalogDiffs extends TestCase {
 
         String report = verifyDiff(catOriginal, catUpdated);
         assert(report.contains("Table A has been modified."));
+<<<<<<< HEAD
+=======
+        assert(report.contains("Procedure ProcedureA has been modified."));
+>>>>>>> master
     }
 
     public void testAddUniqueCoveringTableIndex() throws IOException {

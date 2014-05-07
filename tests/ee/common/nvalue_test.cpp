@@ -66,7 +66,7 @@ public:
         deserDecHelper();
         NValue floatEquivalent = nv.castAs(VALUE_TYPE_DOUBLE);
         double floatValue = ValuePeeker::peekDouble(floatEquivalent);
-        floatValue *= scale;
+        floatValue *= static_cast<double>(scale);
         scaledValue = (int64_t)floatValue;
         double floatDirect = atof(textValue);
         viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(VALUE_TYPE_DECIMAL);
@@ -2361,8 +2361,8 @@ TEST_F(NValueTest, TestInList)
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
 
-    const int int_length1 = SIZE_OF_ARRAY(int_set1);
-    const int int_length2 = SIZE_OF_ARRAY(int_set2);
+    const size_t int_length1 = SIZE_OF_ARRAY(int_set1);
+    const size_t int_length2 = SIZE_OF_ARRAY(int_set2);
     NValue int_NV_set1[int_length1];
     NValue int_NV_set2[int_length2];
     initNValueArray(int_NV_set1, int_set1, int_length1);
@@ -2453,8 +2453,8 @@ TEST_F(NValueTest, TestInList)
     const char* string_set1[] = { "10", "2", "-3" };
     const char* string_set2[] = { "0", "1", "100", "10000", "1000000" };
 
-    const int string_length1 = SIZE_OF_ARRAY(string_set1);
-    const int string_length2 = SIZE_OF_ARRAY(string_set2);
+    const size_t string_length1 = SIZE_OF_ARRAY(string_set1);
+    const size_t string_length2 = SIZE_OF_ARRAY(string_set2);
     NValue string_NV_set1[string_length1];
     NValue string_NV_set2[string_length2];
     initNValueArray(string_NV_set1, string_set1, string_length1);
@@ -2817,7 +2817,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         "2000-01-01 25:01:01.000000",
         "2000-01-01 01:60:01.000000",
         };
-    int ii = sizeof(trials) / sizeof(const char*);
+    size_t ii = sizeof(trials) / sizeof(const char*);
     while (ii--) {
         try {
             NValue::parseTimestampString(trials[ii]);
