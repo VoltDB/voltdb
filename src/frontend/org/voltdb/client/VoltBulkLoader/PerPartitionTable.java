@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.ParameterConverter;
 import org.voltdb.client.HashinatorLite;
@@ -62,8 +63,6 @@ public class PerPartitionTable {
     final VoltTable.ColumnInfo m_columnInfo[];
     //Column types
     final VoltType[] m_columnTypes;
-    //Counter that goes down when acknowledged so that drain is not needed.
-    final AtomicLong m_partitionOutstandingBatchCnt = new AtomicLong(0);
     //The number of rows in m_partitionProcessorQueue.
     final AtomicLong m_partitionQueuedRowCnt = new AtomicLong(0);
     //Size of the batches this table submits (minimum of all values provided by VoltBulkLoaders)
@@ -162,8 +161,8 @@ public class PerPartitionTable {
         }
 
         // Called by Client to inform us of the status of the bulk insert.
-        public void clientCallback(ClientResponse response) throws Exception {
-            m_partitionOutstandingBatchCnt.decrementAndGet();
+        @Override
+        public void clientCallback(ClientResponse response) {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Bulk Insert failed (update per BulkLoader statistics
                 for (LoaderSpecificRowCnt currPair : m_waitingLoaders) {
@@ -365,7 +364,7 @@ public class PerPartitionTable {
     void processSpNextTable() {
         PartitionProcedureCallback callback = buildTable();
         if (table.getRowCount() <= 0) {
-            assert(callback.m_batchRowList.size() == 0);
+            assert (callback.m_batchRowList.isEmpty());
             return;
         }
 
@@ -373,11 +372,12 @@ public class PerPartitionTable {
                 m_partitionedColumnIndex, m_partitionColumnType));
         try {
             m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, table);
-            m_partitionOutstandingBatchCnt.incrementAndGet();
         } catch (IOException e) {
-            m_partitionOutstandingBatchCnt.decrementAndGet();
+            final ClientResponse r = new ClientResponseImpl(
+                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                    "Connection to database was lost");
+            callback.clientCallback(r);
         }
-        m_partitionOutstandingBatchCnt.incrementAndGet();
         table.clearRowData();
     }
 
@@ -391,8 +391,11 @@ public class PerPartitionTable {
         try {
             m_clientImpl.callProcedure(callback, m_procName, m_tableName, table);
         } catch (IOException e) {
+            final ClientResponse r = new ClientResponseImpl(
+                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                    "Connection to database was lost");
+            callback.clientCallback(r);
         }
-        m_partitionOutstandingBatchCnt.incrementAndGet();
         table.clearRowData();
     }
 

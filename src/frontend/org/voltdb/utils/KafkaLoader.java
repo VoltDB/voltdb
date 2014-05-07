@@ -50,10 +50,49 @@ public class KafkaLoader {
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER");
     private final KafkaConfig m_config;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
-    private VoltBulkLoader m_loader;
+    private VoltBulkLoader m_loader = null;
+    private Client m_client = null;
+    private KafkaConsumerConnector m_consumer = null;
+    private ExecutorService m_es = null;
 
     public KafkaLoader(KafkaConfig config) {
         m_config = config;
+    }
+
+    public class Flusher implements Runnable {
+
+        @Override
+        public void run() {
+            m_loader.flush();
+        }
+
+    }
+
+    public void closeConsumer() {
+        if (m_consumer != null) {
+            m_consumer.stop();
+            m_consumer = null;
+        }
+        m_es.shutdownNow();
+    }
+    /**
+     * Close all connections and cleanup on both the sides.
+     */
+    public void close() {
+        try {
+            if (m_loader != null) {
+                m_loader.flush();
+                m_loader.cancelQueued();
+                m_loader.drain();
+                m_loader.close();
+                m_loader = null;
+            }
+            if (m_client != null) {
+                m_client.close();
+                m_client = null;
+            }
+        } catch (InterruptedException ex) {
+        }
     }
 
     public void processKafkaMessages() throws Exception {
@@ -64,33 +103,20 @@ public class KafkaLoader {
         final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
 
-        Client client = getClient(c_config, serverlist);
+        m_client = getClient(c_config, serverlist);
 
-        m_loader = client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
-        m_loader.setFlushInterval(m_config.flush, m_config.flush);
-        final KafkaConsumerConnector consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.table);
+        m_loader = m_client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
+        m_loader.setFlushInterval(m_config.flush, m_config.flush, new Flusher());
+        m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.table);
         try {
-            ExecutorService es = getConsumerExecutor(consumer, m_loader);
-
-            Runtime.getRuntime().addShutdownHook(
-                    new Thread() {
-                        @Override
-                        public void run() {
-                            try {
-                                consumer.stop();
-                                m_loader.flush();
-                                m_loader.drain();
-                                m_loader.close();
-                            } catch (InterruptedException ex) {
-                            }
-                        }
-                    });
-
-            es.awaitTermination(365, TimeUnit.DAYS);
+            m_es = getConsumerExecutor(m_consumer, m_loader);
+            m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
+            m_es.awaitTermination(365, TimeUnit.DAYS);
         } catch (Exception ex) {
-            m_log.error("Error in getting Kafka Consumer", ex);
+            m_log.error("Error in Kafka Consumer", ex);
             System.exit(-1);
         }
+        close();
     }
 
     /**
@@ -151,6 +177,15 @@ public class KafkaLoader {
             if (zookeeper.length() <= 0) {
                 exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
             }
+            //Try and load classes we need and not packaged.
+            try {
+                KafkaConfig.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
+                KafkaConfig.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
+            } catch (ClassNotFoundException cnfex) {
+                System.out.println("Cannot find the Zookeeper libraries, zkclient-0.3.jar and zookeeper-3.3.4.jar.");
+                System.out.println("Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
+                System.exit(1);
+            }
         }
 
         /**
@@ -167,11 +202,14 @@ public class KafkaLoader {
 
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-            if (response.getStatus() != ClientResponse.SUCCESS) {
+            byte status = response.getStatus();
+            if (status != ClientResponse.SUCCESS) {
                 m_log.error("Failed to Insert Row: " + rowHandle);
                 long fc = m_failedCount.incrementAndGet();
-                if (m_config.maxerrors > 0 && fc > m_config.maxerrors) {
-                    System.exit(1);
+                if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
+                        || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
+                    m_log.error("Kafkaloader will exit.");
+                    closeConsumer();
                 }
             }
         }

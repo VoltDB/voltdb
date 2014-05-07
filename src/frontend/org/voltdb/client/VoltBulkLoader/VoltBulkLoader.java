@@ -190,6 +190,7 @@ public class VoltBulkLoader {
                     }
                     m_failedBatchQueuedRowCnt.decrementAndGet();
                     m_failedBatchSentRowCnt.incrementAndGet();
+                    PartitionFailureExecuteProcedureCallback callback = null;
                     try {
                         VoltTable table = new VoltTable(m_colInfo);
                         // No need to check error here if a correctedLine has come here it was
@@ -208,8 +209,7 @@ public class VoltBulkLoader {
                             continue;
                         }
 
-                        PartitionFailureExecuteProcedureCallback callback =
-                                new PartitionFailureExecuteProcedureCallback(currRow);
+                        callback = new PartitionFailureExecuteProcedureCallback(currRow);
                         if (!m_isMP) {
                             Object rpartitionParam =
                                     HashinatorLite.valueToBytes(table.fetchRow(0).
@@ -223,6 +223,12 @@ public class VoltBulkLoader {
                         //Put this processor in error so we exit
                         m_failedQueue.clear();
                         m_failedQueue = null;
+                        if (callback != null) {
+                            final ClientResponse r = new ClientResponseImpl(
+                                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                                    "Connection to database was lost");
+                            callback.clientCallback(r);
+                        }
                         break;
                     }
                 } catch (InterruptedException ex) {
@@ -408,18 +414,13 @@ public class VoltBulkLoader {
      * @param delay Initial delay in seconds
      * @param seconds Interval in seconds, passing <code>seconds <= 0</code> value will cancel periodic flush
      */
-    public synchronized void setFlushInterval(long delay, long seconds) {
+    public synchronized void setFlushInterval(long delay, long seconds, Runnable task) {
         if (m_flush != null) {
             m_flush.cancel(false);
             m_flush = null;
         }
         if (seconds > 0) {
-            m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
-                @Override
-                public void run() {
-                    flush();
-                }
-            }, delay, seconds, TimeUnit.SECONDS);
+            m_flush = m_ses.scheduleAtFixedRate(task, delay, seconds, TimeUnit.SECONDS);
         }
     }
 
@@ -500,8 +501,10 @@ public class VoltBulkLoader {
         for (int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++)
             m_partitionTable[i].abortFromLoader(this);
         List<VoltBulkLoaderRow> allPartitionRows = new ArrayList<VoltBulkLoaderRow>();
-        m_failedQueue.drainTo(allPartitionRows);
-        m_failedBatchQueuedRowCnt.addAndGet(-1*allPartitionRows.size());
+        if (m_failedQueue != null) {
+            m_failedQueue.drainTo(allPartitionRows);
+            m_failedBatchQueuedRowCnt.addAndGet(-1 * allPartitionRows.size());
+        }
     }
 
     /**
@@ -525,11 +528,13 @@ public class VoltBulkLoader {
         assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
 
         // Now we know all batches have been processed so wait for all failedQueue messages to complete
-        CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
-        VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
-        drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
-        m_failedQueue.add(drainRow);
-        batchFailureQueueLatch.await();
+        if (m_failedQueue != null) {
+            CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
+            VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
+            drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
+            m_failedQueue.add(drainRow);
+            batchFailureQueueLatch.await();
+        }
         assert(m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
     }
 
@@ -577,10 +582,12 @@ public class VoltBulkLoader {
 
             // At this point it is safe to assume that this BulkLoader has processed all
             // non-failed Rows to completion
-            VoltBulkLoaderRow closeFailureProcRow = new VoltBulkLoaderRow(this);
-            closeFailureProcRow.new CloseNotificationCallBack(tmpTable, failureThreadLatch);
-            m_failedQueue.add(closeFailureProcRow);
-            failureThreadLatch.await();
+            if (m_failedQueue != null) {
+                VoltBulkLoaderRow closeFailureProcRow = new VoltBulkLoaderRow(this);
+                closeFailureProcRow.new CloseNotificationCallBack(tmpTable, failureThreadLatch);
+                m_failedQueue.add(closeFailureProcRow);
+                failureThreadLatch.await();
+            }
 
             assert(m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
 
