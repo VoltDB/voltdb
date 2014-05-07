@@ -33,6 +33,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
@@ -105,10 +106,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testExistsJoin() {
         AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
-                "exists ( select 1 from r3 where r2.a = r3.a)");
+                "exists ( select 1 from r3 where r1.a = r3.a)");
         pn = pn.getChild(0).getChild(0);
-        assertTrue(pn instanceof NestLoopPlanNode);
-        pn = pn.getChild(1);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
         assertTrue(pred != null);
@@ -232,6 +233,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
 }
