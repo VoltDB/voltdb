@@ -29,7 +29,6 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -44,8 +43,6 @@ public class StmtSubqueryScan extends StmtTableScan {
     private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
-    // The partitioning object for that sub-query
-    PartitioningForStatement m_partitioning = null;
 
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
@@ -92,11 +89,6 @@ public class StmtSubqueryScan extends StmtTableScan {
             }
         }
         return true;
-    }
-
-    @Override
-    public void setPartitioning(PartitioningForStatement partitioning) {
-        m_partitioning = partitioning;
     }
 
     @Override

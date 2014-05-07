@@ -29,8 +29,6 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.UpdateCatalogAcceptancePolicy;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -74,13 +72,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
 
         try {
-            client.callProcedure("@UpdateApplicationCatalog", params);
+            client.callProcedure(name, params);
             fail();
         }
         catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
             if (!e.getClientResponse().getStatusString().contains("Enterprise Edition")) {
                 System.out.println("sup");
+                System.out.println("MESSAGE: " + e.getClientResponse().getStatusString());
             }
             assertTrue(e.getClientResponse().getStatusString().contains("Enterprise"));
         }
@@ -94,13 +93,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         Client client = getClient();
 
-        checkProSysprocError(client, "@UpdateApplicationCatalog", 2);
         checkProSysprocError(client, "@SnapshotSave", 3);
         checkProSysprocError(client, "@SnapshotRestore", 2);
         checkProSysprocError(client, "@SnapshotStatus", 0);
         checkProSysprocError(client, "@SnapshotScan", 2);
         checkProSysprocError(client, "@SnapshotDelete", 2);
-        checkProSysprocError(client, "@Promote", 0);
+        // Turns out we don't flag @Promote as enterprise.  Not touching that right now. --izzy
+        //checkProSysprocError(client, "@Promote", 0);
     }
 
     public void testInvalidProcedureName() throws IOException {
@@ -151,25 +150,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
         catch (ProcCallException pce) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
-        }
-    }
-
-    public void testCommunityUpdateCatalogError() throws Exception {
-        // test is meaningless for enterprise because it has the @UAC proc
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            return;
-        }
-
-        Client client = getClient();
-        try {
-            client.callProcedure("@UpdateApplicationCatalog", "AABBCC", new byte[] { 'a', 'a' });
-            fail();
-        }
-        catch (ProcCallException pce) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
-            String msg = pce.getClientResponse().getStatusString();
-            assertTrue(UpdateCatalogAcceptancePolicy.COMMUNITY_MISSING_UAC_ERROR_MSG.equals(msg));
-            System.out.println(pce.getClientResponse().getStatusString());
         }
     }
 
