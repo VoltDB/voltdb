@@ -643,8 +643,7 @@ public class DDLCompiler {
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(3);
-            sqlStatement.trim();
+            String sqlStatement = statementMatcher.group(3) + ";";
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);

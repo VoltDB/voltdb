@@ -126,7 +126,7 @@ public class VoltCompiler {
     // set of annotations by procedure name
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
 
-    private static final boolean VERIFY_CATALOG = true; //System.getProperties().containsKey("verifycatalog");
+    private static final boolean VERIFY_CATALOG = System.getProperties().containsKey("verifycatalog");
 
 
     String m_projectFileURL = null;

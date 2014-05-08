@@ -2081,6 +2081,7 @@ public class TestVoltCompiler extends TestCase {
 //                "PARTITION TABLE t0 ON COLUMN name;\n" +
 //                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
 //        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+//        Test now returns: ASSUMEUNIQUE is not valid for an index that includes the partitioning column. Please use UNIQUE instead.
 
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.

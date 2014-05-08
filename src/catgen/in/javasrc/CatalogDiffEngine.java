@@ -436,15 +436,34 @@ public class CatalogDiffEngine {
     /**
      * @return true if this change may be ignored
      */
-    private boolean checkIgnoreList(final CatalogType suspect,
-                                    final CatalogType prevType,
-                                    final String field)
+    protected boolean checkModifyIgnoreList(final CatalogType suspect,
+                                            final CatalogType prevType,
+                                            final String field)
     {
         if (suspect instanceof Deployment) {
             // ignore host count differences as clusters may elastically expand,
             // and yet require catalog changes
             return "hostcount".equals(field);
         }
+        return false;
+    }
+
+    /**
+     * @return true if this addition may be ignored
+     */
+    protected boolean checkAddIgnoreList(final CatalogType suspect)
+    {
+        return false;
+    }
+
+    /**
+     * @return true if this delete may be ignored
+     */
+    protected boolean checkDeleteIgnoreList(final CatalogType prevType,
+                                            final CatalogType newlyChildlessParent,
+                                            final String mapName,
+                                            final String name)
+    {
         return false;
     }
 
@@ -622,8 +641,8 @@ public class CatalogDiffEngine {
      */
     private void writeModification(CatalogType newType, CatalogType prevType, String field)
     {
-        // Don't write modifications id the field can be ignored
-        if (checkIgnoreList(newType, prevType, field)) {
+        // Don't write modifications if the field can be ignored
+        if (checkModifyIgnoreList(newType, prevType, field)) {
             return;
         }
 
@@ -652,6 +671,11 @@ public class CatalogDiffEngine {
      */
     private void writeDeletion(CatalogType prevType, CatalogType newlyChildlessParent, String mapName, String name)
     {
+        // Don't write deletions if the field can be ignored
+        if (checkDeleteIgnoreList(prevType, newlyChildlessParent, mapName, name)) {
+            return;
+        }
+
         // verify this is possible, write an error and mark return code false if so
         if (checkAddDropWhitelist(prevType, ChangeType.DELETION) == false) {
             m_supported = false;
@@ -671,6 +695,10 @@ public class CatalogDiffEngine {
      * Add an addition
      */
     private void writeAddition(CatalogType newType) {
+        // Don't write additions if the field can be ignored
+        if (checkAddIgnoreList(newType)) {
+            return;
+        }
         // verify this is possible, write an error and mark return code false if so
         if (checkAddDropWhitelist(newType, ChangeType.ADDITION) == false) {
             m_supported = false;

@@ -357,52 +357,54 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assert(caught);
     }
 
-//    This test is disabled until join order is supported in the DDL and explain plan
-//    public void testJoinOrder() throws Exception {
-//        if (isHSQL() || isValgrind()) return;
-//
-//        Client client = getClient();
-//
-//        VoltTable[] results = null;
-//        int nextId = 0;
-//        for (int mb = 0; mb < 25; mb += 5) {
-//            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
-//            assertEquals(1, results.length);
-//            assertTrue(nextId < results[0].asScalarLong());
-//            nextId = (int) results[0].asScalarLong();
-//            System.err.println("Inserted " + (mb + 5) + "mb");
-//        }
-//
-//        for (int ii = 0; ii < 1000; ii++) {
-//            client.callProcedure("T1.insert", ii);
-//        }
-//        client.callProcedure("T2.insert", 0);
-//
-//        //Right join order
-//        client.callProcedure("SelectWithJoinOrder", 0);
-//
-//        //Wrong join order
-//        boolean exception = false;
-//        try {
-//            client.callProcedure("SelectWithJoinOrder", 1);
-//        } catch (Exception e) {
-//            exception = true;
-//        }
-//        assertTrue(exception);
-//
-//        //Right join order
-//        client.callProcedure("SelectRightOrder");
-//
-//        exception = false;
-//        try {
-//            client.callProcedure("SelectWrongOrder");
-//        } catch (Exception e) {
-//            exception = true;
-//        }
-//        assertTrue(exception);
-//
-//
-//    }
+    public void testJoinOrder() throws Exception {
+        if (isHSQL() || isValgrind() || System.getProperties().containsKey("verifycatalog")) {
+            // This test is disabled for verifycatalog until join order is supported in the DDL and explain plan
+            return;
+        }
+
+        Client client = getClient();
+
+        VoltTable[] results = null;
+        int nextId = 0;
+        for (int mb = 0; mb < 25; mb += 5) {
+            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
+            assertEquals(1, results.length);
+            assertTrue(nextId < results[0].asScalarLong());
+            nextId = (int) results[0].asScalarLong();
+            System.err.println("Inserted " + (mb + 5) + "mb");
+        }
+
+        for (int ii = 0; ii < 1000; ii++) {
+            client.callProcedure("T1.insert", ii);
+        }
+        client.callProcedure("T2.insert", 0);
+
+        //Right join order
+        client.callProcedure("SelectWithJoinOrder", 0);
+
+        //Wrong join order
+        boolean exception = false;
+        try {
+            client.callProcedure("SelectWithJoinOrder", 1);
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
+
+        //Right join order
+        client.callProcedure("SelectRightOrder");
+
+        exception = false;
+        try {
+            client.callProcedure("SelectWrongOrder");
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
+
+
+    }
 
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
@@ -628,12 +630,14 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-//        JOIN ORDER is disabled until it is supported in the DDL and explain plan
-//        project.addProcedures(PROCEDURES);
-//        project.addStmtProcedure("SelectRightOrder",
-//                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-//        project.addStmtProcedure("SelectWrongOrder",
-//                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        if (!System.getProperties().containsKey("verifycatalog")) {
+            // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
+            project.addProcedures(PROCEDURES);
+            project.addStmtProcedure("SelectRightOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
+            project.addStmtProcedure("SelectWrongOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        }
 
         boolean success;
 

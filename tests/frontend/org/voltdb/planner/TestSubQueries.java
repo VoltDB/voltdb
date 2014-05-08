@@ -456,7 +456,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "T1",  "A");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A");
+        checkIndexedSubSelects(pn, "P1", "P1_PK_TREE", "A");
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
