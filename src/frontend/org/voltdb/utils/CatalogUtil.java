@@ -30,7 +30,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -46,7 +45,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -84,27 +82,22 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
-import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compilereport.IndexAnnotation;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.StatementAnnotation;
@@ -128,51 +121,6 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
-
-    /**
-     * Load a catalog from the jar bytes.
-     *
-     * @param catalogBytes
-     * @param log
-     * @return The serialized string of the catalog content.
-     * @throws Exception
-     *             If the catalog cannot be loaded because it's incompatible, or
-     *             if there is no version information in the catalog.
-     */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
-        assert(catalogBytes != null);
-
-        String serializedCatalog = null;
-        String voltVersionString = null;
-        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-
-        if (null == serializedCatalogBytes) {
-            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
-        }
-
-        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
-
-        // Get Volt version string
-        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
-        if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
-        }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
-        String[] buildInfoLines = buildInfo.split("\n");
-        if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
-        }
-        voltVersionString = buildInfoLines[0].trim();
-
-        // Check if it's compatible
-        if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
-                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
-        }
-
-        return serializedCatalog;
-    }
 
     /**
      * Load a catalog from the jar bytes.
@@ -641,22 +589,22 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL,
+    public static long compileDeployment(Catalog catalog, String deploymentURL,
             boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
-    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString,
+    public static long compileDeploymentString(Catalog catalog, String deploymentString,
             boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
     /**
@@ -667,10 +615,11 @@ public abstract class CatalogUtil {
      * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
-    public static long compileDeploymentAndGetCRC(Catalog catalog,
-                                                  DeploymentType deployment,
-            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog)    {
-
+    public static long compileDeployment(Catalog catalog,
+            DeploymentType deployment,
+            boolean crashOnFailedValidation,
+            boolean isPlaceHolderCatalog)
+    {
         if (!validateDeployment(catalog, deployment)) {
             return -1;
         }
@@ -706,7 +655,7 @@ public abstract class CatalogUtil {
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
 
-        return getDeploymentCRC(deployment);
+        return 1;
     }
 
     /*
@@ -747,153 +696,6 @@ public abstract class CatalogUtil {
         config.setFsyncinterval(fsyncInterval);
         config.setMaxtxns(maxTxnsBeforeFsync);
         config.setLogsize(logSizeMb);
-    }
-
-    public static long getDeploymentCRC(String deploymentURL) {
-        DeploymentType deployment = parseDeployment(deploymentURL);
-
-        // wasn't a valid xml deployment file
-        if (deployment == null) {
-            hostLog.error("Not a valid XML deployment file at URL: " + deploymentURL);
-            return -1;
-        }
-
-        return getDeploymentCRC(deployment);
-    }
-
-    /**
-     * This code is not really tenable, and should be replaced with some
-     * XML normalization code, but for now it should work and be pretty
-     * tolerant of XML documents with different formatting for the same
-     * values.
-     * @return A positive CRC for the deployment contents
-     */
-    static long getDeploymentCRC(DeploymentType deployment) {
-        StringBuilder sb = new StringBuilder(1024);
-
-        sb.append(" CLUSTER ");
-        ClusterType ct = deployment.getCluster();
-        sb.append(ct.getHostcount()).append(",");
-        sb.append(ct.getKfactor()).append(",");
-        sb.append(ct.getSitesperhost()).append(",");
-
-        sb.append(" PARTITIONDETECTION ");
-        PartitionDetectionType pdt = deployment.getPartitionDetection();
-        if (pdt != null) {
-            sb.append(pdt.isEnabled()).append(",");
-            PartitionDetectionType.Snapshot st = pdt.getSnapshot();
-            if (st != null) {
-                sb.append(st.getPrefix()).append(",");
-            }
-        }
-
-        sb.append(" SECURITY ");
-        SecurityType st = deployment.getSecurity();
-        if (st != null) {
-            sb.append(st.isEnabled());
-        }
-
-        sb.append(" SECURITYPROVIDER ");
-        if (st == null || !st.isEnabled() || st.getProvider() == null) {
-            sb.append(SecurityProviderString.HASH.value());
-        } else {
-            sb.append(st.getProvider());
-        }
-
-        sb.append(" ADMINMODE ");
-        AdminModeType amt = deployment.getAdminMode();
-        if (amt != null)
-        {
-            sb.append(amt.getPort()).append(",");
-            sb.append(amt.isAdminstartup()).append("\n");
-        }
-
-        sb.append(" HEARTBEATCONFIG ");
-        HeartbeatType hbt = deployment.getHeartbeat();
-        if (hbt != null)
-        {
-            sb.append(hbt.getTimeout()).append("\n");
-        }
-
-        sb.append(" USERS ");
-        UsersType ut = deployment.getUsers();
-        if (ut != null) {
-            List<User> users = ut.getUser();
-            for (User u : users) {
-                sb.append(" USER ");
-                sb.append(u.getName()).append(",");
-                sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
-                sb.append(",").append(u.getPassword()).append(",");
-                sb.append(u.isPlaintext()).append(",");
-            }
-        }
-        sb.append("\n");
-
-        sb.append(" HTTPD ");
-        HttpdType ht = deployment.getHttpd();
-        if (ht != null) {
-            HttpdType.Jsonapi jt = ht.getJsonapi();
-            if (jt != null) {
-                sb.append(jt.isEnabled()).append(",");
-            }
-            sb.append(ht.isEnabled());
-            sb.append(ht.getPort());
-        }
-
-        sb.append(" SYSTEMSETTINGS ");
-        SystemSettingsType sst = deployment.getSystemsettings();
-        if (sst != null)
-        {
-            sb.append(" TEMPTABLES ");
-            Temptables ttt = sst.getTemptables();
-            if (ttt != null)
-            {
-                sb.append(ttt.getMaxsize()).append("\n");
-            }
-        }
-
-        sb.append(" EXPORT ");
-        ExportType export = deployment.getExport();
-        if( export != null) {
-            sb.append(" ENABLE ").append(export.isEnabled());
-            // mimic what is done when the catalog is built, which
-            // ignores anything else within the export XML stanza
-            // when enabled is false
-            if (export.isEnabled()) {
-                ServerExportEnum exportTarget = export.getTarget();
-                if (exportTarget != null) {
-                    sb.append( "TARGET ").append(exportTarget.name());
-                    if (exportTarget.name().equalsIgnoreCase("CUSTOM")) {
-                        sb.append(" EXPORTCONNECTORCLASS ").append(export.getExportconnectorclass());
-                    }
-                }
-                ExportConfigurationType config = export.getConfiguration();
-                if (config != null) {
-                    List<PropertyType> props = config.getProperty();
-                    if( props != null && !props.isEmpty()) {
-                        sb.append(" CONFIGURATION");
-                        int propCnt = 0;
-                        for( PropertyType prop: props) {
-                            if( propCnt++ > 0) {
-                                sb.append(",");
-                            }
-                            sb.append(" ").append(prop.getName());
-                            sb.append(": ").append(prop.getValue());
-                        }
-                    }
-                }
-            }
-            sb.append("\n");
-        }
-
-        byte[] data = null;
-        data = sb.toString().getBytes(Constants.UTF8ENCODING);
-
-        PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(data);
-
-        long retval = crc.getValue();
-        return Math.abs(retval);
     }
 
     /**
@@ -1577,45 +1379,106 @@ public abstract class CatalogUtil {
         return Encoder.hexEncode(passwordHash);
     }
 
-    public static void
-        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
-                throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
+    /**
+     * This code appeared repeatedly.  Extract method to take bytes for the catalog
+     * or deployment file, do the irritating exception crash test, jam the bytes in,
+     * and get the SHA-1 hash.
+     */
+    public static byte[] makeCatalogOrDeploymentHash(byte[] inbytes)
+    {
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+        }
+        md.update(inbytes);
+        byte[] hash = md.digest();
+        assert(hash.length == 20); // sha-1 length
+        return hash;
+    }
+
+    private static ByteBuffer makeCatalogVersionAndBytes(
+                int catalogVersion,
+                long txnId,
+                long uniqueId,
+                byte[] catalogHash,
+                byte[] deploymentHash,
+                byte[] catalogBytes)
+    {
+        ByteBuffer versionAndBytes =
+            ByteBuffer.allocate(catalogBytes.length +
+                    4 +  // catalog version
+                    8 +  // txnID
+                    8 +  // unique ID
+                    20 + // catalog SHA-1 hash
+                    20   // deployment SHA-1 hash
+                    );
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
         versionAndBytes.put(catalogHash);
+        versionAndBytes.put(deploymentHash);
         versionAndBytes.put(catalogBytes);
+        return versionAndBytes;
+    }
+
+    public static void uploadCatalogToZK(ZooKeeper zk,
+                int catalogVersion,
+                long txnId,
+                long uniqueId,
+                byte[] catalogHash,
+                byte[] deploymentHash,
+                byte[] catalogBytes) throws KeeperException, InterruptedException
+    {
+        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
+                txnId, uniqueId, catalogHash, catalogBytes, deploymentHash);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
-    public static void
-        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
-            throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
-        versionAndBytes.putInt(catalogVersion);
-        versionAndBytes.putLong(txnId);
-        versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.put(catalogBytes);
-        zk.setData(VoltZK.catalogbytes,
-                versionAndBytes.array(), -1);
+    public static void setCatalogToZK(ZooKeeper zk,
+            int catalogVersion,
+            long txnId,
+            long uniqueId,
+            byte[] catalogHash,
+            byte[] deploymentHash,
+            byte[] catalogBytes) throws KeeperException, InterruptedException
+    {
+        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
+                txnId, uniqueId, catalogHash, deploymentHash, catalogBytes);
+        zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
     public static class CatalogAndIds {
         public final long txnId;
         public final long uniqueId;
         public final int version;
-        public final byte hash[];
-        public final byte bytes[];
+        public final byte[] catalogHash;
+        public final byte[] deploymentHash;
+        public final byte[] bytes;
 
-        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte[] catalogHash, byte[] catalogBytes) {
+        public CatalogAndIds(long txnId,
+                long uniqueId,
+                int catalogVersion,
+                byte[] catalogHash,
+                byte[] deploymentHash,
+                byte[] catalogBytes) {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
-            this.hash = catalogHash;
+            this.catalogHash = catalogHash;
+            this.deploymentHash = deploymentHash;
             this.bytes = catalogBytes;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
+                    txnId,
+                    Encoder.hexEncode(catalogHash).substring(0, 10),
+                    Encoder.hexEncode(deploymentHash).substring(0, 10));
         }
     }
 
@@ -1627,10 +1490,13 @@ public abstract class CatalogUtil {
         long catalogUniqueId = versionAndBytes.getLong();
         byte[] catalogHash = new byte[20]; // sha-1 hash size
         versionAndBytes.get(catalogHash);
+        byte[] deploymentHash = new byte[20]; // sha-1 hash size
+        versionAndBytes.get(deploymentHash);
         byte[] catalogBytes = new byte[versionAndBytes.remaining()];
         versionAndBytes.get(catalogBytes);
         versionAndBytes = null;
-        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash, catalogBytes);
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
+                deploymentHash, catalogBytes);
     }
 
     /**

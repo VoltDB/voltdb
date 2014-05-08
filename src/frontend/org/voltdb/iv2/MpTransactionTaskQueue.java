@@ -29,7 +29,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.exceptions.TransactionRestartException;
-
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -50,9 +49,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
-    MpTransactionTaskQueue(SiteTaskerQueue queue)
+    MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
     {
-        super(queue);
+        super(queue, initialTnxId);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -77,6 +76,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * Always returns true in this case, side effect of extending
      * TransactionTaskQueue.
      */
+    @Override
     synchronized boolean offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
@@ -211,6 +211,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * submit additional tasks to be done, determined by whatever the current state is.
      * See giant comment at top of taskQueueOffer() for what happens.
      */
+    @Override
     synchronized int flush(long txnId)
     {
         int offered = 0;
@@ -234,6 +235,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * instead of flush by the currently blocking MP transaction in the event a
      * restart is necessary.
      */
+    @Override
     synchronized void restart()
     {
         if (!m_currentReads.isEmpty()) {
@@ -258,6 +260,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * How many Tasks are un-runnable?
      * @return
      */
+    @Override
     synchronized int size()
     {
         return m_backlog.size();

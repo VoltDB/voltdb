@@ -39,7 +39,6 @@
 
 using namespace std;
 using namespace voltdb;
-using namespace boost;
 
 const int COLUMN_COUNT = 5;
 // Annoyingly, there's no easy way to compute the exact Exported tuple
@@ -170,7 +169,7 @@ protected:
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
     DummyTopend m_topend;
-    scoped_ptr<ExecutorContext> m_context;
+    boost::scoped_ptr<ExecutorContext> m_context;
 };
 
 // Several of these cases were move to TestExportDataSource in Java

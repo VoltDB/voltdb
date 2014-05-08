@@ -52,20 +52,32 @@ __NULL = {VOLTTYPE_TINYINT: -128,
           VOLTTYPE_BIGINT: -9223372036854775808,
           VOLTTYPE_FLOAT: -1.7E+308}
 
-RELIABLE_DECIMAL_PLACES = 12
+RELIABLE_DECIMAL_DIGITS = 12
 
 def normalize_value(v, vtype):
     global __NULL
+    if v == None:
+        return v
     if vtype in __NULL and v == __NULL[vtype]:
         return None
-    elif vtype == VOLTTYPE_BIGINT or vtype == VOLTTYPE_DECIMAL:
+    elif vtype == VOLTTYPE_BIGINT:
         # Adapt (with rounding?) to the way HSQL returns some BIGINT results as floats
+        ### print "DEBUG in fuzzynormalizer's normalize_value, v was " , v , " of type " , type(v)
         v = float(v)
+        ### print "DEBUG in fuzzynormalizer's normalize_value, v now " , v
+        vtype = VOLTTYPE_FLOAT
+    elif vtype == VOLTTYPE_DECIMAL:
+        # Adapt (with rounding?) to the way HSQL returns some DECIMAL results
+        ### print "DEBUG in fuzzynormalizer's normalize_value, v was " , v , " of type " , type(v)
+        v = float(str(v))
+        ### print "DEBUG in fuzzynormalizer's normalize_value, v now " , v
         vtype = VOLTTYPE_FLOAT
     if vtype == VOLTTYPE_FLOAT:
         if v != 0.0:
             # round to the desired number of decimal places -- including any digits before the decimal
-            decimal_places = RELIABLE_DECIMAL_PLACES - 1 - int(math.floor(math.log10(abs(v))))
+            decimal_places = RELIABLE_DECIMAL_DIGITS - 1 - int(math.floor(math.log10(abs(v))))
+            ### print "DEBUG in fuzzynormalizer's normalize_value, v finally " , round(v, decimal_places) , \
+            ###        " of type " , type(round(v, decimal_places))
             return round(v, decimal_places)
     return v
 
@@ -165,4 +177,4 @@ def normalize(table, sql):
 
 def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
     return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all, cntonly = False)
+            jni_path, output_dir, report_all)
