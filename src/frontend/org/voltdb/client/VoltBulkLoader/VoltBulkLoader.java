@@ -414,13 +414,18 @@ public class VoltBulkLoader {
      * @param delay Initial delay in seconds
      * @param seconds Interval in seconds, passing <code>seconds <= 0</code> value will cancel periodic flush
      */
-    public synchronized void setFlushInterval(long delay, long seconds, Runnable task) {
+    public synchronized void setFlushInterval(long delay, long seconds) {
         if (m_flush != null) {
             m_flush.cancel(false);
             m_flush = null;
         }
         if (seconds > 0) {
-            m_flush = m_ses.scheduleAtFixedRate(task, delay, seconds, TimeUnit.SECONDS);
+            m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    timedFlush();
+                }
+            }, delay, seconds, TimeUnit.SECONDS);
         }
     }
 
@@ -487,8 +492,17 @@ public class VoltBulkLoader {
      * instances working on the same table and using the same instance of Client.
      */
     public void flush() {
-        for (int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++)
-            m_partitionTable[i].flushAllTableQueues();
+        _flush(true);
+    }
+
+    private void timedFlush() {
+        _flush(false);
+    }
+
+    private void _flush(boolean force) {
+        for (int i = m_firstPartitionTable; i <= m_lastPartitionTable; i++) {
+            m_partitionTable[i].flushAllTableQueues(force);
+        }
     }
 
     /**

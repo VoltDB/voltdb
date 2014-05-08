@@ -73,6 +73,7 @@ public class PerPartitionTable {
     final String m_tableName;
     //List of callbacks for which we have not seen a response from the client.
     LinkedCallbackList m_activeCallbacks = new LinkedCallbackList();
+    boolean m_okToFlush = true;
 
     // Node wrapping each Client callback that is still outstanding.
     static class WrappedCallback {
@@ -258,18 +259,23 @@ public class PerPartitionTable {
     }
 
     synchronized void insertRowInTable(VoltBulkLoaderRow nextRow) throws InterruptedException {
-        if (!m_partitionRowQueue.offer(nextRow))
+        if (!m_partitionRowQueue.offer(nextRow)) {
             m_partitionRowQueue.put(nextRow);
+        }
         if (m_partitionQueuedRowCnt.incrementAndGet() % m_minBatchTriggerSize == 0) {
             // A sync row will typically cause the table to be split into 2 requests
+            m_okToFlush = false;
             m_partitionProcessorQueue.add(this);
         }
     }
 
-    synchronized void flushAllTableQueues() {
-        if (m_partitionQueuedRowCnt.get() % m_minBatchTriggerSize != 0) {
+    synchronized void flushAllTableQueues(boolean force) {
+        if (m_partitionQueuedRowCnt.get() % m_minBatchTriggerSize != 0 && (m_okToFlush || force)) {
             // A flush will typically cause the table to be split into 2 batches
             m_partitionProcessorQueue.add(this);
+        }
+        if (!force) {
+            m_okToFlush = true;
         }
     }
 

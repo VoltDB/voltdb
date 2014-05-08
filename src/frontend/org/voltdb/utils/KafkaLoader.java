@@ -59,27 +59,23 @@ public class KafkaLoader {
         m_config = config;
     }
 
-    public class Flusher implements Runnable {
-
-        @Override
-        public void run() {
-            m_loader.flush();
-        }
-
-    }
-
+    //Close the consumer after this app will exit.
     public void closeConsumer() {
         if (m_consumer != null) {
             m_consumer.stop();
             m_consumer = null;
         }
-        m_es.shutdownNow();
+        if (m_es != null) {
+            m_es.shutdownNow();
+            m_es = null;
+        }
     }
     /**
      * Close all connections and cleanup on both the sides.
      */
     public void close() {
         try {
+            closeConsumer();
             if (m_loader != null) {
                 m_loader.flush();
                 m_loader.cancelQueued();
@@ -106,7 +102,7 @@ public class KafkaLoader {
         m_client = getClient(c_config, serverlist);
 
         m_loader = m_client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
-        m_loader.setFlushInterval(m_config.flush, m_config.flush, new Flusher());
+        m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.table);
         try {
             m_es = getConsumerExecutor(m_consumer, m_loader);
