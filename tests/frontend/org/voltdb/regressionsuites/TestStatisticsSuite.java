@@ -35,7 +35,7 @@ import junit.framework.Test;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
-import org.hsqldb_voltpatches.index.IndexAVL;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
@@ -372,10 +372,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             assertEquals(1, results.length);
             validateSchema(results[0], expectedTable);
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "W_PK_TREE", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
+                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "W_PK_TREE", true);
             }
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "I_PK_TREE", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
+                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "I_PK_TREE", true);
             }
             if (success) break;
         }

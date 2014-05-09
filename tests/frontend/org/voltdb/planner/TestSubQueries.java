@@ -25,7 +25,7 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.hsqldb_voltpatches.index.IndexAVL;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -782,7 +782,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "P1_PK_TREE", "A", "C");
+        checkIndexedSubSelects(pn, "P1", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                "P1_PK_TREE", "A", "C");
 
 
         planNodes = compileToFragments("select T1.A FROM (SELECT A FROM R1) T1, P1 " +
@@ -799,7 +800,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "P1_PK_TREE", "A");
+        checkIndexedSubSelects(pn, "P1", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                "P1_PK_TREE", "A");
 
 
         planNodes = compileToFragments("select T1.A FROM (SELECT A FROM R1) T1, P1 " +
@@ -816,7 +818,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "P1_PK_TREE", "A");
+        checkIndexedSubSelects(pn, "P1", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                "P1_PK_TREE", "A");
 
 
         planNodes = compileToFragments("select T1.A, P1.C FROM (SELECT A FROM R1) T1, P1 " +
@@ -869,7 +872,8 @@ public class TestSubQueries extends PlannerTestCase {
 
         assertEquals(nlpn.getInlinePlanNodes().size(), 1);
         pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkIndexedSubSelects(pn, "P2", IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "P2_PK_TREE", "A");
+        checkIndexedSubSelects(pn, "P2", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                "P2_PK_TREE", "A");
     }
 
     public void testSubSelects_With_Unions() {

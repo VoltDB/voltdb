@@ -271,7 +271,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             InMemoryJarfile jarOutput)
     throws VoltCompiler.VoltCompilerException {
 
-        final String className = procedureDescriptor.getProcedureName();
+        final String className = procedureDescriptor.m_className;
         final Language lang = procedureDescriptor.m_language;
 
         // Load the class given the class name
@@ -282,7 +282,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         // add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String groupName : procedureDescriptor.getAuthGroups()) {
+        for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
                 throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
@@ -302,7 +302,8 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             procedure.setAnnotation(pa);
         }
         if (procedureDescriptor.m_scriptImpl != null) {
-            // This is a Groovy procedure and we need to add an annotation with the script to the Procedure element in the Catalog
+            // This is a Groovy or other Java derived procedure and we need to add an annotation with
+            // the script to the Procedure element in the Catalog
             pa.scriptImpl = procedureDescriptor.m_scriptImpl;
         }
 
@@ -624,7 +625,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             ProcedureDescriptor procedureDescriptor)
     throws VoltCompiler.VoltCompilerException {
 
-        final String className = procedureDescriptor.getProcedureName();
+        final String className = procedureDescriptor.m_className;
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
@@ -639,7 +640,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         // add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);
-        for (String groupName : procedureDescriptor.getAuthGroups()) {
+        for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
                 throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");

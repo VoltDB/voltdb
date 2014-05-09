@@ -39,7 +39,6 @@ import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.hsqldb_voltpatches.index.IndexAVL;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
@@ -627,8 +626,8 @@ public class DDLCompiler {
                 for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
                     // Don't put the same role in the list more than once.
                     String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.getAuthGroups().contains(roleNameFixed)) {
-                        descriptor.getAuthGroups().add(roleNameFixed);
+                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
+                        descriptor.m_authGroups.add(roleNameFixed);
                     }
                 }
             }
@@ -651,7 +650,7 @@ public class DDLCompiler {
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.getAuthGroups().add(roleName.trim().toLowerCase());
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
                 }
             }
 
@@ -693,7 +692,7 @@ public class DDLCompiler {
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.getAuthGroups().add(roleName.trim().toLowerCase());
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
                 }
             }
             // track the defined procedure
@@ -1277,7 +1276,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(IndexAVL.AUTO_GEN_IDX_PREFIX) == false) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1286,7 +1285,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(IndexAVL.AUTO_GEN_IDX_PREFIX) == true) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1692,7 +1691,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX) == false) {
+                if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());

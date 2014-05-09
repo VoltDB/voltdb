@@ -37,6 +37,15 @@ import org.hsqldb_voltpatches.result.Result;
  */
 public class HSQLInterface {
     /**
+     * Naming conventions for unnamed indexes and constraints
+     */
+    static public String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
+    static public String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
+    static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONST_";
+
+    /**
      * The spacer to use for nested XML elements
      */
     public static final String XML_INDENT = "    ";

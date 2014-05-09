@@ -91,7 +91,7 @@ public class VoltDDLElementTracker {
     {
         assert descriptor != null;
 
-        String className = descriptor.getProcedureName();
+        String className = descriptor.m_className;
         assert className != null && ! className.trim().isEmpty();
 
         String shortName = deriveShortProcedureName(className);
@@ -128,7 +128,7 @@ public class VoltDDLElementTracker {
         if( descriptor.m_singleStmt == null) {
             // the longer form costructor asserts on singleStatement
             descriptor = m_compiler.new ProcedureDescriptor(
-                    descriptor.getAuthGroups(),
+                    descriptor.m_authGroups,
                     descriptor.m_class,
                     partitionInfo,
                     descriptor.m_language,
@@ -136,8 +136,8 @@ public class VoltDDLElementTracker {
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
-                    descriptor.getAuthGroups(),
-                    descriptor.getProcedureName(),
+                    descriptor.m_authGroups,
+                    descriptor.m_className,
                     descriptor.m_singleStmt,
                     descriptor.m_joinOrder,
                     partitionInfo,

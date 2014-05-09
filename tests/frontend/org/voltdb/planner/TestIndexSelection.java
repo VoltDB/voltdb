@@ -23,7 +23,7 @@
 
 package org.voltdb.planner;
 
-import org.hsqldb_voltpatches.index.IndexAVL;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -57,7 +57,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
-        assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"" + IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "ID"));
+        assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "ID"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
 //        System.out.println("DEBUG: " + pn.toJSONString());
@@ -167,7 +168,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         json = ispn.toJSONString();
-        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" + IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         json = pn.toJSONString();
@@ -279,7 +281,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         json = ispn.toJSONString();
-        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" + IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         json = pn.toJSONString();
@@ -305,6 +308,7 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2");
         pn = pn.getChild(0);
         System.out.println(pn.toExplainPlanString());
-        assertTrue(pn.toExplainPlanString().contains("using \"" + IndexAVL.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG\" (for deterministic order only)"));
+        assertTrue(pn.toExplainPlanString().contains("using \"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG\" (for deterministic order only)"));
     }
 }

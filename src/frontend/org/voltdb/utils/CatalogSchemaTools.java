@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.index.IndexAVL;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
@@ -189,7 +189,7 @@ public abstract class CatalogSchemaTools {
                     // Get the ConstraintType.
 
                     ret += add + spacer;
-                    if (!catalog_const.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX)) {
+                    if (!catalog_const.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX)) {
                         ret += "CONSTRAINT " + catalog_const.getTypeName() + " ";
                     }
                     if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
@@ -234,7 +234,7 @@ public abstract class CatalogSchemaTools {
                     }
 
                 }
-                if (catalog_idx.getTypeName().startsWith(IndexAVL.AUTO_GEN_PREFIX) ||
+                if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
                         catalog_idx.getTypeName().startsWith("MATVIEW_PK_")) {
                     skip_indexes.add(catalog_idx);
                 }

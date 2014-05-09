@@ -75,7 +75,7 @@ public class CatalogUpgradeTools
     public static void dorkDDL(InMemoryJarfile memCatalog, String statement)
             throws UnsupportedEncodingException
     {
-        String key = "autogen-ddl.sql";
+        String key = VoltCompiler.AUTOGEN_DDL_FILE_NAME;
         String ddl = String.format("%s;\n%s", statement, new String(memCatalog.get(key), "UTF-8"));
         memCatalog.put(key, ddl.getBytes());
     }
