@@ -220,21 +220,16 @@ public class VoltBulkLoader {
                         else
                             m_clientImpl.callProcedure(callback, m_procName, m_tableName, table);
                     } catch (IOException ioex) {
-                        //Put this processor in error so we exit
-                        m_failedQueue.clear();
-                        m_failedQueue = null;
-                        if (callback != null) {
-                            final ClientResponse r = new ClientResponseImpl(
-                                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                                    "Connection to database was lost");
-                            callback.clientCallback(r);
-                        }
+                        //Send connection lost callback.
+                        m_failureProcessor = null;
+                        final ClientResponse r = new ClientResponseImpl(
+                                ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                                "Connection to database was lost");
+                        callback.clientCallback(r);
                         break;
                     }
                 } catch (InterruptedException ex) {
-                    //Put this processor in error so we exit
-                    m_failedQueue.clear();
-                    m_failedQueue = null;
+                    m_failureProcessor = null;
                     break;
                 }
             }
@@ -423,7 +418,7 @@ public class VoltBulkLoader {
             m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
-                    timedFlush();
+                    _flush(false);
                 }
             }, delay, seconds, TimeUnit.SECONDS);
         }
@@ -495,10 +490,6 @@ public class VoltBulkLoader {
         _flush(true);
     }
 
-    private void timedFlush() {
-        _flush(false);
-    }
-
     private void _flush(boolean force) {
         for (int i = m_firstPartitionTable; i <= m_lastPartitionTable; i++) {
             m_partitionTable[i].flushAllTableQueues(force);
@@ -541,15 +532,16 @@ public class VoltBulkLoader {
 
         assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
 
-        // Now we know all batches have been processed so wait for all failedQueue messages to complete
-        if (m_failedQueue != null) {
+        // Now we know all batches have been processed so wait for all failedQueue messages to complete unless failure
+        //processor is dead.
+        if (m_failedQueue != null && m_failureProcessor != null) {
             CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
             VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
             drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
             m_failedQueue.add(drainRow);
             batchFailureQueueLatch.await();
+            assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
         }
-        assert(m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
     }
 
     /**
@@ -595,15 +587,14 @@ public class VoltBulkLoader {
             CountDownLatch failureThreadLatch = new CountDownLatch(1);
 
             // At this point it is safe to assume that this BulkLoader has processed all
-            // non-failed Rows to completion
-            if (m_failedQueue != null) {
+            // non-failed Rows to completion unless failure processor is dead.
+            if (m_failedQueue != null && m_failureProcessor != null) {
                 VoltBulkLoaderRow closeFailureProcRow = new VoltBulkLoaderRow(this);
                 closeFailureProcRow.new CloseNotificationCallBack(tmpTable, failureThreadLatch);
                 m_failedQueue.add(closeFailureProcRow);
                 failureThreadLatch.await();
+                assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
             }
-
-            assert(m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
 
             // Remove all VoltBulkLoader-specific state in the client if there are no others
             if (m_vblGlobals.getTableNameToLoaderCnt() == 0) {
