@@ -32,8 +32,8 @@ SELECT -6, @optionalfn(A._variable[#arg numeric] + 5   )        NUMSUM FROM @fro
 SELECT -5, @optionalfn(A._variable[#arg numeric]       ) + 5    NUMSUM FROM @fromtables A ORDER BY NUMSUM
 SELECT -4, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg] + 5.25)        > @comparableconstant
 SELECT -3, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg]       ) + 5.25 > @comparableconstant
-SELECT -2, @optionalfn(A._variable[numeric] + 5.25)        NUMSUM FROM @fromtables A ORDER BY NUMSUM
-SELECT -1, @optionalfn(A._variable[numeric]       ) + 5.25 NUMSUM FROM @fromtables A ORDER BY NUMSUM
+SELECT -2, @optionalfn(A._variable[#arg numeric] + 5.25)        NUMSUM FROM @fromtables A ORDER BY NUMSUM
+SELECT -1, @optionalfn(A._variable[#arg numeric]       ) + 5.25 NUMSUM FROM @fromtables A ORDER BY NUMSUM
 
 -- cover some select WHERE expressions not covered by the basic templates
 
@@ -110,12 +110,12 @@ SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' 
 
 --- Test CASE WHEN
 --- CASE WHEN with expression
-SELECT * FROM @fromtables Q34    WHERE CASE WHEN Q34._variable[#arg @columntype]      _cmp @comparableconstant THEN Q34._variable[@columntype]          ELSE Q34.__[#arg] * 10 END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables Q35    WHERE CASE WHEN Q35._variable[#arg @columntype]      _cmp @comparableconstant THEN Q35._variable[@columntype]                                 END _cmp @comparableconstant + 10
-SELECT _variable[@comparabletype] Q36, CASE WHEN   A._variable[#arg @columntype]      _cmp @comparableconstant THEN   A._variable[@columntype]          ELSE   A.__[#arg] * 10 END FROM @fromtables WHERE @columnpredicate
-SELECT _variable[@comparabletype] Q37, CASE WHEN   A._variable[#arg @columntype]      _cmp @comparableconstant THEN   A.__[#arg]                                               END FROM @fromtables WHERE @columnpredicate
+SELECT * FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] _cmp @comparableconstant THEN Q34._variable[#numone @columntype]     ELSE Q34.__[#arg] * 10 END _cmp @comparableconstant + 10
+SELECT * FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] _cmp @comparableconstant THEN Q35._variable[#numone @columntype]                            END _cmp @comparableconstant + 10
+SELECT __[#numone]        Q36,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A._variable[#numone @columntype]     ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
+SELECT __[#arg]           Q37,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A.__[#arg]                                                  END FROM @fromtables A WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT * FROM @fromtables Q38    WHERE CASE      Q38._variable[#arg @columntype]      WHEN @comparableconstant THEN Q38._variable[@columntype]      * 2 ELSE Q38.__[#arg] * 10 END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables Q39    WHERE CASE      Q39._variable[#arg @columntype]      WHEN @comparableconstant THEN Q39._variable[@columntype]      * 2                        END _cmp @comparableconstant + 10
-SELECT _variable[@comparabletype] Q40, CASE        A._variable[#arg @columntype]      WHEN @comparableconstant THEN   A._variable[@columntype]      * 2 ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
-SELECT _variable[@comparabletype] Q41, CASE        A._variable[#arg @columntype]      WHEN @comparableconstant THEN   A._variable[#arg @columntype] * 2                        END FROM @fromtables A WHERE @columnpredicate
+SELECT * FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] * 2 ELSE Q38.__[#arg] * 10 END _cmp @comparableconstant + 10
+SELECT * FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] * 2                        END _cmp @comparableconstant + 10
+SELECT __[#numone]        Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2 ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
+SELECT __[#arg]           Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2                        END FROM @fromtables A WHERE @columnpredicate
