@@ -116,6 +116,7 @@ public class VoltDB {
 
         /** name of the m_catalog JAR file */
         public String m_pathToCatalog = null;
+        public boolean m_catalogDefault = false;
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
@@ -509,12 +510,6 @@ public class VoltDB {
                     isValid = false;
                     hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
                 }
-
-            if (m_startAction == StartAction.CREATE &&
-                m_pathToCatalog == null) {
-                isValid = false;
-                hostLog.fatal("The catalog location is missing.");
-            }
 
             if (m_leader == null) {
                 isValid = false;

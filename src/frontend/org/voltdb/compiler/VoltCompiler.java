@@ -413,6 +413,19 @@ public class VoltCompiler {
         return compileInternal(projectReader, jarOutputPath, ddlReaderList, null);
     }
 
+    private static void addBuildInfo(final InMemoryJarfile jarOutput) {
+        StringBuilder buildinfo = new StringBuilder();
+        String info[] = RealVoltDB.extractBuildInfo();
+        buildinfo.append(info[0]).append('\n');
+        buildinfo.append(info[1]).append('\n');
+        buildinfo.append(System.getProperty("user.name")).append('\n');
+        buildinfo.append(System.getProperty("user.dir")).append('\n');
+        buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
+
+        byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
+        jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
+    }
+
     /**
      * Internal method for compiling with and without a project.xml file or DDL files.
      *
@@ -469,16 +482,7 @@ public class VoltCompiler {
             // Don't update buildinfo if it's already present, e.g. while upgrading.
             // Note when upgrading the version has already been updated by the caller.
             if (!jarOutput.containsKey(CatalogUtil.CATALOG_BUILDINFO_FILENAME)) {
-                StringBuilder buildinfo = new StringBuilder();
-                String info[] = RealVoltDB.extractBuildInfo();
-                buildinfo.append(info[0]).append('\n');
-                buildinfo.append(info[1]).append('\n');
-                buildinfo.append(System.getProperty("user.name")).append('\n');
-                buildinfo.append(System.getProperty("user.dir")).append('\n');
-                buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
-
-                byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
-                jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
+                addBuildInfo(jarOutput);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
             if (projectReader != null) {
@@ -508,6 +512,45 @@ public class VoltCompiler {
         }
 
         return true;
+    }
+
+    /**
+     * Internal method for compiling with and without a project.xml file or DDL files.
+     *
+     * @param projectReader Reader for project file or null if a project file is not used.
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
+     * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
+     * @return true if successful
+     */
+    public InMemoryJarfile compileEmptyJar()
+    {
+        // clear out the warnings and errors
+        m_warnings.clear();
+        m_infos.clear();
+        m_errors.clear();
+
+        // do all the work to get the catalog
+        DatabaseType database = new DatabaseType();
+
+        final InMemoryJarfile jarOutput = new InMemoryJarfile();
+        final Catalog catalog = compileCatalogInternal(database, null, jarOutput);
+        if (catalog == null) {
+            return null;
+        }
+        addBuildInfo(jarOutput);
+
+        final String catalogCommands = catalog.serialize();
+        byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
+        jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
+
+        assert(!hasErrors());
+
+        if (hasErrors()) {
+            return null;
+        }
+
+        return jarOutput;
     }
 
     /**
@@ -696,16 +739,19 @@ public class VoltCompiler {
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
 
         // generate the catalog report and write it to disk
-        try {
-            m_report = ReportMaker.report(m_catalog, m_warnings);
-            File file = new File("catalog-report.html");
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+        // Skip if there's no DDL
+        if (ddlReaderList != null) {
+            try {
+                m_report = ReportMaker.report(m_catalog, m_warnings);
+                File file = new File("catalog-report.html");
+                FileWriter fw = new FileWriter(file);
+                fw.write(m_report);
+                fw.close();
+                m_reportPath = file.getAbsolutePath();
+            } catch (IOException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
 
         return m_catalog;
@@ -873,11 +919,13 @@ public class VoltCompiler {
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
-        for (final VoltCompilerReader schemaReader : schemaReaders) {
-            // add the file object's path to the list of files for the jar
-            m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+        if (schemaReaders != null) {
+            for (final VoltCompilerReader schemaReader : schemaReaders) {
+                // add the file object's path to the list of files for the jar
+                m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-            ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+            }
         }
 
         ddlcompiler.compileToCatalog(db);

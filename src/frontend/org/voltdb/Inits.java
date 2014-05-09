@@ -23,8 +23,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,6 +43,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -279,15 +278,17 @@ public class Inits {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 
-                if (m_rvdb.m_pathToStartupCatalog == null) {
-                    VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
-                                             " please see usage for more information",
-                                             false, null);
-                }
-
                 try {
                     // Get the catalog bytes and byte count.
-                    byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
+                    byte[] catalogBytes;
+                    if (m_rvdb.m_pathToStartupCatalog == null) {
+                        VoltCompiler compiler = new VoltCompiler();
+                        InMemoryJarfile catalogJar = compiler.compileEmptyJar();
+                        catalogBytes = catalogJar.getFullJarBytes();
+                    }
+                    else {
+                        catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
+                    }
 
                     //Export needs a cluster global unique id for the initial catalog version
                     long catalogUniqueId =
