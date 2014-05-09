@@ -78,8 +78,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
             Collection<String> indexes)
     {
-        if (m_tableScan != null && m_tableScan instanceof StmtTargetTableScan) {
-            tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+        if (m_tableScan != null) {
+            if (m_tableScan instanceof StmtTargetTableScan) {
+                tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+            } else {
+                assert(m_tableScan instanceof StmtSubqueryScan);
+                StmtSubqueryScan subScan = (StmtSubqueryScan) m_tableScan;
+                List<StmtTargetTableScan> tableScans = subScan.getAllTargetTables();
+                for (StmtTargetTableScan tb: tableScans) {
+                    tablesRead.put(tb.getTableName(), tb);
+                }
+            }
         }
     }
 
@@ -212,6 +221,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Accessor to return the sub-query flag
      * @return m_isSubQuery
      */
+    @Override
     public boolean isSubQuery() {
         return m_isSubQuery;
     }

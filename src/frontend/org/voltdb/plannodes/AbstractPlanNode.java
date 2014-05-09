@@ -555,6 +555,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
+    public boolean isSubQuery() {
+        return false;
+    }
+
     /**
      * Refer to the override implementation on NestLoopIndexJoin node.
      * @param tableName
