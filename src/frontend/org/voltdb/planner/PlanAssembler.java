@@ -609,7 +609,8 @@ public class PlanAssembler {
         // There should be more cases for Joins have to be done on coordinator
         // This case should also not be pushed down
         boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE);
+                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                !root.hasAnyNodeOfType(PlanNodeType.LIMIT);
         if (subScanCanPushdown) {
             compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
         }

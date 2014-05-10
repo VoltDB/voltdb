@@ -961,6 +961,51 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScanSubSelects(pn, "P4");
     }
 
+    public void testSubSelects_LimitOffset() {
+        AbstractPlanNode pn;
+        List<AbstractPlanNode> planNodes;
+        AbstractPlanNode nlpn;
+
+        // Top aggregation node on coordinator
+        planNodes = compileToFragments(
+                "SELECT -8, T1.NUM " +
+                "FROM R4 T0, (select RATIO, NUM, DESC from P4 order by DESC, NUM, RATIO limit 1 offset 1) T1 " +
+                "WHERE (T1.NUM + 5 ) > 44");
+
+        for(AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
+
+        assertTrue(planNodes.size() == 2);
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1", "NUM");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+        pn = nlpn.getChild(1);
+        checkIndexedSubSelects(pn, "R4", null);
+
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "P4");
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
