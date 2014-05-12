@@ -24,9 +24,6 @@ public class CatalogChangeWork extends AsyncCompilerWork {
 
     final byte[] catalogBytes;
     final String deploymentString;
-    final long originalTxnId;
-    final long originalUniqueId;
-    final ProcedureInvocationType invocationType;
 
     public CatalogChangeWork(
             long replySiteId,
@@ -36,7 +33,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData,
+              adminConnection, clientData, type, originalTxnId, originalUniqueId,
               completionHandler);
         if (catalogBytes != null) {
             this.catalogBytes = catalogBytes.clone();
@@ -45,9 +42,6 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             this.catalogBytes = null;
         }
         this.deploymentString = deploymentString;
-        this.invocationType = type;
-        this.originalTxnId = originalTxnId;
-        this.originalUniqueId = originalUniqueId;
     }
 
 }
