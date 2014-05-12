@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -59,6 +58,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
@@ -415,6 +415,12 @@ public class SnapshotSiteProcessor {
      */
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        //Basically asserts that there are no tasks with null targets at this point
+        //getTarget checks and crashes
+        for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
+            t.getTarget();
+        }
+
         ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
