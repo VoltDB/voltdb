@@ -18,6 +18,9 @@
 #ifndef TUPLESCHEMA_H_
 #define TUPLESCHEMA_H_
 
+#include "common/FatalException.hpp"
+#include "common/types.h"
+
 #include <cassert>
 #include <cstring>
 #include <stdint.h>
@@ -25,12 +28,9 @@
 #include <iostream>
 #include <vector>
 
-#include "common/FatalException.hpp"
-#include "common/types.h"
-
-#define UNINLINEABLE_OBJECT_LENGTH 64
-#define UNINLINEABLE_CHARACTER_LENGTH 16
+#define UNINLINEABLE_OBJECT_LENGTH 255
 #define MAX_BYTES_PER_UTF8_CHARACTER 4
+#define UNINLINEABLE_CHARACTER_LENGTH 64
 
 namespace voltdb {
 

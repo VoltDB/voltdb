@@ -354,13 +354,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     voltdb::TupleSchema::freeTupleSchema(keySchema);
 }
 
-TEST_F(IndexKeyTest, SingleVarChar30) {
+TEST_F(IndexKeyTest, SingleVarChar70) {
     std::vector<voltdb::ValueType> columnTypes;
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull(1, true);
 
     columnTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
-    columnLengths.push_back(30);
+    columnLengths.push_back(70);
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
 
