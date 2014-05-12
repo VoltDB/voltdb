@@ -148,43 +148,39 @@ public class PlanSelector implements Cloneable {
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-    public void considerCandidatePlan(CompiledPlan rawplan, AbstractParsedStmt parsedStmt) {
+    public void considerCandidatePlan(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
         //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
         // run the set of microptimizations, which may return many plans (or not)
-        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_detMode, parsedStmt);
+        MicroOptimizationRunner.applyAll(plan, m_detMode, parsedStmt);
 
-        // iterate through the subset of plans
-        for (CompiledPlan plan : optimizedPlans) {
+        // add in the sql to the plan
+        plan.sql = m_sql;
 
-            // add in the sql to the plan
-            plan.sql = m_sql;
+        // compute resource usage using the single stats collector
+        m_stats = new PlanStatistics();
+        AbstractPlanNode planGraph = plan.rootPlanGraph;
 
-            // compute resource usage using the single stats collector
-            m_stats = new PlanStatistics();
-            AbstractPlanNode planGraph = plan.rootPlanGraph;
+        // compute statistics about a plan
+        planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
 
-            // compute statistics about a plan
-            planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
+        // compute the cost based on the resources using the current cost model
+        plan.cost = m_costModel.getPlanCost(m_stats);
 
-            // compute the cost based on the resources using the current cost model
-            plan.cost = m_costModel.getPlanCost(m_stats);
+        // filename for debug output
+        String filename = String.valueOf(m_planId++);
 
-            // filename for debug output
-            String filename = String.valueOf(m_planId++);
+        //* enable for debug */ System.out.println("DEBUG [new plan]: Cost:" + plan.cost + plan.rootPlanGraph.toExplainPlanString());
 
-            //System.out.println(String.format("[new plan]: Cost:%f%n%s", plan.cost, plan.rootPlanGraph.toExplainPlanString()));
-
-            // find the minimum cost plan
-            if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
-                // free the PlanColumns held by the previous best plan
-                m_bestPlan = plan;
-                m_bestFilename = filename;
-                //System.out.println("[Best plan] gets updated ***\n");
-            }
-
-            outputPlan(plan, planGraph, filename);
+        // find the minimum cost plan
+        if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
+            // free the PlanColumns held by the previous best plan
+            m_bestPlan = plan;
+            m_bestFilename = filename;
+            //* enable for debug */ System.out.println("DEBUG [Best plan] updated ***\n");
         }
+
+        outputPlan(plan, planGraph, filename);
     }
 
     public void finalizeOutput() {
