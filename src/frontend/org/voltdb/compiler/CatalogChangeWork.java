@@ -24,6 +24,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
 
     final byte[] catalogBytes;
     final String deploymentString;
+    final String[] adhocDDLStmts;
 
     public CatalogChangeWork(
             long replySiteId,
@@ -42,6 +43,31 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             this.catalogBytes = null;
         }
         this.deploymentString = deploymentString;
+        adhocDDLStmts = null;
     }
 
+    /**
+     * To process adhoc DDL, we want to convert the AdHocPlannerWork we received from the
+     * ClientInterface into a CatalogChangeWork object for the AsyncCompilerAgentHelper to
+     * grind on.
+     */
+    public CatalogChangeWork(AdHocPlannerWork adhocDDL)
+    {
+        super(adhocDDL.replySiteId,
+              adhocDDL.shouldShutdown,
+              adhocDDL.clientHandle,
+              adhocDDL.connectionId,
+              adhocDDL.hostname,
+              adhocDDL.adminConnection,
+              adhocDDL.clientData,
+              adhocDDL.invocationType,
+              adhocDDL.originalTxnId,
+              adhocDDL.originalUniqueId,
+              adhocDDL.completionHandler);
+        // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
+        this.catalogBytes = null;
+        // Ditto for deployment string
+        this.deploymentString = null;
+        this.adhocDDLStmts = adhocDDL.sqlStatements;
+    }
 }
