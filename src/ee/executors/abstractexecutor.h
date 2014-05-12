@@ -72,14 +72,6 @@ class AbstractExecutor {
     bool execute(const NValueArray& params);
 
     /**
-     * Returns true if the output table for the plannode must be cleaned up
-     * after p_execute().  <b>Default is false</b>. This should be overriden in
-     * the receive executor since this is the only place we need to clean up the
-     * output table.
-     */
-    virtual bool needsPostExecuteClear() { return false; }
-
-    /**
      * Returns the plannode that generated this executor.
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
