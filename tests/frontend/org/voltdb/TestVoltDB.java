@@ -125,11 +125,6 @@ public class TestVoltDB extends TestCase {
     public void testConfigurationValidate() {
         VoltDB.Configuration config;
 
-        // missing leader, catalog and missing deployment:
-        String[] args1 = {"create"};
-        config = new VoltDB.Configuration(args1);
-        assertFalse(config.validate());
-
         // missing leader provided deployment - not okay.
         String[] argsya = {"create", "catalog", "qwerty", "deployment", "qwerty"};
         config = new VoltDB.Configuration(argsya);
