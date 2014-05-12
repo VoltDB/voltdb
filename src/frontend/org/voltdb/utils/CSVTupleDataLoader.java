@@ -61,12 +61,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
             byte status = response.getStatus();
             if (status != ClientResponse.SUCCESS) {
                 m_failedCount.incrementAndGet();
-                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
-                    System.out.println("Fatal Response from server for: " + response.getStatusString()
-                                       + " for: " + m_csvLine.rawLine.toString());
-                    System.exit(1);
-                }
-                m_errHandler.handleError(m_csvLine, response.getStatusString());
+                m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
             long currentCount = m_processedCount.incrementAndGet();
 
@@ -123,7 +118,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                 System.exit(1); // Seriously?
             }
         } catch (IOException ex) {
-            m_errHandler.handleError(metaData, ex.toString());
+            m_errHandler.handleError(metaData, null, ex.toString());
         }
     }
 
