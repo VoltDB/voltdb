@@ -44,16 +44,16 @@ import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexLimit extends MicroOptimization {
+    private AbstractParsedStmt m_parsedStmt;
+
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-        this.m_parsedStmt = parsedStmt;
+    public void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        m_parsedStmt = parsedStmt;
         AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph);
         plan.rootPlanGraph = planGraph;
-        retval.add(plan);
-        return retval;
+        m_parsedStmt = null;
     }
 
     // for debug purpose only, this might not be called

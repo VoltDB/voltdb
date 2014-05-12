@@ -18,7 +18,6 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DeterminismMode;
@@ -53,21 +52,14 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
     }
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        this.m_parsedStmt = parsedStmt;
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
+    public void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
         // The statement is already known NOT to be inherently order deterministic.
         // Some PLANs for a non-ordered query may turn out to be deterministic anyway.
         // So, check first.
         AbstractPlanNode planGraph = plan.rootPlanGraph;
-
         if ( ! planGraph.isOrderDeterministic()) {
             plan.rootPlanGraph = recursivelyApply(planGraph);
         }
-
-        retval.add(plan);
-        return retval;
     }
 
     AbstractPlanNode recursivelyApply(AbstractPlanNode plan)

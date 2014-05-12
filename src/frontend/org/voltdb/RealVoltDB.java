@@ -688,7 +688,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
                             getBackendTargetType(),
-                            m_serializedCatalog,
                             m_catalogContext,
                             m_deployment.getCluster().getKfactor(),
                             csp,

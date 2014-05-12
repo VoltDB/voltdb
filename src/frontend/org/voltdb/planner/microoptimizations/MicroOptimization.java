@@ -17,16 +17,12 @@
 
 package org.voltdb.planner.microoptimizations;
 
-import java.util.List;
-
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
 public abstract class MicroOptimization {
-    protected AbstractParsedStmt m_parsedStmt;
-
     boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement) { return true; }
 
-    public abstract List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) ;
+    public abstract void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt);
 }
