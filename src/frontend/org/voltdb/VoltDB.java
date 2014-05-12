@@ -565,13 +565,18 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
-            String answer = jarname;
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
-                answer = System.getenv("TEST_DIR") + File.separator + jarname;
+                File testDir = new File(System.getenv("TEST_DIR"));
+                // Create the folder as needed so that "ant junitclass" works when run before
+                // testobjects is created.
+                if (!testDir.exists()) {
+                    boolean created = testDir.mkdirs();
+                    assert(created);
+                }
                 // returns a full path, like a boss
-                return new File(answer).getAbsolutePath();
+                return testDir.getAbsolutePath() + File.separator + jarname;
             }
 
             // try to find an obj directory
