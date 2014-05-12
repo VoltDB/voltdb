@@ -182,23 +182,6 @@ public class SubqueryExpression extends AbstractExpression {
         if (m_subqueryNode != null) {
             // Explain the subquery
             StringBuilder sb = new StringBuilder();
-            if (m_verboseExplainForDebugging) {
-                sb.append(" (as JSON: ");
-                JSONStringer stringer = new JSONStringer();
-                try
-                {
-                    stringer.object();
-                    toJSONString(stringer);
-                    stringer.endObject();
-                    sb.append(stringer.toString());
-                }
-                catch (Exception e)
-                {
-                    sb.append("CORRUPTED beyond the ability to format? " + e);
-                    e.printStackTrace();
-                }
-                sb.append(")");
-            }
             m_subqueryNode.explainPlan_recurse(sb, "");
             return "(Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
             m_subqueryId + ")";
