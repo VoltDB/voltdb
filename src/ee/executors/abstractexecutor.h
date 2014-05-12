@@ -84,6 +84,14 @@ class AbstractExecutor {
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
 
+    inline void cleanupTempOutputTable()
+    {
+        if (m_tmpOutputTable) {
+            VOLT_TRACE("Clearing output table...");
+            m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
@@ -130,14 +138,11 @@ class AbstractExecutor {
     VoltDBEngine* m_engine;
 };
 
+
 inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-    if (m_tmpOutputTable) {
-        VOLT_TRACE("Clearing output table...");
-        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    }
 
     // substitute params for output schema
     for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {

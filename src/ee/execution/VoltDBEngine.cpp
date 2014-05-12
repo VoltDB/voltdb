@@ -501,6 +501,13 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
 
+    // Clean up all the tempTable when each plan finishes
+    for (int ctr = 0; ctr < ttl; ++ctr) {
+        AbstractExecutor *executor = execsForFrag->list[ctr];
+        assert (executor);
+        executor->cleanupTempOutputTable();
+    }
+
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
 }
