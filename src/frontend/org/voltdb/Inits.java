@@ -280,6 +280,7 @@ public class Inits {
 
                 try {
                     // Get the catalog bytes and byte count.
+                    // If no catalog was supplied provide an empty one.
                     byte[] catalogBytes;
                     if (m_rvdb.m_pathToStartupCatalog == null) {
                         VoltCompiler compiler = new VoltCompiler();

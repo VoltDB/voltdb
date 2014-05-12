@@ -116,7 +116,6 @@ public class VoltDB {
 
         /** name of the m_catalog JAR file */
         public String m_pathToCatalog = null;
-        public boolean m_catalogDefault = false;
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;

@@ -515,13 +515,8 @@ public class VoltCompiler {
     }
 
     /**
-     * Internal method for compiling with and without a project.xml file or DDL files.
-     *
-     * @param projectReader Reader for project file or null if a project file is not used.
-     * @param jarOutputPath The location to put the finished JAR to.
-     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
-     * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
-     * @return true if successful
+     * Compile an empty catalog jar.
+     * @return empty in-memory jar
      */
     public InMemoryJarfile compileEmptyJar()
     {
@@ -530,22 +525,25 @@ public class VoltCompiler {
         m_infos.clear();
         m_errors.clear();
 
-        // do all the work to get the catalog
+        // Need a database.
         DatabaseType database = new DatabaseType();
 
+        // Do the catalog compilation.
         final InMemoryJarfile jarOutput = new InMemoryJarfile();
         final Catalog catalog = compileCatalogInternal(database, null, jarOutput);
         if (catalog == null) {
             return null;
         }
+
+        // Add buildinfo.txt with proper version info, etc..
         addBuildInfo(jarOutput);
 
+        // Add catalog.txt with the generated commands.
         final String catalogCommands = catalog.serialize();
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
         jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
 
         assert(!hasErrors());
-
         if (hasErrors()) {
             return null;
         }
