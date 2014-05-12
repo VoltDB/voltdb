@@ -55,6 +55,11 @@ public class AsyncCompilerAgentHelper {
                     ioe.getMessage();
                 return retval;
             }
+            if (work.adhocDDLStmts != null) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(work, "AdHoc DDL is currently unsupported.");
+                work.completionHandler.onCompletion(errResult);
+            }
         }
         retval.catalogBytes = newCatalogBytes;
         retval.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(newCatalogBytes);
