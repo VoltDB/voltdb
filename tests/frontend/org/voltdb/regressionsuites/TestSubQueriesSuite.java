@@ -68,7 +68,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void notestSubSelects_Simple() throws NoConnectionsException, IOException, ProcCallException
+    public void testSubSelects_Simple() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);
@@ -166,7 +166,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select newid, id  " +
                     "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
                     "WHERE T1.id = T2.dept ORDER BY newid").getResults()[0];
-            //* enable for debug */ System.out.println(vt.toString());
+            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{4, 2}, {5, 2}});
 
             vt = client.callProcedure("@AdHoc",
@@ -195,7 +195,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select T2.id " +
                     "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
                     "ORDER BY T2.id").getResults()[0];
-            //* enable for debug */ System.out.println(vt.toString());
+            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
                     {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
         }

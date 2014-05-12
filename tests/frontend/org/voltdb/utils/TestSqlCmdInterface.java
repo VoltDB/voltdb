@@ -58,8 +58,8 @@ public class TestSqlCmdInterface
     private static int numOfQueries = -1;
     private static String qryFrmFile = "";
     private final static String[] firstKeyQryWord =
-            new String[]{"select", "insert", "delete", "update", "exec", "execute", "truncate", "create", "alter"
-            };
+            //new String[]{"select", "insert", "delete", "update", "exec", "execute", "create", "alter"};
+            new String[]{"select", "insert", "delete", "update", "exec", "execute"};
 
 
     @BeforeClass
@@ -121,7 +121,7 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 2, ID);
     }
 
-    // 3) To test 2 select statements which are separated by one or more semicolons
+    // 3) To test 2 select statements which are separated by one or more colons
     //    and zero or more white spaces
     @Test
     public void testParseQuery3() {

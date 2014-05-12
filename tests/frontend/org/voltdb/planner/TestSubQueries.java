@@ -30,7 +30,6 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -615,11 +614,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         System.out.println(pn.toExplainPlanString());
         assertTrue(pn instanceof ProjectionPlanNode);
-        
-        pn = compile("SELECT MIN(A) FROM (select * from R1) T1");
-        pn = pn.getChild(0);
-        System.out.println(pn.toExplainPlanString());
-        assertTrue(pn instanceof AggregatePlanNode);
     }
 
     public void testSubSelects_Simple_Joins() {

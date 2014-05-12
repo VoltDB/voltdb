@@ -240,136 +240,182 @@ public class SQLCommand
         "UPDATE",
     };
 
-    private static List<String> getInteractiveQueries() throws Exception
+    private static List<String> getQuery(boolean interactive) throws Exception
     {
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
-        while (true) {
-            String line;
-            if (isRecall) {
-                isRecall = false;
-                line = lineInputReader.readLine("");
-            }
-            else {
-                line = lineInputReader.readLine((LineIndex++) + "> ");
-            }
+        String line = null;
 
-            if (line == null) {
-                if (query == null) {
-                    return null;
+        do
+        {
+            if (interactive)
+            {
+                if (isRecall)
+                {
+                    isRecall = false;
+                    line = lineInputReader.readLine("");
+
                 }
-                return parseQuery(query.toString());
+                else
+                    line = lineInputReader.readLine((LineIndex++) + "> ");
+            }
+            else
+                line = lineInputReader.readLine();
+
+            if (line == null)
+            {
+                if (query == null)
+                    return null;
+                else
+                    return parseQuery(query.toString());
             }
 
             // Process recall commands - ONLY in interactive mode
-            if (RecallToken.matcher(line).matches()) {
-                Matcher m = RecallToken.matcher(line);
-                if (m.find()) {
-                    int recall = -1;
-                    try { recall = Integer.parseInt(m.group(1))-1; } catch(Exception x){}
-                    if (recall > -1 && recall < Lines.size()) {
-                        line = Lines.get(recall);
-                        lineInputReader.putString(line);
-                        lineInputReader.flush();
-                        isRecall = true;
-                        continue;
+            if (interactive && RecallToken.matcher(line).matches())
+            {
+                    Matcher m = RecallToken.matcher(line);
+                    if (m.find())
+                    {
+                        int recall = -1;
+                        try { recall = Integer.parseInt(m.group(1))-1; } catch(Exception x){}
+                        if (recall > -1 && recall < Lines.size())
+                        {
+                            line = Lines.get(recall);
+                            lineInputReader.putString(line);
+                            lineInputReader.flush();
+                            isRecall = true;
+                            continue;
+                        }
+                        else
+                            System.out.printf("%s> Invalid RECALL reference: '" + m.group(1) + "'.\n", LineIndex-1);
                     }
-                    else {
-                        System.out.printf("%s> Invalid RECALL reference: '" + m.group(1) + "'.\n", LineIndex-1);
-                    }
-                }
-                else {
-                    System.out.printf("%s> Invalid RECALL command: '" + line + "'.\n", LineIndex-1);
-                }
+                    else
+                        System.out.printf("%s> Invalid RECALL command: '" + line + "'.\n", LineIndex-1);
             }
 
             // Strip out invalid recall commands
-            if (RecallToken.matcher(line).matches()) {
+            if (RecallToken.matcher(line).matches())
                 line = "";
-            }
 
             // Queue up the line to the recall stack - ONLY in interactive mode
-            Lines.add(line);
+            if (interactive)
+                Lines.add(line);
 
             // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
-            if (ExitToken.matcher(line).matches()) {
-                return null;
+            if (ExitToken.matcher(line).matches())
+            {
+                if (interactive)
+                    return null;
             }
             // LIST PROCEDURES command
-            else if (ListProceduresToken.matcher(line).matches()) {
-                List<String> list = new LinkedList<String>(Procedures.keySet());
-                Collections.sort(list);
-                int padding = 0;
-                for(String procedure : list) {
-                    if (padding < procedure.length()) {
-                        padding = procedure.length();
-                    }
-                }
-                padding++;
-                String format = "%1$-" + padding + "s";
-                for (int i = 0; i<2; i++) {
-                    int j = 0;
-                    for (String procedure : list) {
-                        if (i == 0 && procedure.startsWith("@")) {
-                            continue;
-                        }
-                        if (i == 1 && !procedure.startsWith("@")) {
-                            continue;
-                        }
-                        if (j == 0) {
-                            if (i == 0) {
-                                System.out.println("\n--- User Procedures ----------------------------------------");
-                            } else {
-                                System.out.println("\n--- System Procedures --------------------------------------");
+            else if (ListProceduresToken.matcher(line).matches())
+            {
+                if (interactive)
+                {
+                    List<String> list = new LinkedList<String>(Procedures.keySet());
+                    Collections.sort(list);
+                    int padding = 0;
+                    for(String procedure : list)
+                        if (padding < procedure.length()) padding = procedure.length();
+                    padding++;
+                    String format = "%1$-" + padding + "s";
+                    for(int i = 0;i<2;i++)
+                    {
+                        int j = 0;
+                        for(String procedure : list)
+                        {
+                            if (i == 0 && procedure.startsWith("@"))
+                                continue;
+                            else if (i == 1 && !procedure.startsWith("@"))
+                                continue;
+                            if (j == 0)
+                            {
+                                if (i == 0)
+                                    System.out.println("\n--- User Procedures ----------------------------------------");
+                                else
+                                    System.out.println("\n--- System Procedures --------------------------------------");
                             }
-                        }
-                        for (List<String> parameterSet : Procedures.get(procedure).values()) {
-                            System.out.printf(format, procedure);
-                            System.out.print("\t");
-                            int pidx = 0;
-                            for (String paramType : parameterSet) {
-                                if (pidx > 0) {
-                                    System.out.print(", ");
+                            for (List<String> parameterSet : Procedures.get(procedure).values()) {
+                                System.out.printf(format, procedure);
+                                System.out.print("\t");
+                                int pidx = 0;
+                                for(String paramType : parameterSet)
+                                {
+                                    if (pidx > 0)
+                                        System.out.print(", ");
+                                    System.out.print(paramType);
+                                    pidx++;
                                 }
-                                System.out.print(paramType);
-                                pidx++;
+                                System.out.print("\n");
                             }
-                            System.out.print("\n");
+                            j++;
                         }
-                        j++;
                     }
+                    System.out.print("\n");
                 }
-                System.out.print("\n");
             }
             // LIST TABLES command
-            else if (ListTablesToken.matcher(line).matches()) {
-                Tables tables = getTables();
-                printTables("User Tables", tables.tables);
-                printTables("User Views", tables.views);
-                printTables("User Export Streams", tables.exports);
-                System.out.print("\n");
+            else if (ListTablesToken.matcher(line).matches())
+            {
+                if (interactive)
+                {
+                    Tables tables = getTables();
+                    printTables("User Tables", tables.tables);
+                    printTables("User Views", tables.views);
+                    printTables("User Export Streams", tables.exports);
+                    System.out.print("\n");
+                }
             }
             // GO commands - ONLY in interactive mode, close batch and parse for execution
-            else if (GoToken.matcher(line).matches()){
-                return parseQuery(query.toString().trim());
+            else if (GoToken.matcher(line).matches())
+            {
+                if (interactive)
+                    return parseQuery(query.toString().trim());
             }
             // FILE command - include the content of the file into the query
-            // OR regular SQL query - collect until the next semi-colon.
-            else {
-                boolean executeImmediate = SemicolonToken.matcher(line).matches();
+            else if (FileToken.matcher(line).matches())
+            {
+                boolean executeImmediate = false;
+                if (interactive && SemicolonToken.matcher(line).matches())
+                    executeImmediate = true;
                 Matcher m = FileToken.matcher(line);
-                if (m.find()) {
+                if (m.find())
+                {
                     line = readScriptFile(m.group(1));
-                }
-                if (line != null) {
-                    query.append(line);
-                    if (executeImmediate) {
-                        return parseQuery(query.toString().trim());
+                    if (line == null)
+                    {
+                        if (!interactive)
+                            return null;
                     }
-                    query.append("\n");
+                    else
+                    {
+                        query.append(line);
+                        query.append("\n");
+
+                        if (executeImmediate)
+                            return parseQuery(query.toString().trim());
+                    }
+                }
+                else
+                {
+                    System.err.print("Invalid FILE command: '" + line + "'.");
+                    // In non-interactive mode, a failure aborts the entire batch
+                    // In interactive mode, we'll just ignore that specific failed command.
+                    if (!interactive)
+                        return null;
                 }
             }
+            // Regular SQL query - collect until the next semi-colon.
+            else
+            {
+                query.append(line);
+                query.append("\n");
+                if (interactive && SemicolonToken.matcher(line).matches())
+                    return parseQuery(query.toString().trim());
+            }
+            line = null;
         }
+        while(true);
     }
 
     private static void printTables(final String name, final Collection<String> tables)
@@ -385,7 +431,41 @@ public class SQLCommand
     {
         try
         {
-            return readScriptFileRecursive(filePath);
+            StringBuilder query = new StringBuilder();
+            BufferedReader script = new BufferedReader(new FileReader(filePath));
+            String line;
+            while ((line = script.readLine()) != null)
+            {
+                // Strip out RECALL, EXIT and GO commands
+                if (!(RecallToken.matcher(line).matches() || ExitToken.matcher(line).matches() || GoToken.matcher(line).matches()))
+                {
+                    // Recursively process FILE commands, any failure will cause a recursive failure
+                    if (FileToken.matcher(line).matches())
+                    {
+                        Matcher m = FileToken.matcher(line);
+                        if (m.find())
+                        {
+                            line = readScriptFile(m.group(1));
+                            if (line == null)
+                                return null;
+                            query.append(line);
+                            query.append("\n");
+                        }
+                        else
+                        {
+                            System.err.print("Invalid FILE command: '" + line + "'.");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        query.append(line);
+                        query.append("\n");
+                    }
+                }
+            }
+            script.close();
+            return query.toString().trim();
         }
         catch(FileNotFoundException e)
         {
@@ -397,52 +477,6 @@ public class SQLCommand
             System.err.println(x.getMessage());
             return null;
         }
-    }
-
-    private static String readScriptFileRecursive(String filePath)
-            throws FileNotFoundException, IOException
-    {
-        StringBuilder query = new StringBuilder();
-        BufferedReader script = new BufferedReader(new FileReader(filePath));
-        String line;
-        while ((line = script.readLine()) != null)
-        {
-            appendLineToQueryString(query, line);
-        }
-        script.close();
-        return query.toString().trim();
-    }
-
-    private static List<String> getScriptedQueries() throws Exception
-    {
-        StringBuilder query = new StringBuilder();
-        String line = null;
-
-        while ((line = lineInputReader.readLine()) != null) {
-            appendLineToQueryString(query, line);
-        }
-        return parseQuery(query.toString());
-    }
-
-    private static void appendLineToQueryString(StringBuilder query, String line)
-            throws FileNotFoundException, IOException
-    {
-        // Strip out RECALL, EXIT and GO commands
-        if (RecallToken.matcher(line).matches() ||
-                ExitToken.matcher(line).matches() ||
-                GoToken.matcher(line).matches() ||
-                ListProceduresToken.matcher(line).matches() ||
-                ListTablesToken.matcher(line).matches())
-        {
-            return;
-        }
-        // Recursively process FILE commands, any failure will cause a recursive failure
-        Matcher m = FileToken.matcher(line);
-        if (m.find()) {
-            line = readScriptFileRecursive(m.group(1));
-        }
-        query.append(line);
-        query.append("\n");
     }
 
     // Query Execution
@@ -652,7 +686,7 @@ public class SQLCommand
         else if (ExplainCall.matcher(query).find())
         {
             // We've got a query that starts with "explain", pre-pend
-            // the @Explain sp invocation ahead of the query (after stripping "explain").
+            // the @Explain sp invocatino ahead of the query (after stripping "explain").
             query = query.substring("explain ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@Explain", query));
@@ -668,10 +702,6 @@ public class SQLCommand
         else  // Ad hoc query
         {
             query = StripCRLF.matcher(query).replaceAll(" ");
-            if (debug) {
-                System.out.println("Actual AdHoc being submitted: " + query);
-                System.out.flush();
-            }
             printResponse(VoltDB.callProcedure("@AdHoc", query));
         }
         return;
@@ -985,12 +1015,11 @@ public class SQLCommand
 
     private static InputStream in = null;
     private static OutputStream out = null;
-    private static boolean debug = false;
-    
     // Application entry point
     public static void main(String args[])
     {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        boolean debug = false;
         try
         {
             // Initialize parameter defaults
@@ -1149,7 +1178,7 @@ public class SQLCommand
             {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 interactive = false;
-                queries = getScriptedQueries();
+                queries = getQuery(false);
                 if (queries == null)
                     System.exit(0);
                 else
@@ -1161,7 +1190,8 @@ public class SQLCommand
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
 
-                while((queries = getInteractiveQueries()) != null) {
+                while((queries = getQuery(true)) != null)
+                {
                     try
                     {
                         for(int i = 0;i<queries.size();i++)

@@ -169,14 +169,14 @@ public class PlanSelector implements Cloneable {
         // filename for debug output
         String filename = String.valueOf(m_planId++);
 
-        //System.out.println(String.format("[new plan]: Cost:%f%n%s", plan.cost, plan.rootPlanGraph.toExplainPlanString()));
+        //* enable for debug */ System.out.println("DEBUG [new plan]: Cost:" + plan.cost + plan.rootPlanGraph.toExplainPlanString());
 
         // find the minimum cost plan
         if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
             // free the PlanColumns held by the previous best plan
             m_bestPlan = plan;
             m_bestFilename = filename;
-            //System.out.println("[Best plan] gets updated ***\n");
+            //* enable for debug */ System.out.println("DEBUG [Best plan] updated ***\n");
         }
 
         outputPlan(plan, planGraph, filename);

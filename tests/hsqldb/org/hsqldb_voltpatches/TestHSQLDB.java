@@ -33,7 +33,6 @@ import java.net.URLDecoder;
 import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.hsqldb_voltpatches.lib.IntKeyHashMap;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -267,129 +266,6 @@ public class TestHSQLDB extends TestCase {
         }
         assertFalse(xml == null);
         System.out.println(xml);
-    }
-
-
-    final int MOD = 4;
-    int counts[] = new int[MOD];
-    public void testIntKeyHashMap() {
-        Object x = null;
-        IntKeyHashMap map = new IntKeyHashMap();
-/*
-        map = new IntKeyHashMap();
-        // top 0 nulls 0 j 0
-        map.put(0, new Integer(2)); //0
-        // top 1 nulls 0 j 1
-        map.put(1, new Integer(3)); //0
-        // top 2 nulls 0 j 2
-        map.put(2, new Integer(4)); //0
-        // top 3 nulls 0 j 3
-        x = map.put(1, new Integer(5)); //2
-        // top 3 nulls 0 j 3
-        x = map.put(1, new Integer(6)); //2
-        // top 3 nulls 0 j 3
-        x = map.remove(1); //1
-        // top 3 nulls 1 j 2
-        x = map.remove(1); //1
-        // top 3 nulls 1 j 2
-        map.put(2, new Integer(9)); //0
-        // top 3 nulls 1 j 3
-        
-        checkMap(map, 3, 3, -1, -1);
-*/
-        int j = 0;
-        int top = 0;
-        boolean check = false;
-        for (int i = 0; i < 100000; ++i) {
-            check = false;
-            int r = (int)(Math.random() * 10000);
-            ++counts[r % MOD];
-            switch(r % MOD) {
-            default:
-            case 0:
-                int key = r / 500;
-                x = map.get(key);
-                if (x == null) {
-                    System.out.println("        map.put(" + key + ", new Integer(" + i + ")); //0");
-                    map.put(key, new Integer(i));
-                    assertTrue(new Integer(i).equals(map.get(key)));
-                    if (key >= top) {
-                        top = key+1;
-                    }
-                    ++j;
-                    check = true;
-                }
-                break;
-            case 1:
-                System.out.println("        x = map.remove(" + j/2 + "); //1") ;
-                x = map.remove(j/2);
-                assertTrue(null == map.get(j/2));
-                assertTrue(null == map.remove(j/2));
-                if (x != null) {
-                    --j;
-                }
-                check = true;
-                break;
-            case 2:
-                x = map.get(j/2);
-                if (x == null) {
-                    check = true;
-                }
-                break;
-            case 3:
-                x = map.get(j/3);
-                System.out.println("        x = map.put(" + j/3 + ", new Integer(" + i + ")); //2") ;
-                map.put(j/3, new Integer(i));
-                assertTrue(new Integer(i).equals(map.get(j/3)));
-                if (x == null) {
-                    if (j/3 >= top) {
-                        ++top;
-                    }
-                    ++j;
-                }
-                check = true;
-                break;
-            }
-
-            if (check) {
-                checkMap(map, j, top, i, r);
-            }
-
-            if (r % (MOD*MOD) == MOD) {
-                System.out.println("        map = new IntKeyHashMap();") ;
-                map = new IntKeyHashMap();
-                j = 0;
-                top = 0;
-            }
-            
-        }
-    }
-
-    private void checkMap(IntKeyHashMap map, int j, int top, int i, int r) {
-        int nulls = 0;
-        for (int k = 0; k < top; ++k) {
-            if (map.get(k) == null) {
-                ++nulls;
-            }
-        }
-        System.out.println("        // top " + top + " nulls " + nulls + " j " + j);
-        if (top != nulls + j) {
-            System.out.println("Action Counts:");
-            for (int count : counts) {
-                System.out.println(count);
-            }
-            System.out.println("Contents:");
-            for (int k = 0; k < top; ++k) {
-                Object got = map.get(k); 
-                if (got == null) {
-                    System.out.println(" " + k + ": null");
-                } else {
-                    System.out.println(" " + k + ": " + got.toString());
-                }
-            }
-            System.out.println("iteration " + i + " value " + (r % MOD));
-        }
-        assertEquals(top, nulls + j);
     }
 
     /*public void testSimpleSQL() {

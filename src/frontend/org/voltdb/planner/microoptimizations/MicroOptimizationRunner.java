@@ -34,18 +34,11 @@ public class MicroOptimizationRunner {
         optimizations.add(new ReplaceWithIndexLimit());
     }
 
-    public static void applyAll(CompiledPlan plan, DeterminismMode detMode,
-            AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan,
+            DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
-        boolean statementIsDeterministic =  plan.hasDeterministicStatement();
         for (MicroOptimization opt : optimizations) {
-            // skip optimizations that don't apply at this determinism level
-            if (!opt.shouldRun(detMode, statementIsDeterministic)) {
-                continue;
-            }
-
-            opt.apply(plan, parsedStmt);
+            opt.apply(plan, detMode, parsedStmt);
         }
     }
-
 }

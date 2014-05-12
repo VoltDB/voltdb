@@ -20,9 +20,31 @@ package org.voltdb.planner.microoptimizations;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 public abstract class MicroOptimization {
-    boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement) { return true; }
+    protected AbstractParsedStmt m_parsedStmt;
 
-    public abstract void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt);
+    /// Provide a commonly used approach to optimization via a potentially recursive call to
+    /// recursivelyApply that is expected to edit or replace the plan graph.
+    /// The parsed statement is also available as a data member to provide context.
+    /// Derived classes must implement recursiveApply, but that implementation could,
+    /// theoretically, just "assert(false)" IF the class also completely re-implements "apply".
+    /// Implementing recursivelyApply to do real work on the plan graph is the more common paradigm.
+    void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
+    {
+        try {
+            m_parsedStmt = parsedStmt;
+            AbstractPlanNode planGraph = plan.rootPlanGraph;
+            planGraph = recursivelyApply(planGraph);
+            plan.rootPlanGraph = planGraph;
+        }
+        finally {
+            // Avoid leaking a long-term reference from static optimizations
+            // to a large parsed statement structure.
+            m_parsedStmt = null;
+        }
+    }
+
+    protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan);
 }
