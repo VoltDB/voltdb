@@ -46,6 +46,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.common.Constants;
+import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -75,6 +76,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final long m_HSId;
     private final long m_generation;
     private final int m_partitionId;
+    private final ExportFormat m_format;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
@@ -112,6 +114,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             {
         checkNotNull( onDrain, "onDrain runnable is null");
 
+        m_format = ExportFormat.ORIGINAL;
         m_generation = generation;
         m_onDrain = new Runnable() {
             @Override
@@ -247,6 +250,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 int columnType = column.getInt("type");
                 m_columnTypes.add(columnType);
                 m_columnLengths.add(column.getInt("length"));
+            }
+            if (jsObj.has("format")) {
+                m_format = ExportFormat.valueOf(jsObj.getString("format"));
+            } else {
+                m_format = ExportFormat.FOURDOTFOUR;
             }
         } catch (JSONException e) {
             throw new IOException(e);
@@ -750,5 +758,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
+    }
+
+    public ExportFormat getExportFormat() {
+        return m_format;
     }
 }

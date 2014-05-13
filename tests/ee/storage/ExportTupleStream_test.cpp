@@ -50,9 +50,9 @@ const int COLUMN_COUNT = 5;
 // 1 Export header column * sizeof(int64_t) = 8
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
 // sizeof(int32_t) for row header = 4
-// 5 * sizeof(int64_t) for tuple data = 40
-// total: 87
-const int MAGIC_TUPLE_SIZE = 94;
+// 5 * sizeof(int32_t) for tuple data = 40
+// total: 74
+const int MAGIC_TUPLE_SIZE = 74;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
 
@@ -265,7 +265,7 @@ TEST_F(ExportTupleStreamTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
-    EXPECT_EQ( 1802, m_wrapper->allocatedByteCount());
+    EXPECT_EQ( 1422, m_wrapper->allocatedByteCount());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);

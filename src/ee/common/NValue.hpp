@@ -2956,48 +2956,68 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
     assert(isNull() == false);
-    switch (getValueType()) {
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
-    {
-        int64_t val = castAsBigIntAndGetValue();
-        io.writeLong(val);
-        return;
-    }
-    case VALUE_TYPE_DOUBLE:
-    {
-        double value = getDouble();
-        io.writeDouble(value);
-        return;
-    }
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    {
-        // requires (and uses) bytecount not character count
-                io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
-                return;
-    }
-    case VALUE_TYPE_DECIMAL:
-    {
-        std::string decstr = createStringFromDecimal();
-        int32_t objectLength = (int32_t)decstr.length();
-        io.writeBinaryString(decstr.data(), objectLength);
-        return;
-    }
-    case VALUE_TYPE_INVALID:
-    case VALUE_TYPE_NULL:
-    case VALUE_TYPE_BOOLEAN:
-    case VALUE_TYPE_ADDRESS:
-    case VALUE_TYPE_ARRAY:
-    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
-        char message[128];
-        snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                message);
-    }
+    const ValueType type = getValueType();
+     switch (type) {
+     case VALUE_TYPE_VARCHAR:
+     case VALUE_TYPE_VARBINARY:
+     {
+         if (isNull()) {
+             io.writeInt(OBJECTLENGTH_NULL);
+             return;
+         }
+         const int32_t length = getObjectLength_withoutNull();
+         if (length <= OBJECTLENGTH_NULL) {
+             throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
+         }
+         io.writeInt(static_cast<int32_t>(length));
+
+         // Not a null string: write it out
+         io.writeBytes(getObjectValue_withoutNull(), length);
+
+         return;
+     }
+     case VALUE_TYPE_TINYINT: {
+         io.writeByte(getTinyInt());
+         return;
+     }
+     case VALUE_TYPE_SMALLINT: {
+         io.writeShort(getSmallInt());
+         return;
+     }
+     case VALUE_TYPE_INTEGER: {
+         io.writeInt(getInteger());
+         return;
+     }
+     case VALUE_TYPE_TIMESTAMP: {
+         io.writeLong(getTimestamp());
+         return;
+     }
+     case VALUE_TYPE_BIGINT: {
+         io.writeLong(getBigInt());
+         return;
+     }
+     case VALUE_TYPE_DOUBLE: {
+         io.writeDouble(getDouble());
+         return;
+     }
+     case VALUE_TYPE_DECIMAL: {
+         io.writeShort(kMaxDecScale);
+         io.writeShort(16);  //number of bytes in decimal
+         io.writeLong(getDecimal().table[1]);
+         io.writeLong(getDecimal().table[0]);
+         return;
+     }
+     case VALUE_TYPE_INVALID:
+     case VALUE_TYPE_NULL:
+     case VALUE_TYPE_BOOLEAN:
+     case VALUE_TYPE_ADDRESS:
+     case VALUE_TYPE_ARRAY:
+     case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+         char message[128];
+         snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                 message);
+     }
 
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
             "Invalid type in serializeToExport");

@@ -35,6 +35,17 @@ public class AdvertisedDataSource
     final public ArrayList<String> columnNames = new ArrayList<String>();
     final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
     final public List<Integer> columnLengths = new ArrayList<Integer>();
+    final public ExportFormat exportFormat;
+
+    /*
+     * Enumeration defining what format the blocks of export data are in.
+     * Updated for 4.4 to use smaller values for integers and a binary variable size
+     * representation for decimals so that the format would be more efficient and
+     * shareable with other features
+     */
+    public enum ExportFormat {
+        ORIGINAL, FOURDOTFOUR;
+    }
 
     @Override
     public int hashCode() {
@@ -59,7 +70,8 @@ public class AdvertisedDataSource
             long generation,
             ArrayList<String> names,
             ArrayList<VoltType> types,
-            List<Integer> lengths)
+            List<Integer> lengths,
+            ExportFormat exportFormat)
     {
         partitionId = p_id;
         signature = t_signature;
@@ -75,6 +87,7 @@ public class AdvertisedDataSource
         if (lengths != null) {
             columnLengths.addAll(lengths);
         }
+        this.exportFormat = exportFormat;
     }
 
     public VoltType columnType(int index) {
