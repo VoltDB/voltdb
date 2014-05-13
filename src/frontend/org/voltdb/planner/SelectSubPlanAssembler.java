@@ -654,16 +654,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         //
 
         assert(joinNode.getRightNode() != null);
-        AccessPath innerAccessPath = joinNode.getRightNode().m_currentAccessPath;
+        JoinNode innerJoinNode = joinNode.getRightNode();
+        AccessPath innerAccessPath = innerJoinNode.m_currentAccessPath;
         // We may need to add a send/receive pair to the inner plan for the special case.
         // This trick only works once per plan, BUT once the partitioned data has been
         // received on the coordinator, it can be treated as replicated data in later
         // joins, which MAY help with later outer joins with replicated data.
-        boolean needInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
-                                       (m_partitioning.getCountOfPartitionedTables() > 0) &&
-                                       (joinNode.getJoinType() != JoinType.INNER) &&
-                                       ( ! innerPlan.hasReplicatedResult()) &&
-                                       outerPlan.hasReplicatedResult();
+
+
+        boolean needInnerSendReceive = (m_partitioning.requiresTwoFragments()) &&
+                                       (! innerPlan.hasReplicatedResult()) &&
+                                       (outerPlan.hasReplicatedResult()) &&
+                                       (joinNode.getJoinType() != JoinType.INNER || innerPlan.isNonjoinableSubquery())
+                                       ;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
         // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the
