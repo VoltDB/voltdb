@@ -681,7 +681,7 @@ public class TestSubQueries extends PlannerTestCase {
 
         // Join with partitioned tables
 
-        // Join on coordinator
+        // Join on coordinator: LEFT OUTER JOIN, replicated table on left side
         planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
         assertTrue(planNodes.size() == 2);
         pn = planNodes.get(0).getChild(0);
@@ -699,7 +699,30 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "T1", "C");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode); // FIXME(xin): Inline this projection node.
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "P1", "A", "C");
+
+
+        // Join locally: inner join case for subselects
+        planNodes = compileToFragments("SELECT A, C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
+        assertTrue(planNodes.size() == 2);
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "R1", "A", "C");
+        pn = nlpn.getChild(1);
+        checkSeqScanSubSelects(pn, "T1", "C");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "P1", "A", "C");
 
@@ -707,10 +730,13 @@ public class TestSubQueries extends PlannerTestCase {
         // Two sub-queries. One is partitioned and the other one is replicated
         planNodes = compileToFragments("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 WHERE T1.A = T2.C ");
         assertTrue(planNodes.size() == 2);
-        pn = planNodes.get(0);
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
+        pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
         nlpn = pn.getChild(0);
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
@@ -718,18 +744,13 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScanSubSelects(pn, "T1", "A");
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
-        pn = nlpn.getChild(1);
-        assertTrue(pn instanceof ReceivePlanNode);
 
-        pn = planNodes.get(1);
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
+        pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "P1", "C");
-
 
         // This is a single fragment plan because planner can detect "A = 3".
         // Join locally
@@ -923,7 +944,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertEquals(0, ((ParameterValueExpression)cp).getParameterIndex().intValue());
     }
 
-
     public void testSubSelects_GroupBy_NonPartitionKeys() {
         AbstractPlanNode pn;
         List<AbstractPlanNode> planNodes;
@@ -944,14 +964,13 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
+        checkIndexedSubSelects(pn, "R4", null);
+        pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AggregatePlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof ReceivePlanNode);
-        pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "R4", null);
-
 
         pn = planNodes.get(1);
         assertTrue(pn instanceof SendPlanNode);
@@ -972,8 +991,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "FROM R4 T0, (select RATIO, NUM, DESC from P4 order by DESC, NUM, RATIO limit 1 offset 1) T1 " +
                 "WHERE (T1.NUM + 5 ) > 44");
 
-        for(AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
-
         assertTrue(planNodes.size() == 2);
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
@@ -983,6 +1000,8 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
+        checkIndexedSubSelects(pn, "R4", null);
+        pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -992,9 +1011,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof ReceivePlanNode);
-        pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "R4", null);
-
 
         pn = planNodes.get(1);
         assertTrue(pn instanceof SendPlanNode);

@@ -221,7 +221,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Accessor to return the sub-query flag
      * @return m_isSubQuery
      */
-    @Override
     public boolean isSubQuery() {
         return m_isSubQuery;
     }
