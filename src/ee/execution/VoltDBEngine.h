@@ -514,7 +514,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
-        void cleanupExecutorFragments(ExecutorVector * execsForFrag, size_t ttl);
+        void cleanupExecutors(ExecutorVector * execsForFrag);
 
         // -------------------------------------------------
         // Data Members
