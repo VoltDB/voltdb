@@ -501,7 +501,6 @@ void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
         assert (executor);
         executor->cleanupTempOutputTable();
     }
-
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
 }

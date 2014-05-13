@@ -99,15 +99,6 @@ class AbstractExecutor {
     virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
-     * Returns true if the output table for the plannode must be
-     * cleared before p_execute().  <b>Default is true (clear each
-     * time)</b>. Override this method if the executor receives a
-     * plannode instance that must not be cleared.
-     * @return true if output table must be cleared; false otherwise.
-     */
-    virtual bool needsOutputTableClear() { return true; };
-
-    /**
      * Set up a multi-column temp output table for those executors that require one.
      * Called from p_init.
      */
@@ -122,9 +113,6 @@ class AbstractExecutor {
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
-
-    // cache to avoid runtime virtual function call
-    bool needs_outputtable_clear_cached;
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;

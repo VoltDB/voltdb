@@ -514,6 +514,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
+        bool checkTempTableCleanup(ExecutorVector * execsForFrag);
         void cleanupExecutors(ExecutorVector * execsForFrag);
 
         // -------------------------------------------------
