@@ -868,8 +868,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         StringBuilder sb = new StringBuilder();
         explainPlan_recurse(sb, "");
         String fullExpalinString = sb.toString();
-        // Extract subqueries into a map to explain them separately
-        Pattern subqueryPattern = Pattern.compile("Subquery_([0-9]+)(.*)(\\s*)Subquery_(\\1)", Pattern.DOTALL);
+        // Extract subqueries into a map to explain them separately. Each subquery is
+        // surrounded by the 'Subquery_[SubqueryId]' tags. Example:
+        // Subquery_1SEQUENTIAL SCAN of "R1"Subquery_1
+        Pattern subqueryPattern = Pattern.compile("(Subquery_)([0-9]+)(.*)(\\s*)Subquery_(\\2)", Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
         String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
@@ -883,12 +885,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         Matcher matcher = pattern.matcher(explainedSubquery);
         int pos = 0;
         StringBuilder sb = new StringBuilder();
+        // Find all the subqueries from the input string
         while(matcher.find()) {
-            sb.append(explainedSubquery.substring(pos, matcher.end(1)));
+            sb.append(explainedSubquery.substring(pos, matcher.end(2)));
             pos = matcher.end();
-            String nextExplainedStmt = extractExplainedSubquries(matcher.group(2), pattern, subqueries);
-            subqueries.put("Subquery_" + matcher.group(1), nextExplainedStmt);
+            // Recurse into the subquery string to extract its own subqueries if any
+            String nextExplainedStmt = extractExplainedSubquries(matcher.group(3), pattern, subqueries);
+            subqueries.put("Subquery_" + matcher.group(2), nextExplainedStmt);
         }
+        // Append the rest of the input string
         if (pos < explainedSubquery.length()) {
             sb.append(explainedSubquery.substring(pos));
         }

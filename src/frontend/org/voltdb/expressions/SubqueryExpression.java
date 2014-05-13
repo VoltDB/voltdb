@@ -180,10 +180,11 @@ public class SubqueryExpression extends AbstractExpression {
     @Override
     public String explain(String impliedTableName) {
         if (m_subqueryNode != null) {
-            // Explain the subquery
+            // Surround the explained subquery by the 'Subquery_#' tags.The explained subquery
+            // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "(Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
+            return "EXISTS (Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
             m_subqueryId + ")";
         } else {
             return "(Subquery: null)";

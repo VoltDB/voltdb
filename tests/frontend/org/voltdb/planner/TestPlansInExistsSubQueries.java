@@ -93,6 +93,21 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertEquals("A", ((TupleValueExpression)tve).getColumnName());
     }
 
+    public void testNotExistsW() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where not exists (select c from r1 where r1.c = r2.c)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
+        AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
+        assertEquals(ExpressionType.OPERATOR_NOT, e.getExpressionType());
+        AbstractExpression le = e.getLeft();
+        assertEquals(ExpressionType.SUBQUERY, le.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) le;
+        assertEquals(1, subExpr.getArgs().size());
+        assertEquals(1, subExpr.getParameterIdxList().size());
+        assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
+    }
+
     public void testInToExistsComplex() {
       AbstractPlanNode pn = compile("select * from R1 where (A,C) in (select 2, C from r2 where r2.c > r1.c group by c)");
       pn = pn.getChild(0);
@@ -212,10 +227,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 //      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
 //    }
 
-//    public void testSendReceiveInSubquery() {
-//      failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
-//              "Subqueries on partitioned data are only supported in single partition stored procedures.");
-//    }
+    public void testSendReceiveInSubquery() {
+      failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
+              "Subqueries on partitioned data are only supported in single partition stored procedures.");
+    }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();
