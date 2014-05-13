@@ -555,20 +555,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
-    public boolean partOfSubQueryPlan() {
-        if (this instanceof AbstractScanPlanNode) {
-            AbstractScanPlanNode asp = (AbstractScanPlanNode) this;
-            return asp.isSubQuery();
-        }
+    public boolean isSubQuery() {
+        return false;
+    }
 
+    public boolean hasSubquery() {
+        if (isSubQuery()) {
+            return true;
+        }
         for (AbstractPlanNode n : m_children) {
-            if (n.partOfSubQueryPlan()) {
+            if (n.hasSubquery()) {
                 return true;
             }
         }
-
         for (AbstractPlanNode inlined : m_inlineNodes.values()) {
-            if (inlined.partOfSubQueryPlan()) {
+            if (inlined.hasSubquery()) {
                 return true;
             }
         }
@@ -581,15 +582,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return false when this plan can join locally, otherwise return true.
      */
     public boolean isNonjoinableSubquery() {
-        if (partOfSubQueryPlan()) {
+        if (hasSubquery()) {
             if (this.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                    this.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                    this.hasAnyNodeOfType(PlanNodeType.LIMIT)) {
-
+                this.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                this.hasAnyNodeOfType(PlanNodeType.LIMIT))
+            {
                 return true;
             }
         }
-
         return false;
     }
 
