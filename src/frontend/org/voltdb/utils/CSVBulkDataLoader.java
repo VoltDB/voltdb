@@ -43,7 +43,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             m_failedInsertCount.incrementAndGet();
-            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response.getStatusString());
+            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response, response.getStatusString());
         }
     }
 

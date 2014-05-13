@@ -176,7 +176,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {2,6,8,9,10,11,12,13};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test batch option that splits.
@@ -215,7 +215,47 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {9,10};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+    }
+
+    //Test flush with good and bad rows in < maxBatch
+    public void testBatchOptionCommitByFlush() throws Exception {
+        String mySchema
+                = "create table BLAH ("
+                + "clm_integer integer default 0 not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + //"clm_varinary varbinary(20) default null," +
+                "clm_timestamp timestamp default null "
+                + "); ";
+        //Make batch size large
+        int myBatchSize = 200;
+        TimestampType currentTime = new TimestampType();
+        Object[][] myData = {
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {2, 2, 2, 222222, "second", 3.30, null, currentTime},
+            {3, 3, 3, 333333, " third ", null, 3.33, currentTime},
+            {4, 4, 4, 444444, " NULL ", 4.40, 4.44, currentTime},
+            {5, 5, 5, 5555555, "abcdeg", 5.50, 5.55, currentTime},
+            {6, 6, null, 666666, "sixth", 6.60, 6.66, currentTime},
+            {7, 7, 7, 7777777, " seventh", 7.70, 7.77, currentTime},
+            {11, 1, 1, 1000, "first", 1.10, 1.11, currentTime},
+            //empty line
+            {},
+            //invalid lines below
+            {8, 8},
+            {9, 9, 9, 900, "nine", 1.10, 1.11, currentTime},
+            {10, 10, 10, 10, "second", 2.20, 2.22, currentTime},
+            {12, null, 12, 12121212, "twelveth", 12.12, 12.12, currentTime}
+        };
+        Integer[] failures = {9, 10};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
     }
 
     //Test that gets constraint violations.
@@ -257,7 +297,49 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {5,6,9,10,14,15,16};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+    }
+
+    //Test that gets constraint violations.
+    //has a batch that fully fails and 2 batches that has 50% failure.
+    public void testBatchOptionAndGetsViolationsCommitByFlush() throws Exception {
+        String mySchema
+                = "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        int myBatchSize = 200;
+        TimestampType currentTime = new TimestampType();
+        Object[][] myData = {
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {3, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {4, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {5, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {6, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {7, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {8, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {11, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
+            {12, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}
+        };
+        Integer[] failures = {5, 6, 9, 10, 14, 15, 16};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 3);
     }
 
     //Test batch option that splits and gets constraint violations.
@@ -285,7 +367,59 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {3,4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+    }
+
+    //Test batch option that splits and gets constraint violations.
+    public void testBatchOptionThatSplitsAndGetsViolationsAndDataIsSmallInLastBatchFlush() throws Exception {
+        String mySchema
+                = "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        int myBatchSize = 2;
+        TimestampType currentTime = new TimestampType();
+        Object[][] myData = {
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+        };
+        Integer[] failures = {3};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
+    }
+
+    //Test batch option that splits and gets constraint violations.
+    public void testBatchOptionLastRowGetsViolationsByFlush() throws Exception {
+        String mySchema
+                = "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        int myBatchSize = 2;
+        TimestampType currentTime = new TimestampType();
+        Object[][] myData = {
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},};
+        Integer[] failures = {2};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
     }
 
     public void testOpenQuote() throws Exception
@@ -307,7 +441,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testNULL() throws Exception
@@ -339,7 +473,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {2};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testBlankNull() throws Exception
@@ -363,7 +497,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testBlankEmpty() throws Exception
@@ -387,7 +521,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testStrictQuote() throws Exception
@@ -408,7 +542,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {1, 4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testEmptyFile() throws Exception
@@ -430,7 +564,7 @@ public class TestVoltBulkLoader extends TestCase {
         Object [][]myData = null;
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testEscapeChar() throws Exception
@@ -451,7 +585,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testNoWhiteSpace() throws Exception
@@ -473,7 +607,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testColumnLimitSize() throws Exception
@@ -495,7 +629,7 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testColumnLimitSize2() throws Exception
@@ -515,7 +649,7 @@ public class TestVoltBulkLoader extends TestCase {
 
         Integer[] failures = {2, 3};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface( mySchema, myData, myBatchSize, expectedFailures );
+        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test multiple tables with Multiple Clients and no errors.
@@ -999,7 +1133,8 @@ public class TestVoltBulkLoader extends TestCase {
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
-    public void test_Interface( String my_schema, Object[][] my_data, int my_batchSize,  ArrayList<Integer> expectedFailList) throws Exception {
+    public void test_Interface(String my_schema, Object[][] my_data,
+            int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1025,6 +1160,9 @@ public class TestVoltBulkLoader extends TestCase {
             prepare();
             TestFailureCallback testCallback = new TestFailureCallback();
             VoltBulkLoader bulkLoader = client1.getNewBulkLoader("BLAH", my_batchSize, testCallback);
+            if (flushInterval > 0) {
+                bulkLoader.setFlushInterval(0, flushInterval);
+            }
             // do the test
 
             VoltTable modCount;
@@ -1046,9 +1184,10 @@ public class TestVoltBulkLoader extends TestCase {
                     Integer rowId = new Integer(rowCnt);
                     bulkLoader.insertRow(rowId, nextRow);
                     rowCnt++;
-                    if (rnd.nextInt() % 30 == 0)
-                        //  Randomly inject a flush
+                    if (flushInterval <= 0 && (rnd.nextInt() % 30 == 0)) {
+                        //  Randomly inject a flush if no timer flush is involved.
                         bulkLoader.flush();
+                    }
                 }
             }
             catch( Exception e) {
@@ -1056,11 +1195,19 @@ public class TestVoltBulkLoader extends TestCase {
             }
             System.out.println(String.format("Attempted inserting %d rows", --rowCnt));
 
-            if (rnd.nextBoolean()) {
+            if (flushInterval <= 0 && rnd.nextBoolean()) {
                 // One in 10 tests generate a sync and VoltBulkLoader internal state verification
                 bulkLoader.drain();
                 assert(bulkLoader.getOutstandingRowCount() == 0);
                 assert(bulkLoader.getCompletedRowCount() == rowCnt);
+            }
+            if (flushInterval > 0) {
+                //Lets get timerFlush in
+                Thread.sleep(flushInterval + 500);
+                bulkLoader.drain();
+                //We should have everything processed callbacked.
+                assert (bulkLoader.getOutstandingRowCount() == 0);
+                assert (bulkLoader.getCompletedRowCount() == rowCnt);
             }
 
             bulkLoader.close();
