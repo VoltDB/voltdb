@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -495,7 +496,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // Replace ugly system-generated index name with a description of its user-specified role.
         if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
             m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
-            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+            m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,

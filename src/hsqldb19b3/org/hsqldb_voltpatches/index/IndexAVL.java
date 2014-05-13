@@ -273,45 +273,36 @@ public class IndexAVL implements Index {
     }
 
     // SchemaObject implementation
-    @Override
     public int getType() {
         return SchemaObject.INDEX;
     }
 
-    @Override
     public HsqlName getName() {
         return name;
     }
 
-    @Override
     public HsqlName getCatalogName() {
         return name.schema.schema;
     }
 
-    @Override
     public HsqlName getSchemaName() {
         return name.schema;
     }
 
-    @Override
     public Grantee getOwner() {
         return name.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
         return new OrderedHashSet();
     }
 
-    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
 
-    @Override
     public void compile(Session session) {}
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -338,22 +329,18 @@ public class IndexAVL implements Index {
     }
 
     // IndexInterface
-    @Override
     public RowIterator emptyIterator() {
         return emptyIterator;
     }
 
-    @Override
     public int getPosition() {
         return position;
     }
 
-    @Override
     public void setPosition(int position) {
         this.position = position;
     }
 
-    @Override
     public long getPersistenceId() {
         return persistenceId;
     }
@@ -361,7 +348,6 @@ public class IndexAVL implements Index {
     /**
      * Returns the count of visible columns used
      */
-    @Override
     public int getVisibleColumns() {
         return colIndex.length;
     }
@@ -369,7 +355,6 @@ public class IndexAVL implements Index {
     /**
      * Returns the count of visible columns used
      */
-    @Override
     public int getColumnCount() {
         return colIndex.length;
     }
@@ -377,7 +362,6 @@ public class IndexAVL implements Index {
     /**
      * Is this a UNIQUE index?
      */
-    @Override
     public boolean isUnique() {
         return isUnique;
     }
@@ -385,7 +369,6 @@ public class IndexAVL implements Index {
     /**
      * Does this index belong to a constraint?
      */
-    @Override
     public boolean isConstraint() {
         return isConstraint;
     }
@@ -393,7 +376,6 @@ public class IndexAVL implements Index {
     /**
      * Returns the array containing column indexes for index
      */
-    @Override
     public int[] getColumns() {
         return colIndex;
     }
@@ -401,12 +383,10 @@ public class IndexAVL implements Index {
     /**
      * Returns the array containing column indexes for index
      */
-    @Override
     public Type[] getColumnTypes() {
         return colTypes;
     }
 
-    @Override
     public boolean[] getColumnDesc() {
         return colDesc;
     }
@@ -429,7 +409,6 @@ public class IndexAVL implements Index {
      *
      * @return ordinal value
      */
-    @Override
     public int getIndexOrderValue() {
 
         if (isConstraint) {
@@ -441,7 +420,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public boolean isForward() {
         return isForward;
     }
@@ -449,7 +427,6 @@ public class IndexAVL implements Index {
     /**
      * Returns the node count.
      */
-    @Override
     public int size(PersistentStore store) {
 
         int count = 0;
@@ -471,12 +448,10 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public int sizeEstimate(PersistentStore store) {
         return (int) (1L << depth);
     }
 
-    @Override
     public boolean isEmpty(PersistentStore store) {
 
         readLock.lock();
@@ -488,7 +463,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public void checkIndex(PersistentStore store) {
 
         readLock.lock();
@@ -542,7 +516,6 @@ public class IndexAVL implements Index {
     /**
      * Insert a node into the index
      */
-    @Override
     public void insert(Session session, PersistentStore store, Row row) {
 
         NodeAVL n;
@@ -589,7 +562,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public void delete(PersistentStore store, Row row) {
 
         if (!row.isInMemory()) {
@@ -776,7 +748,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public boolean exists(Session session, PersistentStore store,
                           Object[] rowdata, int[] rowColMap) {
         return findNode(session, store, rowdata, rowColMap, rowColMap.length)
@@ -793,7 +764,6 @@ public class IndexAVL implements Index {
      * @param match count of columns to match
      * @return iterator
      */
-    @Override
     public RowIterator findFirstRow(Session session, PersistentStore store,
                                     Object[] rowdata, int match) {
 
@@ -811,7 +781,6 @@ public class IndexAVL implements Index {
      * @param rowdata array containing table row data
      * @return iterator
      */
-    @Override
     public RowIterator findFirstRow(Session session, PersistentStore store,
                                     Object[] rowdata) {
 
@@ -830,7 +799,6 @@ public class IndexAVL implements Index {
      * @param rowdata array containing table row data
      * @return iterator
      */
-    @Override
     public RowIterator findFirstRow(Session session, PersistentStore store,
                                     Object[] rowdata, int[] rowColMap) {
 
@@ -851,7 +819,6 @@ public class IndexAVL implements Index {
      *
      * @return iterator
      */
-    @Override
     public RowIterator findFirstRow(Session session, PersistentStore store,
                                     Object value, int compare) {
 
@@ -970,7 +937,6 @@ public class IndexAVL implements Index {
      *
      * @return iterator
      */
-    @Override
     public RowIterator findFirstRowNotNull(Session session,
                                            PersistentStore store) {
 
@@ -1034,7 +1000,6 @@ public class IndexAVL implements Index {
      *
      * @return Iterator for first row
      */
-    @Override
     public RowIterator firstRow(Session session, PersistentStore store) {
 
         int tempDepth = 0;
@@ -1070,7 +1035,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    @Override
     public RowIterator firstRow(PersistentStore store) {
 
         int tempDepth = 0;
@@ -1101,7 +1065,6 @@ public class IndexAVL implements Index {
      *
      * @return last row
      */
-    @Override
     public Row lastRow(Session session, PersistentStore store) {
 
         readLock.lock();
@@ -1269,7 +1232,6 @@ public class IndexAVL implements Index {
      *
      * @return comparison result, -1,0,+1
      */
-    @Override
     public int compareRowNonUnique(Object[] a, int[] rowColMap, Object[] b) {
 
         int fieldcount = rowColMap.length;
@@ -1285,7 +1247,6 @@ public class IndexAVL implements Index {
         return 0;
     }
 
-    @Override
     public int compareRowNonUnique(Object[] a, int[] rowColMap, Object[] b,
                                    int fieldCount) {
 
@@ -1303,7 +1264,6 @@ public class IndexAVL implements Index {
     /**
      * As above but use the index column data
      */
-    @Override
     public int compareRowNonUnique(Object[] a, Object[] b, int fieldcount) {
 
         for (int j = 0; j < fieldcount; j++) {
@@ -1586,12 +1546,10 @@ public class IndexAVL implements Index {
             nextnode = node;
         }
 
-        @Override
         public boolean hasNext() {
             return nextnode != null;
         }
 
-        @Override
         public Row getNextRow() {
 
             if (nextnode == null) {
@@ -1610,20 +1568,16 @@ public class IndexAVL implements Index {
             return lastrow;
         }
 
-        @Override
         public void remove() {
             store.delete(lastrow);
         }
 
-        @Override
         public void release() {}
 
-        @Override
         public boolean setRowColumns(boolean[] columns) {
             return false;
         }
 
-        @Override
         public long getPos() {
             return nextnode.getPos();
         }
@@ -1699,8 +1653,9 @@ public class IndexAVL implements Index {
                 }
             }
         }
-        else
+        else {
             autoGenIndexName = "";
+        }
 
         // Support indexed expressions
         int exprHash = 0;

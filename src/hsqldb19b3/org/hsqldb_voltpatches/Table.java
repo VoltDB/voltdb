@@ -287,7 +287,6 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
-    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
@@ -295,7 +294,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      *  Returns the HsqlName object fo the table
      */
-    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -303,7 +301,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
-    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -311,17 +308,14 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
-    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
-    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -337,7 +331,6 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
-    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -354,7 +347,6 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
-    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -430,7 +422,6 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -541,7 +532,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
-    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -1967,7 +1957,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 for (int j = 0; j < constraints.length; j++) {
                     constraints[j].checkCheckConstraint(session, this,
-                                                        data[i]);
+                                                        (Object) data[i]);
                 }
             }
 
@@ -2260,7 +2250,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav   = result.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = nav.getNext();
+            Object[] data = (Object[]) nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2309,7 +2299,7 @@ public class Table extends TableBase implements SchemaObject {
         int             count = 0;
 
         while (nav.hasNext()) {
-            insertSys(store, nav.getNext());
+            insertSys(store, (Object[]) nav.getNext());
 
             count++;
         }
@@ -2326,7 +2316,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav = ins.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = nav.getNext();
+            Object[] data = (Object[]) nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2613,7 +2603,6 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
-    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2623,7 +2612,6 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
-    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);

@@ -25,7 +25,6 @@ public class FilteredCatalogDiffEngine extends CatalogDiffEngine {
 
     public FilteredCatalogDiffEngine(Catalog prev, Catalog next) {
         super(prev, next);
-        // TODO Auto-generated constructor stub
     }
 
     /**
@@ -40,21 +39,10 @@ public class FilteredCatalogDiffEngine extends CatalogDiffEngine {
             return true;
         if (suspect instanceof Database) {
             if ("schema".equals(field))
-                // Since Epoch dates and other possible fields may be different
-                // Schema will also be different
+                // Since the schema field is generated in the order of the DDL commands,
+                // the generated DDL will have a different command order and therefore
+                // a different schema string.
                 return true;
-        }
-        return false;
-    }
-
-    /**
-     * @return true if this addition may be ignored
-     */
-    @Override
-    protected boolean checkAddIgnoreList(final CatalogType suspect)
-    {
-        if (super.checkAddIgnoreList(suspect)) {
-            return true;
         }
         return false;
     }

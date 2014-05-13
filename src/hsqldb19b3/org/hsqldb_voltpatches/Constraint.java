@@ -239,7 +239,6 @@ public final class Constraint implements SchemaObject {
 
     private Constraint() {}
 
-    @Override
     public int getType() {
         return SchemaObject.CONSTRAINT;
     }
@@ -247,27 +246,22 @@ public final class Constraint implements SchemaObject {
     /**
      * Returns the HsqlName.
      */
-    @Override
     public HsqlName getName() {
         return name;
     }
 
-    @Override
     public HsqlName getCatalogName() {
         return name.schema.schema;
     }
 
-    @Override
     public HsqlName getSchemaName() {
         return name.schema;
     }
 
-    @Override
     public Grantee getOwner() {
         return name.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
 
         switch (constType) {
@@ -286,15 +280,12 @@ public final class Constraint implements SchemaObject {
         return null;
     }
 
-    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
 
-    @Override
     public void compile(Session session) {}
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -1067,6 +1058,8 @@ public final class Constraint implements SchemaObject {
         }
 
         VoltXMLElement constraint = new VoltXMLElement("constraint");
+        // WARNING: the name attribute setting is tentative, subject to reset in the
+        // calling function, Table.voltGetTableXML.
         constraint.attributes.put("name", getName().name);
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
@@ -1077,6 +1070,8 @@ public final class Constraint implements SchemaObject {
         // Any constraint implemented as an index must have an index name attribute.
         // No other constraint details are currently used by VoltDB.
         if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
+            // WARNING: the index attribute setting is tentative, subject to reset in
+            // the calling function, Table.voltGetTableXML.
             constraint.attributes.put("index", core.mainIndex.getName().name);
         }
         return constraint;

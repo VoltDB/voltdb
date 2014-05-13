@@ -1329,7 +1329,8 @@ public class DDLCompiler {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
-        // Temporarily assign the view Query to the annotation so we can use when we build the DDL statement for the VIEW
+        // Temporarily assign the view Query to the annotation so we can use when we build
+        // the DDL statement for the VIEW
         annotation.ddl = query;
 
         if (maxRowSize > MAX_ROW_SIZE) {
@@ -1933,7 +1934,7 @@ public class DDLCompiler {
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
-            Index pkIndex = destTable.getIndexes().add("MATVIEW_PK_INDEX");
+            Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
             pkIndex.setType(IndexType.BALANCED_TREE.getValue());
             pkIndex.setUnique(true);
             // add the group by columns from the src table
@@ -1943,7 +1944,7 @@ public class DDLCompiler {
                 c.setColumn(destColumnArray.get(i));
                 c.setIndex(i);
             }
-            Constraint pkConstraint = destTable.getConstraints().add("MATVIEW_PK_CONSTRAINT");
+            Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
