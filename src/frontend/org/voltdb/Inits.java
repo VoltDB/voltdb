@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -45,7 +44,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -283,34 +281,15 @@ public class Inits {
                 try {
                     // If no catalog was supplied provide an empty one.
                     if (m_rvdb.m_pathToStartupCatalog == null) {
-
-                        // Generate an empty DLL file.
-                        File emptyDDLFile = null;
-                        File emptyJarFile = null;
                         try {
-                            emptyDDLFile = File.createTempFile("ddl-empty", ".sql");
-                            emptyDDLFile.deleteOnExit();
-                            emptyJarFile = File.createTempFile("catalog-empty", ".jar");
-                            emptyJarFile.deleteOnExit();
-                            FileWriter fw = new FileWriter(emptyDDLFile);
-                            try {
-                                fw.write("-- This DDL file is a placeholder for starting without a user-supplied catalog.\n");
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            if (emptyJarFile == null) {
+                                VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
                             }
-                            finally {
-                                fw.close();
-                            }
+                            m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
                         }
                         catch (IOException e) {
-                            VoltDB.crashLocalVoltDB("Failed to create temporary file(s) for generated empty catalog.", false, e);
-                        }
-                        m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
-
-                        VoltCompiler compiler = new VoltCompiler();
-                        try {
-                            compiler.compileFromDDL(emptyJarFile.getAbsolutePath(), emptyDDLFile.getAbsolutePath());
-                        }
-                        catch (VoltCompiler.VoltCompilerException e) {
-                            VoltDB.crashLocalVoltDB("Failed to compile generated empty catalog.", false, e);
+                            VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
                         }
                     }
 

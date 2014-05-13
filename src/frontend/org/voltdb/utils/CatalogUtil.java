@@ -1710,4 +1710,19 @@ public abstract class CatalogUtil {
         return true;
     }
 
+    /**
+     * Build an empty catalog jar file.
+     * @return jar file or null (on failure)
+     * @throws IOException on failure to create temporary jar file
+     */
+    public static File createTemporaryEmptyCatalogJarFile() throws IOException {
+        File emptyJarFile = File.createTempFile("catalog-empty", ".jar");
+        emptyJarFile.deleteOnExit();
+        VoltCompiler compiler = new VoltCompiler();
+        if (!compiler.compileEmptyCatalog(emptyJarFile.getAbsolutePath())) {
+            return null;
+        }
+        return emptyJarFile;
+    }
+
 }
