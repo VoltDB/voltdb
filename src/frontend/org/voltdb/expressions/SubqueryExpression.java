@@ -42,6 +42,8 @@ public class SubqueryExpression extends AbstractExpression {
         PARAM_IDX;
     }
 
+    public static final String SUBQUERY_TAG = "Subquery_";
+
     private StmtSubqueryScan m_subquery;
     private int m_subqueryId;
     private int m_subqueryNodeId = -1;
@@ -184,7 +186,7 @@ public class SubqueryExpression extends AbstractExpression {
             // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "EXISTS (Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
+            return "EXISTS (" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString() + SUBQUERY_TAG +
             m_subqueryId + ")";
         } else {
             return "(Subquery: null)";

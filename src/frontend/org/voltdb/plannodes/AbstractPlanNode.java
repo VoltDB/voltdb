@@ -871,7 +871,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // Extract subqueries into a map to explain them separately. Each subquery is
         // surrounded by the 'Subquery_[SubqueryId]' tags. Example:
         // Subquery_1SEQUENTIAL SCAN of "R1"Subquery_1
-        Pattern subqueryPattern = Pattern.compile("(Subquery_)([0-9]+)(.*)(\\s*)Subquery_(\\2)", Pattern.DOTALL);
+        Pattern subqueryPattern = Pattern.compile(
+                String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", SubqueryExpression.SUBQUERY_TAG,SubqueryExpression.SUBQUERY_TAG),
+                Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
         String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
@@ -891,7 +893,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             pos = matcher.end();
             // Recurse into the subquery string to extract its own subqueries if any
             String nextExplainedStmt = extractExplainedSubquries(matcher.group(3), pattern, subqueries);
-            subqueries.put("Subquery_" + matcher.group(2), nextExplainedStmt);
+            subqueries.put(SubqueryExpression.SUBQUERY_TAG + matcher.group(2), nextExplainedStmt);
         }
         // Append the rest of the input string
         if (pos < explainedSubquery.length()) {
