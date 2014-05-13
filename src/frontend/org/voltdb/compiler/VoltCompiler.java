@@ -123,7 +123,10 @@ public class VoltCompiler {
     // set of annotations by procedure name
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
 
+    // Name of DDL file built by the DDL VoltCompiler from the catalog and added to the jar.
     public static String AUTOGEN_DDL_FILE_NAME = "autogen-ddl.sql";
+    // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
+    // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = System.getProperties().containsKey("verifycatalogdebug");
 
     String m_projectFileURL = null;
