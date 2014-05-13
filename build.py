@@ -314,7 +314,8 @@ CTX.INPUT['storage'] = """
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp
- TupleStreamWrapper.cpp
+ TupleStreamBase.cpp
+ ExportTupleStream.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
@@ -417,7 +418,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_test
      tabletuple_export_test
      TempTableLimitsTest
-     TupleStreamWrapper_test
+     ExportTupleStream_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):

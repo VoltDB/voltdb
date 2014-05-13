@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TUPLESTREAMWRAPPER_H_
-#define TUPLESTREAMWRAPPER_H_
+#ifndef TUPLESTREAMBASE_H_
+#define TUPLESTREAMBASE_H_
 
 #include "StreamBlock.h"
 
@@ -34,13 +34,12 @@ class Topend;
 //it is used to calculate the number of bytes queued
 const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA;
 
-class TupleStreamWrapper {
+class TupleStreamBase {
 public:
-    enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, int64_t siteId);
+    TupleStreamBase(CatalogId partitionId, int64_t siteId);
 
-    ~TupleStreamWrapper() {
+    virtual ~TupleStreamBase() {
         cleanupManagedBuffers();
     }
 
@@ -57,27 +56,14 @@ public:
      */
     void setDefaultCapacity(size_t capacity);
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
-
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
         return m_uso;
     }
 
-    /** Set the total number of bytes used (for rejoin/recover) */
-    void setBytesUsed(size_t count) {
-        assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, count);
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                                m_generation, m_partitionId, m_signature, sb, false, false);
-        delete sb;
-        m_uso = count;
-    }
+    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
-    int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity- MAGIC_HEADER_SPACE_FOR_JAVA)) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
-    }
+    virtual int64_t allocatedByteCount() const = 0;
 
     /** truncate stream back to mark */
     void rollbackTo(size_t mark);
@@ -87,16 +73,6 @@ public:
                        int64_t lastComittedSpHandle,
                        int64_t currentSpHandle);
 
-    /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedSpHandle,
-                       int64_t spHandle,
-                       int64_t seqNo,
-                       int64_t uniqueId,
-                       int64_t timestamp,
-                       TableTuple &tuple,
-                       TupleStreamWrapper::Type type);
-
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
 
@@ -133,9 +109,6 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
-
-    std::string m_signature;
-    int64_t m_generation;
 };
 
 }

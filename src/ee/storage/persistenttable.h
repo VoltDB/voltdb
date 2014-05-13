@@ -60,7 +60,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
 #include "storage/table.h"
-#include "storage/TupleStreamWrapper.h"
+#include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
