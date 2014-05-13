@@ -206,7 +206,7 @@ public class VoltCompiler {
         }
     }
 
-    class VoltCompilerException extends Exception {
+    public class VoltCompilerException extends Exception {
         private static final long serialVersionUID = -2267780579911448600L;
         private String message = null;
 
@@ -515,43 +515,6 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile an empty catalog jar.
-     * @return empty in-memory jar
-     */
-    public InMemoryJarfile compileEmptyJar()
-    {
-        // clear out the warnings and errors
-        m_warnings.clear();
-        m_infos.clear();
-        m_errors.clear();
-
-        // Need a database.
-        DatabaseType database = new DatabaseType();
-
-        // Do the catalog compilation.
-        final InMemoryJarfile jarOutput = new InMemoryJarfile();
-        final Catalog catalog = compileCatalogInternal(database, null, jarOutput);
-        if (catalog == null) {
-            return null;
-        }
-
-        // Add buildinfo.txt with proper version info, etc..
-        addBuildInfo(jarOutput);
-
-        // Add catalog.txt with the generated commands.
-        final String catalogCommands = catalog.serialize();
-        byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
-        jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-
-        assert(!hasErrors());
-        if (hasErrors()) {
-            return null;
-        }
-
-        return jarOutput;
-    }
-
-    /**
      * Get textual explain plan info for each plan from the
      * catalog to be shoved into the catalog jarfile.
      */
@@ -737,19 +700,16 @@ public class VoltCompiler {
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
 
         // generate the catalog report and write it to disk
-        // Skip if there's no DDL
-        if (ddlReaderList != null) {
-            try {
-                m_report = ReportMaker.report(m_catalog, m_warnings);
-                File file = new File("catalog-report.html");
-                FileWriter fw = new FileWriter(file);
-                fw.write(m_report);
-                fw.close();
-                m_reportPath = file.getAbsolutePath();
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
+        try {
+            m_report = ReportMaker.report(m_catalog, m_warnings);
+            File file = new File("catalog-report.html");
+            FileWriter fw = new FileWriter(file);
+            fw.write(m_report);
+            fw.close();
+            m_reportPath = file.getAbsolutePath();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
 
         return m_catalog;

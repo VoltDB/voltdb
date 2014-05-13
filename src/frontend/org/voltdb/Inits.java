@@ -17,7 +17,9 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -279,17 +281,41 @@ public class Inits {
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 
                 try {
-                    // Get the catalog bytes and byte count.
                     // If no catalog was supplied provide an empty one.
-                    byte[] catalogBytes;
                     if (m_rvdb.m_pathToStartupCatalog == null) {
+
+                        // Generate an empty DLL file.
+                        File emptyDDLFile = null;
+                        File emptyJarFile = null;
+                        try {
+                            emptyDDLFile = File.createTempFile("ddl-empty", ".sql");
+                            emptyDDLFile.deleteOnExit();
+                            emptyJarFile = File.createTempFile("catalog-empty", ".jar");
+                            emptyJarFile.deleteOnExit();
+                            FileWriter fw = new FileWriter(emptyDDLFile);
+                            try {
+                                fw.write("-- This DDL file is a placeholder for starting without a user-supplied catalog.\n");
+                            }
+                            finally {
+                                fw.close();
+                            }
+                        }
+                        catch (IOException e) {
+                            VoltDB.crashLocalVoltDB("Failed to create temporary file(s) for generated empty catalog.", false, e);
+                        }
+                        m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
+
                         VoltCompiler compiler = new VoltCompiler();
-                        InMemoryJarfile catalogJar = compiler.compileEmptyJar();
-                        catalogBytes = catalogJar.getFullJarBytes();
+                        try {
+                            compiler.compileFromDDL(emptyJarFile.getAbsolutePath(), emptyDDLFile.getAbsolutePath());
+                        }
+                        catch (VoltCompiler.VoltCompilerException e) {
+                            VoltDB.crashLocalVoltDB("Failed to compile generated empty catalog.", false, e);
+                        }
                     }
-                    else {
-                        catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
-                    }
+
+                    // Get the catalog bytes and byte count.
+                    byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 
                     //Export needs a cluster global unique id for the initial catalog version
                     long catalogUniqueId =
