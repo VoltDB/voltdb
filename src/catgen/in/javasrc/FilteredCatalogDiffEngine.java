@@ -21,6 +21,14 @@
 
 package org.voltdb.catalog;
 
+/*
+ * This class provides additional filtering to the CatalogDiffEngine. This class
+ * is used to verify that Generated DDL is consistent with the catalog that it was
+ * generated from. However, some elements in the two catalogs such as the schema or
+ * the export entries may be different due to ordering of DDL statements or catalog
+ * state not processed with DDL statements. This filter class is used to provide the
+ * incremental filtering to allow two subtly different catalogs to be considered identical.
+ */
 public class FilteredCatalogDiffEngine extends CatalogDiffEngine {
 
     public FilteredCatalogDiffEngine(Catalog prev, Catalog next) {

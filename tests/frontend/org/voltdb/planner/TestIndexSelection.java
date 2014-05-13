@@ -308,7 +308,6 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2");
         pn = pn.getChild(0);
         System.out.println(pn.toExplainPlanString());
-        assertTrue(pn.toExplainPlanString().contains("using \"" +
-                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG\" (for deterministic order only)"));
+        assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
 }

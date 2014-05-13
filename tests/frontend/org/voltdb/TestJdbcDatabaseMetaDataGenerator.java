@@ -426,21 +426,24 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,

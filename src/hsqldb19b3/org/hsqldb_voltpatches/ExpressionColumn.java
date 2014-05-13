@@ -412,8 +412,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangeVariable.rangePosition]
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangeVariable.rangePosition]
                     .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
@@ -426,8 +426,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangePosition].getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
