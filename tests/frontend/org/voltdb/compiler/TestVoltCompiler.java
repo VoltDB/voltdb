@@ -519,10 +519,10 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertTrue(success);
     }
 
@@ -564,11 +564,11 @@ public class TestVoltCompiler extends TestCase {
             "</project>";
 
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
 
         assertFalse(success);
     }
@@ -589,9 +589,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -610,9 +610,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -1045,7 +1045,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
 
-        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
+        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         assertNotNull(sql);
     }
 
@@ -2078,10 +2078,8 @@ public class TestVoltCompiler extends TestCase {
 
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+                "PARTITION TABLE t0 ON COLUMN name;";
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
-
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
@@ -2525,8 +2523,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
-                "\"CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER\"";
+        expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -2535,8 +2532,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
-                "\"CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER\"";
+        expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(

@@ -34,6 +34,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
@@ -358,7 +359,10 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     public void testJoinOrder() throws Exception {
-        if (isHSQL() || isValgrind()) return;
+        if (isHSQL() || isValgrind() || VoltCompiler.DEBUG_VERIFY_CATALOG) {
+            // This test is disabled for verifycatalog until join order is supported in the DDL and explain plan
+            return;
+        }
 
         Client client = getClient();
 
@@ -627,11 +631,14 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("SelectRightOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-        project.addStmtProcedure("SelectWrongOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
+            // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
+            project.addProcedures(PROCEDURES);
+            project.addStmtProcedure("SelectRightOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
+            project.addStmtProcedure("SelectWrongOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        }
 
         boolean success;
 

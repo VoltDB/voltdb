@@ -224,10 +224,7 @@ public class DDLCompiler {
             "\\s+" +                                // one or more spaces
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
-            "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
-            "\\s+" +                                //   one or more spaces
-            ".+)" +                                 //   end SELECT or DML statement
+            "(.+)" +                                // (3) SELECT or DML statement
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of DDL statement
             );
@@ -622,7 +619,7 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), Language.JAVA, clazz);
+                    new ArrayList<String>(), Language.JAVA, null, clazz);
 
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
@@ -645,10 +642,10 @@ public class DDLCompiler {
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(3);
+            String sqlStatement = statementMatcher.group(3) + ";";
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -690,7 +687,7 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), language, scriptClass);
+                    new ArrayList<String>(), language, codeBlock, scriptClass);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -1240,7 +1237,6 @@ public class DDLCompiler {
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
-        annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
 
         // handle the case where this is a materialized view
         String query = node.attributes.get("query");
@@ -1280,7 +1276,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1289,7 +1285,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1333,6 +1329,10 @@ public class DDLCompiler {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
+        // Temporarily assign the view Query to the annotation so we can use when we build
+        // the DDL statement for the VIEW
+        annotation.ddl = query;
+
         if (maxRowSize > MAX_ROW_SIZE) {
             throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
                     " but the maximum supported row size is " + MAX_ROW_SIZE);
@@ -1692,7 +1692,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith("SYS_IDX_") == false) {
+                if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
@@ -1934,7 +1934,7 @@ public class DDLCompiler {
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
-            Index pkIndex = destTable.getIndexes().add("MATVIEW_PK_INDEX");
+            Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
             pkIndex.setType(IndexType.BALANCED_TREE.getValue());
             pkIndex.setUnique(true);
             // add the group by columns from the src table
@@ -1944,7 +1944,7 @@ public class DDLCompiler {
                 c.setColumn(destColumnArray.get(i));
                 c.setIndex(i);
             }
-            Constraint pkConstraint = destTable.getConstraints().add("MATVIEW_PK_CONSTRAINT");
+            Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
