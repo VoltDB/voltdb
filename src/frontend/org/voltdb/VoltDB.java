@@ -510,12 +510,6 @@ public class VoltDB {
                     hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
                 }
 
-            if (m_startAction == StartAction.CREATE &&
-                m_pathToCatalog == null) {
-                isValid = false;
-                hostLog.fatal("The catalog location is missing.");
-            }
-
             if (m_leader == null) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");

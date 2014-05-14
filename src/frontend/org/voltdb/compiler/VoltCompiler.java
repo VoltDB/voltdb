@@ -148,6 +148,8 @@ public class VoltCompiler {
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
+    private final static String m_emptyDDLComment = "-- This DDL file is a placeholder for starting without a user-supplied catalog.\n";
+
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
 
     /**
@@ -420,10 +422,45 @@ public class VoltCompiler {
             ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         }
         catch (VoltCompilerException e) {
-            compilerLog.error("Unable to open DDL file.", e);;
+            compilerLog.error("Unable to open DDL file.", e);
             return false;
         }
         return compileInternal(projectReader, jarOutputPath, ddlReaderList, null);
+    }
+
+    /**
+     * Compile empty catalog jar
+     * @param jarOutputPath output jar path
+     * @return true if successful
+     */
+    public boolean compileEmptyCatalog(final String jarOutputPath) {
+        // Use a special DDL reader to provide the contents.
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(1);
+        ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
+        // Seed it with the DDL so that a version upgrade hack in compileInternal()
+        // doesn't try to get the DDL file from the path.
+        InMemoryJarfile jarFile = new InMemoryJarfile();
+        try {
+            ddlReaderList.get(0).putInJar(jarFile, "ddl.sql");
+        }
+        catch (IOException e) {
+            compilerLog.error("Failed to add DDL file to empty in-memory jar.");
+            return false;
+        }
+        return compileInternal(null, jarOutputPath, ddlReaderList, jarFile);
+    }
+
+    private static void addBuildInfo(final InMemoryJarfile jarOutput) {
+        StringBuilder buildinfo = new StringBuilder();
+        String info[] = RealVoltDB.extractBuildInfo();
+        buildinfo.append(info[0]).append('\n');
+        buildinfo.append(info[1]).append('\n');
+        buildinfo.append(System.getProperty("user.name")).append('\n');
+        buildinfo.append(System.getProperty("user.dir")).append('\n');
+        buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
+
+        byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
+        jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
     }
 
     /**
@@ -512,16 +549,7 @@ public class VoltCompiler {
             // Don't update buildinfo if it's already present, e.g. while upgrading.
             // Note when upgrading the version has already been updated by the caller.
             if (!jarOutput.containsKey(CatalogUtil.CATALOG_BUILDINFO_FILENAME)) {
-                StringBuilder buildinfo = new StringBuilder();
-                String info[] = RealVoltDB.extractBuildInfo();
-                buildinfo.append(info[0]).append('\n');
-                buildinfo.append(info[1]).append('\n');
-                buildinfo.append(System.getProperty("user.name")).append('\n');
-                buildinfo.append(System.getProperty("user.dir")).append('\n');
-                buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
-
-                byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
-                jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
+                addBuildInfo(jarOutput);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
             // put the compiler report into the jarfile
