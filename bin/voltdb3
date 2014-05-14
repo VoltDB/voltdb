@@ -75,7 +75,9 @@ JAVA=`which java`
 if [ "$JAVA_HOME" != "" ]; then
   #echo "run java in $JAVA_HOME"
   JAVA=$JAVA_HOME/bin/java
-else
+fi
+
+if [ "$JAVA" = "" ]; then
   echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
   exit 1
 fi
