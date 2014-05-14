@@ -70,10 +70,6 @@ protected:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    // SendExecutors don't actually have output tables, so they
-    // don't require them to be cleared before executing
-    virtual bool needsOutputTableClear() { return false; };
-
 private:
     Table* m_inputTable;
     VoltDBEngine *m_engine;
