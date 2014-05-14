@@ -414,7 +414,7 @@ public class ExpressionColumn extends Expression {
                 Object[] data =
                     (Object[]) session.sessionContext
                         .rangeIterators[rangeVariable.rangePosition]
-                    .getCurrent();
+                        .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
 
