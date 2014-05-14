@@ -23,21 +23,19 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Predicate;
-import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.cache.Cache;
-import com.google_voltpatches.common.cache.CacheBuilder;
-
 import org.voltcore.network.Connection;
-import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.RateLimiter;
 
@@ -59,7 +57,7 @@ public class RateLimitedClientNotifier {
 
     private final ConcurrentMap<Connection, Object> m_clientsPendingNotification
                                 = new ConcurrentHashMap<Connection, Object>(2048, .75f, 128);
-    private final LinkedTransferQueue<Runnable> m_submissionQueue = new LinkedTransferQueue<Runnable>();
+    private final LinkedBlockingQueue<Runnable> m_submissionQueue = new LinkedBlockingQueue<Runnable>();
 
     static double NOTIFICATION_RATE = Long.getLong("CLIENT_NOTIFICATION_RATE", 1000).doubleValue();
     static long WARMUP_MS = Long.getLong("CLIENT_NOTIFICATION_WARMUP_MS", 5000);

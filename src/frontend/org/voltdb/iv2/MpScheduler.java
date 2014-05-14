@@ -82,7 +82,7 @@ public class MpScheduler extends Scheduler
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks, getCurrentTxnId());
         m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
@@ -164,6 +164,7 @@ public class MpScheduler extends Scheduler
      * @return true if the message can be delivered directly to the scheduler,
      * false if the message was a duplicate
      */
+    @Override
     public boolean sequenceForReplay(VoltMessage message)
     {
         boolean canDeliver = true;
@@ -516,7 +517,7 @@ public class MpScheduler extends Scheduler
      */
     private static Constructor<?> loadNpProcedureTaskClass()
     {
-        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", MiscUtils.isPro());
+        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", !MiscUtils.isPro());
         if (klass != null) {
             try {
                 return klass.getConstructor(Mailbox.class, String.class, TransactionTaskQueue.class,

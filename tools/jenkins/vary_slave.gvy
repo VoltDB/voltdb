@@ -23,6 +23,10 @@ def controller5 = [ "volt13a-controller-of-votl13a-b-c-d-e-f" ]
 
 def controller6 = [ "volt5a-controller-of-volt5b-c-d-volt7b-c-d-frankencluster" ]
 
+def controller7 = [ "volt13i-controller-of-volt13i-j-k-l-m-n" ]
+
+def controller8 = [ "volt10d-controller-of-volt10d-c-b-a" ]
+
 void varyHost(host, OfflineIsTrue) {
        slave = Jenkins.instance.getComputer(host)
        msg =  OfflineIsTrue ? "OFFLINE" : "ONLINE"
@@ -102,6 +106,7 @@ h = new Date().getHours()
 println ("hour: " + h)
 if (h < 17)
    //setRotation("night", [  stack4 ])
-   setRotation("day", [ stack1, stack2 ])
+   setRotation("day", [ stack1, stack2, stack3 ])
 else
-   setRotation("night", [ stack1, stack2, stack3, controller6 ]) 
+   setRotation("night", [ stack1, stack2, stack3, controller5, controller6, controller7, controller8 ])
+

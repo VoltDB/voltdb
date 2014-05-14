@@ -25,10 +25,6 @@
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
 
-
-    ALSO, if you change this, consider updating:
-        CatalogUtil.getDeploymentCRC()
-
   -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -58,7 +54,7 @@
   <!-- <cluster> -->
   <xs:complexType name="clusterType">
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
-    <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
+    <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
   </xs:complexType>
@@ -87,13 +83,13 @@
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
     <xs:simpleType name="elasticPauseType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
       <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
@@ -119,13 +115,14 @@
                 <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
             </xs:complexType>
         </xs:element>
-        
+
     </xs:all>
   </xs:complexType>
 
   <!-- <security> -->
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
   </xs:complexType>
 
   <!-- <admin-mode> (always enabled.) -->
@@ -276,6 +273,7 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
+      <xs:enumeration value="kafka"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -294,5 +292,13 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+
+  <!--  Security provider enumeration -->
+  <xs:simpleType name="SecurityProviderString">
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="hash"/>
+        <xs:enumeration value="kerberos"/>
+    </xs:restriction>
+  </xs:simpleType>
 
 </xs:schema>

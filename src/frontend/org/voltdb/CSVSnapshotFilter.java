@@ -57,10 +57,10 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                     return null;
                 }
                 try {
-                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining() - 4);
+                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b().remaining() - 4);
                     buf.put(m_schemaBytes);
-                    cont.b.position(4);
-                    buf.put(cont.b);
+                    cont.b().position(4);
+                    buf.put(cont.b());
 
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
                     Pair<Integer, byte[]> p =
@@ -73,9 +73,10 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                     m_lastNumCharacters = p.getFirst();
                     final BBContainer origin = cont;
                     cont = null;
-                    return new BBContainer( ByteBuffer.wrap(p.getSecond()), 0L) {
+                    return new BBContainer( ByteBuffer.wrap(p.getSecond())) {
                         @Override
                         public void discard() {
+                            checkDoubleFree();
                             origin.discard();
                         }
                     };

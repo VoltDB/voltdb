@@ -45,28 +45,28 @@ public class TestUnionSuite extends RegressionSuite {
      */
     //This test fails due to https://issues.voltdb.com/browse/ENG-5246
     //Be sure to bring it back when it is fixed
-//    public void testUnion() throws NoConnectionsException, IOException, ProcCallException {
-//        Client client = this.getClient();
-//        client.callProcedure("InsertA", 0, 1); // In the final result set - 0
-//        client.callProcedure("InsertB", 1, 1); // In the final result set - 1
-//        client.callProcedure("InsertB", 2, 1); // Eliminated (duplicate)
-//        client.callProcedure("InsertC", 1, 2); // In the final result set - 2
-//        client.callProcedure("InsertC", 2, 3); // In the final result set - 3
-//        client.callProcedure("InsertC", 3, 3); // Eliminated (duplicate)
-//        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
-//                                 .getResults()[0];
-//        assertEquals(4, result.getRowCount());
-//        result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION SELECT I FROM B) UNION SELECT I FROM C;")
-//                .getResults()[0];
-//        assertEquals(4, result.getRowCount());
-//        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION (SELECT I FROM B UNION SELECT I FROM C);")
-//                .getResults()[0];
-//        assertEquals(4, result.getRowCount());
-//        // test with parameters
-//        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
-//                .getResults()[0];
-//        assertEquals(3, result.getRowCount());
-//    }
+    //    public void testUnion() throws NoConnectionsException, IOException, ProcCallException {
+    //        Client client = this.getClient();
+    //        client.callProcedure("InsertA", 0, 1); // In the final result set - 0
+    //        client.callProcedure("InsertB", 1, 1); // In the final result set - 1
+    //        client.callProcedure("InsertB", 2, 1); // Eliminated (duplicate)
+    //        client.callProcedure("InsertC", 1, 2); // In the final result set - 2
+    //        client.callProcedure("InsertC", 2, 3); // In the final result set - 3
+    //        client.callProcedure("InsertC", 3, 3); // Eliminated (duplicate)
+    //        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
+    //                                 .getResults()[0];
+    //        assertEquals(4, result.getRowCount());
+    //        result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION SELECT I FROM B) UNION SELECT I FROM C;")
+    //                .getResults()[0];
+    //        assertEquals(4, result.getRowCount());
+    //        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION (SELECT I FROM B UNION SELECT I FROM C);")
+    //                .getResults()[0];
+    //        assertEquals(4, result.getRowCount());
+    //        // test with parameters
+    //        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
+    //                .getResults()[0];
+    //        assertEquals(3, result.getRowCount());
+    //    }
 
     /**
      * Three table Union ALL - A.PKEY, B.I and C.I
@@ -82,7 +82,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 2); //In the final result set
         client.callProcedure("InsertC", 2, 3); //In the final result set
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(5, result.getRowCount());
         result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B) UNION ALL SELECT I FROM C;")
                 .getResults()[0];
@@ -105,7 +105,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertB", 2, 1); //In the final result set
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A UNION SELECT PKEY, I FROM B;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(3, result.getRowCount());
     }
 
@@ -122,7 +122,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 1, 1); //In the final result set
         client.callProcedure("InsertB", 2, 1); //In the final result set
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY, I FROM A UNION ALL SELECT PKEY, I FROM B;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(4, result.getRowCount());
     }
 
@@ -139,7 +139,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertB", 2, 1); //In the final result set
         VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A UNION SELECT * FROM B;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(3, result.getRowCount());
     }
 
@@ -178,7 +178,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 1); //Eliminated (by A.PKEY=0)
         client.callProcedure("InsertC", 2, 2); //Eliminated (not in A)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT SELECT I FROM B EXCEPT SELECT I FROM C;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(1, result.getRowCount());
         result = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT SELECT I FROM B) EXCEPT SELECT I FROM C;")
                 .getResults()[0];
@@ -191,7 +191,7 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-   public void testExceptAll1() throws NoConnectionsException, IOException, ProcCallException {
+    public void testExceptAll1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         client.callProcedure("InsertA", 0, 0); //In the final result set
         client.callProcedure("InsertA", 1, 0); //In the final result set
@@ -209,39 +209,39 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 0, 2); //Eliminated (not in (A-B))
         client.callProcedure("InsertC", 1, 5); //Eliminated (by A.PKEY=6)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B EXCEPT ALL SELECT I FROM C;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(3, result.getRowCount());
         result = client.callProcedure("@AdHoc", "(SELECT I FROM A EXCEPT ALL SELECT I FROM B) EXCEPT ALL SELECT I FROM C;")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
     }
 
-   /**
-    * Three table Except ALL - B.I and C.I
-    * @throws NoConnectionsException
-    * @throws IOException
-    * @throws ProcCallException
-    */
-  public void testExceptAll2() throws NoConnectionsException, IOException, ProcCallException {
-       Client client = this.getClient();
-       client.callProcedure("InsertB", 1, 1); //Eliminated (not in C)
-       client.callProcedure("InsertB", 2, 2); //Eliminated (both in C and B)
-       client.callProcedure("InsertB", 3, 2); //Eliminated (C has only 1)
-       client.callProcedure("InsertB", 4, 3); //Eliminated (not in C)
-       client.callProcedure("InsertB", 5, 5); //Eliminated (both in C and B)
-       client.callProcedure("InsertC", 0, 2); //Eliminated (both in C and B)
-       client.callProcedure("InsertC", 1, 5); //Eliminated (both in C and B)
-       VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT ALL SELECT I FROM B;")
-               .getResults()[0];
-       assertEquals(0, result.getRowCount());
-   }
+    /**
+     * Three table Except ALL - B.I and C.I
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testExceptAll2() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertB", 1, 1); //Eliminated (not in C)
+        client.callProcedure("InsertB", 2, 2); //Eliminated (both in C and B)
+        client.callProcedure("InsertB", 3, 2); //Eliminated (C has only 1)
+        client.callProcedure("InsertB", 4, 3); //Eliminated (not in C)
+        client.callProcedure("InsertB", 5, 5); //Eliminated (both in C and B)
+        client.callProcedure("InsertC", 0, 2); //Eliminated (both in C and B)
+        client.callProcedure("InsertC", 1, 5); //Eliminated (both in C and B)
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT ALL SELECT I FROM B;")
+                .getResults()[0];
+        assertEquals(0, result.getRowCount());
+    }
 
-   /**
-    * Three table Intersect - A.I, B.I and C.I
-    * @throws NoConnectionsException
-    * @throws IOException
-    * @throws ProcCallException
-    */
+    /**
+     * Three table Intersect - A.I, B.I and C.I
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
     public void testIntersect() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         client.callProcedure("InsertA", 0, 0); //In the final result set
@@ -254,7 +254,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 2); //Eliminated (not in A)
         client.callProcedure("InsertC", 3, 0); //Eliminated (duplicate)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT SELECT I FROM B INTERSECT SELECT I FROM C;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(2, result.getRowCount());
         result = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT SELECT I FROM B) INTERSECT SELECT I FROM C;")
                 .getResults()[0];
@@ -288,7 +288,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 3, 0); //Eliminated (same as A.PKEY=0)
         client.callProcedure("InsertC", 4, 0); //Eliminated (A & B have only one 0)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL SELECT I FROM B INTERSECT ALL SELECT I FROM C;")
-                                 .getResults()[0];
+                .getResults()[0];
         assertEquals(3, result.getRowCount());
         result = client.callProcedure("@AdHoc", "(SELECT I FROM A INTERSECT ALL SELECT I FROM B) INTERSECT ALL SELECT I FROM C;")
                 .getResults()[0];
@@ -326,7 +326,7 @@ public class TestUnionSuite extends RegressionSuite {
         result = client.callProcedure("@AdHoc", "SELECT I FROM A where I = 0 UNION SELECT I FROM B EXCEPT SELECT I FROM C WHERE I = 3;")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
-   }
+    }
 
     /**
      * (A.I union B.I) except (C.I union D.I)
@@ -349,7 +349,7 @@ public class TestUnionSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         result.advanceToRow(0);
         assertEquals(4, result.getLong(0));
-   }
+    }
 
     /**
      * A.I intersect all (B.I except all C.I)
@@ -375,7 +375,7 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL (SELECT I FROM B EXCEPT ALL SELECT I FROM C);")
                 .getResults()[0];
         assertEquals(2, result.getRowCount());
-   }
+    }
 
     /**
      * (A.I) except (B.I except C.I)
@@ -400,7 +400,7 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT (SELECT I FROM B EXCEPT SELECT I FROM C);")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
-   }
+    }
 
     /**
      * (A.I) except (B.I except C.I) except (D.I)
@@ -426,7 +426,7 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A) EXCEPT (SELECT I FROM B EXCEPT SELECT I FROM C) EXCEPT SELECT I FROM D;")
                 .getResults()[0];
         assertEquals(2, result.getRowCount());
-   }
+    }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;

@@ -114,7 +114,8 @@ function sync-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-        --threads=40
+        --threads=40 \
+        --csvfile=periodic.csv.gz
 }
 
 function help() {

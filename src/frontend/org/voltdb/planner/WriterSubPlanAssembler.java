@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -53,8 +54,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     {
         super(db, parsedStmt, partitioning);
 
-        assert(m_parsedStmt.tableList.size() == 1);
-        m_targetTable = m_parsedStmt.tableList.get(0);
+        assert(m_parsedStmt.m_tableList.size() == 1);
+        m_targetTable = m_parsedStmt.m_tableList.get(0);
     }
 
     /**
@@ -65,19 +66,18 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
+            m_parsedStmt.m_joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // these just shouldn't happen right?
-            assert(m_parsedStmt.noTableSelectionList.size() == 0);
+            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
-            assert (m_parsedStmt.joinTree != null);
-            JoinNode tableNode = m_parsedStmt.joinTree;
+            assert (m_parsedStmt.m_joinTree != null);
+            JoinNode tableNode = m_parsedStmt.m_joinTree;
             // This is either UPDATE or DELETE statement. Consolidate all expressions
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            assert (tableNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.m_tableAliasIndex,
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
                     null,
                     tableNode.m_whereInnerList,
                     null));
@@ -85,7 +85,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
 
-                AbstractPlanNode plan = getAccessPlanForTable(tableNode.m_tableAliasIndex, tableNode.m_currentAccessPath);
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode);
                 m_plans.add(plan);
             }
 

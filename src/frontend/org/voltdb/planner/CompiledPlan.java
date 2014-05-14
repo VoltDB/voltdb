@@ -29,7 +29,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 

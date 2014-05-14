@@ -112,8 +112,8 @@ class AE {
     /* this is how java serializes.. note derived class data follows
        the serialization of children */
     virtual void serialize(Json::Value &json) {
-        json["TYPE"] = expressionToString(m_type);
-        json["VALUE_TYPE"] = valueToString(m_valueType);
+        json["TYPE"] = static_cast<int>(m_type);
+        json["VALUE_TYPE"] = static_cast<int>(m_valueType);
         json["VALUE_SIZE"] = m_valueSize;
 
         if (left)
@@ -400,10 +400,7 @@ TEST_F(ExpressionTest, HashRange) {
     types.push_back(voltdb::VALUE_TYPE_BIGINT);
     types.push_back(voltdb::VALUE_TYPE_INTEGER);
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(types,
-                                                               columnSizes,
-                                                               allowNull,
-                                                               true);
+    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(types,columnSizes,allowNull);
 
     boost::scoped_array<char> tupleStorage(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
 

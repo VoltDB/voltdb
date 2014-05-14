@@ -105,16 +105,16 @@ public class ClientInterfaceHandleManager
         final long m_ciHandle;
         final long m_clientHandle;
         final int m_messageSize;
-        final long m_creationTime;
+        final long m_creationTimeNanos;
         final String m_procName;
         final long m_initiatorHSId;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime, String procName, long initiatorHSId)
+                int messageSize, long creationTimeNanos, String procName, long initiatorHSId)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
-            m_creationTime = creationTime;
+            m_creationTimeNanos = creationTimeNanos;
             m_procName = procName;
             m_initiatorHSId = initiatorHSId;
         }
@@ -151,10 +151,10 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName, long initiatorHSId,
+                    long clientHandle, int messageSize, long creationTimeNanos, String procName, long initiatorHSId,
                     boolean readOnly, boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName, initiatorHSId, readOnly, isShortCircuitRead);
+                        clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId, readOnly, isShortCircuitRead);
             }
             @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
@@ -199,7 +199,7 @@ public class ClientInterfaceHandleManager
             int partitionId,
             long clientHandle,
             int messageSize,
-            long creationTime,
+            long creationTimeNanos,
             String procName,
             long initiatorHSId,
             boolean readOnly,
@@ -222,7 +222,7 @@ public class ClientInterfaceHandleManager
         long ciHandle =
                 isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : partitionStuff.m_generator.getNextHandle();
         Iv2InFlight inFlight =
-                new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName, initiatorHSId);
+                new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId);
 
         if (isShortCircuitRead) {
             /*

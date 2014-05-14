@@ -106,6 +106,7 @@ class PersistentTableSurgeon {
 public:
 
     TBMap &getData();
+    PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -130,6 +131,7 @@ public:
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
+    void initTableStreamer(TableStreamerInterface* streamer);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
     ElasticIndex::iterator indexIteratorLowerBound(int32_t lowerBound);
@@ -396,7 +398,41 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
+    PersistentTable * getPreTruncateTable() {
+        return m_preTruncateTable;
+    }
+
+    PersistentTable * currentPreTruncateTable() {
+        if (m_preTruncateTable != NULL) {
+            return m_preTruncateTable;
+        }
+        return this;
+    }
+
+    void setPreTruncateTable(PersistentTable * tb) {
+        if (tb->getPreTruncateTable() != NULL) {
+            m_preTruncateTable = tb->getPreTruncateTable();
+        } else {
+            m_preTruncateTable= tb;
+        }
+
+        if (m_preTruncateTable != NULL) {
+            m_preTruncateTable->incrementRefcount();
+        }
+    }
+
+    void unsetPreTruncateTable() {
+        PersistentTable * prev = this->m_preTruncateTable;
+        if (prev != NULL) {
+            this->m_preTruncateTable = NULL;
+            prev->decrementRefcount();
+        }
+    }
+
   private:
+
+    // Zero allocation size uses defaults.
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -438,8 +474,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     bool checkNulls(TableTuple &tuple) const;
 
-    // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -517,7 +551,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
-  private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
@@ -527,6 +560,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
+
+    // The original table from the first truncated table
+    PersistentTable * m_preTruncateTable;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -539,6 +575,10 @@ inline PersistentTableSurgeon::~PersistentTableSurgeon()
 
 inline TBMap &PersistentTableSurgeon::getData() {
     return m_table.m_data;
+}
+
+inline PersistentTable& PersistentTableSurgeon::getTable() {
+    return m_table;
 }
 
 inline void PersistentTableSurgeon::insertTupleForUndo(char *tuple) {
@@ -681,7 +721,13 @@ inline uint32_t PersistentTableSurgeon::getTupleCount() const {
     return m_table.m_tupleCount;
 }
 
+inline void PersistentTableSurgeon::initTableStreamer(TableStreamerInterface* streamer) {
+    assert(m_table.m_tableStreamer == NULL);
+    m_table.m_tableStreamer.reset(streamer);
+}
+
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
+    assert(m_table.m_tableStreamer != NULL);
     return m_table.m_tableStreamer->hasStreamType(streamType);
 }
 

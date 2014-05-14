@@ -51,12 +51,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         // TODO: When INSERT ... SELECT is supported, it's unclear how the source and target tables will
         // be distinguished (positionally? in separate members?) and/or how soon thereafter the SELECT
         // clause will need to allow joins.
-        assert(tableList.isEmpty());
+        assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
         Table table = getTableFromDB(tableName);
 
-        tableList.add(table);
+        m_tableList.add(table);
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {

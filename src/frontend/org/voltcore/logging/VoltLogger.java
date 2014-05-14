@@ -19,6 +19,7 @@ package org.voltcore.logging;
 
 import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ShutdownHooks;
 
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
@@ -40,7 +41,7 @@ public class VoltLogger {
     private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
 
     static {
-        Runtime.getRuntime().addShutdownHook(new Thread("Async logger final sync") {
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOGGER, true, new Runnable() {
             @Override
             public void run() {
                 try {
@@ -74,7 +75,13 @@ public class VoltLogger {
      * but don't wait for the task to complete for info, debug, trace, and warn
      */
     private void submit(final Level l, final Object message, final Throwable t, boolean wait) {
-        if (m_disableAsync) m_logger.log(l, message, t);
+        if (m_disableAsync) {
+            m_logger.log(l, message, t);
+            return;
+        }
+
+        if (!m_logger.isEnabledFor(l)) return;
+
         final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override
@@ -99,7 +106,13 @@ public class VoltLogger {
     }
 
     private void submitl7d(final Level level, final String key, final Object[] params, final Throwable t) {
-        if (m_disableAsync) m_logger.l7dlog(level, key, params, t);
+        if (m_disableAsync) {
+            m_logger.l7dlog(level, key, params, t);
+            return;
+        }
+
+        if (!m_logger.isEnabledFor(level)) return;
+
         final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override

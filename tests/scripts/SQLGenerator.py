@@ -235,17 +235,17 @@ class BaseGenerator:
     #                   |       |
     LABEL_PATTERN_GROUP =                    "label" # optional label for variables
     #                   |       |             |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" \
-                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                       |                      |              |                        |                   |
-    #                       |                      |              |                        |       end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                                             "nullpct" # optional null percentage
-    #                       |                      |              |
-    MAX_VALUE_PATTERN_GROUP =                                    "max" # optional max (only for numeric values)
-    #                       |                      |
-    MIN_VALUE_PATTERN_GROUP =                     "min" # optional min (only for numeric values)
-    #                       |
-    TYPE_PATTERN_GROUP =   "type" # optional type for columns, values
+    TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
+    #                   |       |             |                      |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+                      r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                |                             |                   |
+    #                         |                |                             |       end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                               "nullpct" # optional null percentage
+    #                         |                |
+    MAX_VALUE_PATTERN_GROUP =                 "max" # optional max (only for numeric values)
+    #                         |
+    MIN_VALUE_PATTERN_GROUP ="min" # optional min (only for numeric values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
@@ -292,6 +292,7 @@ class BaseGenerator:
                 if rewrite:
                     prior_generators = another_gen.configure_from_schema(schema, prior_generators)
                     field_map[field_name] = another_gen
+                    ### print "DEBUG field_map[" + field_name + "] got " + another_gen.debug_gen_to_string()
                     new_generators.append(another_gen)
                     statement = rewrite
                 else:
@@ -376,6 +377,14 @@ class BaseGenerator:
         if not self.prior_generator:
             return False
         return self.prior_generator.has_reserved(name)
+
+    def debug_gen_to_string(self):
+        result = "generator: " + self.__token + " VALUES: "
+        for val in self.values:
+            result += val + ", "
+        if self.reserved_value:
+            result += "reserved: " + self.reserved_value
+        return result
 
 
 class TableGenerator(BaseGenerator):
@@ -609,6 +618,17 @@ class Schema:
     def get_typed_columns(self, supertype):
         return self.__col_by_type[supertype].keys()
 
+    def debug_schema_to_string(self):
+        result = "TABLES: "
+        for table in self.get_tables():
+            result += table + ", "
+
+        result += "COLUMNS: "
+        for code, supertype in Schema.TYPE_NAMES.iteritems():
+            for column_name in self.get_typed_columns(supertype):
+                result += supertype + " " + column_name + ", "
+        return result
+
 
 class Template:
     def __init__(self, **kwargs):
@@ -687,6 +707,7 @@ class Template:
             # Check for something to expand
             match = Template.MACRO_NAME_PATTERN.search(line[pos:])
             if not match:
+                ### print 'VERBOSE DEBUG no more macros for line "' + line + '"'
                 return line
             key = match.group()
             # This could be a false positive. Check for exact key match
@@ -694,8 +715,10 @@ class Template:
             if sub == None:
                 # nothing to see here. move along.
                 pos += len(key)
+                ### print 'VERBOSE DEBUG no macro defined for key "' + key + '"'
                 continue
             pos += match.start()
+            ### print 'VERBOSE DEBUG key "' + key + '" becomes "' + sub + '"'
             line = line[0:pos] + sub + line[pos+len(key):]
 
     GENERATOR_NAME_PATTERN = re.compile(r'_\w+')
@@ -740,10 +763,11 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, is_volt):
+    def __init__(self, catalog, template, subversion_generation, is_volt):
         global IS_VOLT
         IS_VOLT = is_volt
 
+        self.__subversion_generation = subversion_generation
         # Reset the counters
         IdGenerator.initialize(0)
 
@@ -768,19 +792,23 @@ class SQLGenerator:
     # is likely enough to be a false positive for an unresolved generator that it is
     # allowed to pass without the usual warning triggered by a leading underbar.
     LIKELY_FALSE_ALARMS = re.compile(r"LIKE '[^']*_.*'")
+
     def __generate_statement(self, text):
         text = self.__template.apply_macros(text)
         text = unicode(text)
 
         for statement in self.__template.generate_statements_from_text(text):
+            ### print ('VERBOSE DEBUG: text and statement post-generate_statements_from_text: "' + text + '", "' + statement + '"')
             statement, generators, field_map = BaseGenerator.prepare_generators(statement,
                                                                      self.__schema,
                                                                      SQLGenerator.GENERATOR_TYPES)
+            ### print ('VERBOSE DEBUG: prepared statement looks like: "' + statement + '"')
             if (SQLGenerator.UNRESOLVED_PUNCTUATION.search(statement) or
                 (SQLGenerator.UNRESOLVED_GENERATOR.search(statement) and
                  not SQLGenerator.LIKELY_FALSE_ALARMS.search(statement))):
                 print ('WARNING: final statement contains suspicious unresolved symbol(s): "' +
                        statement + '"')
+                print ('with schema "' + self.__schema.debug_schema_to_string() + '"')
             for generated_stmt in BaseGenerator.generate_statements_from_list(statement,
                                                                               generators,
                                                                               field_map):
@@ -794,6 +822,11 @@ class SQLGenerator:
                 results += 1
                 ### print 'DEBUG VERBOSELY SPOUTING OUTPUT STATEMENT: ' + i
                 yield i
+                ### TODO: make generation of the subquery wrapping variant of the select statements optional by some global flag
+                if self.__subversion_generation and re.match("(?i)\s*SELECT", i):
+                    results += 1
+                    yield 'SELECT * FROM (' + i + ') subquery'
+
             if results == 0:
                 print 'Template "%s" failed to yield SQL statements' % s
             elif summarize_successes:
@@ -823,7 +856,7 @@ if __name__ == "__main__":
 
     catalog = args[0]
     template = args[1]
-    generator = SQLGenerator(catalog, template, False)
+    generator = SQLGenerator(catalog, template, True, False)
     for i in generator.generate(True):
         print 'STATEMENT: ' + i
 

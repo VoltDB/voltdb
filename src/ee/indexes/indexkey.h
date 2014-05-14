@@ -752,10 +752,9 @@ struct TupleKeyComparator
 
             int comparison = lhValue.compare(rhValue);
 
-            if (comparison == VALUE_COMPARE_LESSTHAN) return -1;
-            else if (comparison == VALUE_COMPARE_GREATERTHAN) return 1;
+            if (comparison != VALUE_COMPARE_EQUAL) return comparison;
         }
-        return 0;
+        return VALUE_COMPARE_EQUAL;
     }
 private:
     const TupleSchema *m_keySchema;

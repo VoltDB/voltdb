@@ -21,7 +21,6 @@
 #include <string>
 #include <boost/scoped_ptr.hpp>
 #include "storage/ElasticScanner.h"
-#include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
 #include "storage/TupleBlock.h"
 
@@ -31,13 +30,13 @@ class CopyOnWriteTest;
 namespace voltdb {
 
 class PersistentTable;
+class TableStreamer;
 class TupleOutputStreamProcessor;
 
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
-                                              TableStreamType, const std::vector<std::string>&);
+    friend class TableStreamer;
     friend class ::DummyElasticTableStreamer;
     friend class ::CopyOnWriteTest;
 
@@ -108,6 +107,11 @@ private:
                    size_t nTuplesPerCall = DEFAULT_TUPLES_PER_CALL);
 
     /**
+     * Clone to perpetuate streaming after a TRUNCATE TABLE.
+     */
+    virtual TableStreamerContext* cloneForTruncatedTable(PersistentTableSurgeon &surgeon);
+
+    /**
      * Allow overriding how often index creation is throttled.
      */
     void setTuplesPerCall(size_t nTuplesPerCall) {
@@ -118,6 +122,11 @@ private:
      * Scanner for retrieving rows.
      */
     boost::scoped_ptr<ElasticScanner> m_scanner;
+
+    /**
+     * Predicate strings retained in case they may need to be re-applied post-"TRUNCATE TABLE".
+     */
+    std::vector<std::string> m_predicateStrings;
 
     /**
      * The maximum number of tuples to index per handleStreamMore() call.

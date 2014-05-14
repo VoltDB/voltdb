@@ -29,13 +29,16 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public TableCountPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
-        super();
+        super(child.getTargetTableName(), child.getTargetTableAlias());
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
-        m_targetTableAlias = child.getTargetTableAlias();
-        m_targetTableName = child.getTargetTableName();
         m_tableSchema = child.getTableSchema();
     }
 

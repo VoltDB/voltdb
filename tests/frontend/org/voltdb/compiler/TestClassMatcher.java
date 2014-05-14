@@ -23,6 +23,8 @@
 
 package org.voltdb.compiler;
 
+import java.util.Set;
+
 import junit.framework.TestCase;
 
 public class TestClassMatcher extends TestCase {
@@ -48,7 +50,8 @@ public class TestClassMatcher extends TestCase {
         ClassMatcher cm = new ClassMatcher();
         cm.m_classList = testClasses;
         cm.addPattern("org.**.B*");
-        String[] out = cm.getMatchedClassList();
+        Set<String> matchedClasses = cm.getMatchedClassList();
+        String[] out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(3, out.length);
         assertTrue(strContains(out, "org.voltdb.utils.BinaryDeque"));
         assertTrue(strContains(out, "org.voltdb.utils.BuildDirectoryUtils"));
@@ -57,21 +60,24 @@ public class TestClassMatcher extends TestCase {
         cm = new ClassMatcher();
         cm.m_classList = testClasses;
         cm.addPattern("**BinaryDeque");
-        out = cm.getMatchedClassList();
+        matchedClasses = cm.getMatchedClassList();
+        out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(1, out.length);
         assertTrue(strContains(out, "org.voltdb.utils.BinaryDeque"));
 
         cm = new ClassMatcher();
         cm.m_classList = testClasses;
         cm.addPattern("*.voltdb.*.CLibrary");
-        out = cm.getMatchedClassList();
+        matchedClasses = cm.getMatchedClassList();
+        out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(1, out.length);
         assertTrue(strContains(out, "org.voltdb.utils.CLibrary"));
 
         cm = new ClassMatcher();
         cm.m_classList = testClasses;
         cm.addPattern("*.voltdb.*CLibrary");
-        out = cm.getMatchedClassList();
+        matchedClasses = cm.getMatchedClassList();
+        out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(0, out.length);
     }
 }

@@ -23,7 +23,9 @@
 
 package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
 @ProcInfo (
     partitionInfo = "WIDE.P: 0",
@@ -37,7 +39,7 @@ public class InsertLotsOfData extends VoltProcedure {
             ");");
 
     public long run(int p, long initialId) {
-        final int STRLEN = 62;
+        final int STRLEN = 60;
 
         int totalBytes = 0;
         final int MB75Bytes = 1024 * 1024 * 5;

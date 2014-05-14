@@ -39,7 +39,6 @@
 
 using namespace std;
 using namespace voltdb;
-using namespace boost;
 
 const int COLUMN_COUNT = 5;
 // Annoyingly, there's no easy way to compute the exact Exported tuple
@@ -123,10 +122,9 @@ public:
             columnAllowNull.push_back(false);
         }
         m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
+          TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // allocate a new buffer and wrap it
         m_wrapper = new TupleStreamWrapper(1, 1);
@@ -171,7 +169,7 @@ protected:
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
     DummyTopend m_topend;
-    scoped_ptr<ExecutorContext> m_context;
+    boost::scoped_ptr<ExecutorContext> m_context;
 };
 
 // Several of these cases were move to TestExportDataSource in Java
@@ -266,7 +264,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
-    EXPECT_EQ( 1786, m_wrapper->allocatedByteCount());
+    EXPECT_EQ( 1802, m_wrapper->allocatedByteCount());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);

@@ -450,16 +450,18 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
     std::vector<bool> groupByColumnAllowNull;
+    std::vector<bool> groupByColumnInBytes;
     for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
         AbstractExpression* expr = m_groupByExpressions[ii];
         groupByColumnTypes.push_back(expr->getValueType());
         groupByColumnSizes.push_back(expr->getValueSize());
         groupByColumnAllowNull.push_back(true);
+        groupByColumnInBytes.push_back(expr->getInBytes());
     }
     m_groupByKeySchema = TupleSchema::createTupleSchema(groupByColumnTypes,
                                                         groupByColumnSizes,
                                                         groupByColumnAllowNull,
-                                                        true);
+                                                        groupByColumnInBytes);
     return true;
 }
 
@@ -516,8 +518,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        const ValueType columnType = tmptup.getType(columnIndex);
-        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(columnType));
+        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(tmptup.getSchema()->columnType(columnIndex)));
     }
     VOLT_TRACE("Setting passthrough columns");
     // A second pass to set the output columns from the input columns that are being passed through.

@@ -58,6 +58,8 @@ public class SaveRestoreBase extends RegressionSuite {
     {
         super.tearDown();
         deleteTestFiles();
+        System.gc();
+        System.runFinalization();
     }
 
     private void deleteRecursively(File f) {

@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -33,9 +34,9 @@ public interface SiteSnapshotConnection
     public void initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 }

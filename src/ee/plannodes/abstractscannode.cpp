@@ -129,4 +129,5 @@ AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
     if (obj.hasNonNullKey("PREDICATE")) {
         m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
     }
+    m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
 }

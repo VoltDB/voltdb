@@ -50,7 +50,7 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
 
 class TableCatalogDelegate : public CatalogDelegate {
   public:
-    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature);
+    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature, int32_t compactionThreshold);
     virtual ~TableCatalogDelegate();
 
 
@@ -106,11 +106,13 @@ class TableCatalogDelegate : public CatalogDelegate {
 
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                            catalog::Table const &catalogTable);
+                                            catalog::Table const &catalogTable,
+                                            const int32_t compactionThreshold);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
     std::string m_signature;
+    const int32_t m_compactionThreshold;
 };
 
 }

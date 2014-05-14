@@ -314,15 +314,15 @@ public class OneShotBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
         stats = mpPeriodicStatsContext.fetchAndResetBaseline().getStats();
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("MP Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     /**
@@ -378,15 +378,15 @@ public class OneShotBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
 
         for (Entry<String, ClientStats> e : fullStatsContext.getStatsByProc().entrySet()) {
             System.out.println("\nPROC: " + e.getKey());
             System.out.printf("Average throughput:            %,9d txns/sec\n", e.getValue().getTxnThroughput());
             System.out.printf("Average latency:               %,9.2f ms\n", e.getValue().getAverageLatency());
-            System.out.printf("95th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.95));
-            System.out.printf("99th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.99));
+            System.out.printf("95th percentile latency:       %,9.2f ms\n", e.getValue().kPercentileLatencyAsDouble(.95));
+            System.out.printf("99th percentile latency:       %,9.2f ms\n", e.getValue().kPercentileLatencyAsDouble(.99));
         }
 
         ClientStats mpstats = mpFullStatsContext.fetch().getStats();
@@ -395,8 +395,8 @@ public class OneShotBenchmark {
             System.out.println("\nMP PROC: " + e.getKey());
             System.out.printf("Average throughput:            %,9d txns/sec\n", e.getValue().getTxnThroughput());
             System.out.printf("Average latency:               %,9.2f ms\n", e.getValue().getAverageLatency());
-            System.out.printf("95th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.95));
-            System.out.printf("99th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.99));
+            System.out.printf("95th percentile latency:       %,9.2f ms\n", e.getValue().kPercentileLatencyAsDouble(.95));
+            System.out.printf("99th percentile latency:       %,9.2f ms\n", e.getValue().kPercentileLatencyAsDouble(.99));
         }
 
         System.out.print("\n" + HORIZONTAL_RULE);

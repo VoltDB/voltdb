@@ -818,15 +818,21 @@ public class ExpressionColumn extends Expression {
     VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
         if (tableName != null) {
-            exp.attributes.put("table", tableName);
+            if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                    rangeVariable.tableAlias == null &&
+                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+                exp.attributes.put("table", tableName.toUpperCase() + rangeVariable.rangeTable.getName().hashCode());
+            } else {
+                exp.attributes.put("table", tableName.toUpperCase());
+            }
         }
         //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
-        exp.attributes.put("column", columnName);
+        exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {
-            exp.attributes.put("alias", columnName);
+            exp.attributes.put("alias", columnName.toUpperCase());
         }
         if (rangeVariable != null && rangeVariable.tableAlias != null) {
-            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name);
+            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
         return exp;
     }

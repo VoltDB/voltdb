@@ -99,6 +99,7 @@ public class TestClientInterface {
     private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<DeferredSerialization>();
     private int drStatsInvoked = 0;
     private StatsAgent m_statsAgent = new StatsAgent() {
+        @Override
         public void performOpsAction(final Connection c, final long clientHandle, final OpsSelector selector,
                                      final ParameterSet params) throws Exception {
             final String stat = (String)params.toArray()[0];
@@ -166,6 +167,7 @@ public class TestClientInterface {
          * construction
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
+        doReturn(m_cxn.connectionId()).when(m_handler).connectionId();
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
         doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
@@ -208,15 +210,15 @@ public class TestClientInterface {
         }
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
-        String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCat = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
 
         String deploymentPath = builder.getPathToDeployment();
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true, false);
+        CatalogUtil.compileDeployment(catalog, deploymentPath, true, false);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
+        m_context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
@@ -453,7 +455,6 @@ public class TestClientInterface {
         catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
-        catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
@@ -476,7 +477,6 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
         assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
         assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
         assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
@@ -488,6 +488,23 @@ public class TestClientInterface {
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, true, true).getStoredProcedureInvocation();
         assertEquals(1, invocation.getParameterAtIndex(0));
+    }
+
+    @Test
+    public void testGC() throws Exception {
+        ByteBuffer msg = createMsg("@GC");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+
+        ByteBuffer b = responses.take();
+        resp = new ClientResponseImpl();
+        b.position(4);
+        resp.initFromBuffer(b);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable vt = resp.getResults()[0];
+        assertTrue(vt.advanceRow());
+        //System.gc() should take at least a little time
+        assertTrue(resp.getResults()[0].getLong(0) > 10000);
     }
 
     @Test
@@ -639,10 +656,10 @@ public class TestClientInterface {
         DeferredSerialization resp = responsesDS.take();
 
         if (shouldRestart) {
-            assertEquals(0, resp.serialize().length);
+            assertEquals(-1, resp.getSerializedSize());
             checkInitMsgSent("hello", 1, true, true);
         } else {
-            assertEquals(1, resp.serialize().length);
+            assertTrue(-1 != resp.getSerializedSize());
             verify(m_messenger, never()).send(anyLong(), any(VoltMessage.class));
         }
 
@@ -725,7 +742,10 @@ public class TestClientInterface {
             //to make its way to the client
             ByteBuffer expectedBuf = getClientResponse("bar");
             statsAnswers.offer(dsOf(expectedBuf));
-            assertEquals(expectedBuf, responsesDS.take().serialize()[0]);
+            DeferredSerialization ds = responsesDS.take();
+            ByteBuffer actualBuf = ByteBuffer.allocate(ds.getSerializedSize());
+            ds.serialize(actualBuf);
+            assertEquals(expectedBuf, actualBuf);
         } finally {
             RateLimitedClientNotifier.WARMUP_MS = 1000;
             ClientInterface.TOPOLOGY_CHANGE_CHECK_MS = 5000;
@@ -736,11 +756,15 @@ public class TestClientInterface {
     private DeferredSerialization dsOf(final ByteBuffer buf) {
         return new DeferredSerialization() {
             @Override
-            public ByteBuffer[] serialize() throws IOException {
-                return new ByteBuffer[] {buf.duplicate()};
+            public void serialize(final ByteBuffer outbuf) throws IOException {
+                outbuf.put(buf);
             }
             @Override
             public void cancel() {}
+            @Override
+            public int getSerializedSize() {
+                return buf.remaining();
+            }
         };
     }
 

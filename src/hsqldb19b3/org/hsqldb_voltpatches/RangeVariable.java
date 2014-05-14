@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -499,7 +500,14 @@ final class RangeVariable {
      */
     void addIndexCondition(Expression[] exprList, Index index, int colCount,
                            boolean isJoin) {
-
+// VoltDB extension
+        if (rangeIndex == index && isJoinIndex && (!isJoin) &&
+                (multiColumnCount > 0) && (colCount == 0)) {
+            // This is one particular set of conditions which broke the classification of
+            // ON and WHERE clauses.
+            return;
+        }
+// End of VoltDB extension
         rangeIndex  = index;
         isJoinIndex = isJoin;
 
@@ -676,10 +684,12 @@ final class RangeVariable {
             isBeforeFirst      = true;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -701,26 +711,32 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
+        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
+        @Override
         public long getRowid() {
             return currentRow == null ? 0
                                       : currentRow.getId();
         }
 
+        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : Long.valueOf(currentRow.getId());
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -732,6 +748,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangePosition;
         }
@@ -765,10 +782,12 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -784,8 +803,10 @@ final class RangeVariable {
             return findNext();
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -799,6 +820,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1024,8 +1046,10 @@ final class RangeVariable {
             it                 = rangeVar.rangeIndex.firstRow(session, store);
         }
 
+        @Override
         protected void initialiseIterator() {}
 
+        @Override
         protected boolean findNext() {
 
             boolean result;
@@ -1081,10 +1105,12 @@ final class RangeVariable {
             this.rangeIterators = rangeIterators;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1121,6 +1147,7 @@ final class RangeVariable {
             return false;
         }
 
+        @Override
         public void reset() {}
     }
 
@@ -1139,16 +1166,9 @@ final class RangeVariable {
     {
         Index        index;
         Index        primaryIndex;
-        int[]        primaryKey;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
-        primaryKey   = rangeTable.getPrimaryKey();
-
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support subqueries, consider using views instead");
-        }
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1158,10 +1178,27 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        scan.attributes.put("table", rangeTable.getName().name);
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY && tableAlias == null) {
+            scan.attributes.put("table", rangeTable.getName().name + rangeTable.getName().hashCode());
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
+        }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("tablealias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
+        }
+
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            if (rangeTable instanceof TableDerived) {
+                if (tableAlias == null || tableAlias.name == null) {
+                    // VoltDB require derived sub select table with user specified alias
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "SQL Syntax error: Every derived table must have its own alias.");
+                }
+
+                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
+                scan.children.add(subQuery);
+            }
         }
 
         // note if this is an outer join
@@ -1200,7 +1237,7 @@ final class RangeVariable {
             whereCond = nonIndexWhereCondition;
         } else {
             joinCond = nonIndexJoinCondition;
-            
+
             whereCond = indexCondition;
             if (indexEndCondition != null) {
                 if (whereCond != null) {
@@ -1217,7 +1254,7 @@ final class RangeVariable {
                     whereCond = nonIndexWhereCondition;
                 }
             }
-            
+
         }
         if (joinCond != null) {
             joinCond = joinCond.eliminateDuplicates(session);

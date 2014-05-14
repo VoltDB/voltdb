@@ -31,7 +31,6 @@ static uint32_t cpuid(uint32_t functionInput) {
 }
 
 CRC32CFunctionPtr detectBestCRC32C() {
-#ifdef __SSE4_2__
     static const int SSE42_BIT = 20;
     uint32_t ecx = cpuid(1);
     bool hasSSE42 = ecx & (1 << SSE42_BIT);
@@ -40,10 +39,6 @@ CRC32CFunctionPtr detectBestCRC32C() {
     } else {
         return crc32cSlicingBy8;
     }
-#else
-    cpuid(1);
-    return crc32cSlicingBy8;
-#endif
 }
 
 // Implementations adapted from Intel's Slicing By 8 Sourceforge Project
@@ -98,14 +93,34 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
 
     return crc;
 }
-#ifdef __SSE4_2__
+
+inline uint64_t _mm_crc32_u64(uint64_t crc, uint64_t value) {
+    asm("crc32q %[value], %[crc]\n" : [crc] "+r" (crc) : [value] "rm" (value));
+    return crc;
+}
+
+inline uint32_t _mm_crc32_u32(uint32_t crc, uint32_t value) {
+    asm("crc32l %[value], %[crc]\n" : [crc] "+r" (crc) : [value] "rm" (value));
+    return crc;
+}
+
+inline uint32_t _mm_crc32_u16(uint32_t crc, uint16_t value) {
+    asm("crc32w %[value], %[crc]\n" : [crc] "+r" (crc) : [value] "rm" (value));
+    return crc;
+}
+
+inline uint32_t _mm_crc32_u8(uint32_t crc, uint8_t value) {
+    asm("crc32b %[value], %[crc]\n" : [crc] "+r" (crc) : [value] "rm" (value));
+    return crc;
+}
+
 // Hardware-accelerated CRC-32C (using CRC32 instruction)
 uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     const char* p_buf = (const char*) data;
     // alignment doesn't seem to help?
     uint64_t crc64bit = crc;
     for (size_t i = 0; i < length / sizeof(uint64_t); i++) {
-        crc64bit = __builtin_ia32_crc32di(crc64bit, *(uint64_t*) p_buf);
+        crc64bit = _mm_crc32_u64(crc64bit, *(const uint64_t*) p_buf);
         p_buf += sizeof(uint64_t);
     }
 
@@ -114,30 +129,30 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     length &= sizeof(uint64_t) - 1;
     /*
     while (length > 0) {
-        crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf++);
+        crc32bit = _mm_crc32_u64(crc32bit, *p_buf++);
         length--;
     }
     */
     switch (length) {
         case 7:
-            crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf++);
+            crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
         case 6:
-            crc32bit = __builtin_ia32_crc32hi(crc32bit, *(uint16_t*) p_buf);
+            crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             p_buf += 2;
         // case 5 is below: 4 + 1
         case 4:
-            crc32bit = __builtin_ia32_crc32si(crc32bit, *(uint32_t*) p_buf);
+            crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             break;
         case 3:
-            crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf++);
+            crc32bit = _mm_crc32_u8(crc32bit, *p_buf++);
         case 2:
-            crc32bit = __builtin_ia32_crc32hi(crc32bit, *(uint16_t*) p_buf);
+            crc32bit = _mm_crc32_u16(crc32bit, *(const uint16_t*) p_buf);
             break;
         case 5:
-            crc32bit = __builtin_ia32_crc32si(crc32bit, *(uint32_t*) p_buf);
+            crc32bit = _mm_crc32_u32(crc32bit, *(const uint32_t*) p_buf);
             p_buf += 4;
         case 1:
-            crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf);
+            crc32bit = _mm_crc32_u8(crc32bit, *p_buf);
             break;
         case 0:
             break;
@@ -148,6 +163,5 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
 
     return crc32bit;
 }
-#endif
 
 }  // namespace vdbcrc

@@ -25,35 +25,43 @@
 --SELECT
 -- test select expressions
 --- test simple projection
-SELECT _variable[@comparabletype] FROM @fromtables
-SELECT _variable[@comparabletype], _variable FROM @fromtables
+SELECT _variable[#arg @comparabletype] B1 FROM @fromtables
+SELECT _variable[#arg @comparabletype], _variable B2 FROM @fromtables
 --- test column alias
-SELECT _variable[@columntype] AS DUDE FROM @fromtables
+SELECT _variable[#arg @columntype] AS B3 FROM @fromtables A
 --- test *
-SELECT * FROM @fromtables
+SELECT * FROM @fromtables B4
 --- test simple arithmetic expressions (+, -, *, /) with constant
-SELECT _variable[@columntype] @aftermath AS LITTLE_MATH FROM @fromtables
+SELECT _variable[#arg @columntype] @aftermath AS B5LITTLEMATH FROM @fromtables A
 
 --- test DISTINCT
-SELECT DISTINCT _variable[@comparabletype] FROM @fromtables
+SELECT DISTINCT _variable[#arg @comparabletype] B6 FROM @fromtables A
 --- test ALL
-SELECT ALL _variable[@comparabletype] FROM @fromtables
+SELECT ALL _variable[#arg @comparabletype] B7 FROM @fromtables A
+
 --- test aggregate functions (COUNT, SUM, MAX, MIN, AVG)
-SELECT @agg(_variable[@comparabletype]) FROM @fromtables
+---- TODO: Re-simplify when the ENG-6176 optimized MIN(NULL) wrong answer bug is fixed.
+---- SELECT  @agg(_variable[#arg @comparabletype]) B8 FROM @fromtables A --->
+{_countormax |= "COUNT"}
+{_countormax |= "MAX"}
+SELECT _countormax(_variable[#arg @comparabletype]) B8 FROM @fromtables A
+
+
+SELECT @agg(_variable[#arg @comparabletype]) B9 FROM @fromtables A WHERE _maybe A._variable[#arg @comparabletype] _cmp @comparableconstant
 
 --- count(*), baby
 -- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
-SELECT COUNT(*) FROM @fromtables
+SELECT COUNT(*) FROM @fromtables B10
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @fromtables WHERE _maybe _variable[@comparabletype] _cmp @comparableconstant
+SELECT * FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @fromtables WHERE (_variable[@comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
+SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
-SELECT _variable[#grouped @columntype] FROM @fromtables GROUP BY __[#grouped]
+SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
 
 {_optionallimitoffset |= ""}
 {_optionallimitoffset |= "LIMIT _value[int:1,3]"}
@@ -62,15 +70,18 @@ SELECT _variable[#grouped @columntype] FROM @fromtables GROUP BY __[#grouped]
 --{_optionallimitoffset |= "                      OFFSET _value[int:1,3]"}
 
 -- test ORDER BY with optional LIMIT/OFFSET
-SELECT _variable[#order], _variable FROM @fromtables ORDER BY __[#order] _sortorder _optionallimitoffset
+-- HSQL disagrees about ordering of NULLs descending, this only shows as an error on limit/offset queries,
+-- so these two statements (DESC sort order and varying limit offset) are kept separate.
+SELECT _variable[#order], _variable B15 FROM @fromtables A ORDER BY __[#order], 2            _optionallimitoffset
+SELECT _variable[#order], _variable B16 FROM @fromtables A ORDER BY __[#order], 2 DESC
 
 -- test GROUP BY count(*)
-SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped]
+SELECT _variable[#grouped], COUNT(*) AS B17 FROM @fromtables A GROUP BY __[#grouped]
 -- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
-SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
+SELECT _variable[#grouped], COUNT(*) AS B18 FROM @fromtables A GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
 
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS.@idcol = RHS.@idcol
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables B19RHS ON LHS.@idcol = B19RHS.@idcol
 -- TODO: If the intent is to support a schema with multiple id-partitioned tables,
 -- this statement is looking for trouble -- might want to migrate it to its own template/suite.
-SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._variable[@columntype] = B20RHS._variable[@comparabletype]

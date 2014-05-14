@@ -223,7 +223,7 @@ public class RegressionSuite extends TestCase {
         }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port)[0];
+                    hNp.getHostText(), m_username, hashedPassword, port, null)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -338,6 +338,21 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
+        validateTableColumnOfScalarVarchar(vt, 0, expected);
+    }
+
+    static public void validateTableColumnOfScalarVarchar(VoltTable vt, int col, String[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            assertEquals(expected[i], vt.getString(col));
+        }
+    }
+
+
     // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
     // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
@@ -352,23 +367,48 @@ public class RegressionSuite extends TestCase {
     }
 
     static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
+        validStatisticsForTableLimitAndPercentage(client, tableName, limit, -1);
+    }
+
+    static public void validStatisticsForTableLimitAndPercentage(Client client, String tableName, long limit, long percentage) throws Exception {
         long start = System.currentTimeMillis();
         while (true) {
+            long lastLimit =-1, lastPercentage = -1;
             Thread.sleep(1000);
-            if (System.currentTimeMillis() - start > 10000) fail("Took too long");
+            if (System.currentTimeMillis() - start > 10000) {
+                String percentageStr = "";
+                if (percentage >= 0) {
+                    percentageStr = ", last seen percentage: " + lastPercentage;
+                }
+                fail("Took too long or have wrong answers: last seen limit: " + lastLimit + percentageStr);
+            }
 
             VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
             for (VoltTable t: results) { System.out.println(t.toString()); }
             if (results[0].getRowCount() == 0) continue;
 
+            boolean foundTargetTuple = false;
+            boolean limitExpected = false;
+            boolean percentageExpected = percentage < 0 ? true: false;
+
             for (VoltTable vt: results) {
                 while(vt.advanceRow()) {
                     String name = vt.getString("TABLE_NAME");
                     if (tableName.equals(name)) {
-                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
-                        return;
+                        foundTargetTuple = true;
+                        lastLimit = vt.getLong("TUPLE_LIMIT");
+                        if (limit == lastLimit) {
+                            limitExpected = true;
+                        }
+                        if (percentageExpected || percentage == (lastPercentage = vt.getLong("PERCENT_FULL")) ) {
+                            percentageExpected = true;
+                        }
+
+                        if (limitExpected && percentageExpected) return;
+                        break;
                     }
                 }
+                if (foundTargetTuple) break;
             }
         }
     }

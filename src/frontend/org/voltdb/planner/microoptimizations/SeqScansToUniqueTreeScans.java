@@ -21,10 +21,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -47,30 +47,23 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
      * Only applies when stronger determinism is needed.
      */
     @Override
-    boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement)
+    void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
-        return ( ! hasDeterministicStatement) && detMode != DeterminismMode.FASTER;
+        if (detMode == DeterminismMode.FASTER) {
+            return;
+        }
+        if (plan.hasDeterministicStatement()) {
+            return;
+        }
+        AbstractPlanNode planGraph = plan.rootPlanGraph;
+        if (planGraph.isOrderDeterministic()) {
+            return;
+        }
+        super.apply(plan, detMode, parsedStmt);
     }
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        this.m_parsedStmt = parsedStmt;
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        // The statement is already known NOT to be inherently order deterministic.
-        // Some PLANs for a non-ordered query may turn out to be deterministic anyway.
-        // So, check first.
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-
-        if ( ! planGraph.isOrderDeterministic()) {
-            plan.rootPlanGraph = recursivelyApply(planGraph);
-        }
-
-        retval.add(plan);
-        return retval;
-    }
-
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 
@@ -105,14 +98,17 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         if ( ! (plan instanceof SeqScanPlanNode)) {
             return plan;
         }
-        assert(plan.getChildCount() == 0);
-
-        // got here? we're got ourselves a sequential scan
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
-        String tableName = scanNode.getTargetTableName();
-        Table table = m_parsedStmt.m_db.getTables().get(tableName);
-        assert(table != null);
+        if (scanNode.isSubQuery()) {
+            // This is a sub-query and can't have indexes
+            return plan;
+        }
+
+        // got here? we're got ourselves a sequential scan over a real table
+        assert (scanNode.getChildCount() == 0);
+        StmtTableScan tableScan = scanNode.getTableScan();
+        assert(tableScan != null);
 
         Index indexToScan = null;
 
@@ -120,7 +116,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         // note: This is not the same as picking the narrowest key in c++,
         // which is probably what you want if it turns out this optimization
         // does anything for performance at all.
-        for (Index index : table.getIndexes()) {
+        for (Index index : tableScan.getIndexes()) {
             // skip non-unique indexes
             if (index.getUnique() == false) {
                 continue;

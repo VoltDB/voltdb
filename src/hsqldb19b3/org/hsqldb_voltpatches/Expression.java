@@ -73,9 +73,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.TimestampData;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
+
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -1460,7 +1464,7 @@ public class Expression {
         prototypes.put(OpTypes.SEQUENCE,      null); // not yet supported sequence type
         prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
-        prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
+        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
         prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
@@ -1717,6 +1721,16 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.TABLE_SUBQUERY:
+            if (subQuery == null || subQuery.queryExpression == null) {
+                throw new HSQLParseException("VoltDB could not determine the subquery");
+            }
+            // @TODO: SubQuery doesn't have an information about the query parameters
+            // Or maybe there is a way?
+            ExpressionColumn parameters[] = new ExpressionColumn[0];
+            exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
+            return exp;
+
         case OpTypes.ALTERNATIVE:
             assert(nodes.length == 2);
             // If with ELSE clause, pad NULL with it.
@@ -1786,8 +1800,8 @@ public class Expression {
         case OpTypes.TABLE_SUBQUERY:
         case OpTypes.ROW:
         case OpTypes.TABLE:
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    "VoltDB does not support subqueries, consider using views or multiple statements instead");
+        case OpTypes.EXISTS:
+            throw new HSQLParseException("Unsupported subquery syntax within an expression. Consider using a join or multiple statements instead");
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 
@@ -1799,8 +1813,6 @@ public class Expression {
 
         case OpTypes.IN:
             opAsString = "the IN operator. Consider using an OR expression"; break; // not yet supported
-        case OpTypes.EXISTS:
-            opAsString = "subqueries"; break; // not yet supported ExpressionLogical for subqueries
 
         case OpTypes.OVERLAPS:
         case OpTypes.UNIQUE:

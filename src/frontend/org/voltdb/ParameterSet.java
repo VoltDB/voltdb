@@ -266,8 +266,12 @@ public class ParameterSet implements JSONString {
         return o;
     }
 
+    public Object getParam(int index) {
+        return m_params[index];
+    }
+
     /**
-     * Returns the parameters. Don't modify the returned array!
+     * Returns a copy of the parameter array
      * @return
      */
     public Object[] toArray() {

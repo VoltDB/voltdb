@@ -43,7 +43,9 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
                         {"CHANGE_COLUMNS", "ID"},
-                        {"JUMBO_ROW", "PKEY"}};
+                        {"JUMBO_ROW", "PKEY"},
+                        {"JUMBO_ROW_UTF8", "PKEY"},
+                       };
 
     public static final URL ddlURL =
         SaveRestoreTestProjectBuilder.class.getResource("saverestore-ddl.sql");
@@ -80,12 +82,14 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
     @Override
     public void addAllDefaults()
     {
-        addDefaultProcedures();
-        addDefaultPartitioning();
         addDefaultSchema();
+        addDefaultPartitioning();
+        addDefaultProcedures();
         addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
         addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
         addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
+        addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
+        addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
     }
 
     /*
@@ -107,20 +111,14 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "saverestore-jni.jar";
 
-        addDefaultSchema();
-        addDefaultPartitioning();
-        addDefaultProcedures();
-
-        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
+        addAllDefaults();
 
         boolean status = compile(catalogJar);
         assert(status);
 
         // read in the catalog
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
         assert(serializedCatalog != null);
 
         // create the catalog (that will be passed to the ClientInterface

@@ -44,6 +44,9 @@ try:
                 if os.path.exists(path):
                     print 'Re-running with %s...' % path
                     os.execv(path, [path] + sys.argv)
+        sys.stderr.write("This script requires Python 2.6 or newer. Please install " +
+                         "a more recent Python release and retry.\n")
+        sys.exit(-1)
 
     cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
     # Adjust these variables as needed for other base commands, locations, etc..

@@ -23,6 +23,8 @@
 
 package org.voltdb.jdbc;
 
+import static junit.framework.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -44,10 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
-import static junit.framework.Assert.assertFalse;
 
 import org.junit.AfterClass;
-import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
@@ -790,29 +790,37 @@ public class TestJDBCDriver {
         if (tmp.exists()) {
             tmp.delete();
         }
-        Properties props = new Properties();
-        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
-        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
-        FileOutputStream out = null;
         try {
-            out = new FileOutputStream(propfile);
-            props.store(out, "");
-        } catch (FileNotFoundException e) {
-            fail();
-        } catch (IOException e) {
-            fail();
-        }        finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException e) { }
+            Properties props = new Properties();
+            props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+            props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+            FileOutputStream out = null;
+            try {
+                out = new FileOutputStream(propfile);
+                props.store(out, "");
+            } catch (FileNotFoundException e) {
+                fail();
+            } catch (IOException e) {
+                fail();
+            }        finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (IOException e) { }
+                }
+            }
+
+            System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
+            props = new Properties();
+            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            checkCarlosDanger(myconn);
+            myconn.close();
+        }
+        finally {
+            // end clean
+            if (tmp.exists()) {
+                tmp.delete();
             }
         }
-
-        System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
-        props = new Properties();
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        checkCarlosDanger(myconn);
-        myconn.close();
     }
 }
