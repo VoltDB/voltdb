@@ -45,20 +45,9 @@ import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexLimit extends MicroOptimization {
 
-    @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-        this.m_parsedStmt = parsedStmt;
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph);
-        plan.rootPlanGraph = planGraph;
-        retval.add(plan);
-        return retval;
-    }
-
     // for debug purpose only, this might not be called
     int indent = 0;
-    void recursivelyPrint(AbstractPlanNode node, StringBuilder sb)
+    protected void recursivelyPrint(AbstractPlanNode node, StringBuilder sb)
     {
         for (int i = 0; i < indent; i++) {
             sb.append("\t");
@@ -70,7 +59,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         }
     }
 
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    @Override
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 

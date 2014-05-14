@@ -1852,9 +1852,6 @@ TEST CASES
     <condition property="config_verbose" value="-r" else="">
         <isset property="sql_coverage_verbose"/>
     </condition>
-    <condition property="debug_output" value="" else="quietadhoc">
-        <isset property="sql_coverage_verbose"/>
-    </condition>
     <condition property="config_genonly" value="-g" else="">
         <isset property="sql_coverage_genonly"/>
     </condition>
@@ -1888,10 +1885,10 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx640m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -XX:+HeapDumpOnOutOfMemoryError -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
-    ${debug_output}' />
+    ' />
     <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">
       <fileset dir="${test.example.dir}">
         <include name="**/*.sql"/>

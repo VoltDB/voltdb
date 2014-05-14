@@ -91,6 +91,21 @@ public class StmtSubqueryScan extends StmtTableScan {
         return true;
     }
 
+    public List<StmtTargetTableScan> getAllTargetTables() {
+        List <StmtTargetTableScan> stmtTables = new ArrayList<StmtTargetTableScan>();
+        for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
+            if (tableScan instanceof StmtTargetTableScan) {
+                stmtTables.add((StmtTargetTableScan)tableScan);
+            } else {
+                assert(tableScan instanceof StmtSubqueryScan);
+                StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
+                stmtTables.addAll(subScan.getAllTargetTables());
+            }
+        }
+
+        return stmtTables;
+    }
+
     @Override
     public String getPartitionColumnName() {
         //TODO: implement identification of exported subquery partitioning column(s)

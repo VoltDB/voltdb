@@ -39,14 +39,6 @@ class Trigger {
 }
 
 @Canonical
-class Labeler {
-    int count = 0
-    String getLabel() {
-        Integer.toString(++count, Character.MAX_RADIX)
-    }
-}
-
-@Canonical
 class Row {
     long date
     double three9s
@@ -57,22 +49,29 @@ class Row {
 
     TreeSet<String> titles = new TreeSet<String>()
     TreeSet<String> texts = new TreeSet<String>()
+    TreeSet<String> events = new TreeSet<String>()
+
     Row annotate( String title, String text) {
-        if(title) titles << title
-        if(text) texts << text
+        String event = title + ':' + text
+        if (!events.contains(event)) {
+            events << event
+            if(title) titles << title
+            if(text) texts << text
+        }
         this
     }
     Row annotate( String label, String title, String text) {
         if(label && !mark) mark = label
-        if(title) titles << title
-        if(text) texts << text
+        annotate(title,text)
         this
     }
     String getText() {
         titles ? "'${titles.join(',')} ${texts.join(',')}'" : 'undefined'
     }
     String getAnnotation() {
-        mark ? "'${mark}'" : 'undefined'
+        if(!mark) return 'undefined'
+        if(titles.size() > 1) return "'M'"
+        return "'${mark}'"
     }
     String getAnnotatedRow() {
         "[new Date(${date}), ${five9s}, ${annotation}, ${text}]"
@@ -80,8 +79,8 @@ class Row {
     String getNinesRow() {
         "[new Date(${date}), ${three9s}, ${four9s}, ${five9s}]"
     }
-    void label(Labeler lblr) {
-        if (titles && !mark) mark = lblr.label
+    boolean isAnnotatedWith(String title, String text) {
+        events.contains(title + ':' + text)
     }
 }
 
@@ -91,6 +90,7 @@ cli.c(longOpt: 'csv-file', required:true, argName:'file', args:1, 'periodic meas
 cli.h(longOpt: 'help', required:false, 'usage information')
 cli.f(longOpt: 'five9s', required:false, argName:'file', args:1, 'fine nines chart output file [default: annotatedFive9s.html]')
 cli.a(longOpt: 'all9s', required:false, argName:'file', args:1, 'all nines chart output file [default: all9s.html')
+cli.t(longOpt: 'threshold', required:false, argName:'threshold', args:1, 'latency annotation threshold in ms [default: 5]')
 
 def opts = cli.parse(args)
 if (!opts) return
@@ -101,9 +101,11 @@ else if (opts.h) {
 
 def five9sFN = "annotatedFive9s.html"
 def all9sFN = "all9s.html"
+def threshold = 5
 
 if (opts.f) five9sFN = opts.f
 if (opts.a) all9sFN = opts.a
+if (opts.t) threshold = opts.t as int
 
 def fpw = new PrintWriter(new FileWriter(five9sFN),true)
 def apw = new PrintWriter(new FileWriter(all9sFN),true)
@@ -128,10 +130,19 @@ def triggers = []
 def node = ""
 
 def noteWorthy = { long tm, String label, String event ->
-    if (data.subMap(tm-2500,true,tm+2500,true).findAll {k,v -> v.five9s > 5}.size() > 0) {
-        data.floorEntry(tm)?.value?.annotate(label,event,node)
+    SortedMap<Long,Row> submap = data.subMap(tm-2500,true,tm+2500,true)
+    if (!submap.find {k,v -> v.isAnnotatedWith(event,node)}) {
+        if (submap.find {k,v -> v.five9s > threshold}) {
+            data.floorEntry(tm)?.value?.annotate(label,event,node)
+        }
     }
 }
+
+def nodefailRE = ~/${logPFX}REJOIN:\sAgreement,\sAdding\s(\d+:-\d+)\sto\sfailed\ssites\shistory/
+
+triggers << new Trigger(re: nodefailRE, onMatch: { lines, mtc, tm ->
+    data.floorEntry(tm)?.value?.annotate('N','nodefail', node)
+})
 
 def snapinzRE = ~/${logPFX}SNAPSHOT:\sSnapshot\sinitiation\stook\s(\d+)\smilliseconds/
 
@@ -146,10 +157,10 @@ triggers << new Trigger(re: snapendRE, onMatch: { lines, mtc, tm ->
     noteWorthy(tm,'P','snapend')
 })
 
-def segunavailRE = ~/${logPFX}Attempted\sto\sloan\sa\spreallocated\slog\ssegment/
+def segunavailRE = ~/${logPFX}LOGGING:\sAttempted\sto\sloan\sa\spreallocated\slog\ssegment/
 
 triggers << new Trigger(re: segunavailRE, onMatch: { lines, mtc, tm ->
-    noteWorthy(tm,'G','segunavail')
+    noteWorthy(tm,'U','segunavail')
 })
 
 def segaddRE = ~/${logPFX}LOGGING:\sFinished\sadding\ssegment/
@@ -158,10 +169,22 @@ triggers << new Trigger(re: segaddRE, onMatch: { lines, mtc, tm ->
     noteWorthy(tm,'G','segadd')
 })
 
-def nodefailRE = ~/${logPFX}REJOIN:\sAgreement,\sAdding\s(\d+:-\d+)\sto\sfailed\ssites\shistory/
+def segreturnRE = ~/${logPFX}LOGGING:\sReturned\scommand\slog\ssegment/
 
-triggers << new Trigger(re: nodefailRE, onMatch: { lines, mtc, tm ->
-    data.floorEntry(tm)?.value?.annotate('N','nodefail', node)
+triggers << new Trigger(re: segreturnRE, onMatch: { lines, mtc, tm ->
+    noteWorthy(tm,'L','segreturn')
+})
+
+def snapdelRE = ~/${logPFX}SNAPSHOT: Deleting files/
+
+triggers << new Trigger(re: snapdelRE, onMatch: { lines, mtc, tm ->
+    noteWorthy(tm,'P','snapdel')
+})
+
+def segloanRE = ~/${logPFX}LOGGING:\sLoaned\sout\slog\ssegment/
+
+triggers << new Trigger(re: segloanRE, onMatch: { lines, mtc, tm ->
+    noteWorthy(tm,'L','segloan')
 })
 
 def feeder = new LogFeeder()
@@ -209,7 +232,14 @@ def txt = """<html>
           	maxZoomIn: 0.001, 
           	actions: ['dragToZoom', 'rightClickToReset']
           },
-          hAxis : {title: 'Date' }
+          annotations: {
+            textStyle: {
+                fontSize: 10,
+                color: 'orange'
+            }
+          },
+          hAxis : {title: 'Date' },
+          vAxis : {title: 'Latency (ms)'}
         };
 
         chart.draw(data, options);
@@ -251,7 +281,8 @@ txt = """<html>
             maxZoomIn: 0.001,
             actions: ['dragToZoom', 'rightClickToReset']
           },
-          hAxis : {title: 'Date' }
+          hAxis : {title: 'Date' },
+          vAxis : {title: 'Latency (ms)'}
         };
 
         chart.draw(data, options);

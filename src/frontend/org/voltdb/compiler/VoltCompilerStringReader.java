@@ -23,6 +23,9 @@ import java.io.StringReader;
 
 import org.voltdb.utils.InMemoryJarfile;
 
+/**
+ * Used for providing fixed DDL text without involving the filesystem.
+ */
 public class VoltCompilerStringReader extends VoltCompilerReader
 {
     private final String m_path;
