@@ -91,6 +91,9 @@ fi
 if [ "$JAVA_HOME" != "" ]; then
   #echo "run java in $JAVA_HOME"
   JAVA=$JAVA_HOME/bin/java
+else
+  echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
+  exit 1
 fi
 
 # check envvars to see if a user overrides log4j conf
