@@ -114,7 +114,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             {
         checkNotNull( onDrain, "onDrain runnable is null");
 
-        m_format = ExportFormat.ORIGINAL;
+        m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
             @Override
@@ -337,6 +337,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             stringer.endObject();
         }
         stringer.endArray();
+        stringer.key("format").value(ExportFormat.FOURDOTFOUR.toString());
     }
 
     /**

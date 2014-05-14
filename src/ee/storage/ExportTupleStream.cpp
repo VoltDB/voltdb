@@ -139,7 +139,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeLong(m_siteId);
 
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
-    io.writeLong((type == INSERT) ? 1L : 0L);
+    io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
 
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);

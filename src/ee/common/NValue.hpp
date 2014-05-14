@@ -2961,19 +2961,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
      case VALUE_TYPE_VARCHAR:
      case VALUE_TYPE_VARBINARY:
      {
-         if (isNull()) {
-             io.writeInt(OBJECTLENGTH_NULL);
-             return;
-         }
-         const int32_t length = getObjectLength_withoutNull();
-         if (length <= OBJECTLENGTH_NULL) {
-             throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
-         }
-         io.writeInt(static_cast<int32_t>(length));
-
-         // Not a null string: write it out
-         io.writeBytes(getObjectValue_withoutNull(), length);
-
+         io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
          return;
      }
      case VALUE_TYPE_TINYINT: {
