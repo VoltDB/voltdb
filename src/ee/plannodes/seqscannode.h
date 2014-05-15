@@ -77,15 +77,6 @@ class SeqScanPlanNode : public AbstractScanPlanNode {
          */
         ~SeqScanPlanNode();
 
-        /**
-         * Moved here from SeqScanExecutor so that the predicate would only be defined in one place.
-         * Need it here to determine whether the output tables needs to be deleted in the destructor.
-         * Couldn't invoke it from the Executor without making a circular dependency
-         */
-        bool needsOutputTableClear() {
-            return getPredicate() != NULL || getInlinePlanNodes().size() > 0;
-        }
-
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
 
         std::string debugInfo(const std::string &spacer) const;
