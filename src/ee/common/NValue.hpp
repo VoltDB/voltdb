@@ -2991,8 +2991,8 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
      case VALUE_TYPE_DECIMAL: {
          io.writeShort(kMaxDecScale);
          io.writeShort(16);  //number of bytes in decimal
-         io.writeLong(getDecimal().table[1]);
-         io.writeLong(getDecimal().table[0]);
+         io.writeLong(htonll(getDecimal().table[1]));
+         io.writeLong(htonll(getDecimal().table[0]));
          return;
      }
      case VALUE_TYPE_INVALID:
