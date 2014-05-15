@@ -63,7 +63,7 @@ bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::Tab
     int cnt = (int)table->visibleTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
-        voltdb::TableIterator it = table2->iterator();
+        TableIterator it = table2->iterator();
         while (it.next(out)) {
             if (idx-- == 0) {
                 return true;
@@ -75,13 +75,13 @@ bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::Tab
     return false;
 }
 
-bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple)
+void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple)
 {
     assert(table);
     assert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = table->schema()->getColumnInfo(col_ctr);
-        voltdb::NValue value = voltdb::getRandomValue(columnInfo->getVoltType());
+        NValue value = getRandomValue(columnInfo->getVoltType());
 
         tuple->setNValue(col_ctr, value);
 
@@ -92,37 +92,53 @@ bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *t
          */
         const TupleSchema::ColumnInfo *tupleColumnInfo = tuple->getSchema()->getColumnInfo(col_ctr);
 
-        const voltdb::ValueType t = tupleColumnInfo->getVoltType();
-        if (((t == voltdb::VALUE_TYPE_VARCHAR) || (t == voltdb::VALUE_TYPE_VARBINARY)) && tupleColumnInfo->inlined) {
+        const ValueType t = tupleColumnInfo->getVoltType();
+        if (((t == VALUE_TYPE_VARCHAR) || (t == VALUE_TYPE_VARBINARY)) && tupleColumnInfo->inlined) {
             value.free();
         }
     }
-    return (true);
 }
 
-bool tableutil::addRandomTuples(voltdb::Table* table, int num_of_tuples)
+bool tableutil::addRandomTuples(Table* table, int num_of_tuples)
 {
     assert(num_of_tuples >= 0);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
-        voltdb::TableTuple &tuple = table->tempTuple();
-        if (!tableutil::setRandomTupleValues(table, &tuple)) {
-            return (false);
-        }
+        TableTuple &tuple = table->tempTuple();
+        setRandomTupleValues(table, &tuple);
         //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debugNoHeader() << std::endl;
         //VOLT_DEBUG("Created random tuple: %s", tuple.debug().c_str());
-        if (!table->insertTuple(tuple)) {
-            return (false);
+        if ( ! table->insertTuple(tuple)) {
+            return false;
         }
 
         /*
          * The insert into the table (assuming a persistent table) will make a copy of the strings
-         * so the string allocations for unlined columns need to be freed here.
+         * so the string allocations for uninlined columns need to be freed here.
          */
-        for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
-            tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
+        tuple.freeObjectColumns();
+    }
+    return true;
+}
+
+bool tableutil::addDuplicateRandomTuples(Table* table, int num_of_tuples)
+{
+    assert(num_of_tuples > 1);
+    TableTuple &tuple = table->tempTuple();
+    setRandomTupleValues(table, &tuple);
+    for (int ctr = 0; ctr < num_of_tuples; ctr++) {
+        //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debugNoHeader() << std::endl;
+        //VOLT_DEBUG("Created random tuple: %s", tuple.debug().c_str());
+        if ( ! table->insertTuple(tuple)) {
+            return false;
         }
     }
-    return (true);
+
+    /*
+     * The insert into the table (assuming a persistent table) will make a copy of the strings
+     * so the string allocations for uninlined columns need to be freed here.
+     */
+    tuple.freeObjectColumns();
+    return true;
 }
 
 }

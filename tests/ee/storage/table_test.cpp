@@ -92,12 +92,12 @@ bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
 
 class TableTest : public Test {
 public:
-    TableTest() : table(NULL), temp_table(NULL), persistent_table(NULL) {
+    TableTest() : m_table(NULL), temp_table(NULL), persistent_table(NULL) {
         srand(0);
         init(false); // default is temp_table. call init(true) to make it transactional
     }
     ~TableTest() {
-        delete table;
+        delete m_table;
     }
 
 protected:
@@ -120,16 +120,16 @@ protected:
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
             persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
-            table = persistent_table;
+            m_table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);
-            temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, &limits);
-            table = temp_table;
+            temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
+            m_table = temp_table;
         }
-        assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
+        assert(tableutil::addRandomTuples(m_table, NUM_OF_TUPLES));
     }
 
-    Table* table;
+    Table* m_table;
     Table* temp_table;
     Table* persistent_table;
     TempTableLimits limits;
@@ -141,11 +141,11 @@ TEST_F(TableTest, ValueTypes) {
     // Make sure that our table has the right types and that when
     // we pull out values from a tuple that it has the right type too
     //
-    TableIterator iterator = this->table->iterator();
-    TableTuple tuple(table->schema());
+    TableIterator iterator = m_table->iterator();
+    TableTuple tuple(m_table->schema());
     while (iterator.next(tuple)) {
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
-            EXPECT_EQ(COLUMN_TYPES[ctr], this->table->schema()->columnType(ctr));
+            EXPECT_EQ(COLUMN_TYPES[ctr], m_table->schema()->columnType(ctr));
 
             const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(ctr);
             EXPECT_EQ(COLUMN_TYPES[ctr], columnInfo->getVoltType());
@@ -158,10 +158,10 @@ TEST_F(TableTest, TupleInsert) {
     // All of the values have already been inserted, we just
     // need to make sure that the data makes sense
     //
-    TableIterator iterator = this->table->iterator();
-    TableTuple tuple(table->schema());
+    TableIterator iterator = m_table->iterator();
+    TableTuple tuple(m_table->schema());
     while (iterator.next(tuple)) {
-        //printf("%s\n", tuple->debug(this->table).c_str());
+        //printf("%s\n", tuple->debug(m_table).c_str());
         //
         // Make sure it is not deleted
         //
@@ -171,17 +171,17 @@ TEST_F(TableTest, TupleInsert) {
     //
     // Make sure that if we insert one tuple, we only get one tuple
     //
-    TableTuple &temp_tuple = this->table->tempTuple();
-    ASSERT_EQ(true, tableutil::setRandomTupleValues(this->table, &temp_tuple));
-    this->table->deleteAllTuples(true);
-    ASSERT_EQ(0, this->table->activeTupleCount());
-    ASSERT_EQ(true, this->table->insertTuple(temp_tuple));
-    ASSERT_EQ(1, this->table->activeTupleCount());
+    TableTuple &temp_tuple = m_table->tempTuple();
+    tableutil::setRandomTupleValues(m_table, &temp_tuple);
+    m_table->deleteAllTuples(true);
+    ASSERT_EQ(0, m_table->activeTupleCount());
+    ASSERT_EQ(true, m_table->insertTuple(temp_tuple));
+    ASSERT_EQ(1, m_table->activeTupleCount());
 
     //
     // Then check to make sure that it has the same value and type
     //
-    iterator = this->table->iterator();
+    iterator = m_table->iterator();
     ASSERT_EQ(true, iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(col_ctr);
@@ -204,11 +204,11 @@ TEST_F(TableTest, TupleUpdate) {
     vector<int64_t> totals(NUM_OF_COLUMNS, 0);
     vector<int64_t> totalsNotSlim(NUM_OF_COLUMNS, 0);
 
-    TableIterator iterator = this->table->iterator();
-    TableTuple tuple(table->schema());
+    TableIterator iterator = m_table->iterator();
+    TableTuple tuple(m_table->schema());
     while (iterator.next(tuple)) {
         bool update = (rand() % 2 == 0);
-        TableTuple &temp_tuple = table->tempTuple();
+        TableTuple &temp_tuple = m_table->tempTuple();
         for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
             //
             // Only check for numeric columns
@@ -239,11 +239,11 @@ TEST_F(TableTest, TupleUpdate) {
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
         if (isNumeric(COLUMN_TYPES[col_ctr])) {
             int64_t new_total = 0;
-            iterator = this->table->iterator();
+            iterator = m_table->iterator();
             while (iterator.next(tuple)) {
                 new_total += ValuePeeker::peekAsBigInt(tuple.getNValue(col_ctr));
             }
-            //printf("\nCOLUMN: %s\n\tEXPECTED: %d\n\tRETURNED: %d\n", this->table->getColumn(col_ctr)->getName().c_str(), totals[col_ctr], new_total);
+            //printf("\nCOLUMN: %s\n\tEXPECTED: %d\n\tRETURNED: %d\n", m_table->getColumn(col_ctr)->getName().c_str(), totals[col_ctr], new_total);
             EXPECT_EQ(totals[col_ctr], new_total);
             EXPECT_EQ(totalsNotSlim[col_ctr], new_total);
         }
@@ -265,10 +265,8 @@ TEST_F(TableTest, TupleUpdate) {
 //     {
 //         while (true)
 //         {
-//             TableTuple &tuple = table->tempTuple();
-//             if (!tableutil::setRandomTupleValues(table, &tuple)) {
-//                 EXPECT_TRUE(false);
-//             }
+//             TableTuple &tuple = m_table->tempTuple();
+//             tableutil::setRandomTupleValues(m_table, &tuple);
 //             if (!table->insertTuple(tuple)) {
 //                 EXPECT_TRUE(false);
 //             }
@@ -278,17 +276,13 @@ TEST_F(TableTest, TupleUpdate) {
 //              * will make a copy of the strings so the string
 //              * allocations for unlined columns need to be freed here.
 //              */
-//             for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
-//                 tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
-//             }
+//             tuple.freeObjectColumns();
 //         }
 //     }
 //     catch (SQLException& e)
 //     {
-//         TableTuple &tuple = table->tempTuple();
-//         for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
-//             tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
-//         }
+//         TableTuple &tuple = m_table->tempTuple();
+//         tuple.freeObjectColumns();
 //         EXPECT_GT(limits.getAllocated(), 1024 * 1024);
 //         string state(e.getSqlState());
 //         if (state == "V0002")
@@ -305,15 +299,15 @@ TEST_F(TableTest, TupleDelete) {
     // We are just going to delete all of the odd tuples, then make
     // sure they don't exist anymore
     //
-    TableIterator iterator = this->table->iterator();
-    TableTuple tuple(table.get());
+    TableIterator iterator = m_table->iterator();
+    TableTuple tuple(m_table.get());
     while (iterator.next(tuple)) {
         if (tuple.get(1).getBigInt() != 0) {
             EXPECT_EQ(true, temp_table->deleteTuple(tuple));
         }
     }
 
-    iterator = this->table->iterator();
+    iterator = m_table->iterator();
     while (iterator.next(tuple)) {
         EXPECT_EQ(false, tuple.get(1).getBigInt() != 0);
     }
@@ -346,14 +340,14 @@ TEST_F(TableTest, TupleDelete) {
         undos.push_back(boost::shared_ptr<UndoLog>(new UndoLog(xact_id)));
     }
 
-    TableIterator iterator = this->table->iterator();
+    TableIterator iterator = m_table->iterator();
     while ((tuple = iterator.next()) != NULL) {
-        //printf("BEFORE: %s\n", tuple->debug(this->table.get()).c_str());
+        //printf("BEFORE: %s\n", tuple->debug(m_table.get()).c_str());
         int xact_ctr = (rand() % xact_cnt);
         bool update = (rand() % 3 != 0);
         //printf("xact_ctr:%d\n", xact_ctr);
         //if (update) printf("update!\n");
-        temp_tuple = table->tempTuple(tuple);
+        temp_tuple = m_table->tempTuple(tuple);
         for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
             //
             // Only check for numeric columns
@@ -377,12 +371,12 @@ TEST_F(TableTest, TupleDelete) {
             }
         }
         if (update) {
-            //printf("BEFORE?: %s\n", tuple->debug(this->table.get()).c_str());
+            //printf("BEFORE?: %s\n", tuple->debug(m_table.get()).c_str());
             //persistent_table->setUndoLog(undos[xact_ctr]);
             EXPECT_EQ(true, persistent_table->updateTuple(tuple, temp_tuple, true));
             //printf("UNDO: %s\n", undos[xact_ctr]->debug().c_str());
         }
-        //printf("AFTER: %s\n", temp_tuple->debug(this->table.get()).c_str());
+        //printf("AFTER: %s\n", temp_tuple->debug(m_table.get()).c_str());
     }
 
     for (xact_ctr = 0; xact_ctr < xact_cnt; xact_ctr++) {
@@ -393,9 +387,9 @@ TEST_F(TableTest, TupleDelete) {
         }
     }
 
-    //iterator = this->table->iterator();
+    //iterator = m_table->iterator();
     //while ((tuple = iterator.next()) != NULL) {
-    //    printf("TUPLE: %s\n", tuple->debug(this->table.get()).c_str());
+    //    printf("TUPLE: %s\n", tuple->debug(m_table.get()).c_str());
     //}
 
     //
@@ -404,12 +398,12 @@ TEST_F(TableTest, TupleDelete) {
     for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
         if (valueutil::isNumeric(COLUMN_TYPES[col_ctr])) {
             int64_t new_total = 0;
-            iterator = this->table->iterator();
+            iterator = m_table->iterator();
             while ((tuple = iterator.next()) != NULL) {
-                //fprintf(stderr, "TUPLE: %s\n", tuple->debug(this->table).c_str());
+                //fprintf(stderr, "TUPLE: %s\n", tuple->debug(m_table).c_str());
                 new_total += tuple->get(col_ctr).castAsBigInt();
             }
-            //printf("\nCOLUMN: %s\n\tEXPECTED: %d\n\tRETURNED: %d\n", this->table->getColumn(col_ctr)->getName().c_str(), totals[col_ctr], new_total);
+            //printf("\nCOLUMN: %s\n\tEXPECTED: %d\n\tRETURNED: %d\n", m_table->getColumn(col_ctr)->getName().c_str(), totals[col_ctr], new_total);
             EXPECT_EQ(totals[col_ctr], new_total);
         }
     }
@@ -426,7 +420,7 @@ TEST_F(TableTest, TupleDelete) {
     //
     // Loop through the tuples and delete half of them in interleaving transactions
     //
-    TableIterator iterator = this->table->iterator();
+    TableIterator iterator = m_table->iterator();
     TableTuple *tuple;
     int64_t total = 0;
     while ((tuple = iterator.next()) != NULL) {
@@ -447,7 +441,7 @@ TEST_F(TableTest, TupleDelete) {
     // Now make sure all of the values add up to our total
     //
     int64_t new_total = 0;
-    iterator = this->table->iterator();
+    iterator = m_table->iterator();
     while ((tuple = iterator.next()) != NULL) {
         EXPECT_EQ(true, tuple->isActive());
         new_total += 1;//tuple->get(0).getBigInt();
