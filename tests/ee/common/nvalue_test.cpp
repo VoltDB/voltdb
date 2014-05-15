@@ -1964,7 +1964,9 @@ TEST_F(NValueTest, SerializeToExport)
     EXPECT_EQ(12, sin.readShort());//12 digit scale
     EXPECT_EQ(16, sin.readShort());//16 bytes of precision
     int64_t low = sin.readLong();
+    low = ntohll(low);
     int64_t high = sin.readLong();
+    high = ntohll(high);
     TTInt val = ValuePeeker::peekDecimal(nv);
     EXPECT_EQ(low, val.table[1]);
     EXPECT_EQ(high, val.table[0]);

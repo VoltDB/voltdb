@@ -358,7 +358,9 @@ TableTupleExportTest::verSer(int cnt, char *data)
         EXPECT_EQ(12, sin.readShort());
         EXPECT_EQ(16, sin.readShort());
         int64_t low = sin.readLong();
+        low = ntohll(low);
         int64_t high = sin.readLong();
+        high = ntohll(high);
         NValue nv = ValueFactory::getDecimalValueFromString("-12.34");
         TTInt val = ValuePeeker::peekDecimal(nv);
         EXPECT_EQ(low, val.table[1]);
