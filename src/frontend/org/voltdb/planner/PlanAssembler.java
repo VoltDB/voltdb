@@ -601,9 +601,19 @@ public class PlanAssembler {
             }
             return null;
         }
-        // Remove the coordinator send/receive pair. It will be added later
-        // for the whole plan
-        compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
+
+        // Remove the coordinator send/receive pair.
+        // It will be added later for the whole plan
+        AbstractPlanNode root = compiledPlan.rootPlanGraph;
+
+        // There should be more cases for Joins have to be done on coordinator
+        // This case should also not be pushed down
+        boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
+                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                !root.hasAnyNodeOfType(PlanNodeType.LIMIT);
+        if (subScanCanPushdown) {
+            compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
+        }
 
         m_partitioning.addPartitioningFromSubquery(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
@@ -674,11 +684,6 @@ public class PlanAssembler {
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
-                if ( ! root.hasReplicatedResult()) {
-                    throw new PlanningErrorException(
-                            "This special case join between an outer replicated table and " +
-                            "an inner partitioned table is too complex and is not supported.");
-                }
 
                 // Edge cases: left outer join with replicated table.
                 if (m_parsedSelect.mvFixInfo.needed()) {

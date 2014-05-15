@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
@@ -39,7 +38,6 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -76,6 +74,9 @@ public abstract class StatementCompiler {
         catalogStmt.setQuerytype(qtype.getValue());
 
         // put the data in the catalog that we have
+        if (!stmt.endsWith(";")) {
+            stmt += ";";
+        }
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);

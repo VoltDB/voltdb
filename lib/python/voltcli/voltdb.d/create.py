@@ -27,7 +27,7 @@
 
 @VOLT.Command(
     bundles = VOLT.ServerBundle('create',
-                                needs_catalog=True,
+                                needs_catalog=False,
                                 supports_live=False,
                                 default_host=True,
                                 safemode_available=False,

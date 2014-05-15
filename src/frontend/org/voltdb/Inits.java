@@ -17,14 +17,13 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -279,13 +278,21 @@ public class Inits {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 
-                if (m_rvdb.m_pathToStartupCatalog == null) {
-                    VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
-                                             " please see usage for more information",
-                                             false, null);
-                }
-
                 try {
+                    // If no catalog was supplied provide an empty one.
+                    if (m_rvdb.m_pathToStartupCatalog == null) {
+                        try {
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            if (emptyJarFile == null) {
+                                VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
+                            }
+                            m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
+                        }
+                        catch (IOException e) {
+                            VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
+                        }
+                    }
+
                     // Get the catalog bytes and byte count.
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 

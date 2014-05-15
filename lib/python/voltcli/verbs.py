@@ -443,7 +443,7 @@ class ServerBundle(JavaBundle):
                                   'run the VoltDB server in the background (as a daemon process)'))
 
     def go(self, verb, runner):
-        if self.needs_catalog:
+        if self.subcommand == 'create':
             if runner.opts.replica:
                 self.subcommand = 'replica'
         if self.supports_live:

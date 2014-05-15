@@ -71,6 +71,7 @@ def genjava( classes, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogException.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogChangeGroup.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
 
     ##########
     # WRITE THE SOURCE FILES
