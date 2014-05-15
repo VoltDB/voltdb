@@ -141,7 +141,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::DeletePlanNode();
             break;
         // ------------------------------------------------------------------
-        // Update
+        // Upsert
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_UPSERT):
             ret = new voltdb::UpsertPlanNode();

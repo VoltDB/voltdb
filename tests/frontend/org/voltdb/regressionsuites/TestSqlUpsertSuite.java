@@ -32,8 +32,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
- * System tests for UPDATE, mainly focusing on the correctness of the WHERE
- * clause
+ * System tests for UPSERT
  */
 
 public class TestSqlUpsertSuite extends RegressionSuite {
