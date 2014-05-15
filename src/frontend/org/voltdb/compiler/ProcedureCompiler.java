@@ -393,12 +393,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             Statement catalogStmt = procedure.getStatements().add(stmtName);
 
             // compile the statement
-            Object partitionParameter = null;
-            if (info.singlePartition) {
-                // Dummy up a partitioning value to indicate the intent and prevent the planner
-                // from trying to infer a constant partitioning value from the statement.
-                partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
-            }
             PartitioningForStatement partitioning =
                 info.singlePartition ? PartitioningForStatement.forceSP() :
                                        PartitioningForStatement.forceMP();

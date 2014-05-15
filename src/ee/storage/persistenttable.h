@@ -273,7 +273,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
 
-    void insertPersistentTuple(TableTuple &source, bool fallible);
+    void insertPersistentTuple(TableTuple &source, bool fallible, bool upsert = false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
@@ -488,7 +488,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool upsert = false);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,

@@ -32,7 +32,8 @@ public enum QueryType {
     SELECT      (2),
     INSERT      (3),
     UPDATE      (4),
-    DELETE      (5);
+    DELETE      (5),
+    UPSERT      (6);
 
     QueryType(int val) {
         assert (this.ordinal() == val) :
@@ -98,6 +99,9 @@ public enum QueryType {
             // as in "select ... from ... UNION select ... from ...;"
             // Even if set operations are not currently supported, let them pass as "select" statements to let the parser sort them out.
             return QueryType.SELECT;
+        }
+        else if (stmt.startsWith("upsert")) {
+            return QueryType.UPSERT;
         }
         else if (stmt.startsWith("(")) {
             // There does not seem to be a need to support parenthesized DML statements, so assume a read-only statement.

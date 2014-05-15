@@ -1296,6 +1296,7 @@ public class VoltCompiler {
                     crudprocs.add(generateCrudReplicatedInsert(table));
                     crudprocs.add(generateCrudReplicatedDelete(table, pkey));
                     crudprocs.add(generateCrudReplicatedUpdate(table, pkey));
+                    crudprocs.add(generateCrudReplicatedUpsert(table, pkey));
                 }
                 else {
                     compilerLog.debug("Creating multi-partition insert procedures for replicated table " +
@@ -1340,6 +1341,7 @@ public class VoltCompiler {
             crudprocs.add(generateCrudSelect(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudDelete(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudUpdate(table, partitioncolumn, pkey));
+            crudprocs.add(generateCrudUpsert(table, partitioncolumn));
         }
 
         return crudprocs;
@@ -1543,6 +1545,38 @@ public class VoltCompiler {
 
     /**
      * Create a statement like:
+     * Hack simple case of implementation SQL MERGE
+     *  "upsert into <table> values (?, ?, ...);"
+     */
+    private ProcedureDescriptor generateCrudUpsert(Table table,
+            Column partitioncolumn)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
+
+        generateCrudColumnList(table, sb);
+        sb.append(";");
+
+        String partitioninfo =
+            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
+
+        ProcedureDescriptor pd =
+                new ProcedureDescriptor(
+                        new ArrayList<String>(),  // groups
+                        table.getTypeName() + ".upsert",        // className
+                        sb.toString(),            // singleStmt
+                        null,                     // joinOrder
+                        partitioninfo,            // table.column:offset
+                        true,                     // builtin statement
+                        null,                     // language type for embedded scripts
+                        null,                     // script implementation
+                        null);                    // code block script class
+
+            return pd;
+    }
+
+    /**
+     * Create a statement like:
      *  "insert into <table> values (?, ?, ...);"
      *  for a replicated table.
      */
@@ -1624,6 +1658,31 @@ public class VoltCompiler {
 
         return pd;
     }
+
+    private ProcedureDescriptor generateCrudReplicatedUpsert(Table table,
+            Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
+
+        generateCrudColumnList(table, sb);
+        sb.append(";");
+
+        ProcedureDescriptor pd =
+                new ProcedureDescriptor(
+                        new ArrayList<String>(),  // groups
+                        table.getTypeName() + ".upsert",        // className
+                        sb.toString(),            // singleStmt
+                        null,                     // joinOrder
+                        null,                     // table.column:offset
+                        true,                     // builtin statement
+                        null,                     // language type for embedded scripts
+                        null,                     // script implementation
+                        null);                    // code block script class
+
+            return pd;
+    }
+
 
     /**
      * Create a statement like:
