@@ -190,7 +190,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
-    String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
