@@ -150,7 +150,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
                 fail("Expect ProcCallException");
             }
             catch (ProcCallException e) {
-                assertTrue(e.getLocalizedMessage().contains("Failed to generate upgraded catalog"));
+                assertTrue(e.getLocalizedMessage().contains("Catalog upgrade failed"));
                 boolean found = watcher.waitForString();
                 assertTrue(found);
             }
