@@ -161,13 +161,29 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        // try to put the tuple into the target table
-        if (!targetTable->upsertTuple(tbTuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " target table '%s'",
-                       m_inputTable->name().c_str(),
-                       targetTable->name().c_str());
-            return false;
+        // look up the tuple whether it exists already
+        assert(targetTable->primaryKeyIndex() != NULL);
+        TableTuple existsTuple = targetTable->lookupTuple(tbTuple);
+
+        if (existsTuple.isNullTuple()) {
+            // try to put the tuple into the target table
+            if (!targetTable->insertTuple(tbTuple)) {
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                           " target table '%s'",
+                           m_inputTable->name().c_str(),
+                           targetTable->name().c_str());
+                return false;
+            }
+        } else {
+            // tuple exists already, try to update the tuple instead
+            TableTuple newTuple = TableTuple(targetTable->schema());
+            newTuple.move(tbTuple.address());
+            if (!targetTable->updateTupleWithSpecificIndexes(existsTuple, tbTuple,
+                    targetTable->allIndexes())) {
+                VOLT_INFO("Failed to update existsTuple from table '%s'",
+                        targetTable->name().c_str());
+                return false;
+            }
         }
 
         // successfully inserted

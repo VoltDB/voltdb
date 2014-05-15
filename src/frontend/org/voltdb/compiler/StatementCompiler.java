@@ -273,10 +273,14 @@ public abstract class StatementCompiler {
 
             UpsertPlanNode upsertNode = new UpsertPlanNode(insertNode);
 
-            assert(insertNode.getParentCount() == 1);
-            AbstractPlanNode parent = insertNode.getParent(0);
-            parent.clearChildren();
-            parent.addAndLinkChild(upsertNode);
+            assert(insertNode.getParentCount() <= 1);
+            if (insertNode == root) {
+                root = upsertNode;
+            } else {
+                AbstractPlanNode parent = insertNode.getParent(0);
+                parent.clearChildren();
+                parent.addAndLinkChild(upsertNode);
+            }
 
             assert(insertNode.getChildCount() == 1);
             AbstractPlanNode child = insertNode.getChild(0);

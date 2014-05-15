@@ -327,17 +327,11 @@ void setSearchKeyFromTuple(TableTuple &source) {
  */
 bool PersistentTable::insertTuple(TableTuple &source)
 {
-    insertPersistentTuple(source, true, false);
+    insertPersistentTuple(source, true);
     return true;
 }
 
-bool PersistentTable::upsertTuple(TableTuple &source)
-{
-    insertPersistentTuple(source, true, true);
-    return true;
-}
-
-void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, bool upsert)
+void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
 
     if (fallible && visibleTupleCount() >= m_tupleLimit) {
@@ -361,14 +355,14 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     try {
-        insertTupleCommon(source, target, fallible, upsert);
+        insertTupleCommon(source, target, fallible);
     } catch (ConstraintFailureException &e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool upsert)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
 {
     if (fallible) {
         // not null checks at first
@@ -398,11 +392,8 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     if (!tryInsertOnAllIndexes(&target)) {
-        if (!upsert) {
-            throw ConstraintFailureException(this, source, TableTuple(),
-                    CONSTRAINT_TYPE_UNIQUE);
-        }
-
+        throw ConstraintFailureException(this, source, TableTuple(),
+                CONSTRAINT_TYPE_UNIQUE);
     }
 
     // this is skipped for inserts that are never expected to fail,
