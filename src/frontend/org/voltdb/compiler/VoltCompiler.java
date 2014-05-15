@@ -56,6 +56,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
@@ -2399,6 +2400,115 @@ public class VoltCompiler {
 
             return null;
         }
+    }
+
+    public boolean recompileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
+    {
+        boolean success = false;
+        // Check if there's a project.
+        VoltCompilerReader projectReader =
+            (jarfile.containsKey("project.xml")
+             ? new VoltCompilerJarFileReader(jarfile, "project.xml")
+             : null);
+
+        // Patch the buildinfo.
+        // NEED TO THINK ABOUT WHAT TO PUT IN HERE FOR ADHOC DDL
+        String[] buildInfoLines = CatalogUtil.getBuildInfoFromJar(jarfile);
+        String versionFromCatalog = buildInfoLines[0];
+        String versionFromVoltDB = VoltDB.instance().getVersionString();
+        buildInfoLines[0] = versionFromVoltDB;
+        buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
+        byte[] buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
+        jarfile.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
+
+        // Gather DDL files for recompilation if not using a project file.
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+        if (projectReader == null) {
+            Entry<String, byte[]> entry = jarfile.firstEntry();
+            while (entry != null) {
+                String path = entry.getKey();
+                // SOMEDAY: It would be better to have a manifest that explicitly lists
+                // ddl files instead of using a brute force *.sql glob.
+                if (path.toLowerCase().endsWith(".sql")) {
+                    ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
+                }
+                entry = jarfile.higherEntry(entry.getKey());
+            }
+        }
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            m_classLoader = jarfile.getLoader();
+
+            // Compile and save the file to voltdbroot. Assume it's a test environment if there
+            // is no catalog context available.
+            String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+            String textName = String.format("catalog-%s.out", versionFromVoltDB);
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            final String outputJarPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+            // Place the compiler output in a text file in the same folder.
+            final String outputTextPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(textName));
+
+            consoleLog.info(String.format(
+                        "Version %s catalog will be automatically upgraded to version %s.",
+                        versionFromCatalog, versionFromVoltDB));
+
+            // Do the compilation work.
+            success = compileInternal(projectReader, outputJarPath, ddlReaderList, jarfile);
+
+            // Summarize the results to a file.
+            // Briefly log success or failure and mention the output text file.
+            PrintStream outputStream = new PrintStream(outputTextPath);
+            try {
+                if (success) {
+                    summarizeSuccess(outputStream, outputStream, outputJarPath);
+                    consoleLog.info(String.format(
+                                "The catalog was automatically upgraded from " +
+                                "version %s to %s and saved to \"%s\". " +
+                                "Compiler output is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB,
+                                outputJarPath, outputTextPath));
+                }
+                else {
+                    summarizeErrors(outputStream, outputStream);
+                    outputStream.close();
+                    compilerLog.error("Catalog upgrade failed.");
+                    compilerLog.info(String.format(
+                                "Had attempted to perform an automatic version upgrade of a " +
+                                "catalog that was compiled by an older %s version of VoltDB, " +
+                                "but the automatic upgrade failed. The cluster  will not be " +
+                                "able to start until the incompatibility is fixed. " +
+                                "Try re-compiling the catalog with the newer %s version " +
+                                "of the VoltDB compiler. Compiler output from the failed " +
+                                "upgrade is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB, outputTextPath));
+                    String errString = "Adhoc DDL failed";
+                    if (m_errors.size() > 0) {
+                        errString = m_errors.get(m_errors.size() - 1).getLogString();
+                    }
+                    int fronttrim = errString.indexOf("DDL Error");
+                    if (fronttrim < 0) { fronttrim = 0; }
+                    int endtrim = errString.indexOf(" in statement starting");
+                    if (endtrim < 0) { endtrim = errString.length(); }
+                    String trimmed = errString.substring(fronttrim, endtrim);
+                    throw new IOException(trimmed);
+                }
+            }
+            finally {
+                outputStream.close();
+            }
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+        }
+        return success;
     }
 
     /**
