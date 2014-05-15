@@ -19,16 +19,23 @@ package org.voltdb.compiler;
 
 import java.io.IOException;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 
-public class AsyncCompilerAgentHelper {
+public class AsyncCompilerAgentHelper
+{
+    private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
+    private String m_errMsg = null;
+
     public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
@@ -56,9 +63,12 @@ public class AsyncCompilerAgentHelper {
                 return retval;
             }
             if (work.adhocDDLStmts != null) {
-                AsyncCompilerResult errResult =
-                    AsyncCompilerResult.makeErrorResult(work, "AdHoc DDL is currently unsupported.");
-                work.completionHandler.onCompletion(errResult);
+                newCatalogBytes = addDDLToCatalog(newCatalogBytes, work.adhocDDLStmts);
+                if (newCatalogBytes == null) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(work, m_errMsg);
+                    work.completionHandler.onCompletion(errResult);
+                }
             }
         }
         retval.catalogBytes = newCatalogBytes;
@@ -131,5 +141,44 @@ public class AsyncCompilerAgentHelper {
         }
 
         return retval;
+    }
+
+    private byte[] addDDLToCatalog(byte[] oldCatalogBytes, String[] adhocDDLStmts)
+    {
+        VoltCompilerReader ddlReader = null;
+        try {
+            InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
+            String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
+                    Constants.UTF8ENCODING);
+            StringBuilder sb = new StringBuilder();
+            sb.append(oldDDL);
+            sb.append("\n");
+            for (String stmt : adhocDDLStmts) {
+                sb.append(stmt);
+                sb.append(";\n");
+            }
+            compilerLog.debug("Adhoc-modified DDL:\n" + sb.toString());
+            ddlReader =
+                new VoltCompilerStringReader("dontcare.sql", sb.toString());
+            ddlReader.putInJar(jarfile, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
+            VoltCompiler compiler = new VoltCompiler();
+            boolean result = compiler.recompileInMemoryJarfile(jarfile);
+            if (result) {
+                return jarfile.getFullJarBytes();
+            }
+        }
+        catch (IOException ioe) {
+            m_errMsg = ioe.getMessage();
+            return null;
+        }
+        finally {
+            if (ddlReader != null) {
+                try {
+                    ddlReader.close();
+                }
+                catch (IOException ioe) {}
+            }
+        }
+        return null;
     }
 }
