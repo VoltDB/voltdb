@@ -1691,7 +1691,7 @@ public class VoltCompiler {
                         classattr));
             }
             catch (Throwable cause) {
-                // We are here because the class was found and the constructor of the class
+                // We are here because the class was found and the initializer of the class
                 // threw an error we can't anticipate. So we will wrap the error with a
                 // runtime exception that we can trap in our code.
                 throw new VoltCompilerException(String.format(
