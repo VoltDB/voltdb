@@ -231,7 +231,7 @@ public class PlanAssembler {
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException(
+                throw new PlanningErrorException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
@@ -289,7 +289,7 @@ public class PlanAssembler {
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
-            throw new PlanningErrorException("Unknown subclass of AbstractParsedStmt.");
+            throw new RuntimeException("Unknown subclass of AbstractParsedStmt.");
         }
         if ( ! m_partitioning.wasSpecifiedAsSingle()) {
             //TODO: When updates and deletes can contain joins, this step may have to be

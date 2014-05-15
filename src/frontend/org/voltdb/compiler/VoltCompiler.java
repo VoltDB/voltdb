@@ -236,6 +236,7 @@ public class VoltCompiler {
             message += "\n   caused by:\n   " + cause.toString();
             addErr(message);
             this.message = message;
+            this.initCause(cause);
         }
 
         @Override
@@ -450,7 +451,7 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!", false, null);;
+            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
     }
 
