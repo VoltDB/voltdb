@@ -23,8 +23,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -348,7 +346,7 @@ public class Inits {
                 Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
                 m_rvdb.m_serializedCatalog = loadResults.getFirst();
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
