@@ -93,7 +93,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"").append(parsedStmt.m_joinOrder);
                     sb.append("\" contains a duplicate element \"").append(alias).append("\".");
-                    throw new RuntimeException(sb.toString());
+                    throw new PlanningErrorException(sb.toString());
                 }
             }
 
@@ -106,7 +106,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 sb.append(parsedStmt.m_joinOrder).append("\" does not contain the correct number of elements\n");
                 sb.append("Expected ").append(parsedStmt.m_tableList.size());
                 sb.append(" but found ").append(tableAliases.size()).append(" elements.");
-                throw new RuntimeException(sb.toString());
+                throw new PlanningErrorException(sb.toString());
             }
 
             Set<String> aliasSet = parsedStmt.m_tableAliasMap.keySet();
@@ -130,10 +130,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     sb.append("don't ");
                 }
                 sb.append("exist in the FROM clause");
-                throw new RuntimeException(sb.toString());
+                throw new PlanningErrorException(sb.toString());
             }
             if ( ! isValidJoinOrder(tableAliases)) {
-                throw new RuntimeException("The specified join order is invalid for the given query");
+                throw new PlanningErrorException("The specified join order is invalid for the given query");
             }
             //m_parsedStmt.joinTree.m_joinOrder = tables;
             m_joinOrders.add(m_parsedStmt.m_joinTree);

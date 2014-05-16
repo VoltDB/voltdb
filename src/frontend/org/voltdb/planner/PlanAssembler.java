@@ -231,7 +231,7 @@ public class PlanAssembler {
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException(
+                throw new PlanningErrorException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
@@ -253,7 +253,7 @@ public class PlanAssembler {
         // Need to use StmtTableScan instead
         // check that no modification happens to views
         if (tableListIncludesView(parsedStmt.m_tableList)) {
-            throw new RuntimeException("Illegal to modify a materialized view.");
+            throw new PlanningErrorException("Illegal to modify a materialized view.");
         }
 
         m_partitioning.setIsDML();
@@ -280,12 +280,12 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException("Illegal to update an export table.");
+                throw new PlanningErrorException("Illegal to update an export table.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException("Illegal to delete from an export table.");
+                throw new PlanningErrorException("Illegal to delete from an export table.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
