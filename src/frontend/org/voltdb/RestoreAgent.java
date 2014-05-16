@@ -47,6 +47,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
@@ -61,6 +62,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -1248,9 +1251,8 @@ SnapshotCompletionInterest
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    m_zk.create(VoltZK.request_truncation_snapshot, null,
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
+                    m_zk.create(VoltZK.request_truncation_snapshot_node, null,
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 } catch (Exception e) {
                     VoltDB.crashGlobalVoltDB("Requesting a truncation snapshot " +
                                              "via ZK should always succeed",

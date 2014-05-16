@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -476,7 +477,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * is created, reschedules it for a few seconds later
      */
     private void processTruncationRequestEvent(final WatchedEvent event) {
-        if (event.getType() == EventType.NodeCreated) {
+        if (event.getType() == EventType.NodeChildrenChanged) {
             loggingLog.info("Scheduling truncation request processing 10 seconds from now");
             /*
              * Do it 10 seconds later because these requests tend to come in bunches
@@ -522,15 +523,27 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
             return;
         }
-        // Get the truncation request ID if provided.
+        // Get the truncation request ID which is the truncation request node path.
         final String truncReqId;
         try {
-            byte[] data = m_zk.getData(event.getPath(), true, null);
-            if (data != null) {
-                truncReqId = new String(data, "UTF-8");
+            TreeSet<String> children = new TreeSet<>(m_zk.getChildren(event.getPath(), false));
+            if (children.isEmpty()) {
+                loggingLog.error("Unable to retrieve truncation snapshot request id from ZK, log can't be truncated");
+                return;
             }
-            else {
-                truncReqId = "";
+            truncReqId = ZKUtil.joinZKPath(event.getPath(), children.pollLast());
+
+            ZKUtil.VoidCallback lastCallback = null;
+            for (String child: children) {
+                lastCallback = new ZKUtil.VoidCallback();
+                m_zk.delete(ZKUtil.joinZKPath(event.getPath(), child), -1, lastCallback, null);
+            }
+
+            if (lastCallback != null) {
+                try {
+                    lastCallback.get();
+                } catch (KeeperException.NoNodeException ignoreIt) {
+                }
             }
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
@@ -632,7 +645,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                     try {
-                        m_zk.delete(VoltZK.request_truncation_snapshot, -1);
+                        m_zk.delete(truncReqId, -1);
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
@@ -1026,11 +1039,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Checking for existence of snapshot truncation request");
         m_currentTruncationWatcher.cancel();
         m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
-        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_currentTruncationWatcher) != null) {
+        // TRAIL [TruncSnap:2] checking for zk node existence
+        List<String> requests = m_zk.getChildren(VoltZK.request_truncation_snapshot, m_currentTruncationWatcher);
+        if (!requests.isEmpty()) {
             loggingLog.info("A truncation request node already existed, processing truncation request event");
             m_currentTruncationWatcher.cancel();
+            // TRAIL [TruncSnap:3] fake a node created event (req ZK node already there)
             processTruncationRequestEvent(new WatchedEvent(
-                    EventType.NodeCreated,
+                    EventType.NodeChildrenChanged,
                     KeeperState.SyncConnected,
                     VoltZK.request_truncation_snapshot));
         }
@@ -1633,7 +1649,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             else {
-                m_zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_zk.create(VoltZK.request_truncation_snapshot_node, null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             }
         } catch (KeeperException.NodeExistsException e) {
             return null;
