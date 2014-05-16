@@ -173,6 +173,11 @@
                 <li>For more useful results replace row counts with better estimates.</li>
                 <li>All calculated fields update after leaving any input field.</li>
                 <li>Warning: Page refresh resets all input fields.</li>
+                <li>
+                    VARCHAR columns are measured in UTF-8 characters by default. VARCHAR
+                    columns of up to 16 characters are stored in-line at 4 bytes per character.
+                    Columns of 16 characters or more are stored in pooled memory via pointers.
+                </li>
             </ul></small>
             </td>
 
