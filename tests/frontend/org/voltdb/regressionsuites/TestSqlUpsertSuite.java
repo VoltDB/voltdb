@@ -42,10 +42,10 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        String[] tables = {"P1", "R1"};
+        String[] tables = {"R1", "P1", "R2", "P2"};
         for (String tb : tables) {
             String upsertProc = tb + ".upsert";
-            String query = "select ID, wage, dept from " + tb + " order by ID";
+            String query = "select ID, wage, dept from " + tb + " order by ID, dept";
 
             vt = client.callProcedure(upsertProc, 1, 1, 1).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
@@ -55,11 +55,9 @@ public class TestSqlUpsertSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}});
 
-
             vt = client.callProcedure(upsertProc, 2, 2, 1).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
-
 
             vt = client.callProcedure(upsertProc, 1, 1, 1).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
@@ -67,7 +65,37 @@ public class TestSqlUpsertSuite extends RegressionSuite {
 
             vt = client.callProcedure(upsertProc, 1, 1, 2).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,2}, {2, 2, 1}});
+            if (tb.equals("R1") || tb.equals("P1")) {
+                validateTableOfLongs(vt, new long[][] {{1,1,2}, {2, 2, 1}});
+            } else {
+                // multiple cols primary keys
+                validateTableOfLongs(vt, new long[][] {{1,1,1}, {1,1,2}, {2, 2, 1}});
+            }
+        }
+    }
+
+    public void testUpsertWithoutPrimaryKey() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        String[] tables = {"UR1", "UP1", "UR2", "UP2"};
+        for (String tb : tables) {
+            String upsertProc = tb + ".upsert";
+            String errorMsg = "Procedure "+ upsertProc + " was not found";
+            try {
+                client.callProcedure(upsertProc, 1, 1, 2).getResults();
+                fail();
+            } catch(Exception ex) {
+                assertEquals(errorMsg, ex.getMessage());
+            }
+
+            errorMsg = "unexpected token: UPSERT";
+            try {
+                client.callProcedure("@AdHoc", "Upsert into "+ tb + " values(1, 1, 2)").getResults();
+                fail();
+            } catch(Exception ex) {
+                assertTrue(ex.getMessage().contains(errorMsg));
+            }
+
         }
     }
 
@@ -98,33 +126,55 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) );" +
                 "PARTITION TABLE P1 ON COLUMN ID;" +
 
+                "CREATE TABLE R2 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER NOT NULL, " +
+                "DEPT INTEGER NOT NULL, " +
+                "PRIMARY KEY (ID, DEPT) );" +
+
                 "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
-                "CREATE TABLE P3 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
-                "WAGE INTEGER NOT NULL, " +
-                "DEPT INTEGER NOT NULL, " +
-                "PRIMARY KEY (ID, WAGE) );" +
-                "PARTITION TABLE P3 ON COLUMN WAGE;"
+                // Unsupported schema
+                "CREATE TABLE UR1 ( " +
+                "ID INTEGER NOT NULL, " +
+                "DEPT INTEGER);" +
+
+                "CREATE TABLE UR2 ( " +
+                "ID INTEGER NOT NULL UNIQUE, " +
+                "DEPT INTEGER);" +
+
+                "CREATE TABLE UP1 ( " +
+                "ID INTEGER NOT NULL, " +
+                "DEPT INTEGER);" +
+                "PARTITION TABLE UP1 ON COLUMN ID;" +
+
+                "CREATE TABLE UP2 ( " +
+                "ID INTEGER NOT NULL UNIQUE, " +
+                "DEPT INTEGER);" +
+                "PARTITION TABLE UP2 ON COLUMN ID;" +
+
+                ""
                 ;
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
             assertFalse(true);
         }
-
+        boolean success;
         config = new LocalCluster("sqlupsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        success = config.compile(project);
+        assert(success);
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        success = config.compile(project);
+        assert(success);
         builder.addServerConfig(config);
 
         return builder;
