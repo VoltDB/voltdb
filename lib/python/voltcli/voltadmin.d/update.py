@@ -31,11 +31,11 @@ from voltcli import utility
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description='Update the schema of a running database.',
-    description2='Either a catalog .jar or a deployment .xml file, or both, must be provided.',
+    description2='Either a catalog (extension .jar), a deployment file (extension .xml), or both, must be provided.',
     arguments=(
         VOLT.StringArgument(
             'catalog_or_deployment',
-            'application catalog .jar and/or deployment configuration .xml file path(s)',
+            'application catalog (extension .jar) and/or deployment configuration (extension .xml) file path(s)',
             min_count=1, max_count=2),
     )
 )
