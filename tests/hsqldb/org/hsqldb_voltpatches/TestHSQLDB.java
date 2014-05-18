@@ -227,15 +227,18 @@ public class TestHSQLDB extends TestCase {
         //stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in ?;");
         //assertTrue(stmt.toString().contains("vector"));
 
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (select w_id from warehouse);");
+        assertTrue(stmt.toString().contains("tablesubquery"));
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where exists (select w_id from warehouse);");
+        assertTrue(stmt.toString().contains("tablesubquery"));
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where not exists (select w_id from warehouse);");
+        assertTrue(stmt.toString().contains("tablesubquery"));
+
         // The ones below here should continue to give sensible errors
-        expectFailStmt(hsql, "select * from new_order where no_w_id in (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
         expectFailStmt(hsql, "select * from new_order where no_w_id <> (5, 7, 8);",
                 "row column count mismatch");
-        expectFailStmt(hsql, "select * from new_order where exists (select w_id from warehouse);",
-                "Unsupported subquery");
-        expectFailStmt(hsql, "select * from new_order where not exists (select w_id from warehouse);",
-                "Unsupported subquery");
     }
 
     public void testVarbinary() {
