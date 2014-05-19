@@ -23,48 +23,52 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
-public class DeletePlanNode extends AbstractOperationPlanNode {
+public class UpsertPlanNode extends AbstractOperationPlanNode {
 
     public enum Members {
-        TRUNCATE;
+        MULTI_PARTITION;
     }
 
-    /** true if all tuples are deleted. */
-    boolean m_truncate = false;
+    protected boolean m_multiPartition = false;
 
-    public DeletePlanNode() {
+    public UpsertPlanNode() {
         super();
+    }
+
+    public UpsertPlanNode(InsertPlanNode insertNode) {
+        super();
+        setTargetTableName(insertNode.getTargetTableName());
+        setMultiPartition(insertNode.getMultiPartition());
+    }
+
+    public boolean getMultiPartition() {
+        return m_multiPartition;
+    }
+
+    public void setMultiPartition(boolean multiPartition) {
+        m_multiPartition = multiPartition;
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.DELETE;
-    };
-
-    public boolean isTruncate() {
-        return m_truncate;
-    }
-    public void setTruncate(boolean truncate) {
-        m_truncate = truncate;
+        return PlanNodeType.UPSERT;
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.TRUNCATE.name()).value(m_truncate);
+        stringer.key(Members.MULTI_PARTITION.name()).value(m_multiPartition);
     }
 
+    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_truncate = jobj.getBoolean( Members.TRUNCATE.name() );
+        m_multiPartition = jobj.getBoolean( Members.MULTI_PARTITION.name() );
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        if (m_truncate) {
-            return "TRUNCATE TABLE " + m_targetTableName;
-        }
-        return "DELETE " + m_targetTableName;
+        return "UPSERT into \"" + m_targetTableName + "\"";
     }
 }

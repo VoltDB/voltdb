@@ -393,7 +393,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
 
     if (!tryInsertOnAllIndexes(&target)) {
         throw ConstraintFailureException(this, source, TableTuple(),
-                                         CONSTRAINT_TYPE_UNIQUE);
+                CONSTRAINT_TYPE_UNIQUE);
     }
 
     // this is skipped for inserts that are never expected to fail,

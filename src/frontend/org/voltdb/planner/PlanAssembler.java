@@ -997,7 +997,6 @@ public class PlanAssembler {
                             + " has no default and is not nullable.");
                 }
 
-
                 boolean isConstantValue = true;
                 if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
 
