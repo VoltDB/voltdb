@@ -370,36 +370,39 @@ public class PlanAssembler {
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
         if (hasSubquery && retval != null) {
-            boolean orderIsDeterministic = (fromSubqueryResult != null) ?
-                    fromSubqueryResult.m_orderIsDeterministic : true;
-            orderIsDeterministic = (exprSubqueryResult != null) ?
-                    orderIsDeterministic && exprSubqueryResult.m_orderIsDeterministic :
-                    orderIsDeterministic;
-            if (orderIsDeterministic == true) {
-                orderIsDeterministic = retval.isOrderDeterministic();
-            } else {
-                //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
-                // is subject to false negatives for determinism. It misses the subtlety of parent
-                // queries that surgically add orderings for specific "key" columns of a subquery result
-                // or a subquery-based join for an effectively deterministic result.
-                // The first step towards repairing this would involve detecting deterministic and
-                // non-deterministic subquery results IN CONTEXT where they are scanned in the parent
-                // query, so that the parent query can ensure that ALL the columns from a
-                // non-deterministic subquery are later sorted.
-                // The next step would be to extend the model for "subquery scans"
-                // to identify dependencies / uniqueness constraints in subquery results
-                // that can be exploited to impose determinism with fewer parent order by columns
-                // -- like just the keys.
-                orderIsDeterministic = retval.isOrderDeterministic() &&
-                        parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
+            boolean isDQLStmt = (parsedStmt instanceof ParsedSelectStmt) || (parsedStmt instanceof ParsedUnionStmt);
+            if (isDQLStmt) {
+                // Calculate the combined state of determinism for the parent and child statements
+                boolean orderIsDeterministic = (fromSubqueryResult != null) ?
+                        fromSubqueryResult.m_orderIsDeterministic : true;
+                orderIsDeterministic = (exprSubqueryResult != null) ?
+                        orderIsDeterministic && exprSubqueryResult.m_orderIsDeterministic :
+                            orderIsDeterministic;
+                if (orderIsDeterministic == true) {
+                    orderIsDeterministic = retval.isOrderDeterministic();
+                } else {
+                    //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
+                    // is subject to false negatives for determinism. It misses the subtlety of parent
+                    // queries that surgically add orderings for specific "key" columns of a subquery result
+                    // or a subquery-based join for an effectively deterministic result.
+                    // The first step towards repairing this would involve detecting deterministic and
+                    // non-deterministic subquery results IN CONTEXT where they are scanned in the parent
+                    // query, so that the parent query can ensure that ALL the columns from a
+                    // non-deterministic subquery are later sorted.
+                    // The next step would be to extend the model for "subquery scans"
+                    // to identify dependencies / uniqueness constraints in subquery results
+                    // that can be exploited to impose determinism with fewer parent order by columns
+                    // -- like just the keys.
+                    orderIsDeterministic = retval.isOrderDeterministic() &&
+                            parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
+                }
+                boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
+                        fromSubqueryResult.m_hasLimitOrOffset : false;
+                hasLimitOrOffset = (exprSubqueryResult != null) ?
+                        hasLimitOrOffset && exprSubqueryResult.m_hasLimitOrOffset :
+                            hasLimitOrOffset;
+                retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
             }
-            boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
-                    fromSubqueryResult.m_hasLimitOrOffset : false;
-            hasLimitOrOffset = (exprSubqueryResult != null) ?
-                    hasLimitOrOffset && exprSubqueryResult.m_hasLimitOrOffset :
-                        hasLimitOrOffset;
-            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
-
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
