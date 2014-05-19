@@ -444,7 +444,7 @@ public class VoltCompiler {
         // Use a special DDL reader to provide the contents.
         List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(1);
         ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
-        // Seed it with the DDL so that a version upgrade hack in compileInternal()
+        // Seed it with the DDL so that a version upgrade hack in compileInternalToFile()
         // doesn't try to get the DDL file from the path.
         InMemoryJarfile jarFile = new InMemoryJarfile();
         try {
@@ -2431,28 +2431,30 @@ public class VoltCompiler {
         }
     }
 
-    public boolean recompileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
+    /**
+     * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
+     * for the artifacts to be included in the compile, and then compile it in place.
+     *
+     * *NOTE*: Does *NOT* work with project.xml jarfiles.
+     *
+     * @return true if successful, the compiled catalog is contained in the provided jarfile.
+     *
+     */
+    public boolean compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
         boolean success = false;
-        // Check if there's a project.
-        VoltCompilerReader projectReader =
-            (jarfile.containsKey("project.xml")
-             ? new VoltCompilerJarFileReader(jarfile, "project.xml")
-             : null);
 
         // Gather DDL files for recompilation if not using a project file.
         List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
-        if (projectReader == null) {
-            Entry<String, byte[]> entry = jarfile.firstEntry();
-            while (entry != null) {
-                String path = entry.getKey();
-                // SOMEDAY: It would be better to have a manifest that explicitly lists
-                // ddl files instead of using a brute force *.sql glob.
-                if (path.toLowerCase().endsWith(".sql")) {
-                    ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
-                }
-                entry = jarfile.higherEntry(entry.getKey());
+        Entry<String, byte[]> entry = jarfile.firstEntry();
+        while (entry != null) {
+            String path = entry.getKey();
+            // SOMEDAY: It would be better to have a manifest that explicitly lists
+            // ddl files instead of using a brute force *.sql glob.
+            if (path.toLowerCase().endsWith(".sql")) {
+                ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
             }
+            entry = jarfile.higherEntry(entry.getKey());
         }
 
         // Use the in-memory jarfile-provided class loader so that procedure
@@ -2461,7 +2463,7 @@ public class VoltCompiler {
         try {
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
-            InMemoryJarfile jarOut = compileInternal(projectReader, ddlReaderList, jarfile);
+            InMemoryJarfile jarOut = compileInternal(null, ddlReaderList, jarfile);
             success = (jarOut != null);
             // Summarize the results to a file.
             // Briefly log success or failure and mention the output text file.

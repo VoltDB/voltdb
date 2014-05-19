@@ -159,10 +159,10 @@ public class AsyncCompilerAgentHelper
             }
             compilerLog.debug("Adhoc-modified DDL:\n" + sb.toString());
             ddlReader =
-                new VoltCompilerStringReader("dontcare.sql", sb.toString());
+                new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, sb.toString());
             ddlReader.putInJar(jarfile, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
             VoltCompiler compiler = new VoltCompiler();
-            boolean result = compiler.recompileInMemoryJarfile(jarfile);
+            boolean result = compiler.compileInMemoryJarfile(jarfile);
             if (result) {
                 return jarfile.getFullJarBytes();
             }
