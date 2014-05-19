@@ -2072,7 +2072,7 @@ public class VoltCompiler {
             //
             outputStream.printf(
                     "Catalog contains %d built-in CRUD procedures.\n" +
-                    "\tSimple insert, update, delete and select procedures are created\n" +
+                    "\tSimple insert, update, delete, upsert and select procedures are created\n" +
                     "\tautomatically for convenience.\n\n",
                     countDefaultProcs);
             if (countSinglePartition > 0) {
