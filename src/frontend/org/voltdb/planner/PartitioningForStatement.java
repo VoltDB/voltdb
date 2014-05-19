@@ -18,9 +18,11 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.voltdb.VoltType;
@@ -136,6 +138,13 @@ public class PartitioningForStatement implements Cloneable{
      * proposed in feedback messages for possible use in single-partitioning annotations and attributes.
      */
     private String m_fullColumnName;
+
+
+    private List<PartitioningForStatement> m_subqueriesPartitionings = new ArrayList<>();
+
+    public void addPartitioningFromSubquery(PartitioningForStatement partitioning) {
+        m_subqueriesPartitionings.add(partitioning);
+    }
 
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
@@ -299,7 +308,7 @@ public class PartitioningForStatement implements Cloneable{
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
      * This is only the case when they include equality comparisons between partition key columns.
-     * VoltDb will reject joins of multiple partitioned tables unless all their partition keys are
+     * VoltDB will reject joins of multiple partitioned tables unless all their partition keys are
      * constrained to be equal to each other.
      * Example: select * from T1, T2 where T1.ID = T2.ID
      * Additionally, in this case, there may be a constant equality filter on any of the columns,
@@ -374,9 +383,40 @@ public class PartitioningForStatement implements Cloneable{
                     break;
                 }
             }
+        } else {
+            cloneSubqueryPartitionExpressionIfOnlyOne();
         }
 
         return m_countOfIndependentlyPartitionedTables;
+    }
+
+
+    private void cloneSubqueryPartitionExpressionIfOnlyOne() {
+        if (m_subqueriesPartitionings.size() == 0) {
+            return;
+        }
+
+        PartitioningForStatement singlePartitionStmt = null;
+        int ct = 0;
+        for (PartitioningForStatement pStmt: m_subqueriesPartitionings) {
+            if (pStmt.requiresTwoFragments()) {
+                return;
+            }
+            assert(pStmt.getCountOfIndependentlyPartitionedTables() <= 1);
+            // count sub-selects with partitioned tables
+            if (pStmt.getCountOfIndependentlyPartitionedTables() == 1) {
+                if (++ct > 1) {
+                    return;
+                }
+                singlePartitionStmt = pStmt;
+            }
+        }
+
+        if (ct != 1) {
+            return;
+        }
+
+        m_inferredExpression.add(singlePartitionStmt.singlePartitioningExpression());
     }
 
     /**

@@ -142,6 +142,7 @@ public final class DBBPool {
             if (m_freeThrowable == null) {
                 System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
                 m_allocationThrowable.printStackTrace();
+                HOST.fatal("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:", m_allocationThrowable);
                 System.exit(-1);
             }
         }

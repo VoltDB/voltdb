@@ -194,6 +194,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_UPDATE           = 30,
     PLAN_NODE_TYPE_INSERT           = 31,
     PLAN_NODE_TYPE_DELETE           = 32,
+    PLAN_NODE_TYPE_UPSERT           = 33,
 
     //
     // Communication Nodes

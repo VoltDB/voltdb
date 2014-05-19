@@ -88,7 +88,7 @@ class Plot:
 
     def plot(self, x, y, color, marker_shape, legend):
         self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
-                     marker=marker_shape, markerfacecolor=color, markersize=4)
+                     marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
@@ -100,7 +100,7 @@ class Plot:
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        plt.xlim((self.xmin.toordinal(), self.xmax.toordinal()))
+        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)

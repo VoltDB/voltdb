@@ -18,7 +18,6 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -35,37 +34,11 @@ public class MicroOptimizationRunner {
         optimizations.add(new ReplaceWithIndexLimit());
     }
 
-    public static List<CompiledPlan> applyAll(CompiledPlan plan,
-                                              DeterminismMode detMode,
-                                              AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan,
+            DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
-        ArrayList<CompiledPlan> input = new ArrayList<CompiledPlan>();
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        retval.add(plan);
-
         for (MicroOptimization opt : optimizations) {
-            // skip optimizations that don't apply at this determinism level
-            if (!opt.shouldRun(detMode, plan.hasDeterministicStatement())) {
-                continue;
-            }
-
-            // swap input and return lists
-            ArrayList<CompiledPlan> temp = input;
-            input = retval;
-            retval = temp;
-            // empty the retval list
-            retval.clear();
-
-            for (CompiledPlan inPlan : input) {
-                List<CompiledPlan> newPlans = opt.apply(inPlan, parsedStmt);
-                assert(newPlans != null);
-                assert(newPlans.size() >= 1);
-                retval.addAll(newPlans);
-            }
+            opt.apply(plan, detMode, parsedStmt);
         }
-
-        return retval;
     }
-
 }

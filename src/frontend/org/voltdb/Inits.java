@@ -17,14 +17,13 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -279,13 +278,21 @@ public class Inits {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 
-                if (m_rvdb.m_pathToStartupCatalog == null) {
-                    VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
-                                             " please see usage for more information",
-                                             false, null);
-                }
-
                 try {
+                    // If no catalog was supplied provide an empty one.
+                    if (m_rvdb.m_pathToStartupCatalog == null) {
+                        try {
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            if (emptyJarFile == null) {
+                                VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
+                            }
+                            m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
+                        }
+                        catch (IOException e) {
+                            VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
+                        }
+                    }
+
                     // Get the catalog bytes and byte count.
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 
@@ -300,16 +307,7 @@ public class Inits {
                     long catalogTxnId;
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
-                    // get a hash of the catalog - should never actually throw
-                    MessageDigest md = null;
-                    try {
-                        md = MessageDigest.getInstance("SHA-1");
-                    } catch (NoSuchAlgorithmException e) {
-                        VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
-                    }
-                    md.update(catalogBytes);
-                    byte[] catalogHash = md.digest();
-                    assert(catalogHash.length == 20); // sha-1 length
+                    byte[] catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.uploadCatalogToZK(
@@ -317,7 +315,9 @@ public class Inits {
                             0, catalogTxnId,
                             catalogUniqueId,
                             catalogHash,
-                            catalogBytes);
+                            catalogBytes,
+                            // The deployment hash was generated for the starter catalog, reuse it
+                            m_rvdb.m_catalogContext.deploymentHash);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -355,7 +355,7 @@ public class Inits {
                 Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
                 m_rvdb.m_serializedCatalog = loadResults.getFirst();
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
@@ -369,12 +369,14 @@ public class Inits {
             try {
                 //This is where we compile real catalog and create runtime catalog context. To validate deployment
                 //we compile and create a starter context which uses a placeholder catalog.
-                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true, false);
-                if (m_rvdb.m_depCRC < 0)
-                    System.exit(-1);
+                long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, false);
+                if (result < 0) {
+                    hostLog.fatal("Error parsing deployment file");
+                    VoltDB.crashLocalVoltDB("Error parsing deployment file");
+                }
             } catch (Exception e) {
                 hostLog.fatal("Error parsing deployment file", e);
-                System.exit(-1);
+                VoltDB.crashLocalVoltDB("Error parsing deployment file", true, e);
             }
 
             try {
@@ -382,7 +384,11 @@ public class Inits {
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
-                        catalog, catalogStuff.bytes, m_rvdb.m_depCRC, catalogStuff.version, -1);
+                        catalog,
+                        catalogStuff.bytes,
+                        // Our starter catalog has set the deployment hash, just yoink it out for now
+                        m_rvdb.m_catalogContext.deploymentHash,
+                        catalogStuff.version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }

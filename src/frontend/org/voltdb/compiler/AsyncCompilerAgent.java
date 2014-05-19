@@ -17,7 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
@@ -48,6 +47,10 @@ public class AsyncCompilerAgent {
 
     // accept work via this mailbox
     Mailbox m_mailbox;
+
+    // The helper for catalog updates, back after its exclusive three year tour
+    // of Europe, Scandinavia, and the sub-continent.
+    AsyncCompilerAgentHelper m_helper = new AsyncCompilerAgentHelper();
 
     // do work in this executor service
     final ListeningExecutorService m_es =
@@ -110,34 +113,26 @@ public class AsyncCompilerAgent {
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            if (VoltDB.instance().getConfig().m_isEnterprise) {
-                try {
-                    Class<?> acahClz = getClass().getClassLoader().loadClass("org.voltdb.compiler.AsyncCompilerAgentHelper");
-                    Object acah = acahClz.newInstance();
-                    Method acahPrepareMethod = acahClz.getMethod(
-                            "prepareApplicationCatalogDiff", new Class<?>[] { CatalogChangeWork.class });
-                    hostLog.info("Asynchronously preparing to update the application catalog and/or deployment settings.");
-                    final AsyncCompilerResult result = (AsyncCompilerResult) acahPrepareMethod.invoke(acah, w);
-                    if (result.errorMsg != null) {
-                        hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
-                    }
-                    // Log something useful about catalog upgrades when they occur.
-                    if (result instanceof CatalogChangeResult) {
-                        CatalogChangeResult ccr = (CatalogChangeResult)result;
-                        if (ccr.upgradedFromVersion != null) {
-                            hostLog.info(String.format(
-                                    "In order to update the application catalog it was "
-                                    + "automatically upgraded from version %s.",
-                                    ccr.upgradedFromVersion));
-                        }
-                    }
-                    w.completionHandler.onCompletion(result);
-                }
-                catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Error preparing catalog diff.", true, e);
+            final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(w);
+            if (result.errorMsg != null) {
+                hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
+            }
+            // Log something useful about catalog upgrades when they occur.
+            if (result instanceof CatalogChangeResult) {
+                CatalogChangeResult ccr = (CatalogChangeResult)result;
+                if (ccr.upgradedFromVersion != null) {
+                    hostLog.info(String.format(
+                                "In order to update the application catalog it was "
+                                + "automatically upgraded from version %s.",
+                                ccr.upgradedFromVersion));
                 }
             }
-            assert(false); // shouldn't get here in community edition
+            w.completionHandler.onCompletion(result);
+        }
+        else {
+            hostLog.warn("Unexpected message received by AsyncCompilerAgent.  " +
+                    "Please contact VoltDB support with this message and the contents: " +
+                    message.toString());
         }
     }
 

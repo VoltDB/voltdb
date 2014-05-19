@@ -65,7 +65,6 @@ namespace voltdb
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
-        bool needsOutputTableClear();
     };
 }
 

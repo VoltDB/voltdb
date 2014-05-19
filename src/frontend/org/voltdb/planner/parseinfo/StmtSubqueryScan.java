@@ -29,7 +29,6 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -44,8 +43,6 @@ public class StmtSubqueryScan extends StmtTableScan {
     private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
-    // The partitioning object for that sub-query
-    PartitioningForStatement m_partitioning = null;
 
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
@@ -94,9 +91,19 @@ public class StmtSubqueryScan extends StmtTableScan {
         return true;
     }
 
-    @Override
-    public void setPartitioning(PartitioningForStatement partitioning) {
-        m_partitioning = partitioning;
+    public List<StmtTargetTableScan> getAllTargetTables() {
+        List <StmtTargetTableScan> stmtTables = new ArrayList<StmtTargetTableScan>();
+        for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
+            if (tableScan instanceof StmtTargetTableScan) {
+                stmtTables.add((StmtTargetTableScan)tableScan);
+            } else {
+                assert(tableScan instanceof StmtSubqueryScan);
+                StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
+                stmtTables.addAll(subScan.getAllTargetTables());
+            }
+        }
+
+        return stmtTables;
     }
 
     @Override

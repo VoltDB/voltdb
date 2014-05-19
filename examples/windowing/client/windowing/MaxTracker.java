@@ -66,7 +66,6 @@ public class MaxTracker implements Runnable {
             if (currentMax == previousMax) {
                 return;
             }
-            previousMax = currentMax;
 
             // Output synchronized on global state to make this line not print in the middle
             // of other reporting lines.
@@ -80,6 +79,8 @@ public class MaxTracker implements Runnable {
                                       previousMax, currentMax);
                 }
             }
+
+            previousMax = currentMax;
         }
         catch (IOException | ProcCallException e) {
             // track failures in a pretty simple way for the reporter task

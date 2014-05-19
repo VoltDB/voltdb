@@ -231,7 +231,7 @@ public class PlanAssembler {
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException(
+                throw new PlanningErrorException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
@@ -253,7 +253,7 @@ public class PlanAssembler {
         // Need to use StmtTableScan instead
         // check that no modification happens to views
         if (tableListIncludesView(parsedStmt.m_tableList)) {
-            throw new RuntimeException("Illegal to modify a materialized view.");
+            throw new PlanningErrorException("Illegal to modify a materialized view.");
         }
 
         m_partitioning.setIsDML();
@@ -280,12 +280,12 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException("Illegal to update an export table.");
+                throw new PlanningErrorException("Illegal to update an export table.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new RuntimeException("Illegal to delete from an export table.");
+                throw new PlanningErrorException("Illegal to delete from an export table.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
@@ -601,11 +601,21 @@ public class PlanAssembler {
             }
             return null;
         }
-        // Remove the coordinator send/receive pair. It will be added later
-        // for the whole plan
-        compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
 
-        subqueryScan.setPartitioning(currentPartitioning);
+        // Remove the coordinator send/receive pair.
+        // It will be added later for the whole plan
+        AbstractPlanNode root = compiledPlan.rootPlanGraph;
+
+        // There should be more cases for Joins have to be done on coordinator
+        // This case should also not be pushed down
+        boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
+                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                !root.hasAnyNodeOfType(PlanNodeType.LIMIT);
+        if (subScanCanPushdown) {
+            compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
+        }
+
+        m_partitioning.addPartitioningFromSubquery(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
                 compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
@@ -659,10 +669,12 @@ public class PlanAssembler {
          * the one required send/receive pair is already in the plan below the
          * inner side of a NestLoop join.
          */
-        if (m_partitioning.requiresTwoFragments()) {
 
-            if (m_parsedSelect.m_joinTree.containsPartitionedTablesFromSubSelects()) {
-                throw new PlanningErrorException("Subqueries on partitioned data are only supported in single partition stored procedures.");
+        JoinNode jroot = m_parsedSelect.m_joinTree;
+
+        if (m_partitioning.requiresTwoFragments()) {
+            if (!jroot.isReplicatedInSubselects() && !jroot.isReplicatedOutsideSubselects()) {
+                throw new PlanningErrorException("Subqueries from multiple partitioned table or join with partitioned table are not supported.");
             }
 
             boolean mvFixInfoCoordinatorNeeded = true;
@@ -672,11 +684,6 @@ public class PlanAssembler {
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
-                if ( ! root.hasReplicatedResult()) {
-                    throw new PlanningErrorException(
-                            "This special case join between an outer replicated table and " +
-                            "an inner partitioned table is too complex and is not supported.");
-                }
 
                 // Edge cases: left outer join with replicated table.
                 if (m_parsedSelect.mvFixInfo.needed()) {
@@ -989,7 +996,6 @@ public class PlanAssembler {
                     throw new PlanningErrorException("Column " + column.getName()
                             + " has no default and is not nullable.");
                 }
-
 
                 boolean isConstantValue = true;
                 if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
