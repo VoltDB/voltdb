@@ -37,7 +37,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlUpsertSuite extends RegressionSuite {
 
-    public void notestUpsert() throws IOException, ProcCallException
+    public void testUpsert() throws IOException, ProcCallException
     {
         Client client = getClient();
         VoltTable vt = null;
