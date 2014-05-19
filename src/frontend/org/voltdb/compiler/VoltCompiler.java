@@ -234,6 +234,13 @@ public class VoltCompiler {
             this.message = message;
         }
 
+        VoltCompilerException(String message, Throwable cause) {
+            message += "\n   caused by:\n   " + cause.toString();
+            addErr(message);
+            this.message = message;
+            this.initCause(cause);
+        }
+
         @Override
         public String getMessage() {
             return message;
@@ -481,7 +488,7 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            assert(false);
+            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
     }
 
@@ -1765,10 +1772,20 @@ public class VoltCompiler {
             Class<?> clazz;
             try {
                 clazz = Class.forName(classattr, true, m_classLoader);
-            } catch (ClassNotFoundException e) {
+            }
+            catch (ClassNotFoundException e) {
                 throw new VoltCompilerException(String.format(
                         "Cannot load class for procedure: %s",
                         classattr));
+            }
+            catch (Throwable cause) {
+                // We are here because the class was found and the initializer of the class
+                // threw an error we can't anticipate. So we will wrap the error with a
+                // runtime exception that we can trap in our code.
+                throw new VoltCompilerException(String.format(
+                        "Cannot load class for procedure: %s",
+                        classattr), cause);
+
             }
 
             return new ProcedureDescriptor(groups, Language.JAVA, null, clazz);
@@ -2437,21 +2454,21 @@ public class VoltCompiler {
             // Use the in-memory jarfile-provided class loader so that procedure
             // classes can be found and copied to the new file that gets written.
             ClassLoader originalClassLoader = m_classLoader;
+
+            // Compile and save the file to voltdbroot. Assume it's a test environment if there
+            // is no catalog context available.
+            String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+            String textName = String.format("catalog-%s.out", versionFromVoltDB);
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            final String outputJarPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+            // Place the compiler output in a text file in the same folder.
+            final String outputTextPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(textName));
             try {
                 m_classLoader = outputJar.getLoader();
-
-                // Compile and save the file to voltdbroot. Assume it's a test environment if there
-                // is no catalog context available.
-                String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
-                String textName = String.format("catalog-%s.out", versionFromVoltDB);
-                CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                final String outputJarPath = (catalogContext != null
-                        ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
-                        : VoltDB.Configuration.getPathToCatalogForTest(jarName));
-                // Place the compiler output in a text file in the same folder.
-                final String outputTextPath = (catalogContext != null
-                        ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
-                        : VoltDB.Configuration.getPathToCatalogForTest(textName));
 
                 consoleLog.info(String.format(
                         "Version %s catalog will be automatically upgraded to version %s.",
@@ -2492,13 +2509,31 @@ public class VoltCompiler {
                                 "upgrade is available in \"%s\".",
                                 versionFromCatalog, versionFromVoltDB, outputTextPath));
                         throw new IOException(String.format(
-                                "Failed to generate upgraded catalog file \"%s\".",
-                                outputJarPath));
+                                "Catalog upgrade failed. You will need to recompile using voltdb compile."));
                     }
                 }
                 finally {
                     outputStream.close();
                 }
+            }
+            catch (IOException ioe) {
+                // Do nothing because this could come from the normal failure path
+                throw ioe;
+            }
+            catch (Exception e) {
+                compilerLog.error("Catalog upgrade failed with error:");
+                compilerLog.error(e.getMessage());
+                compilerLog.info(String.format(
+                        "Had attempted to perform an automatic version upgrade of a " +
+                        "catalog that was compiled by an older %s version of VoltDB, " +
+                        "but the automatic upgrade failed. The cluster  will not be " +
+                        "able to start until the incompatibility is fixed. " +
+                        "Try re-compiling the catalog with the newer %s version " +
+                        "of the VoltDB compiler. Compiler output from the failed " +
+                        "upgrade is available in \"%s\".",
+                        versionFromCatalog, versionFromVoltDB, outputTextPath));
+                throw new IOException(String.format(
+                        "Catalog upgrade failed. You will need to recompile using voltdb compile."));
             }
             finally {
                 // Restore the original class loader

@@ -58,8 +58,8 @@ namespace voltdb {
  * When the output table is a temp table, it is safe to delete it.
  */
 SeqScanPlanNode::~SeqScanPlanNode() {
-    TempTable* tmpTable = dynamic_cast<TempTable*>(getOutputTable());
-    if (tmpTable) {
+    // this check is the same as when the temp table is created in seqscanexecutor
+    if (getPredicate() != NULL || getInlinePlanNodes().size() > 0) {
         delete getOutputTable();
         setOutputTable(NULL);
     }

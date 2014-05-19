@@ -166,9 +166,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.3";
+    static final String m_defaultVersionString = "4.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.3\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -2182,13 +2182,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
-                try {
-                    if (m_rejoinTruncationReqId == null) {
-                        m_rejoinTruncationReqId = java.util.UUID.randomUUID().toString();
-                    }
-                    zk.create(VoltZK.request_truncation_snapshot, m_rejoinTruncationReqId.getBytes(),
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                } catch (KeeperException.NodeExistsException e) {}
+                String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                if (m_rejoinTruncationReqId == null) {
+                    m_rejoinTruncationReqId = requestNode;
+                }
             } else {
                 logRecoveryCompleted = true;
             }
@@ -2344,7 +2342,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         assert(m_rejoinDataPending == false);
 
         if (m_rejoining) {
-            if (requestId.equals(m_rejoinTruncationReqId)) {
+            if (requestId.compareTo(m_rejoinTruncationReqId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
@@ -2355,13 +2353,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // don't flip the m_rejoining state, all truncation snapshot completions will call back to here.
                 try {
                     final ZooKeeper zk = m_messenger.getZK();
+                    String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                     if (m_rejoinTruncationReqId == null) {
-                        m_rejoinTruncationReqId = java.util.UUID.randomUUID().toString();
+                        m_rejoinTruncationReqId = requestNode;
                     }
-                    zk.create(VoltZK.request_truncation_snapshot, m_rejoinTruncationReqId.getBytes(),
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 }
-                catch (KeeperException.NodeExistsException e) {}
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to retry post-rejoin truncation snapshot request.", true, e);
                 }
