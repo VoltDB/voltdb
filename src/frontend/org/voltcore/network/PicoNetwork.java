@@ -84,6 +84,7 @@ import java.util.concurrent.FutureTask;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
 /**
@@ -169,11 +170,13 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     @Override
     public void run() {
+        LatencyWatchdog.pet(Thread.currentThread());
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
             m_ih.starting(this);
             m_ih.started(this);
             while (m_shouldStop == false) {
+                LatencyWatchdog.pet(Thread.currentThread());
                 //Choose a non-blocking select if things are busy
                 if (m_hadWork) {
                     m_selector.selectNow();
