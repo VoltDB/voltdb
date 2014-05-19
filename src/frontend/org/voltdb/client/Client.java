@@ -312,9 +312,10 @@ public interface Client {
      * Multiple instances of a VoltBulkLoader created by a single Client will share some
      * resources, particularly if they are inserting into the same table.</p>
      *
-     * @param name of table that bulk inserts are to be applied to.
-     * @param number of rows to collect for the table before starting a bulk insert.
-     * @param user defined callback procedure used for notification of failed inserts.
+     * @param tableName Name of table that bulk inserts are to be applied to.
+     * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param blfcb Callback procedure used for notification of failed inserts.
+     * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;

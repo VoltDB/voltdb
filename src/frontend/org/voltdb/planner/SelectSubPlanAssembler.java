@@ -65,7 +65,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param m_partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
+     * @param partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
     SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
@@ -93,7 +93,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"").append(parsedStmt.m_joinOrder);
                     sb.append("\" contains a duplicate element \"").append(alias).append("\".");
-                    throw new RuntimeException(sb.toString());
+                    throw new PlanningErrorException(sb.toString());
                 }
             }
 
@@ -106,7 +106,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 sb.append(parsedStmt.m_joinOrder).append("\" does not contain the correct number of elements\n");
                 sb.append("Expected ").append(parsedStmt.m_tableList.size());
                 sb.append(" but found ").append(tableAliases.size()).append(" elements.");
-                throw new RuntimeException(sb.toString());
+                throw new PlanningErrorException(sb.toString());
             }
 
             Set<String> aliasSet = parsedStmt.m_tableAliasMap.keySet();
@@ -130,10 +130,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     sb.append("don't ");
                 }
                 sb.append("exist in the FROM clause");
-                throw new RuntimeException(sb.toString());
+                throw new PlanningErrorException(sb.toString());
             }
             if ( ! isValidJoinOrder(tableAliases)) {
-                throw new RuntimeException("The specified join order is invalid for the given query");
+                throw new PlanningErrorException("The specified join order is invalid for the given query");
             }
             //m_parsedStmt.joinTree.m_joinOrder = tables;
             m_joinOrders.add(m_parsedStmt.m_joinTree);
@@ -654,16 +654,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         //
 
         assert(joinNode.getRightNode() != null);
-        AccessPath innerAccessPath = joinNode.getRightNode().m_currentAccessPath;
+        JoinNode innerJoinNode = joinNode.getRightNode();
+        AccessPath innerAccessPath = innerJoinNode.m_currentAccessPath;
         // We may need to add a send/receive pair to the inner plan for the special case.
         // This trick only works once per plan, BUT once the partitioned data has been
         // received on the coordinator, it can be treated as replicated data in later
         // joins, which MAY help with later outer joins with replicated data.
-        boolean needInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
-                                       (m_partitioning.getCountOfPartitionedTables() > 0) &&
-                                       (joinNode.getJoinType() != JoinType.INNER) &&
-                                       ( ! innerPlan.hasReplicatedResult()) &&
-                                       outerPlan.hasReplicatedResult();
+
+
+        boolean needInnerSendReceive = (m_partitioning.requiresTwoFragments()) &&
+                                       (! innerPlan.hasReplicatedResult()) &&
+                                       (outerPlan.hasReplicatedResult()) &&
+                                       (joinNode.getJoinType() != JoinType.INNER || innerPlan.isNonjoinableSubquery())
+                                       ;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
         // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the

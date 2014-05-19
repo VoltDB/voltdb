@@ -433,7 +433,8 @@ class ServerBundle(JavaBundle):
            verb.add_options(cli.BooleanOption('-b', '--blocking', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
-                               'the application catalog jar file path'))
+                               'the application catalog jar file path',
+                               min_count=0, max_count=1))
         # --safemode only used by recover server action.
         if self.safemode_available:
             verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', None))
@@ -443,7 +444,7 @@ class ServerBundle(JavaBundle):
                                   'run the VoltDB server in the background (as a daemon process)'))
 
     def go(self, verb, runner):
-        if self.needs_catalog:
+        if self.subcommand == 'create':
             if runner.opts.replica:
                 self.subcommand = 'replica'
         if self.supports_live:
@@ -461,9 +462,8 @@ class ServerBundle(JavaBundle):
             catalog = runner.opts.catalog
             if not catalog:
                 catalog = runner.config.get('volt.catalog')
-            if catalog is None:
-                utility.abort('A catalog path is required.')
-            final_args.extend(['catalog', catalog])
+            if not catalog is None:
+                final_args.extend(['catalog', catalog])
 
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])

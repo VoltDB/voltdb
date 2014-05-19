@@ -243,7 +243,7 @@ public:
         size_t i = 0;
         voltdb::TableIterator& iterator = m_table->iterator();
         while (iterator.next(tuple)) {
-            int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
+            int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             m_values.push_back(value);
             m_valueSet.insert(std::pair<int64_t,size_t>(value, i++));
         }
@@ -262,7 +262,7 @@ public:
                 return;
             }
             if (set != NULL) {
-                set->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+                set->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             }
         }
     }
@@ -300,7 +300,7 @@ public:
         TableTuple tuple(table->schema());
         if (tableutil::getRandomTuple(table, tuple)) {
             if (set != NULL) {
-                set->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+                set->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             }
             table->deleteTuple(tuple, true);
             m_tuplesDeleted++;
@@ -322,10 +322,10 @@ public:
             int value = ::rand();
             tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
             if (setFrom != NULL) {
-                setFrom->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+                setFrom->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             }
             if (setTo != NULL) {
-                setTo->insert(*reinterpret_cast<int64_t*>(tempTuple.address() + 1));
+                setTo->insert(*reinterpret_cast<const int64_t*>(tempTuple.address() + 1));
             }
             table->updateTuple(tuple, tempTuple);
             m_tuplesUpdated++;
@@ -375,16 +375,16 @@ public:
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
         std::set_difference(expected.begin(), expected.end(), received.begin(), received.end(), ii);
-        for (int ii = 0; ii < diff.size(); ii++) {
-            int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+        for (int jj = 0; jj < diff.size(); jj++) {
+            int32_t *values = reinterpret_cast<int32_t*>(&diff[jj]);
             printf("Expected tuple was not received: %d/%d\n", values[0], values[1]);
         }
 
         diff.clear();
         ii = std::insert_iterator<std::vector<int64_t> >(diff, diff.begin());
         std::set_difference( received.begin(), received.end(), expected.begin(), expected.end(), ii);
-        for (int ii = 0; ii < diff.size(); ii++) {
-            int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+        for (int jj = 0; jj < diff.size(); jj++) {
+            int32_t *values = reinterpret_cast<int32_t*>(&diff[jj]);
             printf("Unexpected tuple received: %d/%d\n", values[0], values[1]);
         }
 
@@ -416,7 +416,7 @@ public:
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
-                    set.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+                    set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -516,7 +516,7 @@ public:
             std::cerr << std::endl;
             m_showTuples = false;
         }
-        int64_t value = *reinterpret_cast<int64_t*>(pvalues);
+        int64_t value = *reinterpret_cast<const int64_t*>(pvalues);
         std::ostringstream os;
         os << msg << " value=" << value << "(" << pvalues[0] << "," << pvalues[1] << ") index=";
         std::map<int64_t,size_t>::const_iterator ifound = m_valueSet.find(value);
@@ -538,8 +538,8 @@ public:
         std::insert_iterator<std::vector<int64_t> > idiff( diff, diff.begin());
         std::set_difference(set1.begin(), set1.end(), set2.begin(), set2.end(), idiff);
         if (diff.size() <= MAX_DETAIL_COUNT) {
-            for (int ii = 0; ii < diff.size(); ii++) {
-                int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+            for (int jj = 0; jj < diff.size(); jj++) {
+                int32_t *values = reinterpret_cast<int32_t*>(&diff[jj]);
                 valueError(values, "tuple");
             }
         }
@@ -990,20 +990,20 @@ public:
             if (serialized == 0) {
                 break;
             }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int64_t) <= serialized;
+                 ii += m_tupleWidth + sizeof(int32_t)) {
                 int values[2];
-                values[0] = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii]));
-                values[1] = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii + 4]));
+                values[0] = ntohl(*reinterpret_cast<const int32_t*>(&m_serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<const int32_t*>(&m_serializationBuffer[ii + 4]));
                 void *valuesVoid = reinterpret_cast<void*>(values);
-                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
                 const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < numMutationsDuring; jj++) {
                 doRandomTableMutation(m_table);
@@ -1054,15 +1054,15 @@ public:
             // Trying to clear an index that's not drained will fail, but should be side-effect free
             clearIndex(testRange, false);
 
-            int ii = 12; // skip partition id, row count, and first tuple size
-            while (ii < (serialized - 4)) {
-                int value = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii]));
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int32_t) < serialized; // WHY strictly < ? --paul
+                 ii += m_tupleWidth + sizeof(int32_t)) {
+                int32_t value = ntohl(*reinterpret_cast<const int32_t*>(&m_serializationBuffer[ii]));
                 int32_t hash = MurmurHash3_x64_128(&value, sizeof(value), 0);
                 ElasticIndexKey key(hash, (char *) NULL);
                 bool inserted = index.add(key);
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
         }
 
@@ -1108,7 +1108,7 @@ public:
 
     int64_t m_undoToken;
 
-    int32_t m_tupleWidth;
+    size_t m_tupleWidth;
 
     CatalogId m_tableId;
 
@@ -1207,25 +1207,25 @@ TEST_F(CopyOnWriteTest, BigTest) {
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
-            const int serialized = static_cast<int>(outputStream.position());
+            const size_t serialized = outputStream.position();
             if (serialized == 0) {
                 break;
             }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int64_t) <= serialized;
+                 ii += m_tupleWidth + sizeof(int32_t)) {
                 int32_t values[2];
-                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
-                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
                 const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -1248,7 +1248,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
-            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -1277,21 +1277,21 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             if (serialized == 0) {
                 break;
             }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int64_t) <= serialized;
+                 ii += m_tupleWidth + sizeof(int32_t)) {
                 int values[2];
-                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
-                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
                 const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -1315,7 +1315,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
-            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -1344,21 +1344,21 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             if (serialized == 0) {
                 break;
             }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
+            for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                 ii + sizeof(int64_t) <= serialized;
+                 ii += m_tupleWidth + sizeof(int32_t)) {
                 int values[2];
-                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
-                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
                 const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -1429,7 +1429,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
+            int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
             if (ipart != skippedPartition) {
                 bool inserted = expected[ipart].insert(value).second;
@@ -1477,28 +1477,23 @@ TEST_F(CopyOnWriteTest, MultiStream) {
                 context("serialize: partition=%lu remaining=%lld", ipart, remaining);
 
                 const int serialized = static_cast<int>(outputStream->position());
-                if (serialized > 0) {
-                    // Skip partition id, row count and first tuple length.
-                    int ibuf = sizeof(int32_t) * 3;
-                    while (ibuf < (serialized - sizeof(int32_t))) {
-                        int32_t values[2];
-                        values[0] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf));
-                        values[1] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf+4));
-                        // the following rediculous cast is to placate our gcc treat warnings as errors affliction
-                        void *valuesVoid = reinterpret_cast<void*>(values);
-                        int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
-                        const bool inserted = actual[ipart].insert(*values64).second;
-                        if (!inserted) {
-                            valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
-                                       ipart, totalInserted, ibuf);
-                        }
-                        ASSERT_TRUE(inserted);
-
-                        totalInserted++;
-
-                        // Account for tuple data and second tuple length.
-                        ibuf += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+                const char* serializationBuffer = buffers[ipart].get();
+                for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+                     ii + sizeof(int64_t) <= serialized;
+                     ii += m_tupleWidth + sizeof(int32_t)) {
+                    int32_t values[2];
+                    values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+                    values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
+                    // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                    void *valuesVoid = reinterpret_cast<void*>(values);
+                    const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
+                    const bool inserted = actual[ipart].insert(*values64).second;
+                    if (!inserted) {
+                        valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ii=%d",
+                                   ipart, totalInserted, ii);
                     }
+                    ASSERT_TRUE(inserted);
+                    totalInserted++;
                 }
 
                 // Mozy along to the next predicate/partition.
@@ -1532,7 +1527,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
  */
 TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     const size_t tupleCount = 3;
-    const size_t bufferSize = 12 + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
+    const size_t bufferSize = (sizeof(int32_t) * 3) + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
     initTable(1, 0);
     TableTuple tuple(m_table->schema());
     addRandomUniqueTuples(m_table, tupleCount);
@@ -1591,7 +1586,7 @@ public:
 
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
-        m_test.m_shuffles.insert(*reinterpret_cast<int64_t*>(sourceTuple.address() + 1));
+        m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));
     }
 
     virtual TableStreamerInterface* cloneForTruncatedTable(voltdb::PersistentTableSurgeon&) {

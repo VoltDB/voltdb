@@ -486,7 +486,12 @@ public class ExpressionColumn extends Expression {
                     }
                 }
 
+                // A VoltDB extension to allow toSQL on expressions in DDL
+                if (rangeVariable == null || rangeVariable.tableAlias == null) {
+                /* disable 1 line ...
                 if (rangeVariable.tableAlias == null) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     return column.getName().getSchemaQualifiedStatementName();
                 } else {
                     StringBuffer sb = new StringBuffer();

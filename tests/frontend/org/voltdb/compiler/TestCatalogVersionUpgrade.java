@@ -37,7 +37,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestCatalogVersionUpgrade extends TestCase {
 
     // The message substring we expect to find from an upgrade failure.
-    private static String UPGRADE_ERROR_MESSAGE_SUBSTRING = "Failed to generate upgraded catalog file";
+    private static String UPGRADE_ERROR_MESSAGE_SUBSTRING = "Catalog upgrade failed";
 
     public void testCatalogAutoUpgrade() throws Exception
     {

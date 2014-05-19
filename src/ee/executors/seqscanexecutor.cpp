@@ -80,7 +80,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (needsOutputTableClear()) {
+    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
         // Create output table based on output schema from the plan
         const std::string& temp_name = (node->isSubQuery()) ?
                 node->getChildren()[0]->getOutputTable()->name():
@@ -98,15 +98,6 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
                              node->getTargetTable());
     }
     return true;
-}
-
-bool SeqScanExecutor::needsOutputTableClear() {
-    // clear the temporary output table only when it has a predicate.
-    // if it doesn't have a predicate, it's the original persistent table
-    // and we don't have to (and must not) clear it.
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
-    assert(node);
-    return node->needsOutputTableClear();
 }
 
 bool SeqScanExecutor::p_execute(const NValueArray &params) {

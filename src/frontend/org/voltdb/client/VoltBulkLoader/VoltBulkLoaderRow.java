@@ -44,17 +44,21 @@ class VoltBulkLoaderRow {
             m_rowHandle = this;
         }
 
+        @Override
         public void setBatchCount(int cnt) {
             batchCnt = cnt;
         }
 
+        @Override
         public CountDownLatch getLatch() {
             return drainLatch;
         }
 
+        @Override
         public void notifyOfPendingInsert() {
         }
 
+        @Override
         public void notifyOfClientResponse() {
             if (--batchCnt <= 0)
                 drainLatch.countDown();
@@ -72,20 +76,24 @@ class VoltBulkLoaderRow {
             m_rowHandle = this;
         }
 
+        @Override
         public void setBatchCount(int cnt) {
             batchCnt = cnt;
         }
 
+        @Override
         public CountDownLatch getLatch() {
             return m_closeCompleteLatch;
         }
 
         // In this call we are synchronized by the PerPartitionTable object
+        @Override
         public void notifyOfPendingInsert() {
             // First prevent the BulkLoader from accepting new RowInserts
             m_loader.m_partitionTable[m_tableForClosedBulkLoader.m_partitionId] = null;
         }
 
+        @Override
         public void notifyOfClientResponse() {
             if (--batchCnt <= 0) {
                 if (m_tableForClosedBulkLoader.m_partitionQueuedRowCnt.get() >  0) {

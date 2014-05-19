@@ -45,7 +45,6 @@
 
 using namespace std;
 using namespace voltdb;
-using namespace boost;
 
 const int COLUMN_COUNT = 5;
 

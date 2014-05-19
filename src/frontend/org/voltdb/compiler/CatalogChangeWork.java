@@ -38,7 +38,12 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData,
               completionHandler);
-        this.catalogBytes = catalogBytes.clone();
+        if (catalogBytes != null) {
+            this.catalogBytes = catalogBytes.clone();
+        }
+        else {
+            this.catalogBytes = null;
+        }
         this.deploymentString = deploymentString;
         this.invocationType = type;
         this.originalTxnId = originalTxnId;

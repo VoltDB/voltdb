@@ -1039,7 +1039,7 @@ class NValue {
           case VALUE_TYPE_TIMESTAMP: {
             int64_t value = castAsRawInt64AndGetValue();
             TTInt retval(value);
-            retval *= NValue::kMaxScaleFactor;
+            retval *= kMaxScaleFactor;
             return retval;
           }
           case VALUE_TYPE_DECIMAL:
@@ -1047,11 +1047,11 @@ class NValue {
           case VALUE_TYPE_DOUBLE: {
             int64_t intValue = castAsBigIntAndGetValue();
             TTInt retval(intValue);
-            retval *= NValue::kMaxScaleFactor;
+            retval *= kMaxScaleFactor;
 
             double value = getDouble();
-            value -= (double)intValue; // isolate decimal part
-            value *= NValue::kMaxScaleFactor; // scale up to integer.
+            value -= static_cast<double>(intValue); // isolate decimal part
+            value *= static_cast<double>(kMaxScaleFactor); // scale up to integer.
             TTInt fracval((int64_t)value);
             retval += fracval;
             return retval;
@@ -1119,7 +1119,7 @@ class NValue {
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
+            whole /= kMaxScaleFactor;
             retval.getBigInt() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR:
@@ -1169,7 +1169,7 @@ class NValue {
 
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
+            whole /= kMaxScaleFactor;
             retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR: {
@@ -1214,7 +1214,7 @@ class NValue {
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
+            whole /= kMaxScaleFactor;
             int64_t value = whole.ToInt();
             retval.narrowToInteger(value, type); break;
         }
@@ -1257,7 +1257,7 @@ class NValue {
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
+            whole /= kMaxScaleFactor;
             int64_t value = whole.ToInt();
             retval.narrowToSmallInt(value, type); break;
         }
@@ -1300,7 +1300,7 @@ class NValue {
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
+            whole /= kMaxScaleFactor;
             int64_t value = whole.ToInt();
             retval.narrowToTinyInt(value, type); break;
         }
@@ -1406,7 +1406,7 @@ class NValue {
     void createDecimalFromInt(int64_t rhsint)
     {
         TTInt scaled(rhsint);
-        scaled *= NValue::kMaxScaleFactor;
+        scaled *= kMaxScaleFactor;
         getDecimal() = scaled;
     }
 
@@ -1612,7 +1612,7 @@ class NValue {
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getTinyInt()));
-            lhsValue *= NValue::kMaxScaleFactor;
+            lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
@@ -1631,7 +1631,7 @@ class NValue {
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getSmallInt()));
-            lhsValue *= NValue::kMaxScaleFactor;
+            lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
@@ -1650,7 +1650,7 @@ class NValue {
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(static_cast<int64_t>(getInteger()));
-            lhsValue *= NValue::kMaxScaleFactor;
+            lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
@@ -1669,7 +1669,7 @@ class NValue {
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getBigInt());
-            lhsValue *= NValue::kMaxScaleFactor;
+            lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
@@ -1689,7 +1689,7 @@ class NValue {
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             const TTInt rhsValue = rhs.getDecimal();
             TTInt lhsValue(getTimestamp());
-            lhsValue *= NValue::kMaxScaleFactor;
+            lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         } else {
             int64_t lhsValue, rhsValue;
@@ -1845,31 +1845,31 @@ class NValue {
         case VALUE_TYPE_TINYINT:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getTinyInt()));
-            rhsValue *= NValue::kMaxScaleFactor;
+            rhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_SMALLINT:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getSmallInt()));
-            rhsValue *= NValue::kMaxScaleFactor;
+            rhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_INTEGER:
         {
             TTInt rhsValue(static_cast<int64_t>(rhs.getInteger()));
-            rhsValue *= NValue::kMaxScaleFactor;
+            rhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_BIGINT:
         {
             TTInt rhsValue(rhs.getBigInt());
-            rhsValue *= NValue::kMaxScaleFactor;
+            rhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         case VALUE_TYPE_TIMESTAMP:
         {
             TTInt rhsValue(rhs.getTimestamp());
-            rhsValue *= NValue::kMaxScaleFactor;
+            rhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         default:
@@ -2045,7 +2045,7 @@ class NValue {
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
         calc *= rhs.getDecimal();
-        calc /= NValue::kMaxScaleFactor;
+        calc /= kMaxScaleFactor;
         TTInt retval;
         if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
@@ -2079,7 +2079,7 @@ class NValue {
 
         TTLInt calc;
         calc.FromInt(lhs.getDecimal());
-        calc *= NValue::kMaxScaleFactor;
+        calc *= kMaxScaleFactor;
         if (calc.Div(rhs.getDecimal())) {
             char message[4096];
             snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",

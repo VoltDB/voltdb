@@ -60,20 +60,19 @@ class ReadWriteSet;
  *
  */
 class ReceiveExecutor : public AbstractExecutor {
-    public:
-        ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
+public:
+    ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node)
     {
         this->engine = engine;
     }
-        ~ReceiveExecutor();
-        bool needsPostExecuteClear() { return true; }
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-    private:
-        VoltDBEngine *engine;
+    ~ReceiveExecutor();
+protected:
+    bool p_init(AbstractPlanNode*,
+            TempTableLimits* limits);
+    bool p_execute(const NValueArray &params);
+private:
+    VoltDBEngine *engine;
 };
 
 }

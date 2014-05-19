@@ -37,20 +37,7 @@ import org.voltdb.types.ExpressionType;
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        this.m_parsedStmt = parsedStmt;
-
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph);
-        plan.rootPlanGraph = planGraph;
-
-        retval.add(plan);
-        return retval;
-    }
-
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 

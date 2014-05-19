@@ -125,7 +125,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
             }
         }
     }
-    needs_outputtable_clear_cached = needsOutputTableClear();
 
     // Call the p_init() method on our derived class
     if (!p_init(m_abstractNode, limits)) {
@@ -134,13 +133,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     Table* tmp_output_table_base = m_abstractNode->getOutputTable();
     m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
 
-    // determines whether the output table should be cleared or not.
-    // specific executor might not need (and must not do) clearing.
-    if (!needs_outputtable_clear_cached) {
-        VOLT_TRACE("Did not clear output table because the derived class"
-                   " answered so");
-        m_tmpOutputTable = NULL;
-    }
     return true;
 }
 

@@ -94,7 +94,7 @@
                             "ddl": "DDL.sql",
                             "template": "advanced-subq-joins.sql",
                             "normalizer": "normalizer.py"},
-    "advanced-subq-repl-joins": {"schema": "repl-schema.py",
+    "advanced-repl-subq-joins": {"schema": "repl-schema.py",
                                  "ddl": "repl-DDL.sql",
                                  "template": "advanced-subq-joins.sql",
                                  "normalizer": "normalizer.py"},

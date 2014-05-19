@@ -66,6 +66,7 @@
 
 package org.hsqldb_voltpatches.index;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
@@ -277,7 +278,7 @@ public interface Index extends SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session)
+    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session, String tableName)
         throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 
     /**

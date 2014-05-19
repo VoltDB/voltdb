@@ -19,10 +19,10 @@ package org.voltdb.compiler;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
@@ -39,8 +39,9 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.UpsertPlanNode;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -76,6 +77,9 @@ public abstract class StatementCompiler {
         catalogStmt.setQuerytype(qtype.getValue());
 
         // put the data in the catalog that we have
+        if (!stmt.endsWith(";")) {
+            stmt += ";";
+        }
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);
@@ -86,12 +90,17 @@ public abstract class StatementCompiler {
         String stmtName = catalogStmt.getTypeName();
         String procName = catalogStmt.getParent().getTypeName();
         TrivialCostModel costModel = new TrivialCostModel();
+
+        CompiledPlan plan = null;
+
+        if (qtype == QueryType.UPSERT) {
+            sql = "INSERT" + sql.substring(6);
+        }
+
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
-
-        CompiledPlan plan = null;
         try {
             planner.parse();
             plan = planner.plan();
@@ -114,6 +123,14 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(
                 "The statement's parameter count " + plan.parameters.length +
                 " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
+        }
+
+        if (qtype == QueryType.UPSERT) {
+            plan.rootPlanGraph = replaceInsertPlanNodeWithUpsert(plan.rootPlanGraph);
+            plan.subPlanGraph  = replaceInsertPlanNodeWithUpsert(plan.subPlanGraph);
+
+            // TODO(xin): more work to get formated explain plan
+            plan.explainedPlan = plan.explainedPlan.replace("INSERT", "UPSERT");
         }
 
         // Check order determinism before accessing the detail which it caches.
@@ -245,5 +262,32 @@ public abstract class StatementCompiler {
 
         // if nothing found, return false
         return false;
+    }
+
+    private static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
+        if (root == null) return null;
+
+        List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
+        if (inserts.size() == 1) {
+            InsertPlanNode insertNode = (InsertPlanNode)inserts.get(0);
+
+            UpsertPlanNode upsertNode = new UpsertPlanNode(insertNode);
+
+            assert(insertNode.getParentCount() <= 1);
+            if (insertNode == root) {
+                root = upsertNode;
+            } else {
+                AbstractPlanNode parent = insertNode.getParent(0);
+                parent.clearChildren();
+                parent.addAndLinkChild(upsertNode);
+            }
+
+            assert(insertNode.getChildCount() == 1);
+            AbstractPlanNode child = insertNode.getChild(0);
+            child.clearParents();
+            upsertNode.addAndLinkChild(child);
+        }
+
+        return root;
     }
 }

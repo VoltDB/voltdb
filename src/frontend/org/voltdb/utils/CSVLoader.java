@@ -37,6 +37,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a table.
@@ -112,8 +113,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     //Errors we keep track only upto maxerrors
     final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
     @Override
-    public boolean handleError(CSVLineWithMetaData metaData, String error)
-    {
+    public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
             //Dont collect more than we want to report.
             if (m_errorInfo.size() >= config.maxerrors) {
@@ -126,9 +126,19 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                 } else {
                     rawLine = metaData.rawLine.toString();
                 }
-                String[] info = {rawLine, error};
+                String infoStr = (response != null) ? response.getStatusString() : error;
+                String[] info = {rawLine, infoStr};
                 m_errorInfo.put(metaData.lineNumber, info);
+                if (response != null) {
+                    byte status = response.getStatus();
+                    if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                        System.out.println("Fatal Response from server for: " + response.getStatusString()
+                                + " for: " + rawLine);
+                        System.exit(1);
+                    }
+                }
             }
+
             return false;
         }
     }

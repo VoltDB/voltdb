@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -702,9 +703,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
-            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
-            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+        if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
+                m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX) ||
+                m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,
@@ -726,13 +727,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction +
-                asIndexed[ii] + " = " + m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+            result += conjunction + asIndexed[ii] + " = " +
+                    m_searchkeyExpressions.get(ii).explain(m_targetTableName);
             conjunction = ") AND (";
         }
         // last element
         result += conjunction +
-            asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
+                asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
                 m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
         return result;
     }

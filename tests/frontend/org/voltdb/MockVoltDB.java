@@ -240,7 +240,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, null, 0, 0, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, null, null, 0, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -372,7 +372,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, long deploymentCRC)
+            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

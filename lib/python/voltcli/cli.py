@@ -406,7 +406,7 @@ class CLIParser(ExtendedHelpOptionParser):
                         except ArgumentException, e:
                             exceptions.append(e)
                     iarg = len(args)
-                else:
+                elif len(args) > 0:
                     # All other arguments are treated as scalars.
                     # Pass through argument class get() for validation, conversion, etc..
                     try:
@@ -414,7 +414,7 @@ class CLIParser(ExtendedHelpOptionParser):
                     except ArgumentException, e:
                         exceptions.append(e)
                     iarg += 1
-                if value is not None:
+                if value is not None or arg.min_count == 0:
                     setattr(verb_opts, arg.name, value)
         # Run the gauntlet of error disclosure. Abort and display usage as appropriate.
         had_errors = 0
