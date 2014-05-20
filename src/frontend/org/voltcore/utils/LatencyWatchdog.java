@@ -1,7 +1,6 @@
 package org.voltcore.utils;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -12,17 +11,19 @@ public class LatencyWatchdog {
 
     private static final VoltLogger LOG = new VoltLogger("LatencyWatchdog");
 
-    private static volatile Map<Thread, Long> m_latencyMap = new HashMap<Thread, Long>();
+    private static ConcurrentHashMap<Thread, Long> m_latencyMap = new ConcurrentHashMap<Thread, Long>();
+
+    private static ConcurrentHashMap<Thread, Long> m_lastLogTime = new ConcurrentHashMap<Thread, Long>();
 
     private static ScheduledThreadPoolExecutor executor = CoreUtils.getScheduledThreadPoolExecutor("Latency Watchdog Executor", 10, CoreUtils.SMALL_STACK_SIZE);
 
-    public static final boolean m_enable = true;  /* Compiler will eliminate the code within its scope when turn off */
+    public static final boolean m_enable = true;  /* Compiler will eliminate the code within its scope when turn it off */
 
-    private static final long WATCHDOG_DELAY = 50;
+    private static final long WATCHDOG_THRESHOLD = 50;  /* millisecond */
 
-    private static final long MIN_LOG_INTERVAL = 5 * 1000; /* millisecond */
+    private static final long MIN_LOG_INTERVAL = 10 * 1000; /* millisecond */
 
-    private static volatile long m_lastLogTime = 0;
+
 
     public static boolean isEnable() {
         return m_enable;
@@ -45,16 +46,16 @@ public class LatencyWatchdog {
                 public synchronized void run() {
                     long timestamp = m_latencyMap.get(t);
                     long now = System.currentTimeMillis();
-                    if ((now - timestamp > WATCHDOG_DELAY) && (now - m_lastLogTime > MIN_LOG_INTERVAL) && t.getState() != Thread.State.TERMINATED ) {
+                    if ((now - timestamp > WATCHDOG_THRESHOLD) && (now - m_lastLogTime.get(t) > MIN_LOG_INTERVAL) && t.getState() != Thread.State.TERMINATED ) {
                         LOG.info(t.getName() + " has been delay for " + (now - timestamp) + " milliseconds" );
-                        m_lastLogTime = now;
+                        m_lastLogTime.put(t, now);
                         for (StackTraceElement ste : t.getStackTrace()) {
                             LOG.info(ste);
                         }
                     }
                 }
 
-            }, WATCHDOG_DELAY, WATCHDOG_DELAY, TimeUnit.MILLISECONDS);
+            }, WATCHDOG_THRESHOLD, WATCHDOG_THRESHOLD, TimeUnit.MILLISECONDS);
         }
     }
 
