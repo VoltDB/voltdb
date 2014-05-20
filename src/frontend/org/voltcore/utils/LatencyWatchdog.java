@@ -1,5 +1,6 @@
 package org.voltcore.utils;
 
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -14,6 +15,10 @@ public class LatencyWatchdog {
     static ScheduledThreadPoolExecutor executor = CoreUtils.getScheduledThreadPoolExecutor("Latency Watchdog Executor", 10, CoreUtils.SMALL_STACK_SIZE);
     static volatile long m_lastLogTime = 0;
 
+    public static boolean isEnable() {
+        return m_enable;
+    }
+
     static class WatchdogCallback implements Runnable {
         final Thread m_thread;
 
@@ -26,8 +31,8 @@ public class LatencyWatchdog {
             Thread.currentThread().setName("Latency Watchdog - " + m_thread.getName());
             long timestamp = m_latencyMap.get(m_thread);
             long now = System.currentTimeMillis();
-            if ((now - timestamp > WATCHDOG_DELAY) && (now - m_lastLogTime > MIN_LOG_INTERVAL)) {
-                System.out.printf("Thread [%s] has been delayed for %d milliseconds\n", m_thread.getName(), now - timestamp);
+            if ((now - timestamp > WATCHDOG_DELAY) && (now - m_lastLogTime > MIN_LOG_INTERVAL) && m_thread.getState() != Thread.State.TERMINATED ) {
+                System.out.printf("%s\tThread [%s] has been delayed for %d milliseconds\n", new Timestamp(now), m_thread.getName(), now - timestamp);
                 m_lastLogTime = now;
                 for (StackTraceElement ste : m_thread.getStackTrace()) {
                     System.out.println(ste);

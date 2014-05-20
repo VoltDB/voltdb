@@ -511,7 +511,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
-        LatencyWatchdog.pet(Thread.currentThread());
+        if (LatencyWatchdog.isEnable())
+            LatencyWatchdog.pet(Thread.currentThread());
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
@@ -521,7 +522,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
-                LatencyWatchdog.pet(Thread.currentThread());
+                if (LatencyWatchdog.isEnable())
+                    LatencyWatchdog.pet(Thread.currentThread());
                 if (m_rejoinState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_scheduler.take();

@@ -87,7 +87,6 @@ import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
@@ -291,7 +290,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
     @Override
     public void run() {
-        LatencyWatchdog.pet(Thread.currentThread());
         final ThreadLocalRandom r = ThreadLocalRandom.current();
         if (m_coreBindId != null) {
             // Remove Affinity for now to make this dependency dissapear from the client.
@@ -302,7 +300,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        LatencyWatchdog.pet(Thread.currentThread());
                         final int readyKeys = m_selector.select();
 
                         /*

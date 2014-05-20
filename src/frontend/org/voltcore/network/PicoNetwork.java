@@ -170,13 +170,17 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     @Override
     public void run() {
-        LatencyWatchdog.pet(Thread.currentThread());
+        if (LatencyWatchdog.isEnable())
+            LatencyWatchdog.pet(Thread.currentThread());
+
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
             m_ih.starting(this);
             m_ih.started(this);
             while (m_shouldStop == false) {
-                LatencyWatchdog.pet(Thread.currentThread());
+                if (LatencyWatchdog.isEnable())
+                    LatencyWatchdog.pet(Thread.currentThread());
+
                 //Choose a non-blocking select if things are busy
                 if (m_hadWork) {
                     m_selector.selectNow();
