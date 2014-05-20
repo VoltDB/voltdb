@@ -360,9 +360,10 @@ public class TestJDBCDriver {
             count++;
         }
         System.out.println("Procedure count is: " + count);
-        // 9 tables * 4 CRUD/table + 3 procedures +
-        // 4 tables * 3 for replicated crud
-        assertEquals(9 * 4 + 3 + 4 * 3, count);
+        // After adding .upsert stored procedure
+        // 9 tables * 5 CRUD/table + 3 procedures +
+        // 4 tables * 4 for replicated crud
+        assertEquals(9 * 5 + 3 + 4 * 4, count);
     }
 
     @Test
