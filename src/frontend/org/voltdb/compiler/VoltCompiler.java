@@ -535,7 +535,9 @@ public class VoltCompiler {
      * @param projectReader Reader for project file or null if a project file is not used.
      * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
      * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
-     * @return The InMemoryJarfile containing the compiled catalog if successful, null if not
+     * @return The InMemoryJarfile containing the compiled catalog if
+     * successful, null if not.  If the caller provided an InMemoryJarfile, the
+     * return value will be the same object, not a copy.
      */
     private InMemoryJarfile compileInternal(
             final VoltCompilerReader projectReader,
@@ -2437,14 +2439,12 @@ public class VoltCompiler {
      *
      * *NOTE*: Does *NOT* work with project.xml jarfiles.
      *
-     * @return true if successful, the compiled catalog is contained in the provided jarfile.
+     * @return the compiled catalog is contained in the provided jarfile.
      *
      */
-    public boolean compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
+    public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
-        boolean success = false;
-
-        // Gather DDL files for recompilation if not using a project file.
+        // Gather DDL files for recompilation
         List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
         Entry<String, byte[]> entry = jarfile.firstEntry();
         while (entry != null) {
@@ -2464,10 +2464,9 @@ public class VoltCompiler {
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
             InMemoryJarfile jarOut = compileInternal(null, ddlReaderList, jarfile);
-            success = (jarOut != null);
-            // Summarize the results to a file.
-            // Briefly log success or failure and mention the output text file.
-            if (success) {
+            // Trim the compiler output to try to provide a concise failure
+            // explanation
+            if (jarOut != null) {
                 compilerLog.debug("Successfully recompiled InMemoryJarfile");
             }
             else {
@@ -2487,7 +2486,6 @@ public class VoltCompiler {
             // Restore the original class loader
             m_classLoader = originalClassLoader;
         }
-        return success;
     }
 
     /**

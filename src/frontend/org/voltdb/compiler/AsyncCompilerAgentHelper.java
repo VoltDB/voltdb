@@ -34,7 +34,6 @@ import org.voltdb.utils.InMemoryJarfile;
 public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
-    private String m_errMsg = null;
 
     public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
@@ -63,11 +62,18 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
             if (work.adhocDDLStmts != null) {
-                newCatalogBytes = addDDLToCatalog(newCatalogBytes, work.adhocDDLStmts);
+                try {
+                    newCatalogBytes = addDDLToCatalog(newCatalogBytes, work.adhocDDLStmts);
+                }
+                catch (IOException ioe) {
+                    retval.errorMsg = ioe.getMessage();
+                    return retval;
+                }
                 if (newCatalogBytes == null) {
-                    AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(work, m_errMsg);
-                    work.completionHandler.onCompletion(errResult);
+                    // Shouldn't ever get here
+                    retval.errorMsg =
+                        "Unexpected failure in applying DDL statements to original catalog";
+                    return retval;
                 }
             }
         }
@@ -143,7 +149,12 @@ public class AsyncCompilerAgentHelper
         return retval;
     }
 
+    /**
+     * Append the supplied adhoc DDL to the current catalog's DDL and recompile the
+     * jarfile
+     */
     private byte[] addDDLToCatalog(byte[] oldCatalogBytes, String[] adhocDDLStmts)
+    throws IOException
     {
         VoltCompilerReader ddlReader = null;
         try {
@@ -162,14 +173,8 @@ public class AsyncCompilerAgentHelper
                 new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, sb.toString());
             ddlReader.putInJar(jarfile, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
             VoltCompiler compiler = new VoltCompiler();
-            boolean result = compiler.compileInMemoryJarfile(jarfile);
-            if (result) {
-                return jarfile.getFullJarBytes();
-            }
-        }
-        catch (IOException ioe) {
-            m_errMsg = ioe.getMessage();
-            return null;
+            compiler.compileInMemoryJarfile(jarfile);
+            return jarfile.getFullJarBytes();
         }
         finally {
             if (ddlReader != null) {
@@ -179,6 +184,5 @@ public class AsyncCompilerAgentHelper
                 catch (IOException ioe) {}
             }
         }
-        return null;
     }
 }
