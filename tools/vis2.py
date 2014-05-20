@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
-import numpy
+import numpy as np
 
 STATS_SERVER = 'volt2'
 
@@ -86,8 +86,8 @@ class Plot:
         plt.grid(True)
         self.fig.autofmt_xdate()
 
-    def plot(self, x, y, color, marker_shape, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
+    def plot(self, x, y, color, marker_shape, legend, linestyle):
+        self.ax.plot(x, y, linestyle, label=str(legend), color=color,
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
@@ -99,8 +99,8 @@ class Plot:
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).toordinal()))
+        plt.ylim((ymin-(ymax-ymin)*0.05, ymax+(ymax-ymin)*0.05))
+        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
@@ -121,6 +121,15 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
         datenum = matplotlib.dates.date2num(run['date'])
         plot_data[run['branch']][series].append((datenum,value))
 
+    if series == 'tppn' and run['branch'] == 'master':
+        z1 = plot_data[run['branch']][series]
+        z111 = sorted(z1, key=lambda x: x[0])
+        z2 = np.array(z111)
+        z2a = z2[:,0]
+        z3 = moving_average(z2[:,1], 10)
+        z4 = np.column_stack((z2a, z3))
+        plot_data['master-10dmvavg'] = {'tppn' : z4}
+
     if len(plot_data) == 0:
         return
 
@@ -130,8 +139,15 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
             if b not in mc:
-                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b)
+                if b == 'master-10dmvavg':
+                    mc[b] = (mc['master'][0], None)
+                else:
+                    mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
+            if b == 'master-10dmvavg':
+                linestyle=':'
+            else:
+                linestyle='-'
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, linestyle)
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
@@ -214,6 +230,26 @@ def generate_index_file(filenames):
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
     return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), ''.join(rows))
+
+def moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+
+    type is 'simple' | 'exponential'
+
+    """
+    x = np.asarray(x)
+    if type=='simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+
+    weights /= weights.sum()
+
+    a =  np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n-1] = None
+    return a
+
 
 def usage():
     print "Usage:"
