@@ -169,17 +169,17 @@ TEST_F(TableTupleExportTest, maxExportSerSize_tiny) {
     // + decimal
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(43, sz);
+    EXPECT_EQ(41, sz);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(57, sz); // length, 10 chars
+    EXPECT_EQ(55, sz); // length, 10 chars
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(81, sz); // length, 20 chars
+    EXPECT_EQ(79, sz); // length, 20 chars
 }
 
 /*
@@ -220,17 +220,17 @@ TEST_F(TableTupleExportTest, maxExportSerSize_withNulls) {
     // + decimal
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(43, sz);
+    EXPECT_EQ(41, sz);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(43, sz);
+    EXPECT_EQ(41, sz);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(43, sz);
+    EXPECT_EQ(41, sz);
 }
 
 // helper to make a schema, a tuple and serialize to a buffer
@@ -355,8 +355,8 @@ TableTupleExportTest::verSer(int cnt, char *data)
     }
     if (cnt-- >= 0)
     {
-        EXPECT_EQ(12, sin.readShort());
-        EXPECT_EQ(16, sin.readShort());
+        EXPECT_EQ(12, sin.readByte());
+        EXPECT_EQ(16, sin.readByte());
         int64_t low = sin.readLong();
         low = ntohll(low);
         int64_t high = sin.readLong();
@@ -446,21 +446,21 @@ TEST_F(TableTupleExportTest, serToExport)
     // + decimal
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(43, sz);  // length, radix pt, sign, prec.
+    EXPECT_EQ(41, sz);  // length, radix pt, sign, prec.
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(57, sz); // length, 10 chars
+    EXPECT_EQ(55, sz); // length, 10 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(81, sz); // length, 20 chars
+    EXPECT_EQ(79, sz); // length, 20 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 }

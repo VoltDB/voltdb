@@ -1960,9 +1960,9 @@ TEST_F(NValueTest, SerializeToExport)
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(20, out.position());
-    EXPECT_EQ(12, sin.readShort());//12 digit scale
-    EXPECT_EQ(16, sin.readShort());//16 bytes of precision
+    EXPECT_EQ(18, out.position());
+    EXPECT_EQ(12, sin.readByte());//12 digit scale
+    EXPECT_EQ(16, sin.readByte());//16 bytes of precision
     int64_t low = sin.readLong();
     low = ntohll(low);
     int64_t high = sin.readLong();

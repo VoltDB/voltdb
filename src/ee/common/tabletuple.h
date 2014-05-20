@@ -168,8 +168,8 @@ public:
                 break;
 
               case VALUE_TYPE_DECIMAL:
-                //2-byte scale, 2-byte precision, 16 bytes all the time right now
-                bytes += 20;
+                //1-byte scale, 1-byte precision, 16 bytes all the time right now
+                bytes += 18;
                 break;
 
               case VALUE_TYPE_VARCHAR:
