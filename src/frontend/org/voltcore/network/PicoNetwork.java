@@ -171,7 +171,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     @Override
     public void run() {
         if (LatencyWatchdog.isEnable())
-            LatencyWatchdog.pet(Thread.currentThread());
+            LatencyWatchdog.pet();
 
         m_verbotenThreads.add(Thread.currentThread().getId());
         try {
@@ -179,7 +179,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_ih.started(this);
             while (m_shouldStop == false) {
                 if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet(Thread.currentThread());
+                    LatencyWatchdog.pet();
 
                 //Choose a non-blocking select if things are busy
                 if (m_hadWork) {

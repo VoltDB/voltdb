@@ -21,6 +21,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
 /**
@@ -54,6 +55,8 @@ public class StreamSnapshotAckSender implements Runnable {
     @Override
     public void run() {
         while (true) {
+            if (LatencyWatchdog.isEnable())
+                LatencyWatchdog.pet();
             long hsId;
             RejoinDataAckMessage ackMsg;
             try {

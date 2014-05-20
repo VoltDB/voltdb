@@ -512,7 +512,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         if (LatencyWatchdog.isEnable())
-            LatencyWatchdog.pet(Thread.currentThread());
+            LatencyWatchdog.pet();
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
@@ -523,7 +523,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         try {
             while (m_shouldContinue) {
                 if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet(Thread.currentThread());
+                    LatencyWatchdog.pet();
                 if (m_rejoinState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_scheduler.take();

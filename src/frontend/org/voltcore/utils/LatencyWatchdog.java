@@ -42,10 +42,11 @@ public class LatencyWatchdog {
         }
     }
 
-    public static void pet(Thread t) {
+    public static void pet() {
         if (!m_enable)
             return;
 
+        Thread t = Thread.currentThread();
         if (m_latencyMap.containsKey(t)) {
             // feed it
             m_latencyMap.put(t, System.currentTimeMillis());
