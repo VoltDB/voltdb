@@ -100,18 +100,4 @@ public class SubqueryLeafNode extends JoinNode{
                                                       equivalenceSet);
         }
     }
-
-    @Override
-    public boolean isReplicatedInSubselects() {
-        if (m_subqueryScan.getIsReplicated()) {
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public boolean isReplicatedOutsideSubselects() {
-        return true;
-    }
-
 }

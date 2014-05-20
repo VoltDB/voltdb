@@ -29,6 +29,7 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -36,6 +37,7 @@ import org.voltdb.plannodes.SchemaColumn;
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
  */
 public class StmtSubqueryScan extends StmtTableScan {
+    public static final String subqueryTableName = "SYSTEM_SUBQUERY";
 
     // Sub-Query
     private final AbstractParsedStmt m_subquery;
@@ -43,6 +45,8 @@ public class StmtSubqueryScan extends StmtTableScan {
     private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
+
+    private PartitioningForStatement m_subqueriesPartitioning = null;
 
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
@@ -66,6 +70,71 @@ public class StmtSubqueryScan extends StmtTableScan {
             i++;
         }
 
+    }
+
+    public PartitioningForStatement getPartitioningForStatement() {
+        return m_subqueriesPartitioning;
+    }
+
+    public void setSubqueriesPartitioning(PartitioningForStatement subqueriesPartitioning) {
+        assert(subqueriesPartitioning != null);
+        m_subqueriesPartitioning = subqueriesPartitioning;
+
+        findPartitionColumns();
+    }
+
+    public TupleValueExpression upgradeTableNames(TupleValueExpression tve) {
+        if (tve == null) return null;
+
+        tve.setTableName(subqueryTableName);
+        tve.setTableAlias(m_tableAlias);
+        return tve;
+    }
+
+    private void addPartitioningColumns(List<SchemaColumn> partitioningColumns,
+            List<SchemaColumn> scols) {
+        if (scols == null) return;
+
+        // The partitioning columns have to be in its output column list
+        // in order to be referenced on parent level.
+        for (SchemaColumn scol: scols) {
+            for (SchemaColumn col: m_outputColumnList) {
+                if (!col.getTableName().equals(scol.getTableName())) {
+                    continue;
+                }
+                if (!scol.getColumnName().equals(scol.getColumnName())) {
+                    continue;
+                }
+                if (col.getExpression() instanceof TupleValueExpression == false) {
+                    // check more on expression
+                    continue;
+                }
+                scol.setTableName(subqueryTableName);
+                scol.setTableAlias(getTableAlias());
+
+                partitioningColumns.add(scol);
+                break;
+            }
+        }
+    }
+
+    @Override
+    public List<SchemaColumn> findPartitionColumns() {
+        // exported subquery partitioning column(s)
+        if (m_partitioningColumns != null)
+            return m_partitioningColumns;
+
+        m_partitioningColumns = new ArrayList<>();
+        assert(m_subqueriesPartitioning != null);
+
+        if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
+            for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
+                List<SchemaColumn> scols;
+                scols = tableScan.findPartitionColumns();
+                addPartitioningColumns(m_partitioningColumns, scols);
+            }
+        }
+        return m_partitioningColumns;
     }
 
     @Override
@@ -104,12 +173,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         return stmtTables;
-    }
-
-    @Override
-    public String getPartitionColumnName() {
-        //TODO: implement identification of exported subquery partitioning column(s)
-        return null;
     }
 
     static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();

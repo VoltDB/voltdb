@@ -53,11 +53,14 @@ public abstract class StmtTableScan {
         return m_scanColumnsList;
     }
 
+    // Partitioning column info
+    protected List<SchemaColumn> m_partitioningColumns = null;
+
+    abstract public List<SchemaColumn> findPartitionColumns();
+
     abstract public String getTableName();
 
     abstract public boolean getIsReplicated();
-
-    abstract public String getPartitionColumnName();
 
     abstract public List<Index> getIndexes();
 

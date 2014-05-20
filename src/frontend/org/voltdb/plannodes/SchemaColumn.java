@@ -164,9 +164,17 @@ public class SchemaColumn
         return m_tableName;
     }
 
+    public void setTableName(String tbName) {
+        m_tableName = tbName;
+    }
+
     public String getTableAlias()
     {
         return m_tableAlias;
+    }
+
+    public void setTableAlias(String tableAlias) {
+        m_tableAlias = tableAlias;
     }
 
     public String getColumnName()

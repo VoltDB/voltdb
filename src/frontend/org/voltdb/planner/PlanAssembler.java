@@ -614,9 +614,9 @@ public class PlanAssembler {
         if (subScanCanPushdown) {
             compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
         }
-
-        m_partitioning.addPartitioningFromSubquery(currentPartitioning);
+        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
+
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
                 compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
                 selector.m_planId);
@@ -669,14 +669,7 @@ public class PlanAssembler {
          * the one required send/receive pair is already in the plan below the
          * inner side of a NestLoop join.
          */
-
-        JoinNode jroot = m_parsedSelect.m_joinTree;
-
         if (m_partitioning.requiresTwoFragments()) {
-            if (!jroot.isReplicatedInSubselects() && !jroot.isReplicatedOutsideSubselects()) {
-                throw new PlanningErrorException("Subqueries from multiple partitioned table or join with partitioned table are not supported.");
-            }
-
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
@@ -1045,8 +1038,14 @@ public class PlanAssembler {
 
             // Hint that this statement can be executed SP.
             if (column.equals(m_partitioning.getColumn())) {
-                String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
-                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
+                TupleValueExpression partitionColumn = new TupleValueExpression(
+                        targetTable.getTypeName(), targetTable.getTypeName(), column.getTypeName(),
+                        column.getTypeName(), column.getIndex());
+                partitionColumn.setValueType(expr.getValueType());
+                partitionColumn.setValueSize(expr.getValueSize());
+                partitionColumn.setInBytes(expr.getInBytes());
+
+                m_partitioning.addPartitioningExpression(partitionColumn, expr);
             }
 
             expr.setInBytes(column.getInbytes());

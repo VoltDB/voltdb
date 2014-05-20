@@ -403,27 +403,4 @@ public class BranchNode extends JoinNode {
         }
         return false;
     }
-
-    @Override
-    public boolean isReplicatedInSubselects() {
-        if (m_leftNode != null && ! m_leftNode.isReplicatedInSubselects()) {
-            return false;
-        }
-        if (m_rightNode != null && ! m_rightNode.isReplicatedInSubselects()) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public boolean isReplicatedOutsideSubselects() {
-        if (m_leftNode != null && ! m_leftNode.isReplicatedOutsideSubselects()) {
-            return false;
-        }
-        if (m_rightNode != null && ! m_rightNode.isReplicatedOutsideSubselects()) {
-            return false;
-        }
-        return true;
-    }
-
 }
