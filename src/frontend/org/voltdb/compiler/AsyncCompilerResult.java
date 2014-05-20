@@ -30,6 +30,9 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
     public int expectedCatalogVersion = -1;
     transient public Object clientData = null;
 
+    /**
+     * Build an error response based on the provided work.
+     */
     public static AsyncCompilerResult makeErrorResult(AsyncCompilerWork work, String errMsg)
     {
         AsyncCompilerResult result = new AsyncCompilerResult();

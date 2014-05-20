@@ -51,7 +51,7 @@ public class AsyncCompilerAgentHelper
         CatalogContext context = VoltDB.instance().getCatalogContext();
         byte[] newCatalogBytes = work.catalogBytes;
         // Grab the current catalog bytes if the user didn't provide a catalog
-        // (deployment-only change)
+        // (deployment-only change or adhoc DDL)
         if (work.catalogBytes == null) {
             try {
                 newCatalogBytes = context.getCatalogJarBytes();
