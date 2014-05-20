@@ -161,7 +161,7 @@ public class AsyncCompilerAgent {
     {
         final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
         if (result.errorMsg != null) {
-            hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
+            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
         }
         // Log something useful about catalog upgrades when they occur.
         if (result instanceof CatalogChangeResult) {
