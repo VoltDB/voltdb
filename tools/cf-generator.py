@@ -2,6 +2,9 @@
 
 # This Python script generates AWS CloudFormation templates to start a VoltDB
 # cluster. Run the program without any arguments to see usage.
+#
+# For details on the CloudFormation template, you can check out the doc page at
+# http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
 
 from string import Template
 import sys
