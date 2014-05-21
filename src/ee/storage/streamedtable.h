@@ -30,12 +30,12 @@ namespace voltdb {
 // forward decl.
 class Topend;
 class ExecutorContext;
-class TupleStreamWrapper;
+class ExportTupleStream;
 
 /**
  * A streamed table does not store data. It may not be read. It may
  * not be updated. Only new appended writes are permitted. All writes
- * are passed through a TupleStreamWrapper to Export. The table exists
+ * are passed through a ExportTupleStream to Export. The table exists
  * only to support Export.
  */
 
@@ -122,7 +122,7 @@ private:
 
     voltdb::StreamedTableStats stats_;
     ExecutorContext *m_executorContext;
-    TupleStreamWrapper *m_wrapper;
+    ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
 };
 

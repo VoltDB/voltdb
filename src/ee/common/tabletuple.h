@@ -150,8 +150,17 @@ public:
             voltdb::ValueType columnType = columnInfo->getVoltType();
             switch (columnType) {
               case VALUE_TYPE_TINYINT:
+                  bytes += sizeof (int8_t);
+                  break;
+
               case VALUE_TYPE_SMALLINT:
+                  bytes += sizeof (int16_t);
+                  break;
+
               case VALUE_TYPE_INTEGER:
+                  bytes += sizeof (int32_t);
+                  break;
+
               case VALUE_TYPE_BIGINT:
               case VALUE_TYPE_TIMESTAMP:
               case VALUE_TYPE_DOUBLE:
@@ -159,9 +168,8 @@ public:
                 break;
 
               case VALUE_TYPE_DECIMAL:
-                // decimals serialized in ascii as
-                // 32 bits of length + max prec digits + radix pt + sign
-                bytes += sizeof (int32_t) + NValue::kMaxDecPrec + 1 + 1;
+                //1-byte scale, 1-byte precision, 16 bytes all the time right now
+                bytes += 18;
                 break;
 
               case VALUE_TYPE_VARCHAR:

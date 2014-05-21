@@ -32,7 +32,7 @@
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
 #include "storage/StreamBlock.h"
-#include "storage/TupleStreamWrapper.h"
+#include "storage/ExportTupleStream.h"
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
 #include "boost/smart_ptr.hpp"
@@ -46,12 +46,12 @@ const int COLUMN_COUNT = 5;
 // pre-computed this magic size for an Exported tuple of 5 integer
 // columns, which includes:
 // 5 Export header columns * sizeof(int64_t) = 40
-// 1 Export header column * sizeof(int64_t) = 8
+// 1 Export header column * sizeof(int8_t) = 1
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
 // sizeof(int32_t) for row header = 4
-// 5 * sizeof(int64_t) for tuple data = 40
-// total: 87
-const int MAGIC_TUPLE_SIZE = 94;
+// 5 * sizeof(int32_t) for tuple data = 40
+// total: 67
+const int MAGIC_TUPLE_SIZE = 67;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
 
@@ -106,9 +106,9 @@ public:
 
 };
 
-class TupleStreamWrapperTest : public Test {
+class ExportTupleStreamTest : public Test {
 public:
-    TupleStreamWrapperTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
+    ExportTupleStreamTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
         m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2)) {
         srand(0);
 
@@ -127,7 +127,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1);
+        m_wrapper = new ExportTupleStream(1, 1);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
@@ -153,10 +153,10 @@ public:
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
                                currentTxnId, 1, 1, 1, *m_tuple,
-                               TupleStreamWrapper::INSERT);
+                               ExportTupleStream::INSERT);
     }
 
-    virtual ~TupleStreamWrapperTest() {
+    virtual ~ExportTupleStreamTest() {
         delete m_wrapper;
         delete m_tuple;
         if (m_schema)
@@ -164,7 +164,7 @@ public:
     }
 
 protected:
-    TupleStreamWrapper* m_wrapper;
+    ExportTupleStream* m_wrapper;
     TupleSchema* m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
@@ -173,7 +173,7 @@ protected:
 };
 
 // Several of these cases were move to TestExportDataSource in Java
-// where some TupleStreamWrapper functionality now lives
+// where some ExportTupleStream functionality now lives
 // Cases of interest:
 // 1. periodicFlush with a clean buffer (no open txns) generates a new buffer
 //    DONE
@@ -228,7 +228,7 @@ protected:
 /**
  * Get one tuple
  */
-TEST_F(TupleStreamWrapperTest, DoOneTuple)
+TEST_F(ExportTupleStreamTest, DoOneTuple)
 {
 
     // write a new tuple and then flush the buffer
@@ -245,7 +245,7 @@ TEST_F(TupleStreamWrapperTest, DoOneTuple)
 /**
  * Test the really basic operation order
  */
-TEST_F(TupleStreamWrapperTest, BasicOps)
+TEST_F(ExportTupleStreamTest, BasicOps)
 {
 
     // verify the block count statistic.
@@ -264,7 +264,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
-    EXPECT_EQ( 1802, m_wrapper->allocatedByteCount());
+    EXPECT_EQ( 1289, m_wrapper->allocatedByteCount());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -288,7 +288,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
 /**
  * Verify that a periodicFlush with distant TXN IDs works properly
  */
-TEST_F(TupleStreamWrapperTest, FarFutureFlush)
+TEST_F(ExportTupleStreamTest, FarFutureFlush)
 {
     for (int i = 1; i < 10; i++)
     {
@@ -320,7 +320,7 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
 /**
  * Fill a buffer by appending tuples that advance the last committed TXN
  */
-TEST_F(TupleStreamWrapperTest, Fill) {
+TEST_F(ExportTupleStreamTest, Fill) {
 
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     // fill with just enough tuples to avoid exceeding buffer
@@ -346,7 +346,7 @@ TEST_F(TupleStreamWrapperTest, Fill) {
  * Fill a buffer with a single TXN, and then finally close it in the next
  * buffer.
  */
-TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
+TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
 
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     // fill with just enough tuples to avoid exceeding buffer
@@ -379,7 +379,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
  * Fill a buffer with a single TXN, and then finally close it in the next
  * buffer using periodicFlush
  */
-TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
+TEST_F(ExportTupleStreamTest, FillSingleTxnAndFlush) {
 
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     // fill with just enough tuples to avoid exceeding buffer
@@ -419,7 +419,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
  * the next buffer, and then roll back that tuple, and verify that our
  * committed buffer is still there.
  */
-TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
+TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
 
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     // fill with just enough tuples to avoid exceeding buffer
@@ -451,7 +451,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
  * Verify that several filled buffers all with one open transaction returns
  * nada.
  */
-TEST_F(TupleStreamWrapperTest, FillWithOneTxn) {
+TEST_F(ExportTupleStreamTest, FillWithOneTxn) {
 
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     // fill several buffers
@@ -468,7 +468,7 @@ TEST_F(TupleStreamWrapperTest, FillWithOneTxn) {
  * Simple rollback test, verify that we can rollback the first tuple,
  * append another tuple, and only get one tuple in the output buffer.
  */
-TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
+TEST_F(ExportTupleStreamTest, RollbackFirstTuple)
 {
 
     appendTuple(1, 2);
@@ -493,7 +493,7 @@ TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
  * a buffer can get rolled back and leave the committed transaction
  * untouched.
  */
-TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
+TEST_F(ExportTupleStreamTest, RollbackMiddleTuple)
 {
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
@@ -518,7 +518,7 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
  * Verify that a transaction can generate entire buffers, they can all
  * be rolled back, and the original committed bytes are untouched.
  */
-TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
+TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
 {
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)

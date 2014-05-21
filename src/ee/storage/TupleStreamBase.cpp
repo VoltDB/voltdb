@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage/TupleStreamWrapper.h"
+#include "storage/TupleStreamBase.h"
 
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -39,7 +39,7 @@ using namespace voltdb;
 const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
+TupleStreamBase::TupleStreamBase(CatalogId partitionId,
                                        int64_t siteId)
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
@@ -49,21 +49,20 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       // this allows initial ticks to succeed after rejoins
       m_openSpHandle(0),
       m_openTransactionUso(0),
-      m_committedSpHandle(0), m_committedUso(0),
-      m_signature(""), m_generation(0)
+      m_committedSpHandle(0), m_committedUso(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
 
 void
-TupleStreamWrapper::setDefaultCapacity(size_t capacity)
+TupleStreamBase::setDefaultCapacity(size_t capacity)
 {
     assert (capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {
         throwFatalException("setDefaultCapacity only callable before "
-                            "TupleStreamWrapper is used");
+                            "TupleStreamBase is used");
     }
     cleanupManagedBuffers();
     m_defaultCapacity = capacity;
@@ -75,7 +74,7 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
 /*
  * Essentially, shutdown.
  */
-void TupleStreamWrapper::cleanupManagedBuffers()
+void TupleStreamBase::cleanupManagedBuffers()
 {
     StreamBlock *sb = NULL;
 
@@ -89,47 +88,13 @@ void TupleStreamWrapper::cleanupManagedBuffers()
     }
 }
 
-
-void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_t generation) {
-    assert(generation > m_generation);
-    assert(signature == m_signature || m_signature == string(""));
-
-    //The first time through this is catalog load and m_generation will be 0
-    //Don't send the end of stream notice.
-    if (generation != m_generation && m_generation > 0) {
-        //Notify that no more data is coming from this generation.
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                false,
-                true);
-        /*
-         * With the new generational code the USO is reset to 0 for each
-         * generation. The sequence number stored on the table outside the wrapper
-         * is not reset and remains constant. USO is really just for transport purposes.
-         */
-        m_uso = 0;
-        m_openSpHandle = 0;
-        m_openTransactionUso = 0;
-        m_committedSpHandle = 0;
-        m_committedUso = 0;
-        //Reconstruct the next block so it has a USO of 0.
-        assert(m_currBlock->offset() == 0);
-        extendBufferChain(m_defaultCapacity);
-    }
-    m_signature = signature;
-    m_generation = generation;
-}
-
 /*
  * Handoff fully committed blocks to the top end.
  *
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, bool sync)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, bool sync)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -147,10 +112,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
         //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
         //m_committedSpHandle << ")" << std::endl;
         if (sync) {
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
+            pushExportBuffer(
                     NULL,
                     true,
                     false);
@@ -193,10 +155,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
+            pushExportBuffer(
                     block,
                     false,
                     false);
@@ -210,10 +169,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
     }
 
     if (sync) {
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
+        pushExportBuffer(
                 NULL,
                 true,
                 false);
@@ -224,7 +180,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamWrapper::rollbackTo(size_t mark)
+void TupleStreamBase::rollbackTo(size_t mark)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future.");
@@ -262,7 +218,7 @@ void TupleStreamWrapper::rollbackTo(size_t mark)
  * Correctly release and delete a managed buffer that won't
  * be handed off
  */
-void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
+void TupleStreamBase::discardBlock(StreamBlock *sb) {
     delete [] sb->rawPtr();
     delete sb;
 }
@@ -271,7 +227,7 @@ void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
  * Allocate another buffer, preserving the current buffer's content in
  * the pending queue.
  */
-void TupleStreamWrapper::extendBufferChain(size_t minLength)
+void TupleStreamBase::extendBufferChain(size_t minLength)
 {
     if (m_defaultCapacity < minLength) {
         // exportxxx: rollback instead?
@@ -284,8 +240,8 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
             {
                 //The block is handed off to the topend which is responsible for releasing the
                 //memory associated with the block data. The metadata is deleted here.
-                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                        m_generation, m_partitionId, m_signature, m_currBlock, false, false);
+                pushExportBuffer(
+                        m_currBlock, false, false);
                 delete m_currBlock;
             } else {
                 m_pendingBlocks.push_back(m_currBlock);
@@ -314,7 +270,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  * pending list for commit to operate against.
  */
 void
-TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
+TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                   int64_t lastCommittedSpHandle,
                                   int64_t currentSpHandle)
 {
@@ -336,108 +292,4 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
             commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
         }
     }
-}
-
-/*
- * If SpHandle represents a new transaction, commit previous data.
- * Always serialize the supplied tuple in to the stream.
- * Return m_uso before this invocation - this marks the point
- * in the stream the caller can rollback to if this append
- * should be rolled back.
- */
-size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
-                                       int64_t spHandle,
-                                       int64_t seqNo,
-                                       int64_t uniqueId,
-                                       int64_t timestamp,
-                                       TableTuple &tuple,
-                                       TupleStreamWrapper::Type type)
-{
-    size_t rowHeaderSz = 0;
-    size_t tupleMaxLength = 0;
-
-    // Transaction IDs for transactions applied to this tuple stream
-    // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
-    {
-        throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
-    }
-
-    commit(lastCommittedSpHandle, spHandle);
-
-    // Compute the upper bound on bytes required to serialize tuple.
-    // exportxxx: can memoize this calculation.
-    tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-    if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
-    }
-
-    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
-        extendBufferChain(tupleMaxLength);
-    }
-
-    // initialize the full row header to 0. This also
-    // has the effect of setting each column non-null.
-    ::memset(m_currBlock->mutableDataPtr(), 0, rowHeaderSz);
-
-    // the nullarray lives in rowheader after the 4 byte header length prefix
-    uint8_t *nullArray =
-      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
-
-    // position the serializer after the full rowheader
-    ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
-                             m_currBlock->remaining() - rowHeaderSz);
-
-    // write metadata columns
-    io.writeLong(spHandle);
-    io.writeLong(timestamp);
-    io.writeLong(seqNo);
-    io.writeLong(m_partitionId);
-    io.writeLong(m_siteId);
-
-    // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
-    io.writeLong((type == INSERT) ? 1L : 0L);
-
-    // write the tuple's data
-    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
-
-    // write the row size in to the row header
-    // rowlength does not include the 4 byte row header
-    // but does include the null array.
-    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
-    hdr.writeInt((int32_t)(io.position()) + (int32_t)rowHeaderSz - 4);
-
-    // update m_offset
-    m_currBlock->consumed(rowHeaderSz + io.position());
-
-    // update uso.
-    const size_t startingUso = m_uso;
-    m_uso += (rowHeaderSz + io.position());
-    return startingUso;
-}
-
-size_t
-TupleStreamWrapper::computeOffsets(TableTuple &tuple,
-                                   size_t *rowHeaderSz)
-{
-    // round-up columncount to next multiple of 8 and divide by 8
-    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
-    int nullMaskLength = ((columnCount + 7) & -8) >> 3;
-
-    // row header is 32-bit length of row plus null mask
-    *rowHeaderSz = sizeof (int32_t) + nullMaskLength;
-
-    // metadata column width: 5 int64_ts plus CHAR(1).
-    size_t metadataSz = (sizeof (int64_t) * 5) + 1;
-
-    // returns 0 if corrupt tuple detected
-    size_t dataSz = tuple.maxExportSerializationSize();
-    if (dataSz == 0) {
-        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
-    }
-
-    return *rowHeaderSz + metadataSz + dataSz;
 }

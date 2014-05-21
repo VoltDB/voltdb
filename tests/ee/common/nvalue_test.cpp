@@ -1821,66 +1821,66 @@ TEST_F(NValueTest, SerializeToExport)
     // tinyint
     nv = ValueFactory::getTinyIntValue(-50);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-50, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(-50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(0, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(50);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(50, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     // smallint
     nv = ValueFactory::getSmallIntValue(-128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-128, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(-128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(0, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     // int
     nv = ValueFactory::getIntegerValue(-4999999);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-4999999, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(-4999999, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(0, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(128, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
@@ -1960,32 +1960,16 @@ TEST_F(NValueTest, SerializeToExport)
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(24 + 4, out.position());
-    EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
-    EXPECT_EQ('-', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('7', sin.readChar());
-    EXPECT_EQ('8', sin.readChar());
-    EXPECT_EQ('9', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('.', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ(18, out.position());
+    EXPECT_EQ(12, sin.readByte());//12 digit scale
+    EXPECT_EQ(16, sin.readByte());//16 bytes of precision
+    int64_t low = sin.readLong();
+    low = ntohll(low);
+    int64_t high = sin.readLong();
+    high = ntohll(high);
+    TTInt val = ValuePeeker::peekDecimal(nv);
+    EXPECT_EQ(low, val.table[1]);
+    EXPECT_EQ(high, val.table[0]);
     sin.unread(out.position());
     out.position(0);
 }
