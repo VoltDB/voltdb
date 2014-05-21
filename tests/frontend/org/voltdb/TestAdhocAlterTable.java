@@ -30,17 +30,19 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
-    public void testBasicAlterTable() throws Exception
+    public void testBasicAddColumn() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(
-                "create table FOO ("+
-                "ID integer," +
-                "VAL bigint" +
-                ");"
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint pk_tree primary key (ID)" +
+                ");\n" +
+                "create procedure TestProc as select VAL from FOO;\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
@@ -56,11 +58,56 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             try {
                 m_client.callProcedure("@AdHoc",
-                        "alter table FOO add column newcol varchar(50);");
+                        "alter table FOO add column NEWCOL varchar(50);");
             }
             catch (ProcCallException pce) {
                 fail("Alter table to add column should have succeeded");
             }
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+            assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
+
+            // second time should fail
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50);");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Adding the same column twice should fail", threw);
+
+            // can't add another primary key
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column BADPK integer primary key;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to add a second primary key", threw);
+
+            // Can't add a not-null column with no default
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column BADNOTNULL integer not null;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to add a not null column without default", threw);
+
+            // but we're good with a default
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column GOODNOTNULL integer default 0 not null;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to add a column with not null and a default.");
+            }
+            assertTrue(verifyTableColumnType("FOO", "GOODNOTNULL", "INTEGER"));
         }
         finally {
             teardownSystem();

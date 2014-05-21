@@ -31,6 +31,8 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
+    // Add a test for partitioning a table
+
     public void testBasicCreateTable() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

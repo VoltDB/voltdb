@@ -67,8 +67,7 @@ public class AdhocDDLTestBase extends TestCase {
     }
 
 
-    protected boolean findTableInSystemCatalogResults(String table)
-        throws NoConnectionsException, IOException, ProcCallException
+    protected boolean findTableInSystemCatalogResults(String table) throws Exception
     {
         VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         boolean found = false;
@@ -83,8 +82,7 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
-    protected boolean findIndexInSystemCatalogResults(String index)
-        throws NoConnectionsException, IOException, ProcCallException
+    protected boolean findIndexInSystemCatalogResults(String index) throws Exception
     {
         VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
         boolean found = false;
@@ -97,5 +95,43 @@ public class AdhocDDLTestBase extends TestCase {
             }
         }
         return found;
+    }
+
+    protected boolean verifyTableColumnType(String table, String column, String type)
+        throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean verified = false;
+        columns.resetRowPosition();
+        while (columns.advanceRow()) {
+            String thiscolumn = columns.getString("COLUMN_NAME");
+            String thistable = columns.getString("TABLE_NAME");
+            String thistype = columns.getString("TYPE_NAME");
+            if (thistable.equalsIgnoreCase(table) && thiscolumn.equalsIgnoreCase(column) &&
+                thistype.equalsIgnoreCase(type)) {
+                verified = true;
+                break;
+            }
+        }
+        return verified;
+    }
+
+    protected boolean verifyTableColumnSize(String table, String column, int size)
+        throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean verified = false;
+        columns.resetRowPosition();
+        while (columns.advanceRow()) {
+            String thiscolumn = columns.getString("COLUMN_NAME");
+            String thistable = columns.getString("TABLE_NAME");
+            int thissize = (int)columns.getLong("COLUMN_SIZE");
+            if (thistable.equalsIgnoreCase(table) && thiscolumn.equalsIgnoreCase(column) &&
+                thissize == size) {
+                verified = true;
+                break;
+            }
+        }
+        return verified;
     }
 }
