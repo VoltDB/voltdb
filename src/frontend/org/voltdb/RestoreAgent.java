@@ -1252,7 +1252,7 @@ SnapshotCompletionInterest
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
                     m_zk.create(VoltZK.request_truncation_snapshot_node, null,
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
                 } catch (Exception e) {
                     VoltDB.crashGlobalVoltDB("Requesting a truncation snapshot " +
                                              "via ZK should always succeed",

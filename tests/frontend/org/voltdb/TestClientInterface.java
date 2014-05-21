@@ -554,7 +554,7 @@ public class TestClientInterface {
             m_ci.handleRead(msg, m_handler, m_cxn);
             // Verify that the truncation request node was created.
             verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
-                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT_SEQUENTIAL));
         }
         finally {
             logConfig.setEnabled(wasEnabled);
