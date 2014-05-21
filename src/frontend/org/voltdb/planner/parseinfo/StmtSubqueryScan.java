@@ -40,8 +40,6 @@ import org.voltdb.plannodes.SchemaColumn;
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
  */
 public class StmtSubqueryScan extends StmtTableScan {
-    public static final String subqueryTableName = "SYSTEM_SUBQUERY";
-
     // Sub-Query
     private final AbstractParsedStmt m_subquery;
     private ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
@@ -92,23 +90,31 @@ public class StmtSubqueryScan extends StmtTableScan {
 
         // The partitioning columns have to be in its output column list
         // in order to be referenced on parent level.
-        for (SchemaColumn scol: scols) {
-            for (SchemaColumn col: m_outputColumnList) {
-                if (!col.getTableName().equals(scol.getTableName())) {
-                    continue;
-                }
-                if (!scol.getColumnName().equals(scol.getColumnName())) {
-                    continue;
-                }
-                if (col.getExpression() instanceof TupleValueExpression == false) {
-                    // check more on expression
-                    continue;
-                }
-                scol.setTableName(subqueryTableName);
-                scol.setTableAlias(m_tableAlias);
+        for (SchemaColumn partitionCol: scols) {
+            boolean existsInDisplayList = false;
+            for (SchemaColumn outputCol: m_outputColumnList) {
+                // Find whether the partition column is in output column list
+                if (outputCol.getTableName().equals(partitionCol.getTableName()) &&
+                    outputCol.getColumnName().equals(partitionCol.getColumnName()) &&
+                    outputCol.getExpression() instanceof TupleValueExpression )
+                {
+                    existsInDisplayList = true;
 
-                partitioningColumns.add(scol);
-                break;
+                    String colNameForParentQuery = outputCol.getColumnAlias();
+                    partitionCol.reset(m_tableAlias, m_tableAlias,
+                                       colNameForParentQuery, colNameForParentQuery);
+
+                    partitioningColumns.add(partitionCol);
+                    break;
+                }
+            }
+            // single partition sub-query case can be single partition without
+            // including partition column in its display column list
+            if (! existsInDisplayList && ! m_subqueriesPartitioning.requiresTwoFragments()) {
+                String colNameForParentQuery = partitionCol.getColumnName();
+                partitionCol.reset(m_tableAlias, m_tableAlias,
+                        colNameForParentQuery, colNameForParentQuery);
+                partitioningColumns.add(partitionCol);
             }
         }
     }
@@ -124,11 +130,15 @@ public class StmtSubqueryScan extends StmtTableScan {
             Set< Set<AbstractExpression> > eqSets) {
         PartitioningForStatement pStmt = getPartitioningForStatement();
 
-        if (!pStmt.requiresTwoFragments()) {
+
+        if (pStmt.getCountOfPartitionedTables() > 0 && !pStmt.requiresTwoFragments() ) {
+            // this sub-query is single partitioned query on partitioned tables
+            // promoting the single partition express up the its parent level
+
             AbstractExpression spExpr = pStmt.singlePartitioningExpression();
             TupleValueExpression tveKey = pStmt.getPartitionColumn();
             assert(tveKey != null);
-            tveKey.setTableName(subqueryTableName);
+            tveKey.setTableName(m_tableAlias);
             tveKey.setTableAlias(m_tableAlias);
 
             // (Xin): If it changes valueEquivalence, we have to update eqSets

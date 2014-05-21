@@ -522,14 +522,40 @@ public class TestSubQueries extends PlannerTestCase {
         AbstractPlanNode pn;
         List<AbstractPlanNode> planNodes;
 
-        pn = compileForSinglePartition("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1");
-        System.out.println(pn.toExplainPlanString());
+        //
+        // Single partition detection : single table
+        //
+        planNodes = compileToFragments("select A FROM (SELECT A FROM P1 WHERE A = 3) T1 ");
+        assertEquals(1, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A" );
+        checkSeqScanSubSelects(pn, "T1",  "A");
+        pn = pn.getChild(0);
+        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A");
+        assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
+        assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+
+        planNodes = compileToFragments("select A, C FROM (SELECT A, C FROM P1 WHERE A = 3) T1 ");
+        assertEquals(1, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1",  "A", "C");
         pn = pn.getChild(0);
         checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
+        assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
+        assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
+        // Single partition query without selecting partition column from sub-query
+        planNodes = compileToFragments("select C FROM (SELECT A, C FROM P1 WHERE A = 3) T1 ");
+        assertEquals(1, planNodes.size());
+        planNodes = compileToFragments("select C FROM (SELECT C FROM P1 WHERE A = 3) T1 ");
+        assertEquals(1, planNodes.size());
+
+        //
         // AdHoc multiple partitioned sub-select queries.
+        //
         planNodes = compileToFragments("select A, C FROM (SELECT A, C FROM P1) T1 ");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
@@ -557,31 +583,11 @@ public class TestSubQueries extends PlannerTestCase {
         checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
 
 
-        // Single partition detection : single table
-        // Multiple joins are in Join tests.
-        planNodes = compileToFragments("select A FROM (SELECT A FROM P1 WHERE A = 3) T1 ");
-        assertEquals(1, planNodes.size());
-        pn = planNodes.get(0);
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A");
-        pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A");
-        assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
-        assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+        // Partitioned Joined tests
 
-        planNodes = compileToFragments("select A, C FROM (SELECT A, C FROM P1 WHERE A = 3) T1 ");
-        assertEquals(1, planNodes.size());
-        pn = planNodes.get(0);
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "C");
-        pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
-        assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
-        assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
-
+        //
         // Group by
+        //
         planNodes = compileToFragments("select C, SD FROM " +
                 "(SELECT C, SUM(D) as SD FROM P1 GROUP BY C) T1 ");
         assertEquals(2, planNodes.size());
@@ -603,8 +609,9 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, C, SUM(D) as SD FROM P1 WHERE A = 3 GROUP BY A, C) T1, R1 WHERE T1.C = R1.C ");
         assertEquals(1, planNodes.size());
 
-
+        //
         // Limit
+        //
         planNodes = compileToFragments("select C FROM (SELECT C FROM P1 WHERE A > 3 ORDER BY C LIMIT 5) T1 ");
         assertEquals(2, planNodes.size());
 
@@ -612,19 +619,28 @@ public class TestSubQueries extends PlannerTestCase {
                 "R1 WHERE T1.C > R1.C ");
         assertEquals(2, planNodes.size());
 
-        planNodes = compileToFragments("select C FROM (SELECT C FROM P1 WHERE A = 3 ORDER BY C LIMIT 5) T1 ");
+        planNodes = compileToFragments("select C FROM (SELECT A, C FROM P1 WHERE A = 3 ORDER BY C LIMIT 5) T1 ");
+        assertEquals(1, planNodes.size());
+        // Without selecting partition column from sub-query
+        planNodes = compileToFragments(("select C FROM (SELECT C FROM P1 WHERE A = 3 ORDER BY C LIMIT 5) T1 "));
         assertEquals(1, planNodes.size());
 
+        planNodes = compileToFragments("select T1.C FROM (SELECT A, C FROM P1 WHERE A = 3 ORDER BY C LIMIT 5) T1, " +
+                "R1 WHERE T1.C > R1.C ");
+        assertEquals(1, planNodes.size());
+        // Without selecting partition column from sub-query
         planNodes = compileToFragments("select T1.C FROM (SELECT C FROM P1 WHERE A = 3 ORDER BY C LIMIT 5) T1, " +
                 "R1 WHERE T1.C > R1.C ");
         assertEquals(1, planNodes.size());
 
-
+        //
         // Group by & LIMIT 5
+        //
         planNodes = compileToFragments("select C, SD FROM " +
                 "(SELECT C, SUM(D) as SD FROM P1 GROUP BY C ORDER BY C LIMIT 5) T1 ");
         assertEquals(2, planNodes.size());
 
+        // Without selecting partition column from sub-query
         planNodes = compileToFragments("select C, SD FROM " +
                 "(SELECT C, SUM(D) as SD FROM P1 WHERE A = 3 GROUP BY C ORDER BY C LIMIT 5) T1 ");
         assertEquals(1, planNodes.size());
@@ -714,6 +730,28 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, D D2 FROM P2 WHERE A=2) T2");
         assertEquals(1, planNodes.size());
 
+
+        planNodes = compileToFragments("select D1, D2 FROM " +
+                "(SELECT A, D D1 FROM P1 WHERE A=2) T1, " +
+                "(SELECT A, D D2 FROM P2) T2 where T2.A = 2");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments("select D1, D2 FROM " +
+                "(SELECT A, D D1 FROM P1) T1, " +
+                "(SELECT A, D D2 FROM P2 WHERE A=2) T2 where T1.A = 2");
+        assertEquals(1, planNodes.size());
+
+
+        // partitioned column renaming tests
+        planNodes = compileToFragments("select D1, D2 FROM " +
+                "(SELECT A A1, D D1 FROM P1) T1, " +
+                "(SELECT A, D D2 FROM P2 WHERE A=2) T2 where T1.A1 = 2");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments("select D1, D2 FROM " +
+                "(SELECT A, D D1 FROM P1 WHERE A=2) T1, " +
+                "(SELECT A A2, D D2 FROM P2 ) T2 where T2.A2 = 2");
+        assertEquals(1, planNodes.size());
     }
 
     public void testPartitionedAlias() {
@@ -724,17 +762,14 @@ public class TestSubQueries extends PlannerTestCase {
 
     public void testTry() {
         List<AbstractPlanNode> planNodes;
+//        planNodes = compileToFragments("select A1, A2, D1, D2 " +
+//                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
+//                "(SELECT A A2, D D2 FROM P2) T2 where T2.A2=2");
 
-//        planNodes = compileToFragments("select A FROM (SELECT A FROM P1 WHERE A = 3) T1 ");
-//        planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1 where P1.A = 3) T1 where T1.A = P2.A ");
-//        for (AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
-
-        planNodes = compileToFragments("select A1, A2, D1, D2 " +
-                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
-                "(SELECT A A2, D D2 FROM P2 WHERE A=2) T2");
+        planNodes = compileToFragments("SELECT * FROM P2, (SELECT A, C FROM P1 where P1.A = 3) T1 " +
+                "where T1.A = P2.A ");
 
         for (AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
-
     }
 
     public void testUnsupportedCases() {
