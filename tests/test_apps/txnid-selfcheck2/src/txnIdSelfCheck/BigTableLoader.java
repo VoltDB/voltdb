@@ -49,6 +49,7 @@ public class BigTableLoader extends Thread {
     final String tableName;
     final int rowSize;
     final int batchSize;
+    final int partitionCount;
     final Random r = new Random(0);
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final Semaphore m_permits;
@@ -57,7 +58,7 @@ public class BigTableLoader extends Thread {
     long rowsLoaded = 0;
     long nTruncates = 0;
 
-    BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize, Semaphore permits) {
+    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
         setName("BigTableLoader");
         setDaemon(true);
 
@@ -69,11 +70,11 @@ public class BigTableLoader extends Thread {
         m_permits = permits;
         if (tableName == "bigp")
             this.truncateProcedure += r.nextInt(10) == 0 ? "MP" : "SP";
+        this.partitionCount = partitionCount;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
-
-        log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount);
+        log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
     }
 
     long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
@@ -83,6 +84,8 @@ public class BigTableLoader extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        log.info("BigTableLoader " + tableName + " shutdown: inserts tried " + insertsTried + " rows loaded " + rowsLoaded +
+                    " truncates " + nTruncates);
         this.interrupt();
     }
 
@@ -129,17 +132,30 @@ public class BigTableLoader extends Thread {
             try {
                 currentRowCount = getRowCount();
                 // insert some batches...
-                int tc = batchSize * r.nextInt(99);
-                while ((currentRowCount < tc) && (m_shouldContinue.get())) {
+                while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
-                        long p = Math.abs(r.nextLong());
-                        m_permits.acquire();
+                        long p = Math.abs((long)(r.nextGaussian() * this.partitionCount));
+                        try {
+                            m_permits.acquire();
+                        } catch (InterruptedException e) {
+                            if (!m_shouldContinue.get()) {
+                                return;
+                            }
+                            log.error("BigTableLoader thread interrupted while waiting for permit.", e);
+                        }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
-                    latch.await(10, TimeUnit.SECONDS);
+                    try {
+                        latch.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        if (!m_shouldContinue.get()) {
+                            return;
+                        }
+                        log.error("BigTableLoader thread interrupted while waiting.", e);
+                    }
                     long nextRowCount = getRowCount();
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
@@ -147,9 +163,12 @@ public class BigTableLoader extends Thread {
                     }
                     currentRowCount = nextRowCount;
                 }
-
+                break;
             }
             catch (Exception e) {
+                if ( e instanceof InterruptedIOException && ! m_shouldContinue.get()) {
+                    continue;
+                }
                 // on exception, log and end the thread, but don't kill the process
                 log.error("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
                 try { Thread.sleep(3000); } catch (Exception e2) {}

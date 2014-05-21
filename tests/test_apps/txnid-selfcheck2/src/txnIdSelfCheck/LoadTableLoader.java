@@ -82,7 +82,7 @@ public class LoadTableLoader extends Thread {
     final BlockingQueue<Long> cpDelQueue = new LinkedBlockingQueue<Long>();
     final BlockingQueue<Long> onlyDelQueue = new LinkedBlockingQueue<Long>();
 
-    LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
+    LoadTableLoader(Client client, String tableName, long targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
         setName("LoadTableLoader-" + tableName);
         setDaemon(true);

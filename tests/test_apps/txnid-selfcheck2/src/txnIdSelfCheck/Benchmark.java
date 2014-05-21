@@ -138,10 +138,10 @@ public class Benchmark {
         int fillerrowsize = 5128;
 
         @Option(desc = "Target data size for the filler replicated table (at each site).")
-        int replfillerrowmb = 32;
+        long replfillerrowmb = 32;
 
         @Option(desc = "Target data size for the partitioned filler table.")
-        int partfillerrowmb = 128;
+        long partfillerrowmb = 128;
 
         @Option(desc = "Timeout that kills the client if progress is not made.")
         int progresstimeout = 120;
@@ -415,6 +415,27 @@ public class Benchmark {
         }
     }
 
+    private int getUniquePartitionCount() throws Exception {
+        int partitionCount = -1;
+        ClientResponse cr = client.callProcedure("@Statistics", "PARTITIONCOUNT");
+
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            log.error("Failed to call Statistics proc at startup. Exiting.");
+            log.error(((ClientResponseImpl) cr).toJSONString());
+            printJStack();
+            System.exit(-1);
+        }
+
+        VoltTable t = cr.getResults()[0];
+        partitionCount = (int) t.fetchRow(0).getLong(3);
+        log.info("unique partition count is " + partitionCount);
+        if (partitionCount <= 0) {
+            log.error("partition count is zero");
+            System.exit(-1);
+        }
+        return partitionCount;
+    }
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -437,6 +458,9 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
+
+        // get partition count
+        int partitionCount = getUniquePartitionCount();
 
         // get stats
         try {
@@ -465,6 +489,21 @@ public class Benchmark {
         }
 
         log.info(HORIZONTAL_RULE);
+        log.info("Loading Filler Tables...");
+        log.info(HORIZONTAL_RULE);
+
+        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
+        partitionedLoader.start();
+        BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
+        replicatedLoader.start();
+
+        // wait for the filler tables to load up
+        //partitionedLoader.join();
+        //replicatedLoader.join();
+
+        log.info(HORIZONTAL_RULE);
         log.info("Starting Benchmark");
         log.info(HORIZONTAL_RULE);
 
@@ -484,12 +523,6 @@ public class Benchmark {
             System.out.println("Wait for hashinator..");
         }
 
-        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
-        partitionedLoader.start();
-        BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
-        replicatedLoader.start();
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
