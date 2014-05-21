@@ -27,6 +27,7 @@ package org.voltdb;
 import java.io.IOException;
 
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
@@ -41,10 +42,35 @@ public class AdhocDDLTestBase extends TestCase {
     //adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
     //adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
 
-    protected boolean findTableInSystemCatalogResults(Client client, String table)
+    protected ServerThread m_localServer;
+    protected Client m_client;
+
+    protected void startSystem(VoltDB.Configuration config) throws Exception
+    {
+        m_localServer = new ServerThread(config);
+        m_localServer.start();
+        m_localServer.waitForInitialization();
+        m_client = ClientFactory.createClient();
+        m_client.createConnection("localhost");
+    }
+
+    protected void teardownSystem() throws Exception
+    {
+        if (m_client != null) { m_client.close(); }
+        m_client = null;
+
+        if (m_localServer != null) {
+            m_localServer.shutdown();
+            m_localServer.join();
+        }
+        m_localServer = null;
+    }
+
+
+    protected boolean findTableInSystemCatalogResults(String table)
         throws NoConnectionsException, IOException, ProcCallException
     {
-        VoltTable tables = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+        VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         boolean found = false;
         tables.resetRowPosition();
         while (tables.advanceRow()) {
@@ -57,10 +83,10 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
-    protected boolean findIndexInSystemCatalogResults(Client client, String index)
+    protected boolean findIndexInSystemCatalogResults(String index)
         throws NoConnectionsException, IOException, ProcCallException
     {
-        VoltTable indexinfo = client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
+        VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
         boolean found = false;
         indexinfo.resetRowPosition();
         while (indexinfo.advanceRow()) {

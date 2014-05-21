@@ -24,8 +24,6 @@
 package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -68,48 +66,40 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
-        ServerThread localServer = new ServerThread(config);
-
-        Client client = null;
 
         try {
-            localServer.start();
-            localServer.waitForInitialization();
-
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-
+            startSystem(config);
             // Check basic drop of partitioned table that should work.
-            ClientResponse resp = client.callProcedure("@SystemCatalog", "TABLES");
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "DROPME"));
+            assertTrue(findTableInSystemCatalogResults("DROPME"));
             try {
-                client.callProcedure("@AdHoc", "drop table DROPME;");
+                m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
             catch (ProcCallException pce) {
                 fail("drop table should have succeeded");
             }
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertFalse(findTableInSystemCatalogResults(client, "DROPME"));
+            assertFalse(findTableInSystemCatalogResults("DROPME"));
             // Check basic drop of replicated table that should work.
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "DROPME_R"));
+            assertTrue(findTableInSystemCatalogResults("DROPME_R"));
             try {
-                client.callProcedure("@AdHoc", "drop table DROPME_R;");
+                m_client.callProcedure("@AdHoc", "drop table DROPME_R;");
             }
             catch (ProcCallException pce) {
                 fail("drop table should have succeeded");
             }
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertFalse(findTableInSystemCatalogResults(client, "DROPME_R"));
+            assertFalse(findTableInSystemCatalogResults("DROPME_R"));
 
             // Verify dropping a table that doesn't exist fails
             boolean threw = false;
             try {
-                client.callProcedure("@AdHoc", "drop table DROPME;");
+                m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage().contains("object not found: DROPME"));
@@ -120,7 +110,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             // Verify dropping a table that doesn't exist is fine with IF EXISTS
             threw = false;
             try {
-                client.callProcedure("@AdHoc", "drop table DROPME IF EXISTS;");
+                m_client.callProcedure("@AdHoc", "drop table DROPME IF EXISTS;");
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -128,17 +118,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             assertFalse("Dropping bad table with IF EXISTS should not have failed", threw);
         }
         finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
+            teardownSystem();
         }
     }
 
@@ -168,44 +148,36 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
-        ServerThread localServer = new ServerThread(config);
-
-        Client client = null;
 
         try {
-            localServer.start();
-            localServer.waitForInitialization();
-
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-
+            startSystem(config);
             // Check basic drop of table with an index on it
-            ClientResponse resp = client.callProcedure("@SystemCatalog", "TABLES");
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "DROPME"));
-            resp = client.callProcedure("@SystemCatalog", "INDEXINFO");
+            assertTrue(findTableInSystemCatalogResults("DROPME"));
+            resp = m_client.callProcedure("@SystemCatalog", "INDEXINFO");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findIndexInSystemCatalogResults(client, "PKEY_IDX"));
+            assertTrue(findIndexInSystemCatalogResults("PKEY_IDX"));
             try {
-                client.callProcedure("@AdHoc", "drop table DROPME;");
+                m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
             catch (ProcCallException pce) {
                 fail("drop table should have succeeded");
             }
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertFalse(findTableInSystemCatalogResults(client, "DROPME"));
-            resp = client.callProcedure("@SystemCatalog", "INDEXINFO");
+            assertFalse(findTableInSystemCatalogResults("DROPME"));
+            resp = m_client.callProcedure("@SystemCatalog", "INDEXINFO");
             System.out.println(resp.getResults()[0]);
-            assertFalse(findIndexInSystemCatalogResults(client, "PKEY_IDX"));
+            assertFalse(findIndexInSystemCatalogResults("PKEY_IDX"));
 
             // Verify that we can't drop a table that a procedure depends on
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "BLAH"));
+            assertTrue(findTableInSystemCatalogResults("BLAH"));
             boolean threw = false;
             try {
-                client.callProcedure("@AdHoc", "drop table BLAH;");
+                m_client.callProcedure("@AdHoc", "drop table BLAH;");
             }
             catch (ProcCallException pce) {
                 // The error message is really confusing for this case, not sure
@@ -214,22 +186,12 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 threw = true;
             }
             assertTrue("Shouldn't be able to drop a table used in a procedure", threw);
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "BLAH"));
+            assertTrue(findTableInSystemCatalogResults("BLAH"));
         }
         finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
+            teardownSystem();
         }
     }
 }

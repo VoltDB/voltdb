@@ -24,8 +24,6 @@
 package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -45,17 +43,8 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             "create table BLAH (" +
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID));\n" +
-            "create table DROPME (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID))\n;" +
-            "create table DROPME_R (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
             "PRIMARY KEY(ID));");
         builder.addPartitionInfo("BLAH", "ID");
-        builder.addPartitionInfo("DROPME", "ID");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -63,22 +52,16 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
-        ServerThread localServer = new ServerThread(config);
-
-        Client client = null;
 
         try {
-            localServer.start();
-            localServer.waitForInitialization();
-
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
+            startSystem(config);
 
             // Check basic drop of partitioned table that should work.
-            ClientResponse resp = client.callProcedure("@SystemCatalog", "TABLES");
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("FOO"));
             System.out.println(resp.getResults()[0]);
             try {
-                client.callProcedure("@AdHoc",
+                m_client.callProcedure("@AdHoc",
                         "create table FOO (\n" +
                         "ID int default 0 not null,\n" +
                         "VAL varchar(32 bytes)\n" +
@@ -87,22 +70,12 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             catch (ProcCallException pce) {
                 fail("create table should have succeeded");
             }
-            resp = client.callProcedure("@SystemCatalog", "TABLES");
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
-            assertTrue(findTableInSystemCatalogResults(client, "FOO"));
+            assertTrue(findTableInSystemCatalogResults("FOO"));
         }
         finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
+            teardownSystem();
         }
     }
 
