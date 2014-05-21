@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.utils.CompressionService;
@@ -92,8 +91,6 @@ implements Runnable {
 
         try {
             while (true) {
-                if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet();
                 BBContainer container = null;
                 BBContainer compressionBufferC = null;
                 ByteBuffer compressionBuffer = null;

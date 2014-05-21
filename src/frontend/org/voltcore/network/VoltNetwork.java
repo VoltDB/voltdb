@@ -87,7 +87,6 @@ import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
-import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
 /** Produces work for registered ports that are selected for read, write */
@@ -175,8 +174,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         Callable<Connection> registerTask = new Callable<Connection>() {
             @Override
             public Connection call() throws Exception {
-                if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet();
                 final VoltPort port =
                         new VoltPort(
                                 VoltNetwork.this,
@@ -277,8 +274,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             m_tasks.offer(new Runnable() {
                 @Override
                 public void run() {
-                    if (LatencyWatchdog.isEnable())
-                        LatencyWatchdog.pet();
                     callPort(port);
                 }
             });
@@ -286,8 +281,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             m_tasks.offer(new Runnable() {
                 @Override
                 public void run() {
-                    if (LatencyWatchdog.isEnable())
-                        LatencyWatchdog.pet();
                     installInterests(port);
                 }
             });
@@ -306,8 +299,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         try {
             while (m_shouldStop == false) {
                 try {
-                    if (LatencyWatchdog.isEnable())
-                        LatencyWatchdog.pet();
                     while (m_shouldStop == false) {
                         final int readyKeys = m_selector.select();
 
@@ -533,8 +524,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         Callable<Map<Long, Pair<String, long[]>>> task = new Callable<Map<Long, Pair<String, long[]>>>() {
             @Override
             public Map<Long, Pair<String, long[]>> call() throws Exception {
-                if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet();
                 return getIOStatsImpl(interval);
             }
         };

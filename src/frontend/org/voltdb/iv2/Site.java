@@ -34,7 +34,6 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -511,8 +510,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
-        if (LatencyWatchdog.isEnable())
-            LatencyWatchdog.pet();
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
@@ -522,8 +519,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
-                if (LatencyWatchdog.isEnable())
-                    LatencyWatchdog.pet();
                 if (m_rejoinState == kStateRunning) {
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_scheduler.take();
