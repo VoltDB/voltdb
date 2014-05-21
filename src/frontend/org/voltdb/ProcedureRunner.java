@@ -757,7 +757,7 @@ public class ProcedureRunner {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId,
+            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle,
                              clusterName, databaseName,
                              tableName, data, returnUniqueViolations, false);
         }
@@ -1400,6 +1400,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
            m_isReadOnly);

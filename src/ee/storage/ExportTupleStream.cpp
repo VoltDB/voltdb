@@ -41,7 +41,8 @@ const int MAX_BUFFER_AGE = 4000;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
-    : TupleStreamBase(partitionId, siteId),
+    : TupleStreamBase(),
+      m_partitionId(partitionId), m_siteId(siteId),
       m_signature(""), m_generation(0)
 {}
 

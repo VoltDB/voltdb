@@ -93,6 +93,7 @@ class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
 class PersistentTable;
 class TableCatalogDelegate;
+class DRTupleStream;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -146,6 +147,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
+    void DRRollback(size_t drMark);
 
 private:
 
@@ -432,7 +434,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn,  DRTupleStream *drStream, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -563,6 +565,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
+
+    //Output stream for DR
+    DRTupleStream *m_drStream;
+
+    //Cache config info, is this a materialized view
+    bool m_isMaterialized;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -737,6 +745,13 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     assert(m_table.m_schema != NULL);
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
+}
+
+inline void
+PersistentTableSurgeon::DRRollback(size_t drMark) {
+    if (!m_table.m_isMaterialized) {
+            m_table.m_drStream->rollbackTo(drMark);
+    }
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

@@ -318,6 +318,7 @@ CTX.INPUT['storage'] = """
  TempTableLimits.cpp
  TupleStreamBase.cpp
  ExportTupleStream.cpp
+ DRTupleStream.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp

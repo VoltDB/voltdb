@@ -97,6 +97,8 @@ public:
         receivedExportBuffer = true;
     }
 
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {}
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;

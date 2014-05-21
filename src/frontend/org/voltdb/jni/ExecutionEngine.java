@@ -431,6 +431,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            long txnId,
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
@@ -445,7 +446,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_logDuration = 1000;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -462,6 +463,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
                                                             Object[] parameterSets,
+                                                            long txnId,
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
@@ -473,7 +475,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public long getThreadLocalPoolAllocations();
 
     abstract public byte[] loadTable(
-        int tableId, VoltTable table, long spHandle,
+        int tableId, VoltTable table, long txnId, long spHandle,
         long lastCommittedSpHandle, boolean returnUniqueViolations,
         long undoToken) throws EEException;
 
@@ -667,7 +669,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
      * @param undoToken The undo token to release
      */
-    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
+    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
             long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
 
     /**
@@ -682,6 +684,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
+            long txnId,
             long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
 
     /**

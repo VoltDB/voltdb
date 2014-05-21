@@ -112,6 +112,7 @@ namespace voltdb
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;
+        friend class DRTupleStream;
     };
 }
 

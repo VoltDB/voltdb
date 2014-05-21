@@ -66,6 +66,7 @@ class TempTableLimits;
 class TableColumn;
 class TableIndex;
 class ExecutorContext;
+class DRTupleStream;
 
 class TableFactory {
 public:
@@ -80,6 +81,8 @@ public:
         const std::string &name,
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
+        DRTupleStream *drStream,
+        bool tableIsMaterialized = false,
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,

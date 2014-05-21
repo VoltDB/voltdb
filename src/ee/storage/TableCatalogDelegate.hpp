@@ -33,6 +33,7 @@ class PersistentTable;
 class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
+class DRTupleStream;
 
 // There might be a better place for this, but current callers happen to have this header in common.
 template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
@@ -59,11 +60,13 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     // table specific
     int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+             catalog::Table const &catalogTable,
+             DRTupleStream *drStream);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
-                             std::map<std::string, CatalogDelegate*> const &tablesByName);
+                             std::map<std::string, CatalogDelegate*> const &tablesByName,
+                             DRTupleStream *drStream);
 
     static void migrateChangedTuples(catalog::Table const &catalogTable,
                                      voltdb::PersistentTable* existingTable,
@@ -107,7 +110,8 @@ class TableCatalogDelegate : public CatalogDelegate {
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                             catalog::Table const &catalogTable,
-                                            const int32_t compactionThreshold);
+                                            const int32_t compactionThreshold,
+                                            DRTupleStream *drStream);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

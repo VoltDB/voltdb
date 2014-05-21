@@ -39,10 +39,8 @@ using namespace voltdb;
 const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(CatalogId partitionId,
-                                       int64_t siteId)
-    : m_partitionId(partitionId), m_siteId(siteId),
-      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+TupleStreamBase::TupleStreamBase()
+    : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids

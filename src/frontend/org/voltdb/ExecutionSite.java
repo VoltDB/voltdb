@@ -1010,6 +1010,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public byte[] loadTable(
             long txnId,
+            long spHandle,
             String clusterName,
             String databaseName,
             String tableName,
@@ -1031,7 +1032,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
+        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, undo);
     }
 
     /**
@@ -1040,11 +1041,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      * @param table
      */
     @Override
-    public byte[] loadTable(long txnId, int tableId,
+    public byte[] loadTable(long txnId, long spHandle, int tableId,
             VoltTable data, boolean returnUniqueViolations,
             boolean undo) {
         return ee.loadTable(tableId, data,
                      txnId,
+                     spHandle,
                      lastCommittedTxnId,
                      returnUniqueViolations,
                      undo ? getNextUndoToken() : Long.MAX_VALUE);
@@ -1056,7 +1058,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            long txnId,//txnid is both sphandle and uniqueid pre-iv2
+            long txnId,
+            long spHandle,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
             boolean readOnly) throws EEException
     {
@@ -1065,6 +1068,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             planFragmentIds,
             inputDepIds,
             parameterSets,
+            txnId,
             txnId,
             lastCommittedTxnId,
             txnIdAsUniqueId,

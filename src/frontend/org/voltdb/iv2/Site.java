@@ -755,7 +755,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
             String tableName, VoltTable data,
             boolean returnUniqueViolations, boolean undo) throws VoltAbortException
     {
@@ -772,16 +772,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
+        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, undo);
     }
 
     @Override
-    public byte[] loadTable(long spHandle, int tableId,
+    public byte[] loadTable(long txnId, long spHandle, int tableId,
             VoltTable data, boolean returnUniqueViolations,
             boolean undo)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
-        return m_ee.loadTable(tableId, data,
+        return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 returnUniqueViolations,
@@ -1079,6 +1079,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            long txnId,
                                             long spHandle,
                                             long uniqueId,
                                             boolean readOnly)
@@ -1089,6 +1090,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
+                txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,

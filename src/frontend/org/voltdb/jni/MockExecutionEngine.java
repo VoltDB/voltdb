@@ -25,7 +25,12 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.*;
+import org.voltdb.ParameterSet;
+import org.voltdb.StatsSelector;
+import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 
@@ -44,6 +49,7 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -127,7 +133,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
         final long lastCommittedTxnId, boolean returnUniqueViolations, long undoToken)
     throws EEException
     {

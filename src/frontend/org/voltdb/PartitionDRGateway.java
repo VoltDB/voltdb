@@ -19,7 +19,9 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 
+import org.voltcore.utils.DBBPool;
 import org.voltdb.licensetool.LicenseApi;
 
 /**
@@ -90,4 +92,8 @@ public class PartitionDRGateway {
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
     public void tick(long txnId) {}
+
+    public static void pushExportBuffer(int partitionId, ByteBuffer buf) {
+        DBBPool.wrapBB(buf).discard();
+    }
 }

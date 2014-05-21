@@ -72,6 +72,10 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
+    // cached catalog values
+    const CatalogId m_partitionId;
+    const int64_t m_siteId;
+
     std::string m_signature;
     int64_t m_generation;
 };

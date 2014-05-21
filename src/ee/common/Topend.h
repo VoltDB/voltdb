@@ -56,6 +56,8 @@ class Topend {
             bool sync,
             bool endOfStream) = 0;
 
+    virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
     virtual ~Topend()
     {

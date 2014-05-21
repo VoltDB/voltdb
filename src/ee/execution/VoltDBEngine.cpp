@@ -217,6 +217,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             hostname,
                                             hostId);
 
+    m_drStream.configure(partitionId);
+
     return true;
 }
 
@@ -317,6 +319,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
                                        int64_t intputDependencyIds[],
                                        ReferenceSerializeInput &serialize_in,
+                                       int64_t txnId,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
@@ -348,6 +351,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 intputDependencyIds ? intputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_staticParams,
+                                txnId,
                                 spHandle,
                                 lastCommittedSpHandle,
                                 uniqueId,
@@ -371,6 +375,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
                                       const NValueArray &params,
+                                      int64_t txnId,
                                       int64_t spHandle,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
@@ -407,6 +412,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     // configure the execution context.
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
                                              uniqueId);
@@ -596,7 +602,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
  *
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
- * deleteChildCommand() interface.
+ * deleteChildCommand() intrface.
  *
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
@@ -719,7 +725,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                                                                  m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(*m_database, *catalogTable) != 0) {
+            if (tcd->init(*m_database, *catalogTable, &m_drStream) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -780,7 +786,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
-                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
+                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, &m_drStream);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
@@ -983,7 +989,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t spHandle, int64_t lastCommittedSpHandle,
+                        int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         bool returnUniqueViolations)
 {
     //Not going to thread the unique id through.
@@ -991,6 +997,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     //since their only purpose as of writing this (1/2013) they are only used
     //for export data and we don't technically support loading into an export table
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
                                              spHandle,
                                              -1,
                                              lastCommittedSpHandle);
@@ -1292,6 +1299,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
+    m_drStream.periodicFlush(timeInMillis, lastCommittedSpHandle, m_executorContext->currentSpHandle());
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
@@ -1301,6 +1309,7 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
+    m_drStream.periodicFlush(-1L, lastCommittedSpHandle, m_executorContext->currentSpHandle());
 }
 
 string VoltDBEngine::debug(void) const {

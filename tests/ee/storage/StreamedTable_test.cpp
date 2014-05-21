@@ -87,6 +87,8 @@ class MockTopend : public Topend {
 
     }
 
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {}
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
@@ -140,7 +142,7 @@ public:
         m_quantum->release();
         m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
+        m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0);
     }
 
     virtual ~StreamedTableTest() {

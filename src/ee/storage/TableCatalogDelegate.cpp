@@ -238,7 +238,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                                        catalog::Table const &catalogTable,
-                                                       const int32_t compactionThreshold)
+                                                       const int32_t compactionThreshold,
+                                                       DRTupleStream *drStream)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -359,10 +360,11 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool tableIsMaterialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames,
+                                                    schema, columnNames, drStream, tableIsMaterialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
@@ -389,11 +391,13 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
 int
 TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
-                           catalog::Table const &catalogTable)
+                           catalog::Table const &catalogTable,
+                           DRTupleStream *drStream)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable,
-                                        m_compactionThreshold);
+                                        m_compactionThreshold,
+                                        drStream);
     if (!m_table) {
         return false; // mixing ints and booleans here :(
     }
@@ -461,14 +465,15 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
                                            catalog::Table const &catalogTable,
-                                           std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                                           std::map<std::string, CatalogDelegate*> const &delegatesByName,
+                                           DRTupleStream *drStream)
 {
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////
 
     PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold));
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold, drStream));
     assert(newTable);
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 

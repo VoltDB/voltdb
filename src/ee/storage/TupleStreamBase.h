@@ -37,7 +37,7 @@ const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FO
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(CatalogId partitionId, int64_t siteId);
+    TupleStreamBase();
 
     virtual ~TupleStreamBase() {
         cleanupManagedBuffers();
@@ -56,17 +56,10 @@ public:
      */
     void setDefaultCapacity(size_t capacity);
 
-    /** Read the total bytes used over the life of the stream */
-    size_t bytesUsed() {
-        return m_uso;
-    }
-
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
-    virtual int64_t allocatedByteCount() const = 0;
-
     /** truncate stream back to mark */
-    void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark);
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
@@ -78,10 +71,6 @@ public:
 
     /** Send committed data to the top end */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, bool sync = false);
-
-    // cached catalog values
-    const CatalogId m_partitionId;
-    const int64_t m_siteId;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
