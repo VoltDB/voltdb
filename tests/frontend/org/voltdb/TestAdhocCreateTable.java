@@ -31,6 +31,49 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
+    public void testBasicCreateTable() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            assertFalse(findTableInSystemCatalogResults("FOO"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table FOO (ID int default 0, VAL varchar(64 bytes));");
+            }
+            catch (ProcCallException pce) {
+                fail("create table should have succeeded");
+            }
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+            // make sure we can't create the same table twice
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table FOO (ID int default 0, VAL varchar(64 bytes));");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't have been able to create table FOO twice.", threw);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
     // Test creating a table when we feed a statement containing newlines.
     // I honestly didn't expect this to work yet --izzy
     public void testMultiLineCreateTable() throws Exception {
@@ -39,12 +82,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
-            "create table BLAH (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID));");
-        builder.addPartitionInfo("BLAH", "ID");
+        builder.addLiteralSchema("--dont care");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
