@@ -34,7 +34,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestAdhocDDL extends TestCase {
+public class TestAdhocDropTable extends TestCase {
 
             //adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
             //adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
