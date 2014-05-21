@@ -337,10 +337,14 @@ public class ProcedureRunner {
                         error = true;
                     }
                     if (ex instanceof Error) {
-                        m_statsCollector.endProcedure(false, true, null, null);
-                        throw (Error)ex;
+                        if (!(ex instanceof NoClassDefFoundError || ex instanceof UnsatisfiedLinkError)) {
+                            // If the stored procedure attempted to do something other than linklibraray or instantiate
+                            // a missing object that results in an error, throw the error and let the server deal with
+                            // the condition as best as it can (usually a crashGlobalVoltDB).
+                            m_statsCollector.endProcedure(false, true, null, null);
+                            throw (Error)ex;
+                        }
                     }
-
                     retval = getErrorResponse(ex);
                 }
             }

@@ -53,6 +53,7 @@ public class LocalCluster implements VoltServerConfig {
         ONE_RECOVERING
     }
 
+    public static final String clusterHostIdProperty = "__VOLTDB_CLUSTER_HOSTID__";
     VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
@@ -364,7 +365,7 @@ public class LocalCluster implements VoltServerConfig {
         m_compiled = false;
     }
 
-    void startLocalServer(boolean clearLocalDataDirectories) {
+    void startLocalServer(int hostId, boolean clearLocalDataDirectories) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         if (clearLocalDataDirectories) {
@@ -380,6 +381,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
@@ -519,7 +521,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create the in-process server instance.
         if (m_hasLocalServer) {
-            startLocalServer(clearLocalDataDirectories);
+            startLocalServer(oopStartIndex, clearLocalDataDirectories);
             ++oopStartIndex;
         }
 
@@ -614,6 +616,7 @@ public class LocalCluster implements VoltServerConfig {
     {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
