@@ -93,7 +93,7 @@ public class PartitionDRGateway {
                                    ClientResponseImpl response) {}
     public void tick(long txnId) {}
 
-    public static void pushExportBuffer(int partitionId, ByteBuffer buf) {
+    public static void pushDRBuffer(int partitionId, ByteBuffer buf) {
         DBBPool.wrapBB(buf).discard();
     }
 }
