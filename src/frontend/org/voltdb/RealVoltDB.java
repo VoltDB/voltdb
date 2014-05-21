@@ -2183,7 +2183,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
                 if (m_rejoinTruncationReqId == null) {
                     m_rejoinTruncationReqId = requestNode;
                 }
@@ -2342,7 +2342,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         assert(m_rejoinDataPending == false);
 
         if (m_rejoining) {
-            if (requestId.compareTo(m_rejoinTruncationReqId) <= 0) {
+            if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
@@ -2354,7 +2354,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 try {
                     final ZooKeeper zk = m_messenger.getZK();
                     String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
                     if (m_rejoinTruncationReqId == null) {
                         m_rejoinTruncationReqId = requestNode;
                     }
