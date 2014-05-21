@@ -482,9 +482,14 @@ class ConstantGenerator(BaseGenerator):
         for i in self.__value_generator.generate_values(COUNT):
             if i == None:
                 i = u"NULL"
-            elif IS_VOLT and self.__type == "timestamp":
-                # convert millis to micros when relying on VoltDB's int-to-timestamp conversion.
-                i = i * 1000
+	    elif self.__type == "timestamp":
+		r = random.uniform(-3000000000, 1800000000)
+		ts = datetime.datetime.fromtimestamp(r)
+		i = ts.isoformat(' ')
+		if ts.microsecond == 0:
+		    i += '.000000'
+		i = i[:-3]+'000'
+                i = u"'%s'" % (i)
             elif isinstance(i, basestring):
                 i = u"'%s'" % (i)
             elif isinstance(i, float):
