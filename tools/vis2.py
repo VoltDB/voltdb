@@ -87,7 +87,7 @@ class Plot:
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend, linestyle):
-        self.ax.plot(x, y, linestyle, label=str(legend), color=color,
+        self.ax.plot(x, y, linestyle, label=legend, color=color,
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
@@ -121,15 +121,6 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
         datenum = matplotlib.dates.date2num(run['date'])
         plot_data[run['branch']][series].append((datenum,value))
 
-    if series == 'tppn' and run['branch'] == 'master':
-        z1 = plot_data[run['branch']][series]
-        z111 = sorted(z1, key=lambda x: x[0])
-        z2 = np.array(z111)
-        z2a = z2[:,0]
-        z3 = moving_average(z2[:,1], 10)
-        z4 = np.column_stack((z2a, z3))
-        plot_data['master-10dmvavg'] = {'tppn' : z4}
-
     if len(plot_data) == 0:
         return
 
@@ -139,15 +130,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
             if b not in mc:
-                if b == 'master-10dmvavg':
-                    mc[b] = (mc['master'][0], None)
-                else:
-                    mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            if b == 'master-10dmvavg':
-                linestyle=':'
-            else:
-                linestyle='-'
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, linestyle)
+                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
+
+            if len(u[0]) > 10:
+                pl.plot(u[0], moving_average(u[1], 10), mc[b][0], None, None, ":")
+
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
