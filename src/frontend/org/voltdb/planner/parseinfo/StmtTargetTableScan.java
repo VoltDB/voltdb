@@ -83,12 +83,13 @@ public class StmtTargetTableScan extends StmtTableScan {
         String tbName = m_table.getTypeName();
         String colName = partitionCol.getTypeName();
 
-        TupleValueExpression tve = new TupleValueExpression(tbName, tbName, colName, colName, partitionCol.getIndex());
+        TupleValueExpression tve = new TupleValueExpression(
+                tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
         tve.setValueSize(partitionCol.getSize());
         tve.setValueType(VoltType.get((byte)partitionCol.getType()));
         tve.setInBytes(partitionCol.getInbytes());
 
-        SchemaColumn scol = new SchemaColumn(tbName, tbName, colName, colName, tve);
+        SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
         m_partitioningColumns = new ArrayList<SchemaColumn>();
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;

@@ -19,10 +19,13 @@ package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
@@ -83,14 +86,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         findPartitionColumns();
     }
 
-    public TupleValueExpression upgradeTableNames(TupleValueExpression tve) {
-        if (tve == null) return null;
-
-        tve.setTableName(subqueryTableName);
-        tve.setTableAlias(m_tableAlias);
-        return tve;
-    }
-
     private void addPartitioningColumns(List<SchemaColumn> partitioningColumns,
             List<SchemaColumn> scols) {
         if (scols == null) return;
@@ -110,12 +105,72 @@ public class StmtSubqueryScan extends StmtTableScan {
                     continue;
                 }
                 scol.setTableName(subqueryTableName);
-                scol.setTableAlias(getTableAlias());
+                scol.setTableAlias(m_tableAlias);
 
                 partitioningColumns.add(scol);
                 break;
             }
         }
+    }
+
+    /**
+     * upgrade single partitioning expression to parent level
+     * add the info to equality sets and input value equivalence
+     * @param valueEquivalence
+     * @param eqSets
+     */
+    public void promoteSinglePartitionInfo(
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
+            Set< Set<AbstractExpression> > eqSets) {
+        PartitioningForStatement pStmt = getPartitioningForStatement();
+
+        if (!pStmt.requiresTwoFragments()) {
+            AbstractExpression spExpr = pStmt.singlePartitioningExpression();
+            TupleValueExpression tveKey = pStmt.getPartitionColumn();
+            assert(tveKey != null);
+            tveKey.setTableName(subqueryTableName);
+            tveKey.setTableAlias(m_tableAlias);
+
+            // (Xin): If it changes valueEquivalence, we have to update eqSets
+            // Because HashSet stored a legacy hashcode for the object.
+            // This puzzels me at first time.
+            if (valueEquivalence.containsKey(tveKey)) {
+                Set<AbstractExpression> values = valueEquivalence.get(tveKey);
+                boolean hasLegacyValues = false;
+                if (eqSets.contains(values)) {
+                    eqSets.remove(values);
+                    hasLegacyValues = true;
+                }
+                values.add(spExpr);
+                if (hasLegacyValues) {
+                    eqSets.add(values);
+                }
+
+                if (!valueEquivalence.containsKey(spExpr)) {
+                    valueEquivalence.put(spExpr, values);
+                }
+            } else if (valueEquivalence.containsKey(spExpr)) {
+                Set<AbstractExpression> values = valueEquivalence.get(spExpr);
+                boolean hasLegacyValues = false;
+                if (eqSets.contains(values)) {
+                    eqSets.remove(values);
+                    hasLegacyValues = true;
+                }
+                values.add(tveKey);
+                if (hasLegacyValues) {
+                    eqSets.add(values);
+                }
+                valueEquivalence.put(tveKey, values);
+            } else {
+                Set<AbstractExpression> values = new HashSet<AbstractExpression>();
+                values.add(spExpr);
+                values.add(tveKey);
+
+                valueEquivalence.put(spExpr, values);
+                valueEquivalence.put(tveKey, values);
+            }
+        }
+
     }
 
     @Override

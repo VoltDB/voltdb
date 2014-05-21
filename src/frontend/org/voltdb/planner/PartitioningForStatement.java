@@ -346,38 +346,10 @@ public class PartitioningForStatement implements Cloneable{
 
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
-                PartitioningForStatement pStmt = subScan.getPartitioningForStatement();
-
-                if (!pStmt.requiresTwoFragments()) {
-                    AbstractExpression spExpr = pStmt.singlePartitioningExpression();
-                    TupleValueExpression pColumn = pStmt.getPartitionColumn();
-
-                    // upgrade single partitioning expression to parent level
-                    TupleValueExpression tveKey = subScan.upgradeTableNames(pColumn);
-                    if (valueEquivalence.containsKey(tveKey)) {
-                        Set<AbstractExpression> values = valueEquivalence.get(tveKey);
-                        values.add(spExpr);
-
-                        if (!valueEquivalence.containsKey(spExpr)) {
-                            valueEquivalence.put(spExpr, values);
-                        }
-                    } else if (valueEquivalence.containsKey(spExpr)) {
-                        Set<AbstractExpression> values = valueEquivalence.get(spExpr);
-                        values.add(tveKey);
-                        valueEquivalence.put(tveKey, values);
-                    } else {
-                        Set<AbstractExpression> values = new HashSet<AbstractExpression>();
-                        values.add(spExpr);
-                        values.add(tveKey);
-
-                        valueEquivalence.put(spExpr, values);
-                        valueEquivalence.put(tveKey, values);
-                    }
-                }
+                subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
             }
 
             boolean unfiltered = true;
-
             for (AbstractExpression candidateColumn : valueEquivalence.keySet()) {
                 if ( ! (candidateColumn instanceof TupleValueExpression)) {
                     continue;
@@ -390,8 +362,7 @@ public class PartitioningForStatement implements Cloneable{
                 if (tokenPartitionKey == null) {
                     tokenPartitionKey = candidatePartitionKey;
                 }
-                Set<AbstractExpression> eqValues = valueEquivalence.get(candidatePartitionKey);
-                eqSets.add(eqValues);
+                eqSets.add(valueEquivalence.get(candidatePartitionKey));
             }
 
             if (unfiltered) {
