@@ -33,7 +33,6 @@ from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
 
 COUNT = 2                       # number of random values to generate by default
-IS_VOLT = False
 ALLOW_SELF_JOIN = True
 
 def field_name_generator():
@@ -768,10 +767,7 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, subversion_generation, is_volt):
-        global IS_VOLT
-        IS_VOLT = is_volt
-
+    def __init__(self, catalog, template, subversion_generation):
         self.__subversion_generation = subversion_generation
         # Reset the counters
         IdGenerator.initialize(0)

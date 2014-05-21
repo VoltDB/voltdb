@@ -191,7 +191,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation, True)
+    generator = SQLGenerator(config["schema"], template, subversion_generation)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -218,16 +218,16 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     # for timestamp (microsec vs. millisec), so we have to use different
     # template file for regression test, since all the statements are not
     # generated in this case.
-    if "template-hsqldb" in config:
-        template = config["template-hsqldb"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation, False)
-    counter = 0
+    #if "template-hsqldb" in config:
+    #    template = config["template-hsqldb"]
+    #generator = SQLGenerator(config["schema"], template, subversion_generation)
+    #counter = 0
 
-    statements_file = open(statements_path, "wb")
-    for i in generator.generate():
-        cPickle.dump({"id": counter, "SQL": i}, statements_file)
-        counter += 1
-    statements_file.close()
+    #statements_file = open(statements_path, "wb")
+    #for i in generator.generate():
+    #    cPickle.dump({"id": counter, "SQL": i}, statements_file)
+    #    counter += 1
+    #statements_file.close()
 
     if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
