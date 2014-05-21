@@ -490,6 +490,9 @@ public class VoltCompiler {
         if (diffCmds != null && !diffCmds.equals("")) {
             VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
+        else {
+            Log.info("Catalog verification completed successfuly.");
+        }
     }
 
     /**

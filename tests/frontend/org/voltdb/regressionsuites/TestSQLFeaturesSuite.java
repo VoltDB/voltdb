@@ -631,14 +631,14 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
+//        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
             // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
             project.addProcedures(PROCEDURES);
             project.addStmtProcedure("SelectRightOrder",
                     "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
             project.addStmtProcedure("SelectWrongOrder",
                     "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
-        }
+//        }
 
         boolean success;
 
