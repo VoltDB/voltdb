@@ -421,17 +421,19 @@ void JNITopend::pushExportBuffer(
 }
 
 void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
-    jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
-    if (buffer == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+    if (block != NULL) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        //std::cout << "Block is length " << block->rawLength() << std::endl;
+        m_jniEnv->CallStaticVoidMethod(
+                m_partitionDRGatewayClass,
+                m_pushDRBufferMID,
+                partitionId,
+                buffer);
+        m_jniEnv->DeleteLocalRef(buffer);
     }
-    //std::cout << "Block is length " << block->rawLength() << std::endl;
-    m_jniEnv->CallStaticVoidMethod(
-            m_partitionDRGatewayClass,
-            m_pushDRBufferMID,
-            partitionId,
-            buffer);
-    m_jniEnv->DeleteLocalRef(buffer);
 }
 }
