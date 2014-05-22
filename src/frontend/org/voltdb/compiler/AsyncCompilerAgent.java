@@ -34,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -108,26 +109,37 @@ public class AsyncCompilerAgent {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-            final AsyncCompilerResult result = compileAdHocPlan(w);
-            w.completionHandler.onCompletion(result);
+            // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+            // This is not currently robust to comment, multi-line statments,
+            // multiple statements on a line, etc.
+            Boolean hasDDL = null;
+            for (String stmt : w.sqlStatements) {
+                String ddlToken = SQLLexer.extractDDLToken(stmt);
+                if (hasDDL == null) {
+                    hasDDL = (ddlToken != null) ? true : false;
+                }
+                else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null))
+                {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "DDL mixed with DML and queries is unsupported.");
+                    // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+            }
+            if (!hasDDL) {
+                final AsyncCompilerResult result = compileAdHocPlan(w);
+                w.completionHandler.onCompletion(result);
+            }
+            else {
+                final CatalogChangeWork ccw = new CatalogChangeWork(w);
+                dispatchCatalogChangeWork(ccw);
+            }
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(w);
-            if (result.errorMsg != null) {
-                hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
-            }
-            // Log something useful about catalog upgrades when they occur.
-            if (result instanceof CatalogChangeResult) {
-                CatalogChangeResult ccr = (CatalogChangeResult)result;
-                if (ccr.upgradedFromVersion != null) {
-                    hostLog.info(String.format(
-                                "In order to update the application catalog it was "
-                                + "automatically upgraded from version %s.",
-                                ccr.upgradedFromVersion));
-                }
-            }
-            w.completionHandler.onCompletion(result);
+            dispatchCatalogChangeWork(w);
         }
         else {
             hostLog.warn("Unexpected message received by AsyncCompilerAgent.  " +
@@ -143,6 +155,25 @@ public class AsyncCompilerAgent {
                 apw.completionHandler.onCompletion(compileAdHocPlan(apw));
             }
         });
+    }
+
+    private void dispatchCatalogChangeWork(CatalogChangeWork work)
+    {
+        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
+        if (result.errorMsg != null) {
+            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+        }
+        // Log something useful about catalog upgrades when they occur.
+        if (result instanceof CatalogChangeResult) {
+            CatalogChangeResult ccr = (CatalogChangeResult)result;
+            if (ccr.upgradedFromVersion != null) {
+                hostLog.info(String.format(
+                            "In order to update the application catalog it was "
+                            + "automatically upgraded from version %s.",
+                            ccr.upgradedFromVersion));
+            }
+        }
+        work.completionHandler.onCompletion(result);
     }
 
     AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {

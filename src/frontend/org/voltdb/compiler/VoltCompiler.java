@@ -432,7 +432,7 @@ public class VoltCompiler {
             compilerLog.error("Unable to open DDL file.", e);
             return false;
         }
-        return compileInternal(projectReader, jarOutputPath, ddlReaderList, null);
+        return compileInternalToFile(projectReader, jarOutputPath, ddlReaderList, null);
     }
 
     /**
@@ -444,7 +444,7 @@ public class VoltCompiler {
         // Use a special DDL reader to provide the contents.
         List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(1);
         ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
-        // Seed it with the DDL so that a version upgrade hack in compileInternal()
+        // Seed it with the DDL so that a version upgrade hack in compileInternalToFile()
         // doesn't try to get the DDL file from the path.
         InMemoryJarfile jarFile = new InMemoryJarfile();
         try {
@@ -454,7 +454,7 @@ public class VoltCompiler {
             compilerLog.error("Failed to add DDL file to empty in-memory jar.");
             return false;
         }
-        return compileInternal(null, jarOutputPath, ddlReaderList, jarFile);
+        return compileInternalToFile(null, jarOutputPath, ddlReaderList, jarFile);
     }
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
@@ -501,9 +501,46 @@ public class VoltCompiler {
      * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
      * @return true if successful
      */
-    private boolean compileInternal(
+    private boolean compileInternalToFile(
             final VoltCompilerReader projectReader,
             final String jarOutputPath,
+            final List<VoltCompilerReader> ddlReaderList,
+            final InMemoryJarfile jarOutputRet)
+    {
+        if (jarOutputPath == null) {
+            addErr("The output jar path is null.");
+            return false;
+        }
+
+        InMemoryJarfile jarOutput = compileInternal(projectReader, ddlReaderList, jarOutputRet);
+        if (jarOutput == null) {
+            return false;
+        }
+
+        try {
+            jarOutput.writeToFile(new File(jarOutputPath)).run();
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            addErr("Error writing catalog jar to disk: " + e.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Internal method for compiling with and without a project.xml file or DDL files.
+     *
+     * @param projectReader Reader for project file or null if a project file is not used.
+     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
+     * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
+     * @return The InMemoryJarfile containing the compiled catalog if
+     * successful, null if not.  If the caller provided an InMemoryJarfile, the
+     * return value will be the same object, not a copy.
+     */
+    private InMemoryJarfile compileInternal(
+            final VoltCompilerReader projectReader,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
@@ -517,11 +554,7 @@ public class VoltCompiler {
 
         if (m_projectFileURL == null && (ddlReaderList == null || ddlReaderList.isEmpty())) {
             addErr("One or more DDL files are required.");
-            return false;
-        }
-        if (jarOutputPath == null) {
-            addErr("The output jar path is null.");
-            return false;
+            return null;
         }
 
         // clear out the warnings and errors
@@ -532,11 +565,11 @@ public class VoltCompiler {
         // do all the work to get the catalog
         DatabaseType database = getProjectDatabase(projectReader);
         if (database == null) {
-            return false;
+            return null;
         }
         final Catalog catalog = compileCatalogInternal(database, ddlReaderList, jarOutput);
         if (catalog == null) {
-            return false;
+            return null;
         }
 
         // Build DDL from Catalog Data
@@ -561,20 +594,19 @@ public class VoltCompiler {
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
             // put the compiler report into the jarfile
             jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
-            jarOutput.writeToFile(new File(jarOutputPath)).run();
         }
         catch (final Exception e) {
             e.printStackTrace();
-            return false;
+            return null;
         }
 
         assert(!hasErrors());
 
         if (hasErrors()) {
-            return false;
+            return null;
         }
 
-        return true;
+        return jarOutput;
     }
 
     /**
@@ -2402,6 +2434,61 @@ public class VoltCompiler {
     }
 
     /**
+     * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
+     * for the artifacts to be included in the compile, and then compile it in place.
+     *
+     * *NOTE*: Does *NOT* work with project.xml jarfiles.
+     *
+     * @return the compiled catalog is contained in the provided jarfile.
+     *
+     */
+    public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
+    {
+        // Gather DDL files for recompilation
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+        Entry<String, byte[]> entry = jarfile.firstEntry();
+        while (entry != null) {
+            String path = entry.getKey();
+            // SOMEDAY: It would be better to have a manifest that explicitly lists
+            // ddl files instead of using a brute force *.sql glob.
+            if (path.toLowerCase().endsWith(".sql")) {
+                ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
+            }
+            entry = jarfile.higherEntry(entry.getKey());
+        }
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            m_classLoader = jarfile.getLoader();
+            // Do the compilation work.
+            InMemoryJarfile jarOut = compileInternal(null, ddlReaderList, jarfile);
+            // Trim the compiler output to try to provide a concise failure
+            // explanation
+            if (jarOut != null) {
+                compilerLog.debug("Successfully recompiled InMemoryJarfile");
+            }
+            else {
+                String errString = "Adhoc DDL failed";
+                if (m_errors.size() > 0) {
+                    errString = m_errors.get(m_errors.size() - 1).getLogString();
+                }
+                int fronttrim = errString.indexOf("DDL Error");
+                if (fronttrim < 0) { fronttrim = 0; }
+                int endtrim = errString.indexOf(" in statement starting");
+                if (endtrim < 0) { endtrim = errString.length(); }
+                String trimmed = errString.substring(fronttrim, endtrim);
+                throw new IOException(trimmed);
+            }
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+        }
+    }
+
+    /**
      * Check a loaded catalog. If it needs to be upgraded recompile it and save
      * an upgraded jar file.
      *
@@ -2475,7 +2562,7 @@ public class VoltCompiler {
                         versionFromCatalog, versionFromVoltDB));
 
                 // Do the compilation work.
-                boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
+                boolean success = compileInternalToFile(projectReader, outputJarPath, ddlReaderList, outputJar);
 
                 if (success) {
                     // Set up the return string.
