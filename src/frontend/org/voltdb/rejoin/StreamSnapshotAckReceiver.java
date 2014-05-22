@@ -17,16 +17,17 @@
 
 package org.voltdb.rejoin;
 
-import com.google_voltpatches.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.exceptions.SerializableException;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Thread that blocks on the receipt of Acks.
@@ -73,7 +74,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
                 VoltMessage msg = m_mb.recvBlocking(10 * 60 * 1000); // Wait for 10 minutes
                 if (msg == null) {
                     rejoinLog.warn("No stream snapshot ack message was received in the past 10 minutes" +
-                                   " or the thread was interrupted");
+                                   " or the thread was interrupted (expected eofs: " + m_expectedEOFs.get() + ")" );
                     continue;
                 }
 
@@ -103,7 +104,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
                     // send an end of stream message, must wait until all end of stream
                     // messages are received before terminating the thread.
                     if (m_expectedEOFs.decrementAndGet() == 0) {
-                        break;
+                        return;
                     }
                 }
             }
