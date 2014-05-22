@@ -115,12 +115,6 @@ def safe_print(s):
         print s
 
 def print_section(name, mismatches, output_dir):
-    print "begin print section"
-    #import pickle
-    #with open('print_section_name', 'w') as f1, open('print_section_mismatches', 'w') as f2, open('print_section_output_dir', 'w') as f3:
-#	pickle.dump(name, f1)
-#	pickle.dump(mismatches, f2)
-#	pickle.dump(name, f3)
     result = """
 <h2>%s: %d</h2>
 <table cellpadding=3 cellspacing=1 border=1>
@@ -132,12 +126,9 @@ def print_section(name, mismatches, output_dir):
 </tr>
 """ % (name, len(mismatches))
 
-#attemp 1, use list and join
     temp = []
-
     for i in mismatches:
         safe_print(i["SQL"])
-        #detail_page = ""
         detail_page = generate_detail(name, i, output_dir)
         jniStatus = i["jni"]["Status"]
         if jniStatus < 0:
