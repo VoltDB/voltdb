@@ -41,8 +41,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint pk_tree primary key (ID)" +
-                ");\n" +
-                "create procedure TestProc as select VAL from FOO;\n"
+                ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
