@@ -64,5 +64,29 @@ public class TestSQLLexer {
         checkDDL("altertable pants", null);
         checkDDL("-- alter table pants", null);
         checkDDL("altar table pants", null);
+
+        checkDDL("export table pants", "export");
+        checkDDL("EXPORT table pants", "export");
+        checkDDL("ExPoRt table pants", "export");
+        checkDDL("   export table pants    ", "export");
+        checkDDL("exporttable pants", null);
+        checkDDL("-- export table pants", null);
+        checkDDL("exprot table pants", null);
+
+        checkDDL("import class org.dont.exist", "import");
+        checkDDL("IMPORT class org.dont.exist", "import");
+        checkDDL("ImPoRt class org.dont.exist", "import");
+        checkDDL("    import class org.dont.exist", "import");
+        checkDDL("importclass org.dont.exist", null);
+        checkDDL("-- import class org.dont.exist", null);
+        checkDDL("improt class org.dont.exist", null);
+
+        checkDDL("partition table pants", "partition");
+        checkDDL("PARTITION table pants", "partition");
+        checkDDL("pArTiTioN table pants", "partition");
+        checkDDL("   partition table pants    ", "partition");
+        checkDDL("partitiontable pants", null);
+        checkDDL("-- partition table pants", null);
+        checkDDL("partitoin table pants", null);
     }
 }
