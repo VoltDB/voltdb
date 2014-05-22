@@ -171,8 +171,9 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         OutputWatcher watcher = new OutputWatcher("Failed to generate upgraded catalog", 20, TimeUnit.MILLISECONDS);
         ((LocalCluster)m_config).setOutputWatcher(watcher);
 
-        // Add a bad statement and tweak the version.
-        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath, "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyProcedure");
+        // Add a procedure to the catalog that should never fail
+        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath,
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyProcedure");
 
         File tweakedJarFile = new File(tweakedJarPath);
         try {
@@ -193,6 +194,8 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
     }
 
     public void testCatalogUpgradeWithBadStaticInitProcedure() throws IOException, ProcCallException, InterruptedException {
+        // Connect the client to HostId 0 to ensure that the new procedure's static initializer will fault
+        // during the catalog compilation.
         Client client = getClientToHostId(0);
         loadSomeData(client, 0, 10);
         client.drain();
@@ -202,8 +205,9 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         OutputWatcher watcher = new OutputWatcher("Failed to generate upgraded catalog", 20, TimeUnit.MILLISECONDS);
         ((LocalCluster)m_config).setOutputWatcher(watcher);
 
-        // Add a bad statement and tweak the version.
-        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath, "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyStaticInitializerProcedure");
+        // Add a procedure that will fault in the static initializer if when the hostId is 0
+        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath,
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyStaticInitializerProcedure");
 
         File tweakedJarFile = new File(tweakedJarPath);
         try {
@@ -235,6 +239,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         upgradeCatalogJarPath = upgradeCatalogBasePath + ".jar";
 
         HashMap<String, String> env = new HashMap<String, String>();
+        // If we are doing something special with a stored procedure it will be on HostId 0
         env.put("__VOLTDB_TARGET_CLUSTER_HOSTID__", "0");
         LocalCluster config = new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI, env);
         boolean compile = config.compile(project);

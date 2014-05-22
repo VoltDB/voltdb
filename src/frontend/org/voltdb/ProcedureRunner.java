@@ -238,6 +238,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
+    @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
@@ -341,8 +342,13 @@ public class ProcedureRunner {
                             // If the stored procedure attempted to do something other than linklibraray or instantiate
                             // a missing object that results in an error, throw the error and let the server deal with
                             // the condition as best as it can (usually a crashGlobalVoltDB).
-                            m_statsCollector.endProcedure(false, true, null, null);
-                            throw (Error)ex;
+                            try {
+                                m_statsCollector.endProcedure(false, true, null, null);
+                            }
+                            finally {
+                                // Ensure that ex is always re-thrown even if endProcedure throws an exception.
+                                throw (Error)ex;
+                            }
                         }
                     }
                     retval = getErrorResponse(ex);

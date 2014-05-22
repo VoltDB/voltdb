@@ -610,17 +610,14 @@ public class DDLCompiler {
             }
             String className = checkIdentifierStart(statementMatcher.group(2), statement);
             Class<?> clazz;
-            System.out.println("Calling forName in DDLCompiler");
             try {
                 clazz = Class.forName(className, true, m_classLoader);
             } catch (ClassNotFoundException e) {
-                System.out.println("Fell into ClassNotFoundException");
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Cannot load class for procedure: %s",
                         className));
             }
             catch (Throwable cause) {
-                System.out.println("Fell into catch-all");
                 // We are here because the class was found and the initializer of the class
                 // threw an error we can't anticipate. So we will wrap the error with a
                 // runtime exception that we can trap in our code.
