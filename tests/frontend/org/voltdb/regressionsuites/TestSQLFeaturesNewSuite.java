@@ -237,7 +237,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         LocalCluster config = null;
 
         // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSQLFeaturesSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSQLFeaturesNewSuite.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -295,7 +295,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
         /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         // build the jarfile
         success = config.compile(project);
         assert(success);
