@@ -183,10 +183,15 @@ class VarbinaryValueGenerator:
 
 
 class TimestampValueGenerator:
-    """This generates timestamps.
+    """This generates timestamps in a reasonable range.
     """
 
-    MAX_MILLIS_SINCE_EPOCH = 1999999999999
+    #The MIN_MILLIS_SINCE_EPOCH is the lower bound of the generator, and its timestamp is
+    #1843-03-31 11:57:18.000000. The MAX_MILLIS_SINCE_EPOCH is the upper bound of the generator,
+    #and its timestamp is 2027-01-15 03:00:00.000000. Negative number is to generate timestamp
+    #prior to the unix epoch.
+    MIN_MILLIS_SINCE_EPOCH = -3000000000
+    MAX_MILLIS_SINCE_EPOCH = 1800000000
 
     def __init__(self):
         self.__nullpct = 0
@@ -196,12 +201,23 @@ class TimestampValueGenerator:
 
     def generate_values(self, count):
         for i in xrange(count):
-            # HSQL doesn't support microsecond, generate a 13 digit number of milliseconds
-            # this gets scaled to microseconds later for VoltDB backends
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
-                yield random.randint(0, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
+                r = random.uniform(TimestampValueGenerator.MIN_MILLIS_SINCE_EPOCH, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
+                ts = datetime.datetime.fromtimestamp(r)
+                #The format is YYYY-MM-DD HH:MM:SS.mmmmmm
+                s = ts.isoformat(' ')
+                #According to the python document, the datetime.isoformat() will not show 
+                #microsecond "mmmmmm" if datetime.microsecond is 0. So here we manually add
+                #trailing zeros if datetime.microsecond is 0.
+                #(https://docs.python.org/2/library/datetime.html)
+                if ts.microsecond == 0:
+                    s += '.000000'
+                #HSQL's resolution is millisecond while VoltDB's is microsecond. We rounded
+                #the timestamp down to millisecond so that both databases store the same data.
+                s = s[:-3]+'000'
+                yield s
 
 
 class BaseGenerator:
@@ -481,14 +497,6 @@ class ConstantGenerator(BaseGenerator):
         for i in self.__value_generator.generate_values(COUNT):
             if i == None:
                 i = u"NULL"
-	    elif self.__type == "timestamp":
-		r = random.uniform(-3000000000, 1800000000)
-		ts = datetime.datetime.fromtimestamp(r)
-		i = ts.isoformat(' ')
-		if ts.microsecond == 0:
-		    i += '.000000'
-		i = i[:-3]+'000'
-                i = u"'%s'" % (i)
             elif isinstance(i, basestring):
                 i = u"'%s'" % (i)
             elif isinstance(i, float):

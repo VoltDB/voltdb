@@ -122,9 +122,9 @@
                         "template": "basic-timestamp.sql",
                         "normalizer": "normalizer.py"},
     "advanced-timestamp": {"schema": "timestamp-schema.py",
-                        "ddl": "DDL.sql",
-                        "template": "advanced-timestamp.sql",
-                        "normalizer": "normalizer.py"},
+                           "ddl": "DDL.sql",
+                           "template": "advanced-timestamp.sql",
+                           "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
     "regression-basic-matview": {"schema": "matview-basic-schema.py",
                                  "ddl": "matview-DDL.sql",

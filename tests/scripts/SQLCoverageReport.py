@@ -136,7 +136,7 @@ def print_section(name, mismatches, output_dir):
         hsqldbStatus = i["hsqldb"]["Status"]
         if hsqldbStatus < 0:
             hsqldbStatus = "Error: " + `hsqldbStatus`
-	temp.append("""
+        temp.append("""
 <tr>
 <td>%s</td>
 <td><a href="%s">%s</a></td>
