@@ -30,7 +30,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
-    public void testBasicAddColumn() throws Exception
+    public void testAlterAddColumn() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
@@ -109,6 +109,166 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             }
             assertTrue(verifyTableColumnType("FOO", "GOODNOTNULL", "INTEGER"));
             assertFalse(isColumnNullable("FOO", "GOODNOTNULL"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testAlterDropColumn() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "PKCOL integer not null," +
+                "DROPME bigint, " +
+                "PROCCOL bigint, " +
+                "VIEWCOL bigint, " +
+                "INDEXCOL bigint, " +
+                "INDEX1COL bigint, " +
+                "INDEX2COL bigint, " +
+                "constraint pk_tree primary key (PKCOL)" +
+                ");\n" +
+                "create procedure BAR as select PROCCOL from FOO;\n" +
+                "create view FOOVIEW (VIEWCOL, TOTAL) as select VIEWCOL, COUNT(*) from FOO group by VIEWCOL;\n" +
+                "create index FOODEX on FOO(INDEXCOL);\n" +
+                "create index FOO2DEX on FOO(INDEX1COL, INDEX2COL);\n" +
+                "create table BAZ (" +
+                "PKCOL1 integer not null, " +
+                "PKCOL2 integer not null, " +
+                "constraint pk_tree2 primary key (PKCOL1, PKCOL2)" +
+                ");\n"
+                );
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // Basic alter drop, should work
+            assertTrue(doesColumnExist("FOO", "DROPME"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column DROPME;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to drop a bare column.");
+            }
+            assertFalse(doesColumnExist("FOO", "DROPME"));
+
+            // but not twice
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column DROPME;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop a column that doesn't exist", threw);
+            assertFalse(doesColumnExist("FOO", "DROPME"));
+
+            // Can't drop column used by procedure
+            assertTrue(doesColumnExist("FOO", "PROCCOL"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column PROCCOL;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop a column used by a procedure", threw);
+            assertTrue(doesColumnExist("FOO", "PROCCOL"));
+            try {
+                m_client.callProcedure("BAR");
+            }
+            catch (ProcCallException pce) {
+                fail("Procedure should still exist.");
+            }
+
+            // Can't drop a column used by a view
+            assertTrue(doesColumnExist("FOO", "VIEWCOL"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column VIEWCOL;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop a column used by a view", threw);
+            assertTrue(doesColumnExist("FOO", "VIEWCOL"));
+            assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
+
+            // single-column indexes get cascaded automagically
+            assertTrue(doesColumnExist("FOO", "INDEXCOL"));
+            assertTrue(findIndexInSystemCatalogResults("FOODEX"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column INDEXCOL;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to drop a single column backing a single column index.");
+            }
+            assertFalse(doesColumnExist("FOO", "INDEXCOL"));
+            assertFalse(findIndexInSystemCatalogResults("FOODEX"));
+
+            // single-column primary keys get cascaded automagically
+            assertTrue(doesColumnExist("FOO", "PKCOL"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column PKCOL;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to drop a single column backing a single column primary key.");
+            }
+            assertFalse(doesColumnExist("FOO", "PKCOL"));
+            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+
+            // Can't drop a column used by a multi-column index
+            assertTrue(doesColumnExist("FOO", "INDEX1COL"));
+            assertTrue(findIndexInSystemCatalogResults("FOO2DEX"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column INDEX1COL;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            System.out.println("COLUMNS: " + m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0]);
+            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
+            //assertTrue("Shouldn't be able to drop a column used by a multi-column index", threw);
+            //assertTrue(doesColumnExist("FOO", "INDEX1COL"));
+            //assertTrue(findIndexInSystemCatalogResults("FOO2DEX"));
+
+            // Can't drop a column used by a multi-column primary key
+            assertTrue(doesColumnExist("BAZ", "PKCOL1"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table BAZ drop column PKCOL1;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            System.out.println("COLUMNS: " + m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0]);
+            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
+            assertTrue("Shouldn't be able to drop a column used by a multi-column primary key", threw);
+            assertTrue(doesColumnExist("BAZ", "PKCOL1"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+
         }
         finally {
             teardownSystem();

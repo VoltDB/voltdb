@@ -112,6 +112,13 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
+    protected boolean doesColumnExist(String table, String column) throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
+        return found;
+    }
+
     protected boolean verifyTableColumnType(String table, String column, String type)
         throws Exception
     {
