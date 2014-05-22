@@ -388,8 +388,6 @@ The following place holders are supported,
 """
 
 if __name__ == "__main__":
-    #print " ".join(sys.argv)
-    #sys.exit()
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")
