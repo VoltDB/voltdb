@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.LatencyWatchdog;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
@@ -61,6 +62,10 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        if (LatencyWatchdog.isEnable()) {
+            LatencyWatchdog.pet();
+        }
+
         waitOnDurabilityBackpressureFuture();
         if (HOST_DEBUG_ENABLED) {
             hostLog.debug("STARTING: " + this);
@@ -92,6 +97,10 @@ public class SpProcedureTask extends ProcedureTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
+        if (LatencyWatchdog.isEnable()) {
+            LatencyWatchdog.pet();
+        }
+
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
         }
@@ -117,6 +126,10 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (LatencyWatchdog.isEnable()) {
+            LatencyWatchdog.pet();
+        }
+
         if (HOST_TRACE_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }

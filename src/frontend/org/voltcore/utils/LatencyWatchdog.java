@@ -17,9 +17,10 @@
 
 package org.voltcore.utils;
 
-import java.util.Iterator;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -29,40 +30,22 @@ public class LatencyWatchdog extends Thread {
 
     private static final VoltLogger LOG = new VoltLogger("LatencyWatchdog");
 
-    private static ConcurrentHashMap<Thread, WatchdogTimestamp> sLatencyMap = new ConcurrentHashMap<Thread, WatchdogTimestamp>();
+    private static ConcurrentHashMap<Thread, AtomicLong> sLatencyMap = new ConcurrentHashMap<Thread, AtomicLong>();
 
-    private static final long WATCHDOG_THRESHOLD = 100;  /* millisecond, same below */
+    private static final long WATCHDOG_THRESHOLD = Long.getLong("WATCHDOG_THRESHOLD", 100);  /* millisecond, same below */
 
-    static final long WAKEUP_INTERVAL = 25;
+    private static final long WAKEUP_INTERVAL = Long.getLong("WAKEUP_INTERVAL", 25);
 
-    private static final long MIN_LOG_INTERVAL = 10;   /* second */
+    private static final long MIN_LOG_INTERVAL = Long.getLong("MIN_LOG_INTERVAL", 10 * 1000);
 
     static LatencyWatchdog sWatchdog;
 
-    public static final boolean sEnable = Boolean.getBoolean("ENABLE_LATENCY_WATCHDOG");  /* Compiler will eliminate the code within its scope when turn it off */
+    public static final boolean sEnable = Boolean.getBoolean("ENABLE_LATENCY_WATCHDOG");  /* Compiler will eliminate code surrounded by its scope when turn it off */
 
     static {
         if (sEnable) {
             sWatchdog = new LatencyWatchdog();
             sWatchdog.start();
-        }
-    }
-
-    static class WatchdogTimestamp {
-        private Thread m_thread;
-        private long m_timestamp;
-
-        public WatchdogTimestamp(Thread t, long timestamp) {
-            m_thread = t;
-            m_timestamp = timestamp;
-        }
-
-        public Thread getThread() {
-            return m_thread;
-        }
-
-        public Long getTimestamp() {
-            return m_timestamp;
         }
     }
 
@@ -81,23 +64,28 @@ public class LatencyWatchdog extends Thread {
             return;
 
         Thread thread = Thread.currentThread();
-        sLatencyMap.put(thread, new WatchdogTimestamp(thread, System.currentTimeMillis()));
+        AtomicLong oldVal = sLatencyMap.get(thread);
+        if (oldVal == null) {
+            sLatencyMap.put(thread, new AtomicLong(System.currentTimeMillis()));
+        } else {
+            oldVal.lazySet(System.currentTimeMillis());
+        }
     }
 
     /**
      * The watchdog thread will be invoked every WAKEUP_INTERVAL time, to check if any thread that be monitored
-     * has not updated its time stamp more than WATCHDOG_THRESHOLD millisecond. Rate limiter can be controlled
-     * by setting different MIN_LOG_INTERVAL value.
+     * has not updated its time stamp more than WATCHDOG_THRESHOLD millisecond. Same stack trace messages are
+     * rate limited by MIN_LOG_INTERVAL.
      */
     @Override
     public void run() {
         Thread.currentThread().setName("Latency Watchdog");
-        System.out.println("Latency Watchdog thread has been started.");
+        System.out.printf("Latency Watchdog enabled -- threshold:%d(ms) wakeup_interval:%d(ms) min_log_interval:%d(ms)\n",
+                WATCHDOG_THRESHOLD, WAKEUP_INTERVAL, MIN_LOG_INTERVAL);
         while (true) {
-            for (Iterator<WatchdogTimestamp> iter = sLatencyMap.values().iterator(); iter.hasNext();) {
-                WatchdogTimestamp wt = iter.next();
-                Thread t = wt.getThread();
-                Long timestamp = wt.getTimestamp();
+            for (Entry<Thread, AtomicLong> entry : sLatencyMap.entrySet()) {
+                Thread t = entry.getKey();
+                long timestamp = entry.getValue().get();
                 long now = System.currentTimeMillis();
                 if ((now - timestamp > WATCHDOG_THRESHOLD) && t.getState() != Thread.State.TERMINATED) {
                     StringBuilder sb = new StringBuilder();
@@ -106,10 +94,7 @@ public class LatencyWatchdog extends Thread {
                         sb.append(ste);
                         sb.append("\n");
                     }
-                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.SECONDS, LOG, Level.DEBUG);
-                }
-                if (t.getState() == Thread.State.TERMINATED) {
-                    iter.remove();
+                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.ERROR);
                 }
             }
             try {
