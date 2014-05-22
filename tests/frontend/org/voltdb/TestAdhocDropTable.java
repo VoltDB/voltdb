@@ -133,11 +133,17 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
             "PRIMARY KEY(ID));\n" +
+            "create table VIEWBASE (" +
+            "ID int default 0 not null, " +
+            "VAL varchar(32) default null," +
+            "PRIMARY KEY(ID));\n" +
             "create table DROPME (" +
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
             "PRIMARY KEY(ID));\n" +
-            "create assumeunique index pkey_idx on DROPME(VAL);\n");
+            "create assumeunique index pkey_idx on DROPME(VAL);\n" +
+            "create view BLAT (VAL, TOTAL) as select VAL, COUNT(*) from VIEWBASE group by VAL;\n"
+            );
         builder.addPartitionInfo("BLAH", "ID");
         builder.addPartitionInfo("DROPME", "ID");
         builder.addStmtProcedure("BLERG", "select * from BLAH where ID = ?");
@@ -189,6 +195,19 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
             assertTrue(findTableInSystemCatalogResults("BLAH"));
+
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc", "drop table VIEWBASE;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop a table used in a view", threw);
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertTrue(findTableInSystemCatalogResults("VIEWBASE"));
+            assertTrue(findTableInSystemCatalogResults("BLAT"));
         }
         finally {
             teardownSystem();
