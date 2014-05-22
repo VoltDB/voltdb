@@ -64,6 +64,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             }
             assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
             assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
+            assertTrue(isColumnNullable("FOO", "NEWCOL"));
 
             // second time should fail
             boolean threw = false;
@@ -107,6 +108,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Should be able to add a column with not null and a default.");
             }
             assertTrue(verifyTableColumnType("FOO", "GOODNOTNULL", "INTEGER"));
+            assertFalse(isColumnNullable("FOO", "GOODNOTNULL"));
         }
         finally {
             teardownSystem();
