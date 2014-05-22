@@ -17,10 +17,11 @@
 
 package org.voltcore.utils;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 
 
@@ -28,48 +29,59 @@ public class LatencyWatchdog extends Thread {
 
     private static final VoltLogger LOG = new VoltLogger("LatencyWatchdog");
 
-    private static LinkedHashMap<Thread, Pair<Thread, Long>> sLatencyMap = new LinkedHashMap<Thread, Pair<Thread, Long>>();
+    private static ConcurrentHashMap<Thread, WatchdogTimestamp> sLatencyMap = new ConcurrentHashMap<Thread, WatchdogTimestamp>();
 
-    private static HashMap<Thread, Long> sLastLogTime = new HashMap<Thread, Long>();
-
-    private boolean m_shouldStop = false;
-
-    public static final boolean m_enable = true;  /* Compiler will eliminate the code within its scope when turn it off */
-
-    private static final long WATCHDOG_THRESHOLD = 50;  /* millisecond, same below */
+    private static final long WATCHDOG_THRESHOLD = 100;  /* millisecond, same below */
 
     static final long WAKEUP_INTERVAL = 25;
 
-    private static final long MIN_LOG_INTERVAL = 10 * 1000;
+    private static final long MIN_LOG_INTERVAL = 10;   /* second */
 
     static LatencyWatchdog sWatchdog;
+
+    public static final boolean sEnable = Boolean.getBoolean("ENABLE_LATENCY_WATCHDOG");  /* Compiler will eliminate the code within its scope when turn it off */
+
+    static {
+        if (sEnable) {
+            sWatchdog = new LatencyWatchdog();
+            sWatchdog.start();
+        }
+    }
+
+    static class WatchdogTimestamp {
+        private Thread m_thread;
+        private long m_timestamp;
+
+        public WatchdogTimestamp(Thread t, long timestamp) {
+            m_thread = t;
+            m_timestamp = timestamp;
+        }
+
+        public Thread getThread() {
+            return m_thread;
+        }
+
+        public Long getTimestamp() {
+            return m_timestamp;
+        }
+    }
 
     /**
      * Make sure every pet() invocation was surrounded by if (isEnable()) block
      */
     public static boolean isEnable() {
-        return m_enable;
-    }
-
-    public static LatencyWatchdog getInstance() {
-        if (sWatchdog == null) {
-            sWatchdog = new LatencyWatchdog();
-        }
-        return sWatchdog;
+        return sEnable;
     }
 
     /**
-     * Update latency watchdog time stamp for current thread. If watchdog thread has not been started, starts it.
+     * Update latency watchdog time stamp for current thread.
      */
     public static void pet() {
-        if (!m_enable)
+        if (!sEnable)
             return;
 
-        if (sWatchdog == null) {
-            getInstance().start();
-        }
         Thread thread = Thread.currentThread();
-        sLatencyMap.put(thread, new Pair<Thread, Long>(thread, System.currentTimeMillis()));
+        sLatencyMap.put(thread, new WatchdogTimestamp(thread, System.currentTimeMillis()));
     }
 
     /**
@@ -80,22 +92,21 @@ public class LatencyWatchdog extends Thread {
     @Override
     public void run() {
         Thread.currentThread().setName("Latency Watchdog");
-        while (!m_shouldStop) {
-
-            for (Iterator<Pair<Thread, Long>> iter = sLatencyMap.values().iterator(); iter.hasNext();) {
-                Pair<Thread, Long> pair = iter.next();
-                Thread t = pair.getFirst();
-                Long timestamp = pair.getSecond();
+        System.out.println("Latency Watchdog thread has been started.");
+        while (true) {
+            for (Iterator<WatchdogTimestamp> iter = sLatencyMap.values().iterator(); iter.hasNext();) {
+                WatchdogTimestamp wt = iter.next();
+                Thread t = wt.getThread();
+                Long timestamp = wt.getTimestamp();
                 long now = System.currentTimeMillis();
-                if ((now - timestamp > WATCHDOG_THRESHOLD) &&
-                        t.getState() != Thread.State.TERMINATED &&
-                        (sLastLogTime.get(t) == null || (now - sLastLogTime.get(t)) > MIN_LOG_INTERVAL)) {
-
-                    LOG.info(t.getName() + " has been delayed for " + (now - timestamp) + " milliseconds" );
+                if ((now - timestamp > WATCHDOG_THRESHOLD) && t.getState() != Thread.State.TERMINATED) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(t.getName() + " has been delayed for more than " + WATCHDOG_THRESHOLD + " milliseconds\n");
                     for (StackTraceElement ste : t.getStackTrace()) {
-                        LOG.info(ste);
+                        sb.append(ste);
+                        sb.append("\n");
                     }
-                    sLastLogTime.put(t, now);
+                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.SECONDS, LOG, Level.DEBUG);
                 }
                 if (t.getState() == Thread.State.TERMINATED) {
                     iter.remove();
@@ -107,9 +118,5 @@ public class LatencyWatchdog extends Thread {
                 e.printStackTrace();
             }
         }
-    }
-
-    public void shutdown() {
-        m_shouldStop = true;
     }
 }
