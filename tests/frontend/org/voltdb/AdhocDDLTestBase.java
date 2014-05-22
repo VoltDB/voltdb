@@ -23,13 +23,8 @@
 
 package org.voltdb;
 
-
-import java.io.IOException;
-
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 
 import junit.framework.TestCase;
 
@@ -66,15 +61,16 @@ public class AdhocDDLTestBase extends TestCase {
         m_localServer = null;
     }
 
-
-    protected boolean findTableInSystemCatalogResults(String table) throws Exception
+    protected boolean moveToMatchingRow(VoltTable table, String columnName,
+                              String columnValue)
     {
-        VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         boolean found = false;
-        tables.resetRowPosition();
-        while (tables.advanceRow()) {
-            String thisTable = tables.getString("TABLE_NAME");
-            if (thisTable.equalsIgnoreCase(table)) {
+        table.resetRowPosition();
+        while (table.advanceRow())
+        {
+            if (((String)table.get(columnName, VoltType.STRING)).
+                    equalsIgnoreCase(columnValue.toUpperCase()))
+            {
                 found = true;
                 break;
             }
@@ -82,18 +78,37 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
-    protected boolean findIndexInSystemCatalogResults(String index) throws Exception
+    protected boolean moveToMatchingTupleRow(VoltTable table, String column1Name,
+                              String column1Value, String column2Name,
+                              String column2Value)
     {
-        VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
         boolean found = false;
-        indexinfo.resetRowPosition();
-        while (indexinfo.advanceRow()) {
-            String thisindex = indexinfo.getString("INDEX_NAME");
-            if (thisindex.equalsIgnoreCase(index)) {
+        table.resetRowPosition();
+        while (table.advanceRow())
+        {
+            if (((String)table.get(column1Name, VoltType.STRING)).
+                    equalsIgnoreCase(column1Value.toUpperCase()) &&
+                    ((String)table.get(column2Name, VoltType.STRING)).
+                    equalsIgnoreCase(column2Value.toUpperCase()))
+            {
                 found = true;
                 break;
             }
         }
+        return found;
+    }
+
+    protected boolean findTableInSystemCatalogResults(String table) throws Exception
+    {
+        VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+        boolean found = moveToMatchingRow(tables, "TABLE_NAME", table);
+        return found;
+    }
+
+    protected boolean findIndexInSystemCatalogResults(String index) throws Exception
+    {
+        VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
+        boolean found = moveToMatchingRow(indexinfo, "INDEX_NAME", index);
         return found;
     }
 
@@ -101,16 +116,12 @@ public class AdhocDDLTestBase extends TestCase {
         throws Exception
     {
         VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
         boolean verified = false;
-        columns.resetRowPosition();
-        while (columns.advanceRow()) {
-            String thiscolumn = columns.getString("COLUMN_NAME");
-            String thistable = columns.getString("TABLE_NAME");
+        if (found) {
             String thistype = columns.getString("TYPE_NAME");
-            if (thistable.equalsIgnoreCase(table) && thiscolumn.equalsIgnoreCase(column) &&
-                thistype.equalsIgnoreCase(type)) {
+            if (thistype.equalsIgnoreCase(type)) {
                 verified = true;
-                break;
             }
         }
         return verified;
@@ -120,18 +131,38 @@ public class AdhocDDLTestBase extends TestCase {
         throws Exception
     {
         VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
         boolean verified = false;
-        columns.resetRowPosition();
-        while (columns.advanceRow()) {
-            String thiscolumn = columns.getString("COLUMN_NAME");
-            String thistable = columns.getString("TABLE_NAME");
+        if (found) {
             int thissize = (int)columns.getLong("COLUMN_SIZE");
-            if (thistable.equalsIgnoreCase(table) && thiscolumn.equalsIgnoreCase(column) &&
-                thissize == size) {
+            if (thissize == size) {
                 verified = true;
-                break;
             }
         }
         return verified;
+    }
+
+    // Can be misleading, assumes someone has already checked whether the column actually
+    // exists.
+    protected boolean isColumnNullable(String table, String column) throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean nullable = false;
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
+        if (found) {
+            nullable = columns.getString("IS_NULLABLE").equalsIgnoreCase("YES");
+        }
+        return nullable;
+    }
+
+    protected boolean isColumnPartitionColumn(String table, String column) throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean partitioncol = false;
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
+        if (found) {
+            partitioncol = columns.getString("REMARKS").equalsIgnoreCase("PARTITION_COLUMN");
+        }
+        return partitioncol;
     }
 }
