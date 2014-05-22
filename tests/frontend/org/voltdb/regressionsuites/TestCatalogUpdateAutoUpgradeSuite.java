@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -160,6 +161,68 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         }
     }
 
+    public void testCatalogUpgradeWithGoodProcedure() throws IOException, ProcCallException, InterruptedException {
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+        String tweakedJarPath = upgradeCatalogBasePath + "-tweaked.jar";
+
+        OutputWatcher watcher = new OutputWatcher("Failed to generate upgraded catalog", 20, TimeUnit.MILLISECONDS);
+        ((LocalCluster)m_config).setOutputWatcher(watcher);
+
+        // Add a bad statement and tweak the version.
+        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath, "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyProcedure");
+
+        File tweakedJarFile = new File(tweakedJarPath);
+        try {
+            try {
+                VoltTable[] results = client.updateApplicationCatalog(
+                        tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
+                assertTrue(results.length == 1);
+                boolean found = watcher.waitForString();
+                assertTrue(found);
+            }
+            catch (ProcCallException e) {
+                fail(String.format("@UpdateApplicationCatalog: ProcCallException: %s", e.getLocalizedMessage()));
+            }
+        }
+        finally {
+            tweakedJarFile.delete();
+        }
+    }
+
+    public void testCatalogUpgradeWithBadStaticInitProcedure() throws IOException, ProcCallException, InterruptedException {
+        Client client = getClientToHostId(0);
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+        String tweakedJarPath = upgradeCatalogBasePath + "-tweaked.jar";
+
+        OutputWatcher watcher = new OutputWatcher("Failed to generate upgraded catalog", 20, TimeUnit.MILLISECONDS);
+        ((LocalCluster)m_config).setOutputWatcher(watcher);
+
+        // Add a bad statement and tweak the version.
+        CatalogUpgradeTools.dorkJar(upgradeCatalogJarPath, tweakedJarPath, "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedEmptyStaticInitializerProcedure");
+
+        File tweakedJarFile = new File(tweakedJarPath);
+        try {
+            try {
+                client.updateApplicationCatalog(
+                        tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
+                fail("Expect ProcCallException");
+            }
+            catch (ProcCallException e) {
+                assertTrue(e.getLocalizedMessage().contains("Catalog upgrade failed"));
+                boolean found = watcher.waitForString();
+                assertTrue(found);
+            }
+        }
+        finally {
+            tweakedJarFile.delete();
+        }
+    }
+
     static public Test suite() throws Exception {
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateAutoUpgradeSuite.class);
 
@@ -171,7 +234,9 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         upgradeCatalogXMLPath = upgradeCatalogBasePath + ".xml";
         upgradeCatalogJarPath = upgradeCatalogBasePath + ".jar";
 
-        LocalCluster config = new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        HashMap<String, String> env = new HashMap<String, String>();
+        env.put("__VOLTDB_TARGET_CLUSTER_HOSTID__", "0");
+        LocalCluster config = new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI, env);
         boolean compile = config.compile(project);
         assertTrue(compile);
         config.setHasLocalServer(false);

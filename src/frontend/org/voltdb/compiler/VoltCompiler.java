@@ -886,6 +886,7 @@ public class VoltCompiler {
             }
         }
 
+        System.out.println("IN compileDatabaseNode1");
         // procedures/procedure
         if (database.getProcedures() != null) {
             for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
@@ -893,6 +894,7 @@ public class VoltCompiler {
             }
         }
 
+        System.out.println("IN compileDatabaseNode2");
         // classdependencies/classdependency
         if (database.getClassdependencies() != null) {
             for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
@@ -900,12 +902,14 @@ public class VoltCompiler {
             }
         }
 
+        System.out.println("IN compileDatabaseNode3");
         // partitions/table
         if (database.getPartitions() != null) {
             for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
                 voltDdlTracker.put(table.getTable(), table.getColumn());
             }
         }
+        System.out.println("IN compileDatabaseNode4");
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -941,6 +945,7 @@ public class VoltCompiler {
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
+        System.out.println("reading schemas");
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
@@ -948,6 +953,7 @@ public class VoltCompiler {
             ddlcompiler.loadSchema(schemaReader, db, whichProcs);
         }
 
+        System.out.println("Call compileToCatalog");
         ddlcompiler.compileToCatalog(db);
 
         // Actually parse and handle all the partitions
@@ -1038,6 +1044,7 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
+        System.out.println("Call Compile Procedures");
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
@@ -1172,6 +1179,7 @@ public class VoltCompiler {
         if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
             // Add all the class dependencies to the output jar
             for (final Class<?> classDependency : classDependencies) {
+                System.out.println("Writing Procedure to Jar");
                 addClassToJar(jarOutput, classDependency);
             }
         }
@@ -1181,6 +1189,7 @@ public class VoltCompiler {
         final List<ProcedureDescriptor> procedures = generateCrud();
 
         procedures.addAll(allProcs);
+        System.out.println("Parsing Procedures");
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -1200,8 +1209,10 @@ public class VoltCompiler {
             else {
                 m_currentFilename = procedureName;
             }
+            System.out.println("Compiling Procedure");
             ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
         }
+        System.out.println("Compile complete");
         // done handling files
         m_currentFilename = null;
     }
@@ -1687,6 +1698,7 @@ public class VoltCompiler {
             }
         }
 
+        System.out.println("In getProcedure");
         // @class
         String classattr = xmlproc.getClazz();
 
@@ -1712,14 +1724,17 @@ public class VoltCompiler {
             }
             Class<?> clazz;
             try {
+                System.out.println("Calling forName");
                 clazz = Class.forName(classattr, true, m_classLoader);
             }
             catch (ClassNotFoundException e) {
+                System.out.println("Fell into ClassNotFoundException");
                 throw new VoltCompilerException(String.format(
                         "Cannot load class for procedure: %s",
                         classattr));
             }
             catch (Throwable cause) {
+                System.out.println("Fell into catch-all");
                 // We are here because the class was found and the initializer of the class
                 // threw an error we can't anticipate. So we will wrap the error with a
                 // runtime exception that we can trap in our code.
@@ -1728,6 +1743,7 @@ public class VoltCompiler {
                         classattr), cause);
 
             }
+            System.out.println("Finished forName");
 
             return new ProcedureDescriptor(groups, Language.JAVA, null, clazz);
         }
