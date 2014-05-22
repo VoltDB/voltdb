@@ -208,6 +208,17 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             System.out.println(resp.getResults()[0]);
             assertTrue(findTableInSystemCatalogResults("VIEWBASE"));
             assertTrue(findTableInSystemCatalogResults("BLAT"));
+
+            try {
+                m_client.callProcedure("@AdHoc", "drop table VIEWBASE cascade;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to drop table and view with cascade");
+            }
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertFalse(findTableInSystemCatalogResults("VIEWBASE"));
+            assertFalse(findTableInSystemCatalogResults("BLAT"));
         }
         finally {
             teardownSystem();
