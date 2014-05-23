@@ -89,6 +89,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue("Shouldn't be able to add a second primary key", threw);
 
             // Can't add a not-null column with no default
+            // NOTE: this could/should work with an empty table, but HSQL apparently
+            // doesn't let it get that far.
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -109,6 +111,18 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             }
             assertTrue(verifyTableColumnType("FOO", "GOODNOTNULL", "INTEGER"));
             assertFalse(isColumnNullable("FOO", "GOODNOTNULL"));
+
+            // Can't add a column with a bad definition
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column BADVARCHAR varchar(0) not null;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to add a column with a bad definition", threw);
+            assertFalse(doesColumnExist("FOO", "BADVARCHAR"));
         }
         finally {
             teardownSystem();
@@ -136,6 +150,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 "create view FOOVIEW (VIEWCOL, TOTAL) as select VIEWCOL, COUNT(*) from FOO group by VIEWCOL;\n" +
                 "create index FOODEX on FOO(INDEXCOL);\n" +
                 "create index FOO2DEX on FOO(INDEX1COL, INDEX2COL);\n" +
+                "create table ONECOL (" +
+                "SOLOCOL integer, " +
+                ");\n" +
                 "create table BAZ (" +
                 "PKCOL1 integer not null, " +
                 "PKCOL2 integer not null, " +
@@ -209,6 +226,19 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(doesColumnExist("FOO", "VIEWCOL"));
             assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
 
+            // unless you use cascade
+            assertTrue(doesColumnExist("FOO", "VIEWCOL"));
+            assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop column VIEWCOL cascade;");
+            }
+            catch (ProcCallException pce) {
+                fail("Dropping a column should drop a view with cascade");
+            }
+            assertFalse(doesColumnExist("FOO", "VIEWCOL"));
+            assertFalse(findTableInSystemCatalogResults("FOOVIEW"));
+
             // single-column indexes get cascaded automagically
             assertTrue(doesColumnExist("FOO", "INDEXCOL"));
             assertTrue(findIndexInSystemCatalogResults("FOODEX"));
@@ -235,7 +265,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(doesColumnExist("FOO", "PKCOL"));
             assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
 
-            // Can't drop a column used by a multi-column index
+            // WEIRD: this seems like weird behavior to me still --izzy
+            // Dropping a column used by a multi-column index drops the index
             assertTrue(doesColumnExist("FOO", "INDEX1COL"));
             assertTrue(findIndexInSystemCatalogResults("FOO2DEX"));
             threw = false;
@@ -244,13 +275,10 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table FOO drop column INDEX1COL;");
             }
             catch (ProcCallException pce) {
-                threw = true;
+                fail("Dropping a column used by an index should kill the index");
             }
-            System.out.println("COLUMNS: " + m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0]);
-            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
-            //assertTrue("Shouldn't be able to drop a column used by a multi-column index", threw);
-            //assertTrue(doesColumnExist("FOO", "INDEX1COL"));
-            //assertTrue(findIndexInSystemCatalogResults("FOO2DEX"));
+            assertFalse(doesColumnExist("FOO", "INDEX1COL"));
+            assertFalse(findIndexInSystemCatalogResults("FOO2DEX"));
 
             // Can't drop a column used by a multi-column primary key
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
@@ -268,6 +296,19 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue("Shouldn't be able to drop a column used by a multi-column primary key", threw);
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
             assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+
+            // Can't drop the last column in a table
+            assertTrue(doesColumnExist("ONECOL", "SOLOCOL"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table BAZ drop column PKCOL1;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop the last column in a table", threw);
+            assertTrue(doesColumnExist("ONECOL", "SOLOCOL"));
 
         }
         finally {
