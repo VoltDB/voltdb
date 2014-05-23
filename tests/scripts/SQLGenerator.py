@@ -208,7 +208,7 @@ class TimestampValueGenerator:
                 ts = datetime.datetime.fromtimestamp(r)
                 #The format is YYYY-MM-DD HH:MM:SS.mmmmmm
                 s = ts.isoformat(' ')
-                #According to the python document, the datetime.isoformat() will not show 
+                #According to the python document, the datetime.isoformat() will not show
                 #microsecond "mmmmmm" if datetime.microsecond is 0. So here we manually add
                 #trailing zeros if datetime.microsecond is 0.
                 #(https://docs.python.org/2/library/datetime.html)
@@ -868,4 +868,3 @@ if __name__ == "__main__":
     generator = SQLGenerator(catalog, template, True, False)
     for i in generator.generate(True):
         print 'STATEMENT: ' + i
-
