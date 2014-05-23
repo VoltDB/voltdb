@@ -448,6 +448,7 @@ public class MaterializedViewBenchmark {
     		printResults("ids_delete", fw, "Delete_w/o_Materialized_View");
     		fw.close();
     	}
+    	benchmarkActive = false;
     	
     	// close down the client connections
         client.close();
