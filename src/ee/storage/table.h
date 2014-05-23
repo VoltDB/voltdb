@@ -384,6 +384,8 @@ protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple *tuple) = 0;
 
+    virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) = 0;
+
     Table(int tableAllocationTargetSize);
     void resetTable();
 
@@ -433,6 +435,7 @@ protected:
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
+    // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
 
     // indexes

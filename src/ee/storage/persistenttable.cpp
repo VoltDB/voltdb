@@ -204,6 +204,11 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
+void PersistentTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                 "May not use freeLastScanedBlock with persistent tables.");
+}
+
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
     TableIterator ti(this, m_data.begin());

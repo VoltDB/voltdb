@@ -84,6 +84,10 @@ public:
     bool hasNext();
     int getLocation() const;
 
+    void setTempTableDeleteAsGo(bool flag) {
+        m_tempTableDeleteAsGo = flag;
+    }
+
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
@@ -122,6 +126,7 @@ private:
     TBPtr m_currentBlock;
     std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableIterator;
+    bool m_tempTableDeleteAsGo;
 };
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
@@ -133,7 +138,8 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
       m_tempBlockIterator(start),
-      m_tempTableIterator(true)
+      m_tempTableIterator(true),
+      m_tempTableDeleteAsGo(true)
     {
     }
 
@@ -149,7 +155,8 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock),
       m_currentBlock(NULL),
-      m_tempTableIterator(false)
+      m_tempTableIterator(false),
+      m_tempTableDeleteAsGo(true)
     {
     }
 
@@ -254,6 +261,11 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         if (m_currentBlock == NULL ||
             m_blockOffset >= m_currentBlock->unusedTupleBoundry())
         {
+            // delete the last block of tuples in this temp table when they will never be used
+            if (m_tempTableDeleteAsGo) {
+                m_table->freeLastScanedBlock(m_tempBlockIterator);
+            }
+
             m_currentBlock = *m_tempBlockIterator;
             m_dataPtr = m_currentBlock->address();
             m_blockOffset = 0;

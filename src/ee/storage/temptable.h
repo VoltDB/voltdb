@@ -158,6 +158,8 @@ class TempTable : public Table {
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 
+    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
+
     virtual void onSetColumns() {
         m_data.clear();
     };
@@ -261,6 +263,17 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
     tuple->move(pair.first);
     ++m_tupleCount;
     return;
+}
+
+inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    assert(nextBlockIterator-1 < m_data.end());
+
+    if (nextBlockIterator-1 >= m_data.begin()) {
+        m_data.erase(nextBlockIterator-1, nextBlockIterator);
+        if (m_limits) {
+            m_limits->reduceAllocated(m_tableAllocationSize);
+        }
+    }
 }
 
 

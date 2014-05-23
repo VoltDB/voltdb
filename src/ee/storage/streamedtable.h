@@ -119,6 +119,7 @@ private:
 
     TBPtr allocateNextBlock();
     virtual void nextFreeTuple(TableTuple *tuple);
+    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
 
     voltdb::StreamedTableStats stats_;
     ExecutorContext *m_executorContext;

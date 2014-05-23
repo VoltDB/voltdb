@@ -180,6 +180,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
             TableIterator iterator1 = inner_table->iterator();
+            iterator1.setTempTableDeleteAsGo(false);
             while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
                 pmp.countdownProgress();
                 // Apply join filter to produce matches for each outer that has them,

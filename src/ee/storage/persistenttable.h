@@ -462,6 +462,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     void nextFreeTuple(TableTuple *tuple);
+    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
+
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
     void doForcedCompaction();
 

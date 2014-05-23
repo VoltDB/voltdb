@@ -75,6 +75,11 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
+void StreamedTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                 "May not use freeLastScanedBlock with streamed tables.");
+}
+
 bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
