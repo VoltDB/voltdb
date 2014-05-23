@@ -28,7 +28,16 @@ import org.voltcore.logging.VoltLogger;
 
 public class LatencyWatchdog extends Thread {
 
-    private static final VoltLogger LOG = new VoltLogger("LatencyWatchdog");
+    private static final VoltLogger LOG = new VoltLogger("HOST");
+
+    private static ThreadLocal<AtomicLong> sLatencyVal = new ThreadLocal<AtomicLong>() {
+        @Override
+        public AtomicLong initialValue() {
+            final AtomicLong retval = new AtomicLong();
+            sLatencyMap.put(Thread.currentThread(), retval);
+            return retval;
+        }
+    };
 
     private static ConcurrentHashMap<Thread, AtomicLong> sLatencyMap = new ConcurrentHashMap<Thread, AtomicLong>();
 
@@ -50,26 +59,17 @@ public class LatencyWatchdog extends Thread {
     }
 
     /**
-     * Make sure every pet() invocation was surrounded by if (isEnable()) block
-     */
-    public static boolean isEnable() {
-        return sEnable;
-    }
-
-    /**
      * Update latency watchdog time stamp for current thread.
+     * Keep this method small so inlining and elimination can work their magic
      */
     public static void pet() {
         if (!sEnable)
             return;
+        petImpl();
+    }
 
-        Thread thread = Thread.currentThread();
-        AtomicLong oldVal = sLatencyMap.get(thread);
-        if (oldVal == null) {
-            sLatencyMap.put(thread, new AtomicLong(System.currentTimeMillis()));
-        } else {
-            oldVal.lazySet(System.currentTimeMillis());
-        }
+    private static void petImpl() {
+        sLatencyVal.get().lazySet(System.currentTimeMillis());
     }
 
     /**
@@ -80,8 +80,9 @@ public class LatencyWatchdog extends Thread {
     @Override
     public void run() {
         Thread.currentThread().setName("Latency Watchdog");
-        System.out.printf("Latency Watchdog enabled -- threshold:%d(ms) wakeup_interval:%d(ms) min_log_interval:%d(ms)\n",
-                WATCHDOG_THRESHOLD, WAKEUP_INTERVAL, MIN_LOG_INTERVAL);
+        LOG.info(String.format("Latency Watchdog enabled -- threshold:%d(ms) " +
+                               "wakeup_interval:%d(ms) min_log_interval:%d(ms)\n",
+                               WATCHDOG_THRESHOLD, WAKEUP_INTERVAL, MIN_LOG_INTERVAL));
         while (true) {
             for (Entry<Thread, AtomicLong> entry : sLatencyMap.entrySet()) {
                 Thread t = entry.getKey();
@@ -94,7 +95,7 @@ public class LatencyWatchdog extends Thread {
                         sb.append(ste);
                         sb.append("\n");
                     }
-                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.ERROR);
+                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.INFO);
                 }
             }
             try {

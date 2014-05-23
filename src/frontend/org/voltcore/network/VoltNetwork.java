@@ -301,9 +301,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        if (LatencyWatchdog.isEnable()) {
-                            LatencyWatchdog.pet();
-                        }
+                        LatencyWatchdog.pet();
 
                         final int readyKeys = m_selector.select();
 

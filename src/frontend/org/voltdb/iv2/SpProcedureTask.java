@@ -62,9 +62,7 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if (LatencyWatchdog.isEnable()) {
-            LatencyWatchdog.pet();
-        }
+        LatencyWatchdog.pet();
 
         waitOnDurabilityBackpressureFuture();
         if (HOST_DEBUG_ENABLED) {
@@ -97,9 +95,7 @@ public class SpProcedureTask extends ProcedureTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        if (LatencyWatchdog.isEnable()) {
-            LatencyWatchdog.pet();
-        }
+        LatencyWatchdog.pet();
 
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
@@ -126,9 +122,7 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        if (LatencyWatchdog.isEnable()) {
-            LatencyWatchdog.pet();
-        }
+        LatencyWatchdog.pet();
 
         if (HOST_TRACE_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
