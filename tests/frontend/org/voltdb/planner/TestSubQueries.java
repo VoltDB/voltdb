@@ -226,7 +226,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScanSubSelects(pn, "R1",  "A");
         checkPredicateComparisonExpression(pn, "R1");
 
-
         //
         // Crazy fancy sub-query:
         // Multiple nested levels + partitioned table + partition detecting
@@ -780,6 +779,24 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, D D1 FROM P1 WHERE A=2) T1, " +
                 "(SELECT A A2, D D2 FROM P2 ) T2 where T2.A2 = 2");
         assertEquals(1, planNodes.size());
+
+
+        planNodes = compileToFragments("select A1, A2, D1, D2 " +
+                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
+                "(SELECT A A2, D D2 FROM P2) T2 where T2.A2=2");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments("select A1, A2, D1, D2 " +
+                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
+                "(SELECT A A2, D D2 FROM P2) T2 where T2.A2=2");
+        assertEquals(1, planNodes.size());
+
+
+        // Test with LIMIT
+        planNodes = compileToFragments("select A1, A2, D1, D2 " +
+                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
+                "(SELECT A A2, D D2 FROM P2 ORDER BY D LIMIT 3) T2 where T2.A2=2");
+        assertEquals(2, planNodes.size());
     }
 
     public void testPartitionedGroupBy() {
@@ -789,8 +806,8 @@ public class TestSubQueries extends PlannerTestCase {
 
         // Top aggregation node on coordinator
         planNodes = compileToFragments(
-                "SELECT -8, T1.NUM FROM R4 T0, " +
-                "(select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) T1 " +
+                "SELECT -8, T1.NUM FROM SR4 T0, " +
+                "(select max(RATIO) RATIO, sum(NUM) NUM, DESC from SP4 group by DESC) T1 " +
                 "WHERE (T1.NUM + 5 ) > 44");
 
         assertEquals(2, planNodes.size());
@@ -802,7 +819,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
-        checkIndexedSubSelects(pn, "R4", primaryKeyIndexName("R4"));
+        checkIndexedSubSelects(pn, "SR4", primaryKeyIndexName("SR4"));
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
@@ -815,7 +832,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof AggregatePlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P4");
+        checkSeqScanSubSelects(pn, "SP4");
 
 
         //
@@ -835,7 +852,7 @@ public class TestSubQueries extends PlannerTestCase {
         // Top aggregation node on coordinator
         planNodes = compileToFragments(
                 "SELECT -8, T1.NUM " +
-                "FROM R4 T0, (select RATIO, NUM, DESC from P4 order by DESC, NUM, RATIO limit 1 offset 1) T1 " +
+                "FROM SR4 T0, (select RATIO, NUM, DESC from SP4 order by DESC, NUM, RATIO limit 1 offset 1) T1 " +
                 "WHERE (T1.NUM + 5 ) > 44");
 
         assertEquals(2, planNodes.size());
@@ -847,7 +864,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
-        checkIndexedSubSelects(pn, "R4", primaryKeyIndexName("R4"));
+        checkIndexedSubSelects(pn, "SR4", primaryKeyIndexName("SR4"));
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
@@ -866,7 +883,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P4");
+        checkSeqScanSubSelects(pn, "SP4");
 
 
 
@@ -881,17 +898,63 @@ public class TestSubQueries extends PlannerTestCase {
         List<AbstractPlanNode> planNodes;
         planNodes = compileToFragments("SELECT * FROM P1 X, P2 Y where X.A = Y.A");
         assertEquals(2, planNodes.size());
+
+
+        // Rename partition columns in sub-query
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE P3.A = P4.A and T1.P1A = P3.A");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE P3.A = P4.A and T1.P1A = P4.A");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE T1.P1A = P4.A and T1.P1A = P3.A");
+        assertEquals(1, planNodes.size());
+
+
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE T1.P2A = P4.A and T1.P2A = P3.A");
+        assertEquals(1, planNodes.size());
+
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE P3.A = P4.A and T1.P2A = P3.A");
+        assertEquals(1, planNodes.size());
+
+
+        // Rename partition columns in sub-query
+        planNodes = compileToFragments(
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3 X, P4 Y " +
+                "WHERE X.A = Y.A and T1.P1A = X.A");
+        assertEquals(1, planNodes.size());
+
     }
 
     public void testTry() {
         List<AbstractPlanNode> planNodes;
-//        planNodes = compileToFragments("select A1, A2, D1, D2 " +
-//                "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
-//                "(SELECT A A2, D D2 FROM P2) T2 where T2.A2=2");
-
         planNodes = compileToFragments(
-                "SELECT * FROM (SELECT A, C FROM P1 LIMIT 3) T1 " +
-                "where T1.A = 1 ");
+                "SELECT * FROM " +
+                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3, P4 " +
+                "WHERE T1.P2A = P4.A and T1.P2A = P3.A");
 
         for (AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
     }
@@ -949,6 +1012,16 @@ public class TestSubQueries extends PlannerTestCase {
 
         failToCompile("select * from (SELECT D D1 FROM P1) T1, P2 where P2.A = 1",
                 joinErrorMsg);
+
+
+        // (5)
+        // ambiguous columns referencing
+        //
+        failToCompile(
+                "SELECT * FROM " +
+                "   (select * from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
+                "   P3 X, P4 Y " +
+                "WHERE X.A = Y.A and T1.A = X.A",  "T1.A");
     }
 
     public void testEdgeCases() {

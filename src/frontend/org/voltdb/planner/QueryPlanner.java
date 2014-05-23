@@ -49,7 +49,7 @@ public class QueryPlanner {
     Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
-    PartitioningForStatement m_partitioning;
+    StatementPartitioning m_partitioning;
     int m_maxTablesPerJoin;
     AbstractCostModel m_costModel;
     ScalarValueHints[] m_paramHints;
@@ -87,7 +87,7 @@ public class QueryPlanner {
                         String procName,
                         Cluster catalogCluster,
                         Database catalogDb,
-                        PartitioningForStatement partitioning,
+                        StatementPartitioning partitioning,
                         HSQLInterface HSQL,
                         DatabaseEstimates estimates,
                         boolean suppressDebugOutput,

@@ -135,13 +135,13 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning;
+        StatementPartitioning partitioning;
         if (inferPartitioning) {
-            partitioning = PartitioningForStatement.inferPartitioning();
+            partitioning = StatementPartitioning.inferPartitioning();
         } else if (forceSingle) {
-            partitioning = PartitioningForStatement.forceSP();
+            partitioning = StatementPartitioning.forceSP();
         } else {
-            partitioning = PartitioningForStatement.forceMP();
+            partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
         Cluster catalogCluster = catalog.getClusters().get("cluster");

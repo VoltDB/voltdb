@@ -34,7 +34,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -100,11 +100,11 @@ public class PlannerTool {
     }
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
-        PartitioningForStatement infer = PartitioningForStatement.inferPartitioning();
+        StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer);
     }
 
-    AdHocPlannedStatement planSql(String sqlIn, PartitioningForStatement partitioning) {
+    AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();

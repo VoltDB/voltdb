@@ -62,7 +62,7 @@ public abstract class SubPlanAssembler {
     final Database m_db;
 
     /** Describes the specified and inferred partition context. */
-    final PartitioningForStatement m_partitioning;
+    final StatementPartitioning m_partitioning;
 
     /**
      * A description of a possible error condition that is considered recoverable/recovered
@@ -90,7 +90,7 @@ public abstract class SubPlanAssembler {
     /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;

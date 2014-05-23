@@ -42,7 +42,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         assert (table != null);
         m_table = table;
 
-        findPartitionColumns();
+        findPartitioningColumns();
     }
 
     @Override
@@ -61,7 +61,7 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public List<SchemaColumn> findPartitionColumns() {
+    public List<SchemaColumn> findPartitioningColumns() {
         if (m_partitioningColumns != null) {
             return m_partitioningColumns;
         }

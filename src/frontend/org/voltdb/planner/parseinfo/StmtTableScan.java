@@ -56,7 +56,7 @@ public abstract class StmtTableScan {
     // Partitioning column info
     protected List<SchemaColumn> m_partitioningColumns = null;
 
-    abstract public List<SchemaColumn> findPartitionColumns();
+    abstract public List<SchemaColumn> findPartitioningColumns();
 
     abstract public String getTableName();
 

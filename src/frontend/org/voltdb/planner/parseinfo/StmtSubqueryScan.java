@@ -32,7 +32,7 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -47,7 +47,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     private CompiledPlan m_bestCostPlan = null;
 
-    private PartitioningForStatement m_subqueriesPartitioning = null;
+    private StatementPartitioning m_subqueriesPartitioning = null;
 
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
@@ -73,19 +73,99 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     }
 
-    public PartitioningForStatement getPartitioningForStatement() {
+    public StatementPartitioning getPartitioningForStatement() {
         return m_subqueriesPartitioning;
     }
 
-    public void setSubqueriesPartitioning(PartitioningForStatement subqueriesPartitioning) {
+    public void setSubqueriesPartitioning(StatementPartitioning subqueriesPartitioning) {
         assert(subqueriesPartitioning != null);
         m_subqueriesPartitioning = subqueriesPartitioning;
-
-        findPartitionColumns();
+        findPartitioningColumns();
     }
 
-    private void addPartitioningColumns(List<SchemaColumn> partitioningColumns,
-            List<SchemaColumn> scols) {
+    /**
+     * upgrade single partitioning expression to parent level
+     * add the info to equality sets and input value equivalence
+     * @param valueEquivalence
+     * @param eqSets
+     */
+    public void promoteSinglePartitionInfo(
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
+            Set< Set<AbstractExpression> > eqSets)
+    {
+        StatementPartitioning pStmt = getPartitioningForStatement();
+        // this sub-query is single partitioned query on partitioned tables
+        // promoting the single partition express up the its parent level
+        if (pStmt.getCountOfPartitionedTables() > 0 && !pStmt.requiresTwoFragments() ) {
+            AbstractExpression spExpr = pStmt.singlePartitioningExpression();
+
+            for (SchemaColumn col: m_partitioningColumns) {
+                AbstractExpression tveKey = col.getExpression();
+                assert(tveKey instanceof TupleValueExpression);
+                Set<AbstractExpression> values = null;
+                if (valueEquivalence.containsKey(tveKey)) {
+                    values = valueEquivalence.get(tveKey);
+                } else if (valueEquivalence.containsKey(spExpr)) {
+                    values = valueEquivalence.get(spExpr);
+                } else {
+                    for (SchemaColumn otherCol: m_partitioningColumns) {
+                        if (col == otherCol) continue;
+                        if (valueEquivalence.containsKey(otherCol.getExpression())) {
+                            values = valueEquivalence.get(otherCol.getExpression());
+                            break;
+                        }
+                    }
+                    if (values == null) {
+                        values = new HashSet<AbstractExpression>();
+                    }
+                }
+                updateEqualSets(values, valueEquivalence, eqSets, tveKey, spExpr);
+            }
+        }
+    }
+
+    // update the new equal sets for partitioning columns and values
+    // (Xin): If it changes valueEquivalence, we have to update eqSets
+    // Because HashSet stored a legacy hashcode for the non-final object.
+    private void updateEqualSets(Set<AbstractExpression> values,
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
+            Set< Set<AbstractExpression> > eqSets,
+            AbstractExpression tveKey, AbstractExpression spExpr)
+    {
+        boolean hasLegacyValues = false;
+        if (eqSets.contains(values)) {
+            eqSets.remove(values);
+            hasLegacyValues = true;
+        }
+        values.add(spExpr);
+        values.add(tveKey);
+        if (hasLegacyValues) {
+            eqSets.add(values);
+        }
+        valueEquivalence.put(spExpr, values);
+        valueEquivalence.put(tveKey, values);
+    }
+
+    @Override
+    public List<SchemaColumn> findPartitioningColumns() {
+        // exported subquery partitioning column(s)
+        if (m_partitioningColumns != null)
+            return m_partitioningColumns;
+
+        m_partitioningColumns = new ArrayList<>();
+        assert(m_subqueriesPartitioning != null);
+
+        if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
+            for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
+                List<SchemaColumn> scols;
+                scols = tableScan.findPartitioningColumns();
+                addPartitioningColumns(scols);
+            }
+        }
+        return m_partitioningColumns;
+    }
+
+    private void addPartitioningColumns(List<SchemaColumn> scols) {
         if (scols == null) return;
 
         // The partitioning columns have to be in its output column list
@@ -104,7 +184,7 @@ public class StmtSubqueryScan extends StmtTableScan {
                     partitionCol.reset(m_tableAlias, m_tableAlias,
                                        colNameForParentQuery, colNameForParentQuery);
 
-                    partitioningColumns.add(partitionCol);
+                    m_partitioningColumns.add(partitionCol);
                     break;
                 }
             }
@@ -114,92 +194,9 @@ public class StmtSubqueryScan extends StmtTableScan {
                 String colNameForParentQuery = partitionCol.getColumnName();
                 partitionCol.reset(m_tableAlias, m_tableAlias,
                         colNameForParentQuery, colNameForParentQuery);
-                partitioningColumns.add(partitionCol);
+                m_partitioningColumns.add(partitionCol);
             }
         }
-    }
-
-    /**
-     * upgrade single partitioning expression to parent level
-     * add the info to equality sets and input value equivalence
-     * @param valueEquivalence
-     * @param eqSets
-     */
-    public void promoteSinglePartitionInfo(
-            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
-            Set< Set<AbstractExpression> > eqSets) {
-        PartitioningForStatement pStmt = getPartitioningForStatement();
-
-
-        if (pStmt.getCountOfPartitionedTables() > 0 && !pStmt.requiresTwoFragments() ) {
-            // this sub-query is single partitioned query on partitioned tables
-            // promoting the single partition express up the its parent level
-
-            AbstractExpression spExpr = pStmt.singlePartitioningExpression();
-            TupleValueExpression tveKey = pStmt.getPartitionColumn();
-            assert(tveKey != null);
-            tveKey.setTableName(m_tableAlias);
-            tveKey.setTableAlias(m_tableAlias);
-
-            // (Xin): If it changes valueEquivalence, we have to update eqSets
-            // Because HashSet stored a legacy hashcode for the object.
-            // This puzzels me at first time.
-            if (valueEquivalence.containsKey(tveKey)) {
-                Set<AbstractExpression> values = valueEquivalence.get(tveKey);
-                boolean hasLegacyValues = false;
-                if (eqSets.contains(values)) {
-                    eqSets.remove(values);
-                    hasLegacyValues = true;
-                }
-                values.add(spExpr);
-                if (hasLegacyValues) {
-                    eqSets.add(values);
-                }
-
-                if (!valueEquivalence.containsKey(spExpr)) {
-                    valueEquivalence.put(spExpr, values);
-                }
-            } else if (valueEquivalence.containsKey(spExpr)) {
-                Set<AbstractExpression> values = valueEquivalence.get(spExpr);
-                boolean hasLegacyValues = false;
-                if (eqSets.contains(values)) {
-                    eqSets.remove(values);
-                    hasLegacyValues = true;
-                }
-                values.add(tveKey);
-                if (hasLegacyValues) {
-                    eqSets.add(values);
-                }
-                valueEquivalence.put(tveKey, values);
-            } else {
-                Set<AbstractExpression> values = new HashSet<AbstractExpression>();
-                values.add(spExpr);
-                values.add(tveKey);
-
-                valueEquivalence.put(spExpr, values);
-                valueEquivalence.put(tveKey, values);
-            }
-        }
-
-    }
-
-    @Override
-    public List<SchemaColumn> findPartitionColumns() {
-        // exported subquery partitioning column(s)
-        if (m_partitioningColumns != null)
-            return m_partitioningColumns;
-
-        m_partitioningColumns = new ArrayList<>();
-        assert(m_subqueriesPartitioning != null);
-
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
-            for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
-                List<SchemaColumn> scols;
-                scols = tableScan.findPartitionColumns();
-                addPartitioningColumns(m_partitioningColumns, scols);
-            }
-        }
-        return m_partitioningColumns;
     }
 
     @Override
