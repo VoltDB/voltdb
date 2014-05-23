@@ -32,8 +32,8 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -93,34 +93,37 @@ public class StmtSubqueryScan extends StmtTableScan {
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets)
     {
-        StatementPartitioning pStmt = getPartitioningForStatement();
+        StatementPartitioning stmtPartitioning = getPartitioningForStatement();
+
+        if (stmtPartitioning.getCountOfPartitionedTables() == 0 ||
+            stmtPartitioning.requiresTwoFragments()) {
+            return;
+        }
         // this sub-query is single partitioned query on partitioned tables
         // promoting the single partition express up the its parent level
-        if (pStmt.getCountOfPartitionedTables() > 0 && !pStmt.requiresTwoFragments() ) {
-            AbstractExpression spExpr = pStmt.singlePartitioningExpression();
+        AbstractExpression spExpr = stmtPartitioning.singlePartitioningExpression();
 
-            for (SchemaColumn col: m_partitioningColumns) {
-                AbstractExpression tveKey = col.getExpression();
-                assert(tveKey instanceof TupleValueExpression);
-                Set<AbstractExpression> values = null;
-                if (valueEquivalence.containsKey(tveKey)) {
-                    values = valueEquivalence.get(tveKey);
-                } else if (valueEquivalence.containsKey(spExpr)) {
-                    values = valueEquivalence.get(spExpr);
-                } else {
-                    for (SchemaColumn otherCol: m_partitioningColumns) {
-                        if (col == otherCol) continue;
-                        if (valueEquivalence.containsKey(otherCol.getExpression())) {
-                            values = valueEquivalence.get(otherCol.getExpression());
-                            break;
-                        }
-                    }
-                    if (values == null) {
-                        values = new HashSet<AbstractExpression>();
+        for (SchemaColumn col: m_partitioningColumns) {
+            AbstractExpression tveKey = col.getExpression();
+            assert(tveKey instanceof TupleValueExpression);
+            Set<AbstractExpression> values = null;
+            if (valueEquivalence.containsKey(tveKey)) {
+                values = valueEquivalence.get(tveKey);
+            } else if (valueEquivalence.containsKey(spExpr)) {
+                values = valueEquivalence.get(spExpr);
+            } else {
+                for (SchemaColumn otherCol: m_partitioningColumns) {
+                    if (col == otherCol) continue;
+                    if (valueEquivalence.containsKey(otherCol.getExpression())) {
+                        values = valueEquivalence.get(otherCol.getExpression());
+                        break;
                     }
                 }
-                updateEqualSets(values, valueEquivalence, eqSets, tveKey, spExpr);
+                if (values == null) {
+                    values = new HashSet<AbstractExpression>();
+                }
             }
+            updateEqualSets(values, valueEquivalence, eqSets, tveKey, spExpr);
         }
     }
 
@@ -146,9 +149,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         valueEquivalence.put(tveKey, values);
     }
 
-    @Override
-    public List<SchemaColumn> findPartitioningColumns() {
-        // exported subquery partitioning column(s)
+    // exported subquery partitioning column(s)
+    private List<SchemaColumn> findPartitioningColumns() {
         if (m_partitioningColumns != null)
             return m_partitioningColumns;
 
@@ -158,7 +160,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
             for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
                 List<SchemaColumn> scols;
-                scols = tableScan.findPartitioningColumns();
+                scols = tableScan.getPartitioningColumns();
                 addPartitioningColumns(scols);
             }
         }
@@ -172,20 +174,22 @@ public class StmtSubqueryScan extends StmtTableScan {
         // in order to be referenced on parent level.
         for (SchemaColumn partitionCol: scols) {
             boolean existsInDisplayList = false;
+            // Find whether the partition column is in output column list
             for (SchemaColumn outputCol: m_outputColumnList) {
-                // Find whether the partition column is in output column list
-                if (outputCol.getTableName().equals(partitionCol.getTableName()) &&
-                    outputCol.getColumnName().equals(partitionCol.getColumnName()) &&
-                    outputCol.getExpression() instanceof TupleValueExpression )
+                if (outputCol.getExpression() instanceof TupleValueExpression)
                 {
-                    existsInDisplayList = true;
+                    TupleValueExpression tve = (TupleValueExpression) outputCol.getExpression();
+                    if (tve.getTableName().equals(partitionCol.getTableName()) &&
+                        tve.getColumnName().equals(partitionCol.getColumnName()))
+                    {
+                        existsInDisplayList = true;
 
-                    String colNameForParentQuery = outputCol.getColumnAlias();
-                    partitionCol.reset(m_tableAlias, m_tableAlias,
-                                       colNameForParentQuery, colNameForParentQuery);
-
-                    m_partitioningColumns.add(partitionCol);
-                    break;
+                        String colNameForParentQuery = outputCol.getColumnAlias();
+                        partitionCol.reset(m_tableAlias, m_tableAlias,
+                                colNameForParentQuery, colNameForParentQuery);
+                        m_partitioningColumns.add(partitionCol);
+                        break;
+                    }
                 }
             }
             // single partition sub-query case can be single partition without

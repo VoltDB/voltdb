@@ -333,7 +333,7 @@ public class StatementPartitioning implements Cloneable{
             // The interpretation of this edge case is that the table has "randomly distributed data".
             // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
             // because it has no recognized partitioning join key.
-            List<SchemaColumn> columnsNeedingCoverage = tableScan.findPartitioningColumns();
+            List<SchemaColumn> columnsNeedingCoverage = tableScan.getPartitioningColumns();
 
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;

@@ -50,12 +50,6 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestSubQueries extends PlannerTestCase {
 
-    private String primaryKeyIndexName(String tbName) {
-        // DDL use this patten to define primary key
-        // "CONSTRAINT P1_PK_TREE PRIMARY KEY"
-        return HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + tbName + "_PK_TREE";
-    }
-
     public void testUnsupportedSyntax() {
         failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
     }
@@ -116,6 +110,14 @@ public class TestSubQueries extends PlannerTestCase {
         }
 
         checkOutputSchema(idxNode, columns);
+    }
+
+    private void checkPrimaryKeySubSelect(AbstractPlanNode indexNode, String tableName, String... columns) {
+        // DDL use this patten to define primary key
+        // "CONSTRAINT P1_PK_TREE PRIMARY KEY"
+        String primaryKeyIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + tableName + "_PK_TREE";
+
+        checkIndexedSubSelects(indexNode, tableName, primaryKeyIndexName, columns);
     }
 
     public void testSimple() {
@@ -308,7 +310,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
 
         planNodes = compileToFragments("select T1.A FROM (SELECT A FROM R1) T1, P1 " +
@@ -325,7 +327,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A");
+        checkPrimaryKeySubSelect(pn, "P1", "A");
 
 
         planNodes = compileToFragments("select T1.A FROM (SELECT A FROM R1) T1, P1 " +
@@ -342,7 +344,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A");
+        checkPrimaryKeySubSelect(pn, "P1", "A");
 
 
         planNodes = compileToFragments("select T1.A, P1.C FROM (SELECT A FROM R1) T1, P1 " +
@@ -395,7 +397,7 @@ public class TestSubQueries extends PlannerTestCase {
 
         assertEquals(nlpn.getInlinePlanNodes().size(), 1);
         pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkIndexedSubSelects(pn, "P2", primaryKeyIndexName("P2"), "A");
+        checkPrimaryKeySubSelect(pn, "P2", "A");
     }
 
     public void testReplicatedGroupbyLIMIT() {
@@ -560,7 +562,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "T1",  "A");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A");
+        checkPrimaryKeySubSelect(pn, "P1", "A");
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
@@ -571,7 +573,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "T1",  "A", "C");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
@@ -608,7 +610,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
 
         // Partitioned Joined tests
@@ -700,7 +702,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScanSubSelects(pn, "P1", "A", "C");
         // Check inlined index scan
         pn = ((NestLoopIndexPlanNode) nlpn).getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkIndexedSubSelects(pn, "P2", primaryKeyIndexName("P2"), "A","D");
+        checkPrimaryKeySubSelect(pn, "P2", "A","D");
 
 
         planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1) T1 " +
@@ -819,7 +821,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
-        checkIndexedSubSelects(pn, "SR4", primaryKeyIndexName("SR4"));
+        checkPrimaryKeySubSelect(pn, "SR4");
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
@@ -864,7 +866,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
-        checkIndexedSubSelects(pn, "SR4", primaryKeyIndexName("SR4"));
+        checkPrimaryKeySubSelect(pn, "SR4");
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T1", "NUM");
         pn = pn.getChild(0);
@@ -1234,7 +1236,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSeqScanSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
-        checkIndexedSubSelects(pn, "P1", primaryKeyIndexName("P1"), "C");
+        checkPrimaryKeySubSelect(pn, "P1", "C");
+
         assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 

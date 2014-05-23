@@ -60,8 +60,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_table.getIsreplicated();
     }
 
-    @Override
-    public List<SchemaColumn> findPartitioningColumns() {
+    private List<SchemaColumn> findPartitioningColumns() {
         if (m_partitioningColumns != null) {
             return m_partitioningColumns;
         }
