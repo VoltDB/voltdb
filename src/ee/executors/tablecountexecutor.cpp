@@ -25,6 +25,7 @@
 #include "expressions/abstractexpression.h"
 #include "plannodes/tablecountnode.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -43,37 +44,47 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
+
     return true;
 }
 
 bool TableCountExecutor::p_execute(const NValueArray &params) {
     TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
     assert(node);
+    assert (node->getPredicate() == NULL);
+    bool isTmpTable =  node->isTmpTable();
+
     Table* output_table = node->getOutputTable();
     assert(output_table);
     assert ((int)output_table->columnCount() == 1);
 
-    PersistentTable* target_table = dynamic_cast<PersistentTable*>(node->getTargetTable());
-    if ( ! target_table) {
+    int64_t rowCounts = 0;
+    Table * table = node->getTargetTable();
+    if (dynamic_cast<StreamedTable*>(table)) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "May not iterate a streamed table.");
+                "May not iterate a streamed table.");
     }
-    VOLT_DEBUG("Table Count table : %s which has %d active, %d visible, %d allocated",
-               target_table->name().c_str(),
-               (int)target_table->activeTupleCount(),
-               (int)target_table->visibleTupleCount(),
-               (int)target_table->allocatedTupleCount());
 
-    assert (node->getPredicate() == NULL);
+    if (isTmpTable) {
+        TempTable* temp_table = dynamic_cast<TempTable*>(table);
+        rowCounts = temp_table->tempTableTupleCount();
+
+    } else {
+        PersistentTable* target_table = dynamic_cast<PersistentTable*>(table);
+        VOLT_DEBUG("Table Count table : %s which has %d active, %d visible, %d allocated",
+                   target_table->name().c_str(),
+                   (int)target_table->activeTupleCount(),
+                   (int)target_table->visibleTupleCount(),
+                   (int)target_table->allocatedTupleCount());
+
+        rowCounts = target_table->visibleTupleCount();
+    }
 
     TableTuple& tmptup = output_table->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue(target_table->visibleTupleCount()));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(rowCounts));
     output_table->insertTuple(tmptup);
 
-
-    //printf("Table count answer: %d", iterator.getSize());
-    //printf("\n%s\n", output_table->debug().c_str());
-    VOLT_TRACE("\n%s\n", output_table->debug().c_str());
+    VOLT_DEBUG("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Table Counting");
 
     return true;

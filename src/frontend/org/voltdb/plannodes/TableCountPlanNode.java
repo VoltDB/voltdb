@@ -17,6 +17,9 @@
 
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
@@ -24,6 +27,12 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
 
 public class TableCountPlanNode extends AbstractScanPlanNode {
+
+    public enum Members {
+        TMP_TABLE
+    }
+
+    private boolean m_tmpTable;
 
     public TableCountPlanNode() {
         super();
@@ -40,6 +49,8 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = child.getTableSchema();
+
+        m_tmpTable = child.isSubQuery();
     }
 
     @Override
@@ -69,8 +80,30 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
+    public void toJSONString(JSONStringer stringer) throws JSONException {
+        super.toJSONString(stringer);
+        if (m_tmpTable) {
+            stringer.key(Members.TMP_TABLE.name());
+            stringer.value(true);
+        }
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        m_tmpTable = false;
+        if (jobj.has(Members.TMP_TABLE.name())) {
+            m_tmpTable = true;
+        }
+    }
+
+    @Override
     protected String explainPlanForNode(String indent) {
-        return "TABLE COUNT of \"" + m_targetTableName + "\"";
+        String explainStr = "TABLE COUNT of \"" + m_targetTableName + "\"";
+        if (m_tmpTable) {
+            explainStr = "TEMPORARY " + explainStr;
+        }
+        return explainStr;
     }
 
 }

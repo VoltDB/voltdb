@@ -29,19 +29,27 @@ class AbstractExpression;
  *
  */
 class TableCountPlanNode : public AbstractScanPlanNode {
-   public:
-        TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        TableCountPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
+        // Do nothing
+    }
+    TableCountPlanNode() : AbstractScanPlanNode() {
+        // Do nothing
+    }
 
-        ~TableCountPlanNode();
+    ~TableCountPlanNode();
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
 
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
+
+    bool isTmpTable() const {return m_tmpTable;}
+
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
+
+    // True if Json plan contains it, else False by default.
+    bool m_tmpTable;
 };
 
 }
