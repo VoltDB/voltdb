@@ -56,13 +56,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
-    public void testGroupByA1() {
-        pns = compileToFragments("SELECT A1 from T1 group by A1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
-    }
-
     public void testCountA1() {
         pns = compileToFragments("SELECT count(A1) from T1");
         for (AbstractPlanNode apn: pns) {
@@ -90,6 +83,43 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
+    }
+
+    public void testGroupByA1() {
+        pns = compileToFragments("SELECT A1 from T1 group by A1");
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+    }
+
+    public void testGroupByPartitionKey() {
+        // Primary key is equal to partition key
+        pns = compileToFragments("SELECT PKEY from T1 group by PKEY");
+        AbstractPlanNode p;
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        // Primary key is not equal to partition key
+        pns = compileToFragments("SELECT A2 from T2 group by A2");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
     }
 
     private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments,

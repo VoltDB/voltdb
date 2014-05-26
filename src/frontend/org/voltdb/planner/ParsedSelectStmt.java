@@ -125,6 +125,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private ArrayList<ParsedColInfo> avgPushdownOrderColumns = null;
     private AbstractExpression avgPushdownHaving = null;
     private NodeSchema avgPushdownNewAggSchema;
+    private boolean m_hasPartitionColumnInGroupby = false;
 
     public long limit = -1;
     public long offset = 0;
@@ -685,6 +686,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 org.voltdb.catalog.Column catalogColumn =
                         tb.getColumns().getExact(groupbyCol.columnName);
                 groupbyCol.index = catalogColumn.getIndex();
+
+                Column partitionColumn = tb.getPartitioncolumn();
+                if (partitionColumn != null &&
+                    partitionColumn.getTypeName().equals(groupbyCol.columnName)) {
+                    m_hasPartitionColumnInGroupby = true;
+                }
             }
         }
         else
@@ -891,6 +898,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return hasAverage;
     }
 
+    public boolean hasPartitionColumnInGroupby() {
+        return m_hasPartitionColumnInGroupby;
+    }
+
     public boolean hasOrderByColumns() {
         return ! orderColumns.isEmpty();
     }
@@ -1018,6 +1029,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+    @Override
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries()
     {
         if (hasAOneRowResult()) {

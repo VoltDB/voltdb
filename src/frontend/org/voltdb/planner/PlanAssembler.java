@@ -1647,9 +1647,9 @@ public class PlanAssembler {
 
             NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
-
-
+            root = pushDownAggregate(root, aggNode, topAggNode,
+                    m_parsedSelect.hasComplexAgg(), newSchema,
+                    !m_parsedSelect.hasPartitionColumnInGroupby());
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1800,7 +1800,9 @@ public class PlanAssembler {
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
-                                       boolean needProjectionNode, NodeSchema newSchema) {
+                                       boolean needProjectionNode,
+                                       NodeSchema newSchema,
+                                       boolean needCoordNode) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1832,11 +1834,17 @@ public class PlanAssembler {
             accessPlanTemp.getChild(0).addAndLinkChild(root);
             root = accessPlanTemp;
             // Add the top node
-            coordNode.addAndLinkChild(root);
-            root = coordNode;
+            if (needCoordNode) {
+                coordNode.addAndLinkChild(root);
+                root = coordNode;
+            }
         }
         // Set post predicate for top Aggregation node
-        ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.having);
+        if (needCoordNode) {
+            ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.having);
+        } else {
+            distNode.setPostPredicate(m_parsedSelect.having);
+        }
 
         if (needProjectionNode) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
