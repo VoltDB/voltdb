@@ -17,9 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
@@ -27,12 +24,6 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
 
 public class TableCountPlanNode extends AbstractScanPlanNode {
-
-    public enum Members {
-        TMP_TABLE
-    }
-
-    private boolean m_tmpTable;
 
     public TableCountPlanNode() {
         super();
@@ -50,7 +41,13 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = child.getTableSchema();
 
-        m_tmpTable = child.isSubQuery();
+        m_isSubQuery = child.isSubQuery();
+        if (m_isSubQuery) {
+            assert(child.getChildCount() == 1);
+            AbstractPlanNode subChild = child.getChild(0);
+            subChild.clearParents();
+            addAndLinkChild(subChild);
+        }
     }
 
     @Override
@@ -68,10 +65,18 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db){}
+    public void generateOutputSchema(Database db){
+        if (m_isSubQuery){
+            m_children.get(0).generateOutputSchema(db);
+        }
+    }
 
     @Override
-    public void resolveColumnIndexes(){}
+    public void resolveColumnIndexes(){
+        if (m_isSubQuery){
+            m_children.get(0).resolveColumnIndexes();
+        }
+    }
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
@@ -80,27 +85,9 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
-        if (m_tmpTable) {
-            stringer.key(Members.TMP_TABLE.name());
-            stringer.value(true);
-        }
-    }
-
-    @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
-        m_tmpTable = false;
-        if (jobj.has(Members.TMP_TABLE.name())) {
-            m_tmpTable = true;
-        }
-    }
-
-    @Override
     protected String explainPlanForNode(String indent) {
         String explainStr = "TABLE COUNT of \"" + m_targetTableName + "\"";
-        if (m_tmpTable) {
+        if (m_isSubQuery) {
             explainStr = "TEMPORARY " + explainStr;
         }
         return explainStr;

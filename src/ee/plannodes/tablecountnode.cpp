@@ -32,16 +32,9 @@ std::string TableCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << this->AbstractScanPlanNode::debugInfo(spacer);
     assert(m_predicate == NULL);
-    std::string tmpString = m_tmpTable ? "TEMPORARY " : "";
+    std::string tmpString = isSubQuery() ? "TEMPORARY " : "";
     buffer << spacer << tmpString << "TABLE COUNT Expression: <NULL>";
     return (buffer.str());
-}
-
-void TableCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    m_tmpTable = false;
-    if (obj.hasNonNullKey("TMP_TABLE")) {
-        m_tmpTable = true;
-    }
 }
 
 }

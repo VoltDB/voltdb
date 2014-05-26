@@ -43,13 +43,6 @@ public:
 
     std::string debugInfo(const std::string &spacer) const;
 
-    bool isTmpTable() const {return m_tmpTable;}
-
-protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
-
-    // True if Json plan contains it, else False by default.
-    bool m_tmpTable;
 };
 
 }

@@ -38,8 +38,6 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
     VOLT_TRACE("init Table Count Executor");
 
     assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
-
     assert(abstract_node->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
@@ -52,25 +50,28 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
     assert(node);
     assert (node->getPredicate() == NULL);
-    bool isTmpTable =  node->isTmpTable();
 
     Table* output_table = node->getOutputTable();
     assert(output_table);
     assert ((int)output_table->columnCount() == 1);
 
-    int64_t rowCounts = 0;
-    Table * table = node->getTargetTable();
-    if (dynamic_cast<StreamedTable*>(table)) {
+    bool isTmpTable =  node->isSubQuery();
+    Table* input_table = isTmpTable ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
+    assert(input_table);
+
+    if (dynamic_cast<StreamedTable*>(input_table)) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 "May not iterate a streamed table.");
     }
 
+    int64_t rowCounts = 0;
     if (isTmpTable) {
-        TempTable* temp_table = dynamic_cast<TempTable*>(table);
+        TempTable* temp_table = dynamic_cast<TempTable*>(input_table);
         rowCounts = temp_table->tempTableTupleCount();
-
     } else {
-        PersistentTable* target_table = dynamic_cast<PersistentTable*>(table);
+        PersistentTable* target_table = dynamic_cast<PersistentTable*>(input_table);
         VOLT_DEBUG("Table Count table : %s which has %d active, %d visible, %d allocated",
                    target_table->name().c_str(),
                    (int)target_table->activeTupleCount(),
