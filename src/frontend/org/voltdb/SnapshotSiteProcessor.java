@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -59,6 +58,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
@@ -879,19 +879,27 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context)
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
-        while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context, true);
-            if (result != null) {
-                try {
-                    result.get();
-                } catch (ExecutionException e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
-                } catch (Exception e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
+        //Set to 10 gigabytes/sec, basically unlimited
+        //Does nothing if rate limiting is not enabled
+        DefaultSnapshotDataTarget.setRate(1024 * 10);
+        try {
+            while (m_snapshotTableTasks != null) {
+                Future<?> result = doSnapshotWork(context, true);
+                if (result != null) {
+                    try {
+                        result.get();
+                    } catch (ExecutionException e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    } catch (Exception e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    }
                 }
             }
+        } finally {
+            //Request default rate again
+            DefaultSnapshotDataTarget.setRate(null);
         }
 
         /**
