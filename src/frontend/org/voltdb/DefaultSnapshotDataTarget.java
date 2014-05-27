@@ -562,4 +562,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public String toString() {
         return m_file.toString();
     }
+
+    public static void setRate(final Integer megabytesPerSecond) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (megabytesPerSecond == null) {
+                    SNAPSHOT_RATELIMITER.setRate(SNAPSHOT_RATELIMIT_MEGABYTES * 1024.0 * 1024.0);
+                } else {
+                    SNAPSHOT_RATELIMITER.setRate(megabytesPerSecond * 1024.0 * 1024.0);
+                }
+            }
+        });
+    }
 }
