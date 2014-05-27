@@ -164,17 +164,19 @@ public class ExportManager
     private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
-        synchronized (ExportManager.this) {
-            if (!m_generations.containsValue(drainedGeneration)) {
+        synchronized (ExportManager.class) {
+            boolean restart = false;
+            if (m_generations.containsValue(drainedGeneration)) {
+                m_generations.remove(drainedGeneration.m_timestamp);
+                m_generationGhosts.add(drainedGeneration.m_timestamp);
+                restart = true;
+                exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
+            } else {
                 exportLog.info("Finished draining a generation that is not known to export generations.");
-                return;
             }
-            m_generations.remove(drainedGeneration.m_timestamp);
-            m_generationGhosts.add(drainedGeneration.m_timestamp);
-            exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
 
             try {
-                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                if (m_loaderClass != null && !m_generations.isEmpty() && restart) {
                     exportLog.info("Creating connector " + m_loaderClass);
                     final Class<?> loaderClass = Class.forName(m_loaderClass);
                     //Make it so
@@ -205,19 +207,22 @@ public class ExportManager
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
+                    oldProcessor = m_processor.getAndSet(newProcessor);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
             }
-            oldProcessor = m_processor.getAndSet(newProcessor);
         }
 
         /*
          * The old processor should not be null since this shutdown task
          * is running for this processor
          */
-        oldProcessor.shutdown();
+        if (oldProcessor != null) {
+            oldProcessor.shutdown();
+        }
         try {
+            //We close and delete regardless
             drainedGeneration.closeAndDelete();
         } catch (IOException e) {
             e.printStackTrace();
@@ -269,6 +274,8 @@ public class ExportManager
         ExportGeneration gen = m_generations.firstEntry().getValue();
         if (gen != null && !gen.isDiskBased()) {
             gen.acceptMastershipTask(partitionId);
+        } else {
+            exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
         }
     }
 
