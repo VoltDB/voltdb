@@ -187,23 +187,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "ORDER BY id, newid").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
-
-
-            vt = client.callProcedure("@AdHoc",
-                    "select T2.id " +
-                    "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
-                    "ORDER BY T2.id").getResults()[0];
-            validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
-                    {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
-
-
-            vt = client.callProcedure("@AdHoc",
-                    "select T2.id " +
-                    "FROM (SELECT id, wage FROM P1) T1, R1 T2 " +
-                    "ORDER BY T2.id").getResults()[0];
-
-
         }
+
+        vt = client.callProcedure("@AdHoc",
+                "select T2.id " +
+                "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
+                "ORDER BY T2.id").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
+                {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
     }
 
     public void testSubSelects_from_replicated() throws NoConnectionsException, IOException, ProcCallException
@@ -284,12 +275,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
 
-    public void testPartitioned() throws NoConnectionsException, IOException, ProcCallException
+    // Test subqueries on partitioned table cases
+    public void testSubSelects_from_partitioned() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);
         VoltTable vt;
-
 
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1) T1, P2 " +
@@ -334,7 +325,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, T1.DEPT, P2.WAGE FROM (SELECT ID, DEPT FROM P1) T1 LEFT OUTER JOIN P2 " +
                 "ON T1.ID = P2.DEPT AND P2.DEPT = 2 order by T1.ID;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] {{1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
                 {3, 1, Long.MIN_VALUE},{4,2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
 

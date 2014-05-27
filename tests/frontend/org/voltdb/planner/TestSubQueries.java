@@ -346,6 +346,23 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkPrimaryKeySubSelect(pn, "P1", "A");
 
+        // Uncomment next test cases when ENG-6371 is fixed
+//        planNodes = compileToFragments("select T1.A FROM (SELECT A FROM R1 where R1.A = 3) T1, P1 " +
+//                "WHERE T1.A = P1.A ");
+//        assertEquals(1, planNodes.size());
+//        pn = planNodes.get(0);
+//        assertTrue(pn instanceof SendPlanNode);
+//        pn = pn.getChild(0);
+//        assertTrue(pn instanceof ProjectionPlanNode);
+//        nlpn = pn.getChild(0);
+//        assertTrue(nlpn instanceof NestLoopPlanNode);
+//        pn = nlpn.getChild(0);
+//        checkSeqScanSubSelects(pn, "T1", "A");
+//        pn = pn.getChild(0);
+//        checkSeqScanSubSelects(pn, "R1", "A");
+//        pn = nlpn.getChild(1);
+//        checkPrimaryKeySubSelect(pn, "P1", "A");
+
 
         planNodes = compileToFragments("select T1.A, P1.C FROM (SELECT A FROM R1) T1, P1 " +
                 "WHERE T1.A = P1.C ");
@@ -948,17 +965,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "WHERE X.A = Y.A and T1.P1A = X.A");
         assertEquals(1, planNodes.size());
 
-    }
-
-    public void testTry() {
-        List<AbstractPlanNode> planNodes;
-        planNodes = compileToFragments(
-                "SELECT * FROM " +
-                "   (select P1.A P1A, P2.A P2A from P1, P2 where p1.a=p2.a and p1.a = 1) T1," +
-                "   P3, P4 " +
-                "WHERE T1.P2A = P4.A and T1.P2A = P3.A");
-
-        for (AbstractPlanNode apn: planNodes) System.out.println(apn.toExplainPlanString());
     }
 
     public void testUnsupportedCases() {
