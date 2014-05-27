@@ -30,11 +30,9 @@ PARTITION PROCEDURE ids_delete ON TABLE ids COLUMN id;
 PARTITION PROCEDURE idsWithMatView_delete ON TABLE idsWithMatView COLUMN id;
 
 CREATE VIEW id_count (
-	id,
-        group_id,
+	group_id,
 	total_id
 ) AS SELECT 
-	id,
-        group_id,
+	group_id,
 	COUNT(*) 
 FROM idsWithMatView GROUP BY group_id;
