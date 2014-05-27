@@ -98,7 +98,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     public void testGroupByPartitionKey() {
         // Primary key is equal to partition key
-        pns = compileToFragments("SELECT PKEY from T1 group by PKEY");
+        pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY");
         AbstractPlanNode p;
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
@@ -112,7 +112,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
         // Primary key is not equal to partition key
-        pns = compileToFragments("SELECT A2 from T2 group by A2");
+        pns = compileToFragments("SELECT A3, COUNT(*) from T3 group by A3");
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
