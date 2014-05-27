@@ -209,6 +209,9 @@ void TupleStreamBase::rollbackTo(size_t mark)
                 break;
             }
         }
+        if (m_currBlock == NULL) {
+            extendBufferChain(m_defaultCapacity);
+        }
     }
 }
 

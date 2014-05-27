@@ -34,7 +34,7 @@ public:
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId);
 
-    ~ExportTupleStream() {
+    virtual ~ExportTupleStream() {
     }
 
     void setSignatureAndGeneration(std::string signature, int64_t generation);
