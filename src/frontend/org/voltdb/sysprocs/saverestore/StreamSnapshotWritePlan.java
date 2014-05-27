@@ -18,12 +18,18 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -44,6 +50,7 @@ import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
@@ -144,6 +151,22 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         return deferredSetup;
     }
 
+    private static boolean haveAnyStreamPairs(List<StreamSnapshotRequestConfig.Stream> localStreams) {
+        boolean haveAny = false;
+        if (localStreams != null && !localStreams.isEmpty()) {
+            int pairCount = 0;
+            Iterator<StreamSnapshotRequestConfig.Stream> itr = localStreams.iterator();
+            while (itr.hasNext() && pairCount == 0) {
+                StreamSnapshotRequestConfig.Stream stream = itr.next();
+                if (stream != null && stream.streamPairs != null) {
+                    pairCount = stream.streamPairs.size();
+                }
+            }
+            haveAny = pairCount > 0;
+        }
+        return haveAny;
+    }
+
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
                                                    HashinatorSnapshotData hashinatorData,
                                                    Map<Integer, byte[]> schemas)
@@ -158,7 +181,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
-        if (!localStreams.isEmpty() && !schemas.isEmpty()) {
+        if (haveAnyStreamPairs(localStreams) && !schemas.isEmpty()) {
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
@@ -243,9 +266,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     streamPairs.put(streamPair.getKey(), streamPair.getValue());
                 }
             }
-
-            localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
-                                                                    stream.newPartition));
+            if (!streamPairs.isEmpty()) {
+                localStreams.add(
+                        new StreamSnapshotRequestConfig.Stream(streamPairs, stream.newPartition)
+                        );
+            }
         }
 
         return localStreams;
