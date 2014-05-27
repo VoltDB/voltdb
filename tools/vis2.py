@@ -30,7 +30,6 @@ def COLORS(k):
 
 #COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
 COLORS = ['b','g','r','c','m','y','k']
-#print COLORS
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
@@ -125,8 +124,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
         return
 
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
+
+    flag = dict()
     for b,bd in plot_data.items():
         for k,v in bd.items():
+            if k not in flag.keys():
+                flag[k] = []
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
             if b not in mc:
@@ -134,7 +137,31 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
             if len(u[0]) > 10:
-                pl.plot(u[0], moving_average(u[1], 10), mc[b][0], None, None, ":")
+                ma = moving_average(u[1], 10)
+                pl.plot(u[0], ma, mc[b][0], None, None, ":")
+                failed = 0
+                if k.startswith('lat'):
+                    cv = np.nanmin(ma)
+                    if ma[-1] > cv * 1.05:
+                        failed = -1
+                        rp = (u[0][np.nanargmin(ma)], cv)
+                else:
+                    cv = np.nanmax(ma)
+                    if ma[-1] < cv * 0.95:
+                        failed = 1
+                        rp = (u[0][np.nanargmax(ma)], cv)
+
+                if failed != 0:
+                    p = (ma[-1]-rp[1])/rp[1]*100.
+                    flag[k].append((b, p))
+                    pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,10*failed),
+                        textcoords='offset points', ha='center', color='red')
+                    pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
+                        textcoords='offset points', ha='left', color='red')
+                    pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
+                        textcoords='offset points', ha='left', color='red')
+                    for pos in ['top', 'bottom', 'right', 'left']:
+                        pl.ax.spines[pos].set_edgecolor("red")
 
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
@@ -154,6 +181,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                         textcoords='offset points', ha='center', va='top', xytext=(0,-5))
             """
     pl.close()
+    return flag
 
 def generate_index_file(filenames):
     row = """
@@ -188,18 +216,30 @@ def generate_index_file(filenames):
 
     hrow = """
     <tr>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
     </tr>
 """
-
-    h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    h = []
+    for x in filenames:
+        tdattr = ""
+        tdnote = ""
+        M = 0.0
+        if len(x) == 6:
+            print x[5].values()
+            for v in x[5].values():
+                if len(v) > 0:
+                    M = max(M, abs(v[0][1]))
+        if M > 0.0:
+            tdattr = 'bgcolor=red'
+            tdnote = " (by %.2f%%)" % M
+        h.append((tdattr, x[0].replace(' ','%20'), x[0] + tdnote))
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
-        h.append(('',''))
+        h.append(('','',''))
         z -= 1
 
     rows = []
@@ -296,13 +336,16 @@ def main():
 
         app_filename = app.replace(' ', '_')
         fns = [app]
+        flags = dict()
         for r in legend:
             title = app + " " + r[1]
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            f = plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            flags.update(f)
 
         fns.append(iorder)
+        fns.append(flags)
         filenames.append(tuple(fns))
 
     filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))

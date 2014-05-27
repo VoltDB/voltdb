@@ -19,6 +19,7 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;
@@ -135,8 +136,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     }
                     try {
                         int totalWritten = 0;
-                        while (data.b().hasRemaining()) {
-                            int written = m_fc.write(data.b());
+
+                        final ByteBuffer dataBuf = data.b();
+                        DefaultSnapshotDataTarget.enforceSnapshotRateLimit(dataBuf.remaining());
+
+                        while (dataBuf.hasRemaining()) {
+                            int written = m_fc.write(dataBuf);
                             if (written > 0) {
                                 m_bytesWritten += written;
                                 totalWritten += written;
