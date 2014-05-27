@@ -95,9 +95,11 @@ function matviewbenchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         matviewbenchmark.MaterializedViewBenchmark \
-        # --displayinterval=5 \
-        # --inserts=10000000 \
-        # --servers=localhost
+        --displayinterval=5 \
+        --servers=localhost \
+        --txn=10000000 \
+        --warmup=100000 \
+        --group=0
 }
 
 function help() {
