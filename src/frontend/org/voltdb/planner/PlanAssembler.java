@@ -1263,7 +1263,7 @@ public class PlanAssembler {
          */
         AbstractPlanNode sendNode = null;
         // Whether or not we can push the limit node down
-        boolean canPushDown = ! m_parsedSelect.m_distinct;
+        boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
             sendNode = checkPushDownViability(root);
             if (sendNode == null) {
@@ -1926,7 +1926,7 @@ public class PlanAssembler {
      * @return
      */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
-        if (m_parsedSelect.m_distinct) {
+        if (m_parsedSelect.hasDistinct()) {
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
             //if (m_parsedSelect.displayColumns.size() > 1)

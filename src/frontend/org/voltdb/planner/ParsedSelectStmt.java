@@ -129,10 +129,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public long m_limit = -1;
     public long m_offset = 0;
-    public boolean m_distinct = false;
 
     private long m_limitParameterId = -1;
     private long m_offsetParameterId = -1;
+    private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
@@ -905,6 +905,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
+    }
+
+    public boolean hasDistinct() {
+        return m_distinct;
     }
 
     public List<ParsedColInfo> displayColumns() {

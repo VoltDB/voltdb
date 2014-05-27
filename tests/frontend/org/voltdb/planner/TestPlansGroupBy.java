@@ -86,20 +86,39 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByA1() {
+        AbstractPlanNode p;
+        AggregatePlanNode aggNode;
         pns = compileToFragments("SELECT A1 from T1 group by A1");
-        AbstractPlanNode p = pns.get(0).getChild(0);
+        p = pns.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        // Having
+        pns = compileToFragments("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNotNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
     }
 
     public void testGroupByPartitionKey() {
         // Primary key is equal to partition key
-        pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY");
         AbstractPlanNode p;
+        AggregatePlanNode aggNode;
+
+        pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY");
+
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
@@ -111,6 +130,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
+        // Test Having expression
+        pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY Having count(*) > 3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNotNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
         // Primary key is not equal to partition key
         pns = compileToFragments("SELECT A3, COUNT(*) from T3 group by A3");
         p = pns.get(0).getChild(0);
@@ -119,6 +150,69 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        // Test Having expression
+        pns = compileToFragments("SELECT A3, COUNT(*) from T3 group by A3 Having count(*) > 3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNotNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+
+        // Group by partition key and others
+        pns = compileToFragments("SELECT B3, A3, COUNT(*) from T3 group by B3, A3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        // Test Having expression
+        pns = compileToFragments("SELECT B3, A3, COUNT(*) from T3 group by B3, A3 Having count(*) > 3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNotNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+    }
+
+    public void testGroupByPartitionKey_Negative() {
+        AbstractPlanNode p;
+        AggregatePlanNode aggNode;
+
+        pns = compileToFragments("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY)");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+
+        pns = compileToFragments("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY) Having count(*) > 3");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNotNull(aggNode.getPostPredicate());
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode)p;
+        assertNull(aggNode.getPostPredicate());
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
     }
 
