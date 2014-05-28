@@ -112,6 +112,21 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
+    protected boolean verifyIndexUniqueness(String index, boolean expectedUniq) throws Exception
+    {
+        VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
+        boolean found = moveToMatchingRow(indexinfo, "INDEX_NAME", index);
+        boolean verified = false;
+        if (found) {
+            int thisval = (int)indexinfo.getLong("NON_UNIQUE");
+            int expectedVal = expectedUniq ? 0 : 1;
+            if (thisval == expectedVal) {
+                verified = true;
+            }
+        }
+        return verified;
+    }
+
     protected boolean doesColumnExist(String table, String column) throws Exception
     {
         VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
@@ -143,6 +158,21 @@ public class AdhocDDLTestBase extends TestCase {
         if (found) {
             int thissize = (int)columns.getLong("COLUMN_SIZE");
             if (thissize == size) {
+                verified = true;
+            }
+        }
+        return verified;
+    }
+
+    protected boolean verifyTableColumnDefault(String table, String column, String value)
+        throws Exception
+    {
+        VoltTable columns = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
+        boolean verified = false;
+        if (found) {
+            String thisdefault = columns.getString("COLUMN_DEF");
+            if ((thisdefault == null && value == null) || (thisdefault.equals(value))) {
                 verified = true;
             }
         }

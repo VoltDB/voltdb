@@ -315,4 +315,201 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testAlterColumnOther() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL varchar(50), " +
+                "constraint PK_TREE primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            assertTrue(verifyTableColumnDefault("FOO", "VAL", null));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set default 'goats';");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail");
+            }
+            assertTrue(verifyTableColumnDefault("FOO", "VAL", "'goats'"));
+            assertTrue(isColumnNullable("FOO", "VAL"));
+            // Can't just make something not null (for the moment, empty table
+            // check to come later?)
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set not null;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to declare not null on existing column", threw);
+            assertTrue(isColumnNullable("FOO", "VAL"));
+            // Now change the default back to null
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set default NULL;");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail");
+            }
+            assertTrue(verifyTableColumnDefault("FOO", "VAL", null));
+            assertTrue(isColumnNullable("FOO", "VAL"));
+
+            // Can't make primary key nullable
+            assertFalse(isColumnNullable("FOO", "ID"));
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter ID set null;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to make the primary key nullable", threw);
+            assertFalse(isColumnNullable("FOO", "ID"));
+
+            // magic name for PK index
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add unique (ID);");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail to add unique constraint to column with unique constraint");
+            }
+            // Unique constraint we added is redundant with existing constraint
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+
+            // Now, drop the PK constraint
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO drop constraint PK_TREE;");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail to drop primary key constraint");
+            }
+            // Now we create a new named index for the unique constraint.  C'est la vie.
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_CT_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_CT_FOO_ID", true));
+
+            // Can't add a PK constraint on the other column
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add constraint PK_TREE primary key (VAL);");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to add a primary key on nullable column", threw);
+
+            // But we can add it back on the original column
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add constraint PK_TREE primary key (ID);");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Shouldn't fail to add primary key constraint");
+            }
+            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
+            // Of course we rename this yet again, because, why not?
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testAlterRename() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL varchar(50), " +
+                "constraint PK_TREE primary key (ID)" +
+                ");\n" +
+                "create table EMPTYFOO (" +
+                "ID integer not null," +
+                "VAL varchar(50), " +
+                "constraint PK_TREE2 primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.addPartitionInfo("EMPTYFOO", "ID");
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            // write a couple rows to FOO so it's not empty
+            m_client.callProcedure("FOO.insert", 0, "ryanloves");
+            m_client.callProcedure("FOO.insert", 1, "theyankees");
+
+            // check rename table fails
+            assertEquals(2, m_client.callProcedure("@AdHoc", "select count(*) from foo;").getResults()[0].asScalarLong());
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO rename to BAR;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to rename a non-empty table", threw);
+            assertEquals(2, m_client.callProcedure("@AdHoc", "select count(*) from foo;").getResults()[0].asScalarLong());
+
+            // check rename column on a table fails
+            assertEquals("ryanloves", m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0].asScalarLong());
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter column VAL rename to LAV;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to rename columns in a non-empty table", threw);
+            assertEquals("ryanloves", m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0].asScalarLong());
+
+            // After the empty table checks go in, add similar tests to EMPTYFOO that show
+            // that rename on empty stuff works.
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
