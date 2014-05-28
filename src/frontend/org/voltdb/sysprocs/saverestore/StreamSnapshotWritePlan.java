@@ -266,11 +266,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     streamPairs.put(streamPair.getKey(), streamPair.getValue());
                 }
             }
-            if (!streamPairs.isEmpty()) {
-                localStreams.add(
-                        new StreamSnapshotRequestConfig.Stream(streamPairs, stream.newPartition)
-                        );
-            }
+
+            localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
+                                                                    stream.newPartition));
         }
 
         return localStreams;
