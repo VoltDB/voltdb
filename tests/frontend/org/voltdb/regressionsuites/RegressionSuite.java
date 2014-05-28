@@ -277,14 +277,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+    public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, expected);
     }
 
-    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -293,7 +293,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -302,7 +302,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+    public void validateRowOfLongs(VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -329,11 +329,17 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
+            // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
                 assertEquals(expected[i], actual);
             } else {
-                VoltType type = vt.getColumnType(i);
-                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                if (isHSQL()) {
+                    // Hsql return 0 for NULL
+                    assertEquals(0, actual);
+                } else {
+                    VoltType type = vt.getColumnType(i);
+                    assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                }
             }
         }
     }
