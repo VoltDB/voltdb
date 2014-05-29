@@ -94,6 +94,7 @@ public class TestSQLLexer {
     public void testIsPermitted()
     {
         assertTrue(SQLLexer.isPermitted("create table PANTS (ID int, RENAME varchar(50));"));
+        assertTrue(SQLLexer.isPermitted("create table PANTS (\n ID int,\n RENAME varchar(50)\n);"));
         assertFalse(SQLLexer.isPermitted("create view PANTS (ID int, RENAME varchar(50));"));
         assertFalse(SQLLexer.isPermitted("create index PANTS (ID int, RENAME varchar(50));"));
         assertFalse(SQLLexer.isPermitted("create tabel PANTS (ID int, RENAME varchar(50));"));

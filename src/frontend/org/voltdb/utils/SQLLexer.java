@@ -30,7 +30,7 @@ public class SQLLexer
             "^\\s*" +  // start of line, 0 or more whitespace
             "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
             "\\s+", // one or more whitespace
-            Pattern.CASE_INSENSITIVE
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
     private static final Pattern WHITELIST_1 = Pattern.compile(
@@ -40,7 +40,7 @@ public class SQLLexer
             "table" + // but it's gotta be on tables
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
     private static final Pattern[] WHITELISTS = { WHITELIST_1 };
@@ -51,7 +51,7 @@ public class SQLLexer
             "(export|import|limit|partition)" + // DDL we're not ready to handle
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
     // Also, don't accept RENAME for the tokens we do take yet
@@ -68,7 +68,7 @@ public class SQLLexer
             "to" + // VERBOTEN, CONT'D
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
     private static final Pattern[] BLACKLISTS = { BLACKLIST_1, BLACKLIST_2 };
@@ -94,14 +94,14 @@ public class SQLLexer
         for (Pattern wl : WHITELISTS) {
             Matcher wlMatcher = wl.matcher(sql);
             if (!wlMatcher.matches()) {
-                COMPILER_LOG.debug("Statement: " + sql + " , failed whitelist: " + wlMatcher.toString());
+                COMPILER_LOG.info("Statement: " + sql + " , failed whitelist: " + wlMatcher.toString());
                 return false;
             }
         }
         for (Pattern bl : BLACKLISTS) {
             Matcher blMatcher = bl.matcher(sql);
             if (blMatcher.matches()) {
-                COMPILER_LOG.debug("Statement: " + sql + " , failed blacklist: " + blMatcher.toString());
+                COMPILER_LOG.info("Statement: " + sql + " , failed blacklist: " + blMatcher.toString());
                 return false;
             }
         }
