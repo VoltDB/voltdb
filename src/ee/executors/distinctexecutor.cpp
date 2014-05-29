@@ -91,7 +91,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iterator(true);
     TableTuple tuple(input_table->schema());
 
     // substitute params for distinct expression

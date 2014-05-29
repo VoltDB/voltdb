@@ -162,7 +162,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        TableIterator iterator = input_table->iterator();
+        TableIterator iterator = input_table->iterator(true);
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
