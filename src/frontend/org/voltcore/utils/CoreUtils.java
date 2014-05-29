@@ -676,4 +676,15 @@ public class CoreUtils {
             return queue.take();
         }
     }
+
+    public static final boolean fatalStoredProcThrowable(Throwable th) {
+        if (th instanceof NoClassDefFoundError || th instanceof UnsatisfiedLinkError || th instanceof AssertionError) {
+            return false;
+        }
+        if (th instanceof Exception) {
+            return false;
+        }
+        return true;
+    };
+
 }

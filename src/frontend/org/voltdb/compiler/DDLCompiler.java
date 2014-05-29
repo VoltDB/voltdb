@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -612,19 +613,19 @@ public class DDLCompiler {
             Class<?> clazz;
             try {
                 clazz = Class.forName(className, true, m_classLoader);
-            } catch (ClassNotFoundException e) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Cannot load class for procedure: %s",
-                        className));
             }
             catch (Throwable cause) {
-                // We are here because the class was found and the initializer of the class
-                // threw an error we can't anticipate. So we will wrap the error with a
-                // runtime exception that we can trap in our code.
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Cannot load class for procedure: %s",
-                        className), cause);
-
+                // We are here because either the class was not found or the class was found and
+                // the initializer of the class threw an error we can't anticipate. So we will
+                // wrap the error with a runtime exception that we can trap in our code.
+                if (CoreUtils.fatalStoredProcThrowable(cause)) {
+                    throw (Error)cause;
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Cannot load class for procedure: %s",
+                            className), cause);
+                }
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
