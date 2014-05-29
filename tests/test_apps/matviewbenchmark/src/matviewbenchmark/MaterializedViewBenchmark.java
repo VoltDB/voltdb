@@ -95,7 +95,7 @@ public class MaterializedViewBenchmark {
     }
 	
     class StatusListener extends ClientStatusListenerExt {
-	@Override
+	    @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
             if (benchmarkActive) {
@@ -107,19 +107,19 @@ public class MaterializedViewBenchmark {
     public MaterializedViewBenchmark(MatViewConfig config) {
         this.config = config;
 		
-	benchmarkActive = false;
+        benchmarkActive = false;
 		
-	ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-		
-	client = ClientFactory.createClient(clientConfig);
-		
-	periodicStatsContext = client.createStatsContext();
-	fullStatsContext = client.createStatsContext();
-		
-	insert_throughput = 0;
-	insert_execute = 0;
-	delete_throughput = 0;
-	delete_execute = 0;
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+
+        client = ClientFactory.createClient(clientConfig);
+
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
+
+        insert_throughput = 0;
+        insert_execute = 0;
+        delete_throughput = 0;
+        delete_execute = 0;
     }
 	
     /**
@@ -211,7 +211,7 @@ public class MaterializedViewBenchmark {
      */
     public synchronized void printResults(String procedure) throws Exception {
         ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
-        double metric = 0.0;
+        double execTimeInMicroSec = 0.0;
 
         // 1. Results and performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -227,8 +227,8 @@ public class MaterializedViewBenchmark {
         while (procStats.advanceRow()) {
             String procName = procStats.getString("PROCEDURE");
             if (procName.equals(procedure)) {
-            	metric = (procStats.getLong("AVG") / 1000.0);
-            	System.out.printf("Average execution time: %,9f usec\n", metric);
+            	execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
+            	System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
             	break;
             }
         }
@@ -242,7 +242,7 @@ public class MaterializedViewBenchmark {
      */
     public synchronized void printResults(String procedure, FileWriter fw, String suffix) throws Exception {
         ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
-        double metric = 0.0;
+        double execTimeInMicroSec = 0.0;
 
         // 1. Results and performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -258,8 +258,8 @@ public class MaterializedViewBenchmark {
         while (procStats.advanceRow()) {
             String procName = procStats.getString("PROCEDURE");
             if (procName.equals(procedure)) {
-            	metric = (procStats.getLong("AVG") / 1000.0);
-            	System.out.printf("Average execution time: %,9f usec\n", metric);
+            	execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
+            	System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
             	break;
             }
         }
@@ -269,12 +269,13 @@ public class MaterializedViewBenchmark {
                                 suffix,
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
-                                metric));
+                                execTimeInMicroSec));
         
+        // Expecting the custom insert/delete procedure names ex. ids_insert
         if (procedure.split("_")[1].equals("insert")) {
             if (insert_throughput > 0) {
                 insert_throughput = Math.abs(insert_throughput - stats.getTxnThroughput());
-                insert_execute = Math.abs(insert_execute - metric);
+                insert_execute = Math.abs(insert_execute - execTimeInMicroSec);
                 fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
                                         "Insert_Diff",
                                         stats.getStartTimestamp(),
@@ -282,12 +283,12 @@ public class MaterializedViewBenchmark {
                                         insert_execute));
             } else {
                 insert_throughput = stats.getTxnThroughput();
-                insert_execute = metric;
+                insert_execute = execTimeInMicroSec;
             }
         } else {
             if (delete_throughput > 0) {
                 delete_throughput = Math.abs(delete_throughput - stats.getTxnThroughput());
-                delete_execute = Math.abs(delete_execute - metric);
+                delete_execute = Math.abs(delete_execute - execTimeInMicroSec);
                 fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
                                         "Delete_Diff",
                                         stats.getStartTimestamp(),
@@ -295,7 +296,7 @@ public class MaterializedViewBenchmark {
                                         delete_execute));
             } else {
                 delete_throughput = stats.getTxnThroughput();
-                delete_execute = metric;
+                delete_execute = execTimeInMicroSec;
             }
         }
     }
