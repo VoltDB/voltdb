@@ -20,15 +20,58 @@ package org.voltdb.utils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltcore.logging.VoltLogger;
+
 public class SQLLexer
 {
+    private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL at the moment
+            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
             "\\s+", // one or more whitespace
             Pattern.CASE_INSENSITIVE
             );
+
+    private static final Pattern WHITELIST_1 = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(alter|create|drop)" + // DDL we're ready to handle
+            "\\s+" + // one or more whitespace
+            "table" + // but it's gotta be on tables
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE
+            );
+
+    private static final Pattern[] WHITELISTS = { WHITELIST_1 };
+
+    // Don't accept these DDL tokens yet
+    private static final Pattern BLACKLIST_1 = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(export|import|limit|partition)" + // DDL we're not ready to handle
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE
+            );
+
+    // Also, don't accept RENAME for the tokens we do take yet
+    private static final Pattern BLACKLIST_2 = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "alter" + // DDL we're ready to handle
+            "\\s+" + // one or more whitespace
+            "table" + // but it's gotta be on tables
+            "\\s+" + // one or more whitespace
+            ".*" + // some stuff
+            "\\s+" + // one or more whitespace
+            "rename" + // VERBOTEN
+            "\\s+" + // one or more whitespace
+            "to" + // VERBOTEN, CONT'D
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE
+            );
+
+    private static final Pattern[] BLACKLISTS = { BLACKLIST_1, BLACKLIST_2 };
 
     /**
      * Get the DDL token, if any, at the start of this statement.
@@ -42,5 +85,26 @@ public class SQLLexer
             ddlToken = ddlMatcher.group(1).toLowerCase();
         }
         return ddlToken;
+    }
+
+    // Naive filtering for stuff we haven't implemented yet.
+    // Hopefully this gets whittled away and eventually disappears.
+    public static boolean isPermitted(String sql)
+    {
+        for (Pattern wl : WHITELISTS) {
+            Matcher wlMatcher = wl.matcher(sql);
+            if (!wlMatcher.matches()) {
+                COMPILER_LOG.debug("Statement: " + sql + " , failed whitelist: " + wlMatcher.toString());
+                return false;
+            }
+        }
+        for (Pattern bl : BLACKLISTS) {
+            Matcher blMatcher = bl.matcher(sql);
+            if (blMatcher.matches()) {
+                COMPILER_LOG.debug("Statement: " + sql + " , failed blacklist: " + blMatcher.toString());
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -127,6 +127,14 @@ public class AsyncCompilerAgent {
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }
+                // if it's DDL, check to see if it's allowed
+                if (hasDDL && !SQLLexer.isPermitted(stmt)) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
             }
             if (!hasDDL) {
                 final AsyncCompilerResult result = compileAdHocPlan(w);

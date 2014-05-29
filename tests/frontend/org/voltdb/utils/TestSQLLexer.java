@@ -89,4 +89,28 @@ public class TestSQLLexer {
         checkDDL("-- partition table pants", null);
         checkDDL("partitoin table pants", null);
     }
+
+    @Test
+    public void testIsPermitted()
+    {
+        assertTrue(SQLLexer.isPermitted("create table PANTS (ID int, RENAME varchar(50));"));
+        assertFalse(SQLLexer.isPermitted("create view PANTS (ID int, RENAME varchar(50));"));
+        assertFalse(SQLLexer.isPermitted("create index PANTS (ID int, RENAME varchar(50));"));
+        assertFalse(SQLLexer.isPermitted("create tabel PANTS (ID int, RENAME varchar(50));"));
+        assertFalse(SQLLexer.isPermitted("craete table PANTS (ID int, RENAME varchar(50));"));
+
+        assertTrue(SQLLexer.isPermitted("drop table pants;"));
+        assertFalse(SQLLexer.isPermitted("drop view pants;"));
+        assertFalse(SQLLexer.isPermitted("drop index pants;"));
+        assertFalse(SQLLexer.isPermitted("dorp table pants;"));
+        assertFalse(SQLLexer.isPermitted("drop tabel pants;"));
+
+        assertTrue(SQLLexer.isPermitted("alter table pants add column blargy blarg;"));
+        assertTrue(SQLLexer.isPermitted("alter table pants add constraint blargy blarg;"));
+        assertFalse(SQLLexer.isPermitted("alter index pants"));
+        assertFalse(SQLLexer.isPermitted("alter table pants rename to shorts;"));
+        assertFalse(SQLLexer.isPermitted("alter table pants alter column rename to shorts;"));
+        assertFalse(SQLLexer.isPermitted("altre table pants blargy blarg;"));
+        assertFalse(SQLLexer.isPermitted("alter tabel pants blargy blarg;"));
+    }
 }
