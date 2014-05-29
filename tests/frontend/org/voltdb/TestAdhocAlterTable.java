@@ -492,7 +492,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertEquals(2, m_client.callProcedure("@AdHoc", "select count(*) from foo;").getResults()[0].asScalarLong());
 
             // check rename column on a table fails
-            assertEquals("ryanloves", m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0].asScalarLong());
+            VoltTable results = m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0];
+            results.advanceRow();
+            assertEquals("ryanloves", results.getString("VAL"));
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -503,7 +505,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 threw = true;
             }
             assertTrue("Shouldn't be able to rename columns in a non-empty table", threw);
-            assertEquals("ryanloves", m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0].asScalarLong());
+            results = m_client.callProcedure("@AdHoc", "select VAL from FOO where ID = 0;").getResults()[0];
+            results.advanceRow();
+            assertEquals("ryanloves", results.getString("VAL"));
 
             // After the empty table checks go in, add similar tests to EMPTYFOO that show
             // that rename on empty stuff works.
