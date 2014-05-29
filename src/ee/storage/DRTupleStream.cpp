@@ -141,11 +141,8 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
     // row header is 32-bit length of row plus null mask
     *rowHeaderSz = sizeof(int32_t) + nullMaskLength;
 
-    // returns 0 if corrupt tuple detected
+    //Can return 0 for a single column varchar with null
     size_t dataSz = tuple.maxExportSerializationSize();
-    if (dataSz == 0) {
-        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
-    }
 
     return *rowHeaderSz + dataSz;
 }
