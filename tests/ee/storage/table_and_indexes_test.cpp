@@ -173,7 +173,7 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, &drStream, false, 0);
+            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, signature, &drStream, false, 0);
 
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
@@ -193,6 +193,7 @@ class TableAndIndexTest : public Test {
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                       warehouseTupleSchema, warehouseColumnNames,
+                                                                      signature,
                                                                       &drStream, false,
                                                                       0, false, false);
 
@@ -214,6 +215,7 @@ class TableAndIndexTest : public Test {
 
             customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                      customerTupleSchema, customerColumnNames,
+                                                                     signature,
                                                                      &drStream, false,
                                                                      0, false, false);
 
@@ -275,6 +277,7 @@ class TableAndIndexTest : public Test {
         TableIndexScheme  customerIndex2Scheme;
         vector<int>       customerIndex3ColumnIndices;
         TableIndexScheme  customerIndex3Scheme;
+        char signature[20];
 };
 
 TEST_F(TableAndIndexTest, BigTest) {

@@ -91,7 +91,7 @@ public:
         vector<TableIndexScheme> indexes;
 
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, &drStream, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -115,6 +115,7 @@ public:
     vector<int32_t> m_tableSchemaColumnSizes;
     vector<bool> m_tableSchemaAllowNull;
     vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
 };
 
 TEST_F(PersistentTableMemStatsTest, InsertTest) {

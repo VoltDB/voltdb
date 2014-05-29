@@ -24,6 +24,7 @@
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
+#include "crc/crc32c.h"
 
 #include <cstdio>
 #include <limits>
@@ -41,7 +42,7 @@ const int MAX_BUFFER_AGE = 4000;
 
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
-      m_enabled(false),
+      m_enabled(true),
       m_partitionId(0)
 {}
 
@@ -61,69 +62,71 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 {
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
-//
-//    size_t rowHeaderSz = 0;
-//    size_t tupleMaxLength = 0;
-//
-//    // Transaction IDs for transactions applied to this tuple stream
-//    // should always be moving forward in time.
-//    if (spHandle < m_openSpHandle)
-//    {
-//        throwFatalException(
-//                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-//                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-//                );
-//    }
-//
-//    commit(lastCommittedSpHandle, spHandle);
-//
-//    // Compute the upper bound on bytes required to serialize tuple.
-//    // exportxxx: can memoize this calculation.
-//    tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-//    if (!m_currBlock) {
-//        extendBufferChain(m_defaultCapacity);
-//    }
-//
-//    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
-//        extendBufferChain(tupleMaxLength);
-//    }
-//
-//    // initialize the full row header to 0. This also
-//    // has the effect of setting each column non-null.
-//    ::memset(m_currBlock->mutableDataPtr(), 0, rowHeaderSz);
-//
-//    // the nullarray lives in rowheader after the 4 byte header length prefix
-//    uint8_t *nullArray =
-//      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
-//
-//    // position the serializer after the full rowheader
-//    ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
-//                             m_currBlock->remaining() - rowHeaderSz);
-//
-//    // write metadata columns
-//    io.writeLong(spHandle);
-//    io.writeLong(timestamp);
-//    io.writeLong(seqNo);
-//    io.writeLong(m_partitionId);
-//
-//    // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
-//    io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
-//
-//    // write the tuple's data
-//    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
-//
-//    // write the row size in to the row header
-//    // rowlength does not include the 4 byte row header
-//    // but does include the null array.
-//    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), 4);
-//    hdr.writeInt((int32_t)(io.position()) + (int32_t)rowHeaderSz - 4);
-//
-//    // update m_offset
-//    m_currBlock->consumed(rowHeaderSz + io.position());
+
+    size_t rowHeaderSz = 0;
+    size_t tupleMaxLength = 0;
+
+    // Transaction IDs for transactions applied to this tuple stream
+    // should always be moving forward in time.
+    if (spHandle < m_openSpHandle)
+    {
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle
+                );
+    }
+
+    commit(lastCommittedSpHandle, spHandle, txnId);
+
+    // Compute the upper bound on bytes required to serialize tuple.
+    // exportxxx: can memoize this calculation.
+    tupleMaxLength = computeOffsets(tuple, &rowHeaderSz) + TXN_RECORD_HEADER_SIZE;
+    if (!m_currBlock) {
+        extendBufferChain(m_defaultCapacity);
+    }
+
+    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
+        extendBufferChain(tupleMaxLength);
+    }
+
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                             m_currBlock->remaining());
+    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<int8_t>(type));
+    io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
+    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
+
+    // initialize the full row header to 0. This also
+    // has the effect of setting each column non-null.
+    ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
+
+    // the nullarray lives in rowheader after the 4 byte header length prefix
+    uint8_t *nullArray =
+      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position());
+
+    // write the tuple's data
+    tuple.serializeToExport(io, 0, nullArray);
+
+    // write the row size in to the row header
+    // rowlength does not include the 4 byte length prefix or record header
+    // but does include the null array.
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, 4);
+    //The TXN_RECORD_HEADER_SIZE is 4 bytes longer because it includes the checksum at the end
+    //so there is no need to subtract and additional 4 bytes to make the length prefix not inclusive
+    hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
+
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
+    crc = vdbcrc::crc32cFinish(crc);
+    io.writeInt(crc);
+
+    // update m_offset
+    m_currBlock->consumed(io.position());
 //
 //    // update uso.
     const size_t startingUso = m_uso;
-//    m_uso += (rowHeaderSz + io.position());
+    m_uso += io.position();
+
     return startingUso;
 }
 
@@ -132,14 +135,11 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
                                    size_t *rowHeaderSz)
 {
     // round-up columncount to next multiple of 8 and divide by 8
-    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
+    const int columnCount = tuple.sizeInValues();
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask
-    *rowHeaderSz = sizeof (int32_t) + nullMaskLength;
-
-    // metadata column width: 5 int64_ts plus CHAR(1).
-    size_t metadataSz = (sizeof (int64_t) * 5) + 1;
+    *rowHeaderSz = sizeof(int32_t) + nullMaskLength;
 
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxExportSerializationSize();
@@ -147,9 +147,50 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
 
-    return *rowHeaderSz + metadataSz + dataSz;
+    return *rowHeaderSz + dataSz;
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+}
+
+void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
+    if (!m_currBlock) {
+         extendBufferChain(m_defaultCapacity);
+     }
+
+     if ((m_currBlock->rawLength() + BEGIN_RECORD_SIZE) > m_defaultCapacity) {
+         extendBufferChain(BEGIN_RECORD_SIZE);
+     }
+     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                              m_currBlock->remaining());
+     io.writeByte(DR_VERSION);
+     io.writeByte(static_cast<int8_t>(BEGIN_TXN));
+     io.writeLong(txnId);
+     io.writeLong(spHandle);
+     uint32_t crc = vdbcrc::crc32cInit();
+     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), BEGIN_RECORD_SIZE - 4);
+     crc = vdbcrc::crc32cFinish(crc);
+     io.writeInt(crc);
+     m_currBlock->consumed(io.position());
+}
+
+void DRTupleStream::endTransaction(int64_t spHandle) {
+    if (!m_currBlock) {
+         extendBufferChain(m_defaultCapacity);
+     }
+
+     if ((m_currBlock->rawLength() + END_RECORD_SIZE) > m_defaultCapacity) {
+         extendBufferChain(END_RECORD_SIZE);
+     }
+     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                              m_currBlock->remaining());
+     io.writeByte(DR_VERSION);
+     io.writeByte(static_cast<int8_t>(END_TXN));
+     io.writeLong(spHandle);
+     uint32_t crc = vdbcrc::crc32cInit();
+     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
+     crc = vdbcrc::crc32cFinish(crc);
+     io.writeInt(crc);
+     m_currBlock->consumed(io.position());
 }

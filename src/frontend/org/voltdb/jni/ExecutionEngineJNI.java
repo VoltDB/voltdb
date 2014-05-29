@@ -376,7 +376,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long spHandle, final long lastCommittedSpHandle, boolean returnUniqueViolations,
+        final long spHandle, final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
@@ -390,7 +390,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //Clear is destructive, do it before the native call
         deserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
-                                              spHandle, lastCommittedSpHandle, returnUniqueViolations, undoToken);
+                                              spHandle, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
+                                              undoToken);
         checkErrorCode(errorCode);
 
         try {

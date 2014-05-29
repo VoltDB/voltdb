@@ -232,7 +232,7 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
-                                                         m_columnNames, &drStream, false, 0, false, false,
+                                                         m_columnNames, signature, &drStream, false, 0, false, false,
                                                          tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
@@ -1093,6 +1093,7 @@ public:
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
     DefaultTupleSerializer m_serializer;
     char m_serializationBuffer[BUFFER_SIZE];
     char m_predicateBuffer[1024 * 256];

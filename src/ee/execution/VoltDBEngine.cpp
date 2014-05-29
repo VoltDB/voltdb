@@ -990,7 +990,8 @@ bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
-                        bool returnUniqueViolations)
+                        bool returnUniqueViolations,
+                        bool shouldDRStream)
 {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
@@ -1018,7 +1019,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }

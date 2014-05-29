@@ -155,7 +155,7 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, &drStream));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature, &drStream));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -277,6 +277,7 @@ public:
 
     CatalogId m_tableId;
     MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(CompactionTest, BasicCompaction) {

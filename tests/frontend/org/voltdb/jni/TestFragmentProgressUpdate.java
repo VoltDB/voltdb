@@ -101,7 +101,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 

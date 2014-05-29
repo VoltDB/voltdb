@@ -20,6 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.utils.DBBPool;
 import org.voltdb.licensetool.LicenseApi;
@@ -93,7 +95,104 @@ public class PartitionDRGateway {
                                    ClientResponseImpl response) {}
     public void tick(long txnId) {}
 
-    public static void pushDRBuffer(int partitionId, ByteBuffer buf) {
+    private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
+        @Override
+        protected AtomicLong initialValue() {
+            return new AtomicLong(-1);
+        }
+    };
+
+    private static final ThreadLocal<AtomicLong> lastCommittedSpHandle = new ThreadLocal<AtomicLong>() {
+        @Override
+        protected AtomicLong initialValue() {
+            return new AtomicLong(0);
+        }
+    };
+
+    private static final boolean logDebug = false;
+
+    public static synchronized void pushDRBuffer(int partitionId, ByteBuffer buf) {
+        if (logDebug) {
+            System.out.println("Received DR buffer size " + buf.remaining());
+            AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            //Magic header space for Java for implementing zero copy stuff
+            buf.position(8);
+            while (buf.hasRemaining()) {
+                int startPosition = buf.position();
+                byte version = buf.get();
+                byte type = buf.get();
+
+                int checksum = 0;
+                if (version != 0) System.out.println("Remaining is " + buf.remaining());
+
+                switch (type) {
+                case 0: {
+                    //Insert
+                    if (haveOpenTransaction.get() == -1) {
+                        System.out.println("Have insert but no open transaction");
+                        System.exit(-1);
+                    }
+                    final long tableHandle = buf.getLong();
+                    final int lengthPrefix = buf.getInt();
+                    buf.position(buf.position() + lengthPrefix);
+                    checksum = buf.getInt();
+                    System.out.println("Version " + version + " type INSERT table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
+                    break;
+                }
+                case 1: {
+                    //Delete
+                    if (haveOpenTransaction.get() == -1) {
+                        System.out.println("Have insert but no open transaction");
+                        System.exit(-1);
+                    }
+                    final long tableHandle = buf.getLong();
+                    final int lengthPrefix = buf.getInt();
+                    buf.position(buf.position() + lengthPrefix);
+                    checksum = buf.getInt();
+                    System.out.println("Version " + version + " type DELETE table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
+                    break;
+                }
+                case 2:
+                    //Update
+                    //System.out.println("Version " + version + " type UPDATE " + checksum " + checksum);
+                    break;
+                case 3: {
+                    //Begin txn
+                    final long txnId = buf.getLong();
+                    final long spHandle = buf.getLong();
+                    if (haveOpenTransaction.get() != -1) {
+                        System.out.println("Have open transaction txnid " + txnId + " spHandle " + spHandle + " but already open transaction");
+                        System.exit(-1);
+                    }
+                    haveOpenTransaction.set(spHandle);
+                    checksum = buf.getInt();
+                    System.out.println("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
+                    break;
+                }
+                case 4: {
+                    //End txn
+                    final long spHandle = buf.getLong();
+                    if (haveOpenTransaction.get() == -1 ) {
+                        System.out.println("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandle.get().get());
+    //                    checksum = buf.getInt();
+    //                    break;
+                        System.exit(-1);
+                    }
+                    haveOpenTransaction.set(-1);
+                    lastCommittedSpHandle.get().set(spHandle);
+                    checksum = buf.getInt();
+                    System.out.println("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
+                    break;
+                }
+                }
+                int calculatedChecksum = DBBPool.getBufferCRC32C(buf, startPosition, buf.position() - startPosition - 4);
+                if (calculatedChecksum != checksum) {
+                    System.out.println("Checksum " + calculatedChecksum + " didn't match " + checksum);
+                    System.exit(-1);
+                }
+            }
+        }
         DBBPool.wrapBB(buf).discard();
     }
 }

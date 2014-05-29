@@ -236,7 +236,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        ReferenceSerializeInput &serializeIn,
                        int64_t txnId,
                        int64_t spHandle, int64_t lastCommittedSpHandle,
-                       bool returnUniqueViolations);
+                       bool returnUniqueViolations,
+                       bool shouldDRStream);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }

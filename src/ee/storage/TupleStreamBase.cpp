@@ -92,7 +92,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, bool sync)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, bool sync)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -123,12 +123,16 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     // - The current transaction is now our open transaction
     if (m_openSpHandle < currentSpHandle)
     {
+        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
+            endTransaction(m_openSpHandle);
+        }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
-        //<< currentSpHandle << ")" << std::endl;
+        //<< currentSpHandle << ")" << std::endl;T
         m_committedUso = m_uso;
         // Advance the tip to the new transaction.
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
+        beginTransaction(txnId, currentSpHandle);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -139,6 +143,9 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
+        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
+            endTransaction(m_openSpHandle);
+        }
         m_committedSpHandle = m_openSpHandle;
     }
 
@@ -290,7 +297,7 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          */
         if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
             extendBufferChain(0);
-            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
+            commit(lastCommittedSpHandle, currentSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
         }
     }
 }

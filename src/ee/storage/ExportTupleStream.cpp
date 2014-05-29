@@ -107,7 +107,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle);
+    commit(lastCommittedSpHandle, spHandle, spHandle);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.

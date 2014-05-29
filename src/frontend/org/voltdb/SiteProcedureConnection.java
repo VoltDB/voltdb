@@ -73,6 +73,7 @@ public interface SiteProcedureConnection {
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo)
     throws VoltAbortException;
 
@@ -85,6 +86,7 @@ public interface SiteProcedureConnection {
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo);
 
     /**

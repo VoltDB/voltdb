@@ -88,7 +88,7 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, DRTupleStream *drStream, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
+PersistentTable::PersistentTable(int partitionColumn, DRTupleStream *drStream, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -110,6 +110,7 @@ PersistentTable::PersistentTable(int partitionColumn, DRTupleStream *drStream, b
     }
 
     m_preTruncateTable = NULL;
+    ::memcpy(&m_signature, signature, 20);
 }
 
 PersistentTable::~PersistentTable()
@@ -365,7 +366,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
 {
     if (fallible) {
         // not null checks at first
@@ -399,13 +400,13 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
                 CONSTRAINT_TYPE_UNIQUE);
     }
 
-    size_t drMark = 0;
-    if (!m_isMaterialized) {
+    size_t drMark = m_drStream->m_uso;
+    if (!m_isMaterialized && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        m_drStream->appendTuple(lastCommittedSpHandle, NULL, currentTxnId, currentSpHandle, target, DRTupleStream::INSERT);
+        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -563,14 +564,14 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
-    size_t drMark = 0;
+    size_t drMark = m_drStream->m_uso;
     if (!m_isMaterialized) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        m_drStream->appendTuple(lastCommittedSpHandle, NULL, currentTxnId, currentSpHandle, targetTupleToUpdate, DRTupleStream::DELETE);
-        drMark = m_drStream->appendTuple(lastCommittedSpHandle, NULL, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DRTupleStream::INSERT);
+        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DRTupleStream::DELETE);
+        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DRTupleStream::INSERT);
     }
 
     if (uq) {
@@ -688,13 +689,13 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         m_views[i]->processTupleDelete(target, fallible);
     }
 
-    size_t drMark = 0;
+    size_t drMark = m_drStream->m_uso;
     if (!m_isMaterialized) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drMark = m_drStream->appendTuple(lastCommittedSpHandle, NULL, currentTxnId, currentSpHandle, target, DRTupleStream::DELETE);
+        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::DELETE);
     }
 
     if (fallible) {
@@ -1039,9 +1040,10 @@ void PersistentTable::onSetColumns() {
 void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
-                                         size_t &tupleCountPosition) {
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows) {
     try {
-        insertTupleCommon(tuple, tuple, true);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {

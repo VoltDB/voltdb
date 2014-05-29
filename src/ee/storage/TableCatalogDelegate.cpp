@@ -36,6 +36,7 @@
 #include "storage/StreamBlock.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+#include "sha1/sha1.h"
 
 #include <boost/foreach.hpp>
 
@@ -363,8 +364,13 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     bool tableIsMaterialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
+    SHA1_CTX shaCTX;
+    SHA1_Init(&shaCTX);
+    SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
+    char signatureDigest[SHA1_DIGEST_SIZE];
+    SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureDigest));
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, drStream, tableIsMaterialized,
+                                                    schema, columnNames, signatureDigest, drStream, tableIsMaterialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,

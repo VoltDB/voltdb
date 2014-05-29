@@ -62,6 +62,7 @@ Table* TableFactory::getPersistentTable(
             const std::string &name,
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
+            char *signature,
             DRTupleStream *drStream,
             bool tableIsMaterialized,
             int partitionColumn,
@@ -77,7 +78,7 @@ Table* TableFactory::getPersistentTable(
         table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(partitionColumn, drStream, tableIsMaterialized, tableAllocationTargetSize, tupleLimit);
+        table = new PersistentTable(partitionColumn, drStream, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit);
     }
 
     initCommon(databaseId, table, name, schema, columnNames, true, compactionThreshold);

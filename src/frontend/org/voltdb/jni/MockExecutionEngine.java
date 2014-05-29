@@ -134,7 +134,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
-        final long lastCommittedTxnId, boolean returnUniqueViolations, long undoToken)
+        final long lastCommittedTxnId, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         return null;

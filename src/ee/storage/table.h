@@ -276,7 +276,8 @@ class Table {
      */
     void loadTuplesFromNoHeader(SerializeInput &serialize_in,
                                 Pool *stringPool = NULL,
-                                ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                                bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
@@ -284,7 +285,8 @@ class Table {
      */
     void loadTuplesFrom(SerializeInput &serialize_in,
                         Pool *stringPool = NULL,
-                        ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                        bool shouldDRStreamRows = false);
 
 
     // ------------------------------------------------------------------
@@ -368,7 +370,8 @@ protected:
     virtual void processLoadedTuple(TableTuple &tuple,
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition) {
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRow) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {

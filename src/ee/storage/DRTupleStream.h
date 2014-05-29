@@ -30,7 +30,14 @@ namespace voltdb {
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
-    enum Type { INSERT = 0, DELETE = 1, UPDATE = 2 };
+    //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
+    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
+    //Version(1), type(1), sphandle(8), checksum(4)
+    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
+    //Version(1), type(1), table signature(8), checksum(4)
+    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
+    static const uint8_t DR_VERSION = 0;
+    enum Type { INSERT = 0, DELETE = 1, UPDATE = 2, BEGIN_TXN = 3, END_TXN = 4 };
 
     DRTupleStream();
 
@@ -52,6 +59,9 @@ public:
                        DRTupleStream::Type type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+
+    void beginTransaction(int64_t txnId, int64_t spHandle);
+    void endTransaction(int64_t spHandle);
 
 private:
     bool m_enabled;

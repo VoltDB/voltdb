@@ -120,7 +120,7 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, &drStream, false);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature, &drStream, false);
             table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);
@@ -136,6 +136,7 @@ protected:
     TempTableLimits limits;
     int tempTableMemory;
     MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(TableTest, ValueTypes) {
