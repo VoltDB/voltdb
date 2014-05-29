@@ -95,7 +95,7 @@ public class MaterializedViewBenchmark {
     }
 	
     class StatusListener extends ClientStatusListenerExt {
-	    @Override
+        @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
             if (benchmarkActive) {
