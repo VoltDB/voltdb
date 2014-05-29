@@ -121,9 +121,9 @@ public class PlanAssembler {
     PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
-    private PartitioningForStatement m_partitioning;
+    private StatementPartitioning m_partitioning;
 
-    public PartitioningForStatement getPartition() {
+    public StatementPartitioning getPartition() {
         return m_partitioning;
     }
 
@@ -150,7 +150,7 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanSelector planSelector) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
@@ -269,7 +269,7 @@ public class PlanAssembler {
                 throw new PlanningErrorException(msg);
             }
         } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
-            m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+            m_partitioning.setPartitioningColumnForDML(targetTable.getPartitioncolumn());
         }
 
         if (parsedStmt instanceof ParsedInsertStmt) {
@@ -487,12 +487,12 @@ public class PlanAssembler {
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
-        PartitioningForStatement commonPartitioning = null;
+        StatementPartitioning commonPartitioning = null;
 
         // Build best plans for the children first
         int planId = 0;
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
-            PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+            StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector processor = (PlanSelector) m_planSelector.clone();
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
@@ -590,7 +590,7 @@ public class PlanAssembler {
         assert(subQuery != null);
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = planId;
-        PartitioningForStatement currentPartitioning = (PartitioningForStatement)m_partitioning.clone();
+        StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, selector);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
@@ -614,9 +614,9 @@ public class PlanAssembler {
         if (subScanCanPushdown) {
             compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
         }
-
-        m_partitioning.addPartitioningFromSubquery(currentPartitioning);
+        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
+
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
                 compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
                 selector.m_planId);
@@ -669,14 +669,7 @@ public class PlanAssembler {
          * the one required send/receive pair is already in the plan below the
          * inner side of a NestLoop join.
          */
-
-        JoinNode jroot = m_parsedSelect.m_joinTree;
-
         if (m_partitioning.requiresTwoFragments()) {
-            if (!jroot.isReplicatedInSubselects() && !jroot.isReplicatedOutsideSubselects()) {
-                throw new PlanningErrorException("Subqueries from multiple partitioned table or join with partitioned table are not supported.");
-            }
-
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
@@ -1044,7 +1037,7 @@ public class PlanAssembler {
             }
 
             // Hint that this statement can be executed SP.
-            if (column.equals(m_partitioning.getColumn())) {
+            if (column.equals(m_partitioning.getPartitionColForDML())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }

@@ -1842,7 +1842,7 @@ TEST CASES
     <condition property="config_seed" value="-s ${sql_coverage_seed}" else="">
         <isset property="sql_coverage_seed"/>
     </condition>
-    <condition property="config_suite" value="${default_config}"
+    <condition property="config_suite" value="${test.example.dir}/${sql_coverage_suite}"
                else="${regression_config}">
         <isset property="sql_coverage_suite"/>
     </condition>
