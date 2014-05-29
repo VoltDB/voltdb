@@ -464,7 +464,7 @@ public class TestCSVLoader {
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
-    
+
     @Test
     public void testBlankNull() throws Exception
     {
