@@ -618,7 +618,7 @@ public class DDLCompiler {
                 // We are here because either the class was not found or the class was found and
                 // the initializer of the class threw an error we can't anticipate. So we will
                 // wrap the error with a runtime exception that we can trap in our code.
-                if (CoreUtils.fatalStoredProcThrowable(cause)) {
+                if (CoreUtils.isStoredProcThrowableFatalToServer(cause)) {
                     throw (Error)cause;
                 }
                 else {

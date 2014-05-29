@@ -338,7 +338,7 @@ public class ProcedureRunner {
                     } else {
                         error = true;
                     }
-                    if (CoreUtils.fatalStoredProcThrowable(ex)) {
+                    if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
                         // a missing object that results in an error, throw the error and let the server deal with
                         // the condition as best as it can (usually a crashLocalVoltDB).

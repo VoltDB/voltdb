@@ -677,8 +677,13 @@ public class CoreUtils {
         }
     }
 
-    public static final boolean fatalStoredProcThrowable(Throwable th) {
-        if (th instanceof NoClassDefFoundError || th instanceof UnsatisfiedLinkError || th instanceof AssertionError) {
+    /*
+     * This method manages the whitelist of all acceptable Throwables (and Exceptions) that
+     * will not cause the Server harm if they occur while invoking the initializer of a stored
+     * procedure or while calling the stored procedure.
+     */
+    public static final boolean isStoredProcThrowableFatalToServer(Throwable th) {
+        if (th instanceof LinkageError || th instanceof AssertionError) {
             return false;
         }
         if (th instanceof Exception) {
