@@ -53,6 +53,8 @@
 #include "storage/TempTableLimits.h"
 #include "storage/TupleBlock.h"
 
+#include <iterator>
+
 namespace voltdb {
 
 class TableColumn;
@@ -273,10 +275,10 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
 }
 
 inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
-    if (nextBlockIterator != m_data.begin()) {
+    // somehow we preserve the first block
+    if(std::distance(m_data.begin(), nextBlockIterator) >= 2) {
         nextBlockIterator--;
         *nextBlockIterator = NULL;
-
         if (m_limits) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
