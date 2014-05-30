@@ -161,9 +161,6 @@ public class TestJDBCResultSet {
         try {
             hsqlEmptyStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLEMPTY", ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
             hsql3RowStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLTABLE", ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
-            //Statement HsqlStmt = HsqlConn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE);
-            //hsql3RowRS = HsqlStmt.executeQuery("SELECT * FROM HSQLTABLE");
-            //HsqlStmt.close();
 
             hsqlEmptyRS = hsqlEmptyStmt.executeQuery();
             hsql3RowRS = hsql3RowStmt.executeQuery();
