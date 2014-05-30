@@ -135,6 +135,10 @@ public class RegressionSuite extends TestCase {
         return getClient(1000 * 60 * 10); // 10 minute default
     }
 
+    public Client getClientToHostId(int hostId) throws IOException {
+        return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
+    }
+
     public Client getFullyConnectedClient() throws IOException {
         return getFullyConnectedClient(1000 * 60 * 10); // 10 minute default
     }
@@ -164,6 +168,30 @@ public class RegressionSuite extends TestCase {
         // retry once
         catch (ConnectException e) {
             listener = listeners.get(r.nextInt(listeners.size()));
+            client.createConnection(listener);
+        }
+        m_clients.add(client);
+        return client;
+    }
+
+    /**
+     * Get a VoltClient instance connected to a specific server driven by the
+     * VoltServerConfig instance. Find the server by the config's HostId.
+     *
+     * @return A VoltClient instance connected to the server driven by the
+     * VoltServerConfig instance.
+     */
+    public Client getClientToHostId(int hostId, long timeout) throws IOException {
+        final String listener = m_config.getListenerAddress(hostId);
+        ClientConfig config = new ClientConfigForTest(m_username, m_password);
+        config.setConnectionResponseTimeout(timeout);
+        config.setProcedureCallTimeout(timeout);
+        final Client client = ClientFactory.createClient(config);
+        try {
+            client.createConnection(listener);
+        }
+        // retry once
+        catch (ConnectException e) {
             client.createConnection(listener);
         }
         m_clients.add(client);
