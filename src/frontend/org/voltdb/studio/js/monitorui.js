@@ -88,8 +88,8 @@ this.AddMonitor = function(tab)
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
-    , 'lastTransactionCount': -1
     , 'lastTimedTransactionCount': -1
+    , 'lastTickTransactions': -1
     , 'lastLatencyAverage': 0.0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
@@ -203,7 +203,7 @@ this.RefreshMonitor = function(id, Success)
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
 
-	var currentTimerTick = (new Date()).getTime();
+	var currentTimerTick = 0;
 	var latData = monitor.latData;
 	var tpsData = monitor.tpsData;
 	var memData = monitor.memData;
@@ -229,6 +229,7 @@ this.RefreshMonitor = function(id, Success)
 	{
 		var srcData = table[j];
 		var data = null;
+                currentTimerTick = srcData[0];
 		if (srcData[1] in procStats)
 		{
 			data = procStats[srcData[1]];
@@ -271,18 +272,19 @@ this.RefreshMonitor = function(id, Success)
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
-	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
+	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0)
 	{
-		var delta = currentTimedTransactionCount - monitor.lastTransactionCount;
+		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
-		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
-		dataLat = dataLat.slice(1);
-		if (currentTimedTransactionCount == monitor.lastTimedTransactionCount)
+		if (monitor.lastTimerTick != currentTimerTick)
 		{
-			if (delta < 10)
-				dataLat.push([dataIdx,0]);
-			else
-				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+			monitor.lastTickTransactions = delta*1000.0 / (currentTimerTick - monitor.lastTimerTick);
+		}
+		dataTPS.push([dataIdx, monitor.lastTickTransactions]);
+		dataLat = dataLat.slice(1);
+		if (monitor.lastTimerTick == currentTimerTick)
+		{
+			dataLat.push([dataIdx,0]);
 		}
 		else
 		{
@@ -333,7 +335,6 @@ this.RefreshMonitor = function(id, Success)
 	}
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
-	monitor.lastTransactionCount = currentTimedTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
 	monitor.lastLatencyAverage = currentLatencyAverage;
 	
