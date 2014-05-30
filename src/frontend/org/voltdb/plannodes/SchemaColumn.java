@@ -179,6 +179,21 @@ public class SchemaColumn
         return m_columnAlias;
     }
 
+    public void reset(String tbName, String tbAlias, String colName, String colAlias) {
+        m_tableName = tbName;
+        m_tableAlias = tbAlias;
+        m_columnName = colName;
+        m_columnAlias = colAlias;
+
+        if (m_expression instanceof TupleValueExpression) {
+            TupleValueExpression tve = (TupleValueExpression) m_expression;
+            tve.setTableName(m_tableName);
+            tve.setTableAlias(m_tableAlias);
+            tve.setColumnName(m_columnName);
+            tve.setColumnAlias(m_columnAlias);
+        }
+    }
+
     public AbstractExpression getExpression()
     {
         return m_expression;

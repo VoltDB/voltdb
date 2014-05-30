@@ -449,6 +449,23 @@ public class TestCSVLoader {
     }
 
     @Test
+    public void testBlankDefault() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,,,,,,,",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
     public void testBlankNull() throws Exception
     {
         String []myOptions = {

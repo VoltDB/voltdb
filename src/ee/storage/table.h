@@ -138,6 +138,7 @@ class Table {
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
     virtual TableIterator *makeIterator() = 0;
+    virtual TableIterator& iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -383,6 +384,10 @@ public:
 protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple *tuple) = 0;
+    virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May not use freeLastScanedBlock with streamed tables or persistent tables.");
+    }
 
     Table(int tableAllocationTargetSize);
     void resetTable();
@@ -433,6 +438,7 @@ protected:
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
+    // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
 
     // indexes

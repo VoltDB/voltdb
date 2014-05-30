@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -612,10 +613,19 @@ public class DDLCompiler {
             Class<?> clazz;
             try {
                 clazz = Class.forName(className, true, m_classLoader);
-            } catch (ClassNotFoundException e) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Cannot load class for procedure: %s",
-                        className));
+            }
+            catch (Throwable cause) {
+                // We are here because either the class was not found or the class was found and
+                // the initializer of the class threw an error we can't anticipate. So we will
+                // wrap the error with a runtime exception that we can trap in our code.
+                if (CoreUtils.isStoredProcThrowableFatalToServer(cause)) {
+                    throw (Error)cause;
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Cannot load class for procedure: %s",
+                            className), cause);
+                }
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
@@ -1889,7 +1899,7 @@ public class DDLCompiler {
 
             if (stmt.hasComplexGroupby()) {
                 groupbyExprs = new ArrayList<AbstractExpression>();
-                for (ParsedColInfo col: stmt.groupByColumns) {
+                for (ParsedColInfo col: stmt.m_groupByColumns) {
                     groupbyExprs.add(col.expression);
                 }
                 // Parse group by expressions to json string
@@ -1904,8 +1914,8 @@ public class DDLCompiler {
 
             } else {
                 // add the group by columns from the src table
-                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
                     Column srcCol = srcColumnArray.get(gbcol.index);
                     ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
                     // groupByColumns is iterating in order of groups. Store that grouping order
@@ -1917,8 +1927,8 @@ public class DDLCompiler {
                 }
 
                 // parse out the group by columns into the dest table
-                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
@@ -1926,11 +1936,11 @@ public class DDLCompiler {
             }
 
             // Set up COUNT(*) column
-            ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
+            ParsedSelectStmt.ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
             processMaterializedViewColumn(matviewinfo, srcTable,
-                    destColumnArray.get(stmt.groupByColumns.size()),
+                    destColumnArray.get(stmt.m_groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
@@ -1939,7 +1949,7 @@ public class DDLCompiler {
             pkIndex.setUnique(true);
             // add the group by columns from the src table
             // assume index 1 throuh #grpByCols + 1 are the cols
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+            for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
                 ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
                 c.setColumn(destColumnArray.get(i));
                 c.setIndex(i);
@@ -1953,8 +1963,8 @@ public class DDLCompiler {
             boolean hasAggregationExprs = false;
             boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
-            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
                 if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     hasAggregationExprs = true;
@@ -1997,8 +2007,8 @@ public class DDLCompiler {
             }
 
             // parse out the aggregation columns into the dest table
-            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
@@ -2102,8 +2112,8 @@ public class DDLCompiler {
      * @throws VoltCompilerException
      */
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
-        int groupColCount = stmt.groupByColumns.size();
-        int displayColCount = stmt.displayColumns.size();
+        int groupColCount = stmt.m_groupByColumns.size();
+        int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
         if (stmt.m_tableList.size() != 1) {
@@ -2126,8 +2136,8 @@ public class DDLCompiler {
 
         int i;
         for (i = 0; i < groupColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
@@ -2136,14 +2146,14 @@ public class DDLCompiler {
             checkExpressions.add(outcol.expression);
         }
 
-        AbstractExpression coli = stmt.displayColumns.get(i).expression;
+        AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
             msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 
         for (i++; i < displayColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&

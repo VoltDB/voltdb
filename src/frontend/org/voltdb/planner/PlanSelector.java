@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.io.File;
-import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;

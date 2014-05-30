@@ -33,7 +33,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -164,16 +164,16 @@ public class AsyncCompilerAgent {
         assert(work.sqlStatements != null);
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
-        PartitioningForStatement partitioning = null;
+        StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
-                partitioning = PartitioningForStatement.inferPartitioning();
+                partitioning = StatementPartitioning.inferPartitioning();
             }
             else if (work.userPartitionKey == null) {
-                partitioning = PartitioningForStatement.forceMP();
+                partitioning = StatementPartitioning.forceMP();
             } else {
-                partitioning = PartitioningForStatement.forceSP();
+                partitioning = StatementPartitioning.forceSP();
             }
             try {
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);

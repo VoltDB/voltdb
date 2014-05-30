@@ -84,6 +84,10 @@ public:
     bool hasNext();
     int getLocation() const;
 
+    void setTempTableDeleteAsGo(bool flag) {
+        m_tempTableDeleteAsGo = flag;
+    }
+
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
@@ -122,6 +126,7 @@ private:
     TBPtr m_currentBlock;
     std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableIterator;
+    bool m_tempTableDeleteAsGo;
 };
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
@@ -133,7 +138,8 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
       m_tempBlockIterator(start),
-      m_tempTableIterator(true)
+      m_tempTableIterator(true),
+      m_tempTableDeleteAsGo(false)
     {
     }
 
@@ -149,10 +155,12 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock),
       m_currentBlock(NULL),
-      m_tempTableIterator(false)
+      m_tempTableIterator(false),
+      m_tempTableDeleteAsGo(false)
     {
     }
 
+// FIXME: This constructor is called from Temptable constructor, but set m_tempTableIterator to be false
 inline TableIterator::TableIterator(Table *parent)
     : m_table(parent),
       m_dataPtr(NULL),
@@ -163,7 +171,8 @@ inline TableIterator::TableIterator(Table *parent)
       m_tupleLength(0),
       m_tuplesPerBlock(1),
       m_currentBlock(NULL),
-      m_tempTableIterator(false)
+      m_tempTableIterator(false),
+      m_tempTableDeleteAsGo(false)
     {
     }
 
@@ -179,6 +188,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
     m_tempTableIterator = true;
+    m_tempTableDeleteAsGo = false;
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -192,6 +202,7 @@ inline void TableIterator::reset(TBMapI start) {
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
     m_tempTableIterator = false;
+    m_tempTableDeleteAsGo = false;
 }
 
 inline bool TableIterator::hasNext() {
@@ -201,12 +212,10 @@ inline bool TableIterator::hasNext() {
 // This function should be replaced by specific iteration functions
 // when the caller knows the table type.
 inline bool TableIterator::next(TableTuple &out) {
-    if (!m_tempTableIterator) {
-        return persistentNext(out);
-    }
-    else {
+    if (m_tempTableIterator) {
         return tempNext(out);
     }
+    return persistentNext(out);
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {
@@ -254,6 +263,11 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         if (m_currentBlock == NULL ||
             m_blockOffset >= m_currentBlock->unusedTupleBoundry())
         {
+            // delete the last block of tuples in this temp table when they will never be used
+            if (m_tempTableDeleteAsGo) {
+                m_table->freeLastScanedBlock(m_tempBlockIterator);
+            }
+
             m_currentBlock = *m_tempBlockIterator;
             m_dataPtr = m_currentBlock->address();
             m_blockOffset = 0;
