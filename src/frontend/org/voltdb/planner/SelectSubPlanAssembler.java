@@ -68,7 +68,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
-    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
         super(db, parsedStmt, partitioning);
         //TODO: refactor all of this join order calculation into an AbstractParsedStmt method that

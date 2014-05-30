@@ -69,6 +69,26 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof IndexScanPlanNode);
     }
 
+
+    // Test subquery temp table count
+    public void testCountStar003() {
+        List<AbstractPlanNode> pn = compileToFragments("select count(*) from (SELECT count(*) from T1) Temp");
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+    }
+
+    public void testCountStar004() {
+        List<AbstractPlanNode> pn = compileToFragments("select count(*) from (SELECT count(*) from P1) Temp");
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+    }
+
     // This is generated as an IndexScan which can't be converted into an index count,
     // rather than as the same table count as "SELECT count(*) from T1".
     // The meaningless "order by" here fools the planner.
