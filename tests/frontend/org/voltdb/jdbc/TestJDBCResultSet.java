@@ -190,6 +190,7 @@ public class TestJDBCResultSet {
     @Test
     public void testEmptyLastStatement() throws Exception {
         assertTrue(hsqlEmptyRS.last() == voltEmptyRS.last());
+        assertTrue(hsqlEmptyRS.getRow() == voltEmptyRS.getRow());
     }
 
 }

@@ -737,7 +737,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkClosed();
         try
         {
-            return table.getActiveRowIndex();
+            return table.getActiveRowIndex()+1;
         }
         catch(Exception x)
         {
