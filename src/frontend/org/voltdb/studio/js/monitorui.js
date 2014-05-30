@@ -272,7 +272,7 @@ this.RefreshMonitor = function(id, Success)
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
-	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0)
+	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
 	{
 		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
