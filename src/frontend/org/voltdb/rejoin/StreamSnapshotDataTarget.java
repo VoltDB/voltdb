@@ -247,7 +247,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 if ((now - work.m_ts) > m_writeTimeout) {
                     IOException exception =
                         new IOException(String.format(
-                            "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
+                            "A snapshot write task failed after a timeout (currently %d seconds outstanding). " +
+                            "Node rejoin may need to be retried",
                             (now - work.m_ts) / 1000));
                     rejoinLog.error(exception.getMessage());
                     m_writeFailed.compareAndSet(null, exception);

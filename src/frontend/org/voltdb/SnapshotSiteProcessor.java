@@ -45,6 +45,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -61,7 +62,6 @@ import com.google_voltpatches.common.collect.ListMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -581,12 +581,16 @@ public class SnapshotSiteProcessor {
                             writeFutures.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                if (t.getMessage().startsWith("A snapshot write task failed after a timeout")) {
+                                    SNAP_LOG.error(t.getMessage());
+                                } else {
+                                    SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                }
                                 m_lastSnapshotSucceded = false;
                             }
                         }
                     }
-                }, MoreExecutors.sameThreadExecutor());
+                }, CoreUtils.SAMETHREADEXECUTOR);
             }
 
             /**
@@ -768,7 +772,6 @@ public class SnapshotSiteProcessor {
                 jsonObj.put("hostCount", remainingHosts);
                 jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
-                    SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
