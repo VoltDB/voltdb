@@ -268,8 +268,6 @@ inline bool TableIterator::tempNext(TableTuple &out) {
                 m_table->freeLastScanedBlock(m_tempBlockIterator);
             }
 
-            assert(m_tempBlockIterator != m_table->getDataEndBlockIterator());
-
             m_currentBlock = *m_tempBlockIterator;
             m_dataPtr = m_currentBlock->address();
             m_blockOffset = 0;

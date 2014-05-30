@@ -91,9 +91,9 @@ class TempTable : public Table {
         return new TableIterator(this, m_data.begin());
     }
 
-    TableIterator& iterator(bool deleteAsWeGo) {
+    TableIterator& iteratorDeletingAsWeGo() {
         m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(deleteAsWeGo);
+        m_iter.setTempTableDeleteAsGo(true);
         return m_iter;
     }
 
@@ -284,11 +284,6 @@ inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBloc
         }
     }
 }
-
-inline std::vector<TBPtr>::iterator TempTable::getDataEndBlockIterator() {
-    return m_data.end();
-}
-
 
 }
 

@@ -138,7 +138,7 @@ class Table {
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
     virtual TableIterator *makeIterator() = 0;
-    virtual TableIterator& iterator(bool deleteAsWeGo) = 0;
+    virtual TableIterator& iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -387,11 +387,6 @@ protected:
     virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "May not use freeLastScanedBlock with streamed tables or persistent tables.");
-    }
-
-    virtual std::vector<TBPtr>::iterator getDataEndBlockIterator() {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "May not use getDataEndBlockIterator with streamed tables or persistent tables.");
     }
 
     Table(int tableAllocationTargetSize);
