@@ -355,6 +355,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 m_currentIndexInBatch == (numFragments - 1)))
         {
             ++failures;
+            break;
         }
 
         // at the end of each frag, rollup and reset counters
