@@ -327,7 +327,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
         sb.append("AGGREGATION ops: ");
         int ii = 0;
