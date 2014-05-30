@@ -89,7 +89,6 @@ this.AddMonitor = function(tab)
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
     , 'lastTimedTransactionCount': -1
-    , 'lastTickTransactions': -1
     , 'lastLatencyAverage': 0.0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
