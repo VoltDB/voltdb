@@ -610,7 +610,8 @@ public class PlanAssembler {
         // This case should also not be pushed down
         boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
                 !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.LIMIT);
+                !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
+                !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
         if (subScanCanPushdown) {
             compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
         }

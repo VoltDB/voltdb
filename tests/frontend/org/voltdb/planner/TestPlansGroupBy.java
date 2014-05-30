@@ -38,6 +38,7 @@ import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
@@ -83,6 +84,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
+    }
+
+    public void testDistinctA1_Subquery() {
+        AbstractPlanNode p;
+        pns = compileToFragments("select * from (SELECT DISTINCT A1 FROM T1) temp");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof DistinctPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof DistinctPlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
     }
 
     public void testDistinctA1() {
