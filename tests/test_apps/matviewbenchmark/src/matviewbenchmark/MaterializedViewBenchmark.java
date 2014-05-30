@@ -47,10 +47,10 @@ public class MaterializedViewBenchmark {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
-    long insert_throughput;
+    double insert_throughput;
     double insert_execute;
 
-    long delete_throughput;
+    double delete_throughput;
     double delete_execute;
 
     /**
@@ -274,28 +274,32 @@ public class MaterializedViewBenchmark {
         // Expecting the custom insert/delete procedure names ex. ids_insert
         if (procedure.split("_")[1].equals("insert")) {
             if (insert_throughput > 0) {
-                insert_throughput = Math.abs(insert_throughput - stats.getTxnThroughput());
-                insert_execute = Math.abs(insert_execute - execTimeInMicroSec);
-                fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Insert_Diff",
+                insert_throughput = (((stats.getTxnThroughput() - insert_throughput) /
+                                      stats.getTxnThroughput()) * 100);
+                insert_execute = (((insert_execute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Insert Diff",
                                         stats.getStartTimestamp(),
                                         insert_throughput,
                                         insert_execute));
             } else {
-                insert_throughput = stats.getTxnThroughput();
+                insert_throughput = (double)stats.getTxnThroughput();
                 insert_execute = execTimeInMicroSec;
             }
         } else {
             if (delete_throughput > 0) {
-                delete_throughput = Math.abs(delete_throughput - stats.getTxnThroughput());
-                delete_execute = Math.abs(delete_execute - execTimeInMicroSec);
-                fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Delete_Diff",
+                delete_throughput = (((stats.getTxnThroughput() - delete_throughput) /
+                                      stats.getTxnThroughput()) * 100.0);
+                delete_execute = (((delete_execute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Delete Diff",
                                         stats.getStartTimestamp(),
                                         delete_throughput,
                                         delete_execute));
             } else {
-                delete_throughput = stats.getTxnThroughput();
+                delete_throughput = (double)stats.getTxnThroughput();
                 delete_execute = execTimeInMicroSec;
             }
         }
@@ -395,7 +399,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_insert");
         } else {
-            printResults("idsWithMatView_insert", fw, "insert_wmv");
+            printResults("idsWithMatView_insert", fw, "Insert w/ MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -414,7 +418,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_delete");
         } else {
-            printResults("idsWithMatView_delete", fw, "delete_wmv");
+            printResults("idsWithMatView_delete", fw, "Delete w/ MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -447,7 +451,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_insert");
         } else {
-            printResults("ids_insert", fw, "insert_womv");
+            printResults("ids_insert", fw, "Insert w/o MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -465,7 +469,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_delete");
         } else {
-            printResults("ids_delete", fw, "delete_womv");
+            printResults("ids_delete", fw, "Delete w/o MV");
             fw.close();
         }
         benchmarkActive = false;

@@ -1946,6 +1946,8 @@ public class VoltCompiler {
         else if (args.length > 0 && args[0].toLowerCase().endsWith(".xml")) {
             // The first argument is *.xml for the legacy syntax.
             if (args.length == 2) {
+                // warn the user that this is deprecated
+                consoleLog.warn("Compiling from a project file is deprecated and will be removed in a future release.");
                 success = compiler.compileWithProjectXML(args[0], args[1]);
             }
             else {
