@@ -223,7 +223,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        bool processCatalogAdditions(int64_t timestamp);
 
 
         /**

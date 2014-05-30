@@ -577,7 +577,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         return false;
     }
 
@@ -604,9 +604,32 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 void
 VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
-    vector<string> deletions;
-    m_catalog->getDeletedPaths(deletions);
+    vector<string> deletion_vector;
+    m_catalog->getDeletedPaths(deletion_vector);
+    set<string> deletions(deletion_vector.begin(), deletion_vector.end());
 
+    // delete any empty persistent tables, forcing them to be rebuilt
+    // (Unless the are actually being deleted -- then this does nothing)
+
+    typedef pair<string, CatalogDelegate*> DelegatePair;
+    BOOST_FOREACH(DelegatePair delegatePair, m_catalogDelegates) {
+        CatalogDelegate *delegate = delegatePair.second;
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+        Table* table = tcd->getTable();
+
+        // skip export tables for now
+        StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
+        if (streamedtable) {
+            continue;
+        }
+
+        // identify empty tables and mark for deletion
+        if (table->activeTupleCount() == 0) {
+            deletions.insert(delegatePair.first);
+        }
+    }
+
+    // delete tables in the set
     BOOST_FOREACH(string path, deletions) {
         VOLT_TRACE("delete path:");
 
@@ -696,7 +719,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
+VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     map<string, catalog::Table*>::const_iterator catTableIter;
@@ -706,17 +729,22 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
     {
         // get the catalog's table object
         catalog::Table *catalogTable = catTableIter->second;
-        if (addAll || catalogTable->wasAdded()) {
-            VOLT_TRACE("add a completely new table...");
+
+        // get the delegate for the table... add the table if it's null
+        CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+
+        if (!tcd) {
+            VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
 
-            TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
-                                                                 catalogTable->path(),
-                                                                 catalogTable->signature(),
-                                                                 m_compactionThreshold);
+            tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
+                                           catalogTable->path(),
+                                           catalogTable->signature(),
+                                           m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {
@@ -741,14 +769,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
-            // get the delegate and bail if it's not here
-            // - JHH: I'm not sure why not finding a delegate is safe to ignore
-            CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
-            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
-            if (!tcd) {
-                continue;
-            }
 
             Table *table = tcd->getTable();
 
@@ -966,7 +986,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(false, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
