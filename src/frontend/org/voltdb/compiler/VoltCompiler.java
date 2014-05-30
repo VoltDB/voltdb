@@ -127,7 +127,7 @@ public class VoltCompiler {
     public static String AUTOGEN_DDL_FILE_NAME = "autogen-ddl.sql";
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
-    public static final boolean DEBUG_VERIFY_CATALOG = System.getProperties().containsKey("verifycatalogdebug");
+    public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
 
     String m_projectFileURL = null;
     String m_currentFilename = null;
