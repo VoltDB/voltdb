@@ -53,6 +53,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -115,7 +116,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -2241,8 +2241,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // create the execution site task
                             StoredProcedureInvocation task = new StoredProcedureInvocation();
                             task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
-                                           changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                            task.setParams(changeResult.encodedDiffCommands,
+                                           changeResult.catalogHash,
+                                           changeResult.catalogBytes,
+                                           changeResult.expectedCatalogVersion,
+                                           changeResult.deploymentString,
+                                           changeResult.tablesThatMustBeEmpty,
+                                           changeResult.reasonsForEmptyTables,
                                            changeResult.requiresSnapshotIsolation ? 1 : 0,
                                            changeResult.worksWithElastic ? 1 : 0,
                                            changeResult.deploymentHash);

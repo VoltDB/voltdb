@@ -24,6 +24,7 @@ package org.voltdb.catalog;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
@@ -64,6 +65,8 @@ public class CatalogDiffEngine {
     // true if table changes require the catalog change runs
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
+
+    private SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
@@ -128,6 +131,16 @@ public class CatalogDiffEngine {
      */
     public boolean requiresSnapshotIsolation() {
         return m_requiresSnapshotIsolation;
+    }
+
+    public String[] tablesThatMustBeEmpty() {
+        // this lines up with reasonsWhyTablesMustBeEmpty because SortedMap/TreeMap has order
+        return m_tablesThatMustBeEmpty.keySet().toArray(new String[0]);
+    }
+
+    public String[] reasonsWhyTablesMustBeEmpty() {
+        // this lines up with reasonsWhyTablesMustBeEmpty because SortedMap/TreeMap has order
+        return m_tablesThatMustBeEmpty.values().toArray(new String[0]);
     }
 
     public boolean worksWithElastic() {
