@@ -246,10 +246,6 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
-        if (System.getProperty("verifycatalogdebug") != null) {
-            this.templateCmdLine.setJavaProperty("verifycatalogdebug", "1");
-        }
-
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
