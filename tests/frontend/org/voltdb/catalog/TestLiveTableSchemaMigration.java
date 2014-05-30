@@ -58,16 +58,22 @@ public class TestLiveTableSchemaMigration extends TestCase {
         return retval;
     }
 
+    void migrateSchema(VoltTable t1, VoltTable t2) throws Exception {
+        migrateSchema(t1, t2, true);
+    }
+
     /**
      * Assuming given tables have schema metadata, fill them with random data
      * and compare a pure-java schema migration with an EE schema migration.
      */
-    void migrateSchema(VoltTable t1, VoltTable t2) throws Exception {
+    void migrateSchema(VoltTable t1, VoltTable t2, boolean withData) throws Exception {
         ServerThread server = null;
         Client client = null;
 
         try {
-            TableHelper.randomFill(t1, 1000, 1024, new Random(0));
+            if (withData) {
+                TableHelper.randomFill(t1, 1000, 1024, new Random(0));
+            }
 
             String catPath1 = catalogPathForTable(t1, "t1.jar");
             String catPath2 = catalogPathForTable(t2, "t2.jar");
@@ -148,20 +154,20 @@ public class TestLiveTableSchemaMigration extends TestCase {
         // do nada with more schema
         migrateSchema("FOO (A:INTEGER-N/'28154', B:TINYINT/NULL, C:VARCHAR1690/NULL, " +
                       "CX:VARCHAR563-N/'mbZyuwvBzhMDvajcrmOFKeGOxgFm', D:FLOAT, E:TIMESTAMP, " +
-                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') P(PKEY)",
+                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') PK(PKEY)",
                       "FOO (A:INTEGER-N/'28154', B:TINYINT/NULL, C:VARCHAR1690/NULL, " +
                       "CX:VARCHAR563-N/'mbZyuwvBzhMDvajcrmOFKeGOxgFm', D:FLOAT, E:TIMESTAMP, " +
-                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') P(PKEY)");
+                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') PK(PKEY)");
 
         // try to add a column in front of a pkey
-        migrateSchema("FOO (A:INTEGER) P(0)", "FOO (X:INTEGER, A:INTEGER) P(1)");
+        migrateSchema("FOO (A:INTEGER) PK(0)", "FOO (X:INTEGER, A:INTEGER) PK(1)");
 
         // widen a pkey (a unique index)
-        migrateSchema("FOO (X:INTEGER, A:INTEGER) P(0)", "FOO (X:INTEGER, A:INTEGER) P(0,1)");
+        migrateSchema("FOO (X:INTEGER, A:INTEGER) PK(0)", "FOO (X:INTEGER, A:INTEGER) PK(0,1)");
 
         // base case of widening column
-        migrateSchema("FOO (A:INTEGER, B:TINYINT) P(0)", "FOO (A:BIGINT, B:TINYINT) P(0)");
-        migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER) P(2,1)", "FOO (A:BIGINT, B:SMALLINT, C:INTEGER), P(2,1)");
+        migrateSchema("FOO (A:INTEGER, B:TINYINT) PK(0)", "FOO (A:BIGINT, B:TINYINT) PK(0)");
+        migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER) PK(2,1)", "FOO (A:BIGINT, B:SMALLINT, C:INTEGER), PK(2,1)");
 
         // string widening
         migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR24, C:INTEGER)");
@@ -183,6 +189,10 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
         // reordering columns
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (C:INTEGER, A:BIGINT, B:TINYINT)");
+    }
+
+    public void testFixedSchemasNoData() throws Exception {
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)");
     }
 
     /**

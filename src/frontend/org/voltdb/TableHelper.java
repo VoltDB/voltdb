@@ -726,6 +726,13 @@ public class TableHelper {
 
         s += "\n);";
 
+        // partition this table if need be
+        if (table.m_partitionColIndex != -1) {
+            s += String.format("\nPARTITION TABLE %s ON COLUMN %s;",
+                    table.m_name,
+                    table.m_originalColumnInfos[table.m_partitionColIndex].name);
+        }
+
         return s;
     }
 

@@ -137,8 +137,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     // kept around if provided for schema enforcement - only really used for test code
     ColumnInfo[] m_originalColumnInfos = null;
-    // used for test code that generates schema from tables
+    // next two used for test code that generates schema from tables
     String m_name = null;
+    int m_partitionColIndex = -1; // -1 means replicated
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";

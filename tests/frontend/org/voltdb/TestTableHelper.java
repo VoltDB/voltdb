@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 public class TestTableHelper extends TestCase {
 
     public void testShorthand() {
-        VoltTable t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(2,BAR)");
+        VoltTable t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR)");
         assertEquals("C0", t.getColumnName(0));
         assertEquals("BAR", t.getColumnName(1));
         assertEquals("A", t.getColumnName(2));
@@ -82,11 +82,11 @@ public class TestTableHelper extends TestCase {
         VoltTable t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD')");
         TableHelper.randomFill(t, 10, 128, r);
 
-        t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(2,BAR)");
+        t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR) P(0)");
         TableHelper.randomFill(t, 10, 128, r);
         System.out.println(t.toString());
 
-        VoltTable t2 = TableHelper.quickTable("FOO (BAR:DOUBLE, C0:BIGINT-N, A:VARCHAR14/'foo') P(2,BAR)");
+        VoltTable t2 = TableHelper.quickTable("FOO (BAR:DOUBLE, C0:BIGINT-N, A:VARCHAR14/'foo') PK(2,BAR) P(0)");
 
         TableHelper.migrateTable(t, t2);
         System.out.println(t2.toString());

@@ -29,10 +29,10 @@ import java.util.regex.Pattern;
  * Note that no SQL constraints like unique or not null will be enforced.
  *
  * Syntax is:
- * [TABLENAME] (COLUMN1, COLUMN2, .. COLUMNN) [P(PKEYCOL1, PKEYCOL2, .. PKEYCOLN)]
+ * [TABLENAME] (COLUMN1, COLUMN2, .. COLUMNN) [PK(PKEYCOL1, PKEYCOL2, .. PKEYCOLN)] [P(PARTITIONCOL)]
  * Where COLUMNX is of the form:
  * [NAME:]TYPE[SIZE]-[U][N][/'default value']
- * And PKEYCOLX is either the column index or name.
+ * And PKEYCOLX and PARTITIONCOL are either a column index or name.
  *
  * Unnamed tables are named "T". Unnamed columns are named "CX" where X is their 0-based-index.
  * The U or N after the dash imply unique and not null respectively.
@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
  * Which would lead to "CREATE TABLE T (C0 BIGINT);"
  *
  * A more complex example might be:
- * "FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(2,BAR)"
+ * "FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR) P(0)"
  * Which creates:
  * CREATE TABLE FOO (
  *   C0 BIGINT NOT NULL,
@@ -52,6 +52,7 @@ import java.util.regex.Pattern;
  *   A VARCHAR(12) UNIQUE DEFAULT 'foo',
  *   PRIMARY KEY (A,BAR)
  * );
+ * PARTITION TABLE FOO ON COLUMN C0;
  *
  * Test cases are in org.voltdb.TestTableHelper
  */
@@ -60,6 +61,7 @@ public class TableShorthand {
     static Pattern m_namePattern;
     static Pattern m_columnsPattern;
     static Pattern m_pkeyPattern;
+    static Pattern m_partitionPattern;
     static Pattern m_colTypePattern;
     static Pattern m_colSizePattern;
     static Pattern m_colMetaPattern;
@@ -72,7 +74,8 @@ public class TableShorthand {
         try {
             m_namePattern = Pattern.compile("^\\w*(?=\\s+\\()");
             m_columnsPattern = Pattern.compile("(?<=\\()[^\\)]*(?=\\))");
-            m_pkeyPattern = Pattern.compile("(?<=P\\()[^\\)]*(?=\\))");
+            m_pkeyPattern = Pattern.compile("(?<=PK\\()[^\\)]*(?=\\))");
+            m_partitionPattern = Pattern.compile("(?<=P\\()[^\\)]*(?=\\))");
             m_colTypePattern = Pattern.compile("^[A-Za-z]*");
             m_colSizePattern = Pattern.compile("(?<=[A-Za-z])\\d+");
             m_colMetaPattern = Pattern.compile("-[A-Za-z]*");
@@ -204,8 +207,29 @@ public class TableShorthand {
             }
         }
 
+        // get any partitioning
+        Matcher partitionMatcher = m_partitionPattern.matcher(schema);
+        int partitionColumnIndex = -1; // default to replicated
+        if (partitionMatcher.find()) {
+            String partitionColStr = partitionMatcher.group().trim();
+            // numeric means index of column
+            if (Character.isDigit(partitionColStr.charAt(0))) {
+                partitionColumnIndex = Integer.parseInt(partitionColStr);
+            }
+            else {
+                for (int colIndex = 0; colIndex < columnCount; colIndex++) {
+                    if (columns[colIndex].name.equals(partitionColStr)) {
+                        partitionColumnIndex = colIndex;
+                        break;
+                    }
+                }
+            }
+            assert(partitionColumnIndex != -1) : "Regex match here means there is a partitioning column";
+        }
+
         VoltTable table = new VoltTable(columns);
         table.m_name = name;
+        table.m_partitionColIndex = partitionColumnIndex;
         return table;
     }
 }
