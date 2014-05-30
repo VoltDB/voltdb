@@ -198,7 +198,10 @@ public class AdhocDDLTestBase extends TestCase {
         boolean partitioncol = false;
         boolean found = moveToMatchingTupleRow(columns, "TABLE_NAME", table, "COLUMN_NAME", column);
         if (found) {
-            partitioncol = columns.getString("REMARKS").equalsIgnoreCase("PARTITION_COLUMN");
+            String remarks = columns.getString("REMARKS");
+            if (remarks != null) {
+                partitioncol = columns.getString("REMARKS").equalsIgnoreCase("PARTITION_COLUMN");
+            }
         }
         return partitioncol;
     }

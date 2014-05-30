@@ -120,49 +120,73 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
-    // This test should pass when PARTITION TABLE ddl is supported
-//    public void testCreatePartitionedTable() throws Exception {
-//
-//        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-//        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-//
-//        VoltProjectBuilder builder = new VoltProjectBuilder();
-//        builder.addLiteralSchema("--dont care");
-//        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-//        assertTrue("Schema compilation failed", success);
-//        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-//
-//        VoltDB.Configuration config = new VoltDB.Configuration();
-//        config.m_pathToCatalog = pathToCatalog;
-//        config.m_pathToDeployment = pathToDeployment;
-//
-//        try {
-//            startSystem(config);
-//
-//            // Check basic drop of partitioned table that should work.
-//            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
-//            assertFalse(findTableInSystemCatalogResults("FOO"));
-//            System.out.println(resp.getResults()[0]);
-//            try {
-//                m_client.callProcedure("@AdHoc",
-//                        "create table FOO (\n" +
-//                        "ID int default 0 not null,\n" +
-//                        "VAL varchar(32 bytes)\n" +
-//                        ");\n" +
-//                        "partition table FOO on column ID;\n"
-//                        );
-//            }
-//            catch (ProcCallException pce) {
-//                pce.printStackTrace();
-//                fail("create table should have succeeded");
-//            }
-//            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
-//            System.out.println(resp.getResults()[0]);
-//            assertTrue(findTableInSystemCatalogResults("FOO"));
-//            assertTrue(isColumnPartitionColumn("FOO", "ID"));
-//        }
-//        finally {
-//            teardownSystem();
-//        }
-//    }
+    public void testCreatePartitionedTable() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // Check basic create of partitioned table that should work.
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("FOO"));
+            System.out.println(resp.getResults()[0]);
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table FOO (\n" +
+                        "ID int default 0 not null,\n" +
+                        "VAL varchar(32 bytes)\n" +
+                        ");\n" +
+                        "partition table FOO on column ID;\n"
+                        );
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("create table should have succeeded");
+            }
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+            assertTrue(isColumnPartitionColumn("FOO", "ID"));
+
+            // This, however, not being batched, won't work until the empty table
+            // check goes in.
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("BAR"));
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table BAR (\n" +
+                        "ID int default 0 not null,\n" +
+                        "VAL varchar(32 bytes)\n" +
+                        ");\n");
+                m_client.callProcedure("@AdHoc",
+                        "partition table BAR on column ID;\n"
+                        );
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Shouldn't yet be able to partition an already created table.", threw);
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            // Table will exist but not be partitioned
+            assertTrue(findTableInSystemCatalogResults("BAR"));
+            assertFalse(isColumnPartitionColumn("BAR", "ID"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
