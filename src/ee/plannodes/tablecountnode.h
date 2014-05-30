@@ -29,19 +29,20 @@ class AbstractExpression;
  *
  */
 class TableCountPlanNode : public AbstractScanPlanNode {
-   public:
-        TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        TableCountPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
+        // Do nothing
+    }
+    TableCountPlanNode() : AbstractScanPlanNode() {
+        // Do nothing
+    }
 
-        ~TableCountPlanNode();
+    ~TableCountPlanNode();
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
 
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
+
 };
 
 }

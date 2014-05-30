@@ -142,6 +142,13 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
+    public String getListenerAddress(int hostId) {
+        if (m_server == null)
+            return null;
+        return "localhost";
+    }
+
+    @Override
     public String getName() {
         // name is combo of the classname and the parameters
 
