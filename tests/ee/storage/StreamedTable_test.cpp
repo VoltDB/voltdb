@@ -103,7 +103,7 @@ public:
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, true, "", 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

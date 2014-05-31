@@ -471,25 +471,6 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
-
-    // substitute params
-    BOOST_FOREACH(AbstractExpression* inputExpression, m_inputExpressions) {
-        if (inputExpression) {
-            inputExpression->substitute(params);
-        }
-    }
-    BOOST_FOREACH(AbstractExpression* groupByExpression, m_groupByExpressions) {
-        groupByExpression->substitute(params);
-    }
-    BOOST_FOREACH(AbstractExpression* outputColumnExpression, m_outputColumnExpressions) {
-        outputColumnExpression->substitute(params);
-    }
-    if (m_prePredicate != NULL && m_prePredicate->hasParameter()) {
-        m_prePredicate->substitute(params);
-    }
-    if (m_postPredicate != NULL && m_postPredicate->hasParameter()) {
-        m_postPredicate->substitute(params);
-    }
 }
 
 inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &nextGroupByKeyStorage,
