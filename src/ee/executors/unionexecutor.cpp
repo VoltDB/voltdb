@@ -117,7 +117,7 @@ bool UnionSetOperator::processTuplesDo() {
     for (size_t ctr = 0, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
         Table* input_table = m_input_tables[ctr];
         assert(input_table);
-        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+        TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
             if (m_is_all || needToInsert(tuple, tuples)) {
@@ -242,7 +242,7 @@ bool ExceptIntersectSetOperator::processTuplesDo() {
 }
 
 void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tuple_map) {
-    TableIterator iterator = input_table.iteratorDeletingAsWeGo();
+    TableIterator iterator = input_table.iterator();
     TableTuple tuple(input_table.schema());
     while (iterator.next(tuple)) {
         TupleMap::iterator mapIt = tuple_map.find(tuple);
