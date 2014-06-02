@@ -90,6 +90,7 @@ this.AddMonitor = function(tab)
     , 'starvStatsResponse': null
     , 'lastTimedTransactionCount': -1
     , 'lastLatencyAverage': 0.0
+    , 'noTransactionCount': 0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
@@ -279,13 +280,22 @@ this.RefreshMonitor = function(id, Success)
 		dataLat = dataLat.slice(1);
                 if (delta == 0)
 		{
-			dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+			if (monitor.noTransactionCount < 5)
+			{
+				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+				monitor.noTransactionCount++;
+			}
+			else
+			{
+				dataLat.push([dataIdx,0]);
+			}
 		}
 		else
 		{
 			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
 			var delta_latency = latency_val / delta;
 			dataLat.push([dataIdx,delta_latency/1000000.0]);
+			monitor.noTransactionCount = 0;
 		}
 	}
 	// Update procedure statistics table
