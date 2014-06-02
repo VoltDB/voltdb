@@ -42,7 +42,7 @@ function QueryUI(queryTab) {
 
             // There are some easily recognizable patterns that contain statement keywords mid-statement.
             // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
-            // always ignored by the statement splitter -- the user must eparate them from the prior
+            // always ignored by the statement splitter -- the user must separate them from the prior
             // statement with a semicolon.
             // For these other keywords, the usual statement splitting can be easily disabled in special
             // cases:
