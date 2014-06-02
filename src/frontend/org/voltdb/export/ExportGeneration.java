@@ -91,11 +91,15 @@ public class ExportGeneration {
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
-    private Runnable m_onAllSourcesDrained;
+    private Runnable m_onAllSourcesDrained = null;
 
     private final Runnable m_onSourceDrained = new Runnable() {
         @Override
         public void run() {
+            if (m_onAllSourcesDrained == null) {
+                VoltDB.crashLocalVoltDB("No export generation roller found.", true, null);
+                return;
+            }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {

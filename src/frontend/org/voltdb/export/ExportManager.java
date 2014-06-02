@@ -164,19 +164,19 @@ public class ExportManager
     private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
-        synchronized (ExportManager.class) {
-            boolean restart = false;
+        synchronized (ExportManager.this) {
+            boolean installNewProcessor = false;
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
-                restart = true;
+                installNewProcessor = true;
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
                 exportLog.info("Finished draining a generation that is not known to export generations.");
             }
 
             try {
-                if (m_loaderClass != null && !m_generations.isEmpty() && restart) {
+                if (m_loaderClass != null && !m_generations.isEmpty() && installNewProcessor) {
                     exportLog.info("Creating connector " + m_loaderClass);
                     final Class<?> loaderClass = Class.forName(m_loaderClass);
                     //Make it so
@@ -215,8 +215,7 @@ public class ExportManager
         }
 
         /*
-         * The old processor should not be null since this shutdown task
-         * is running for this processor
+         * The old processor should shutdown if we installed a new processor.
          */
         if (oldProcessor != null) {
             oldProcessor.shutdown();
