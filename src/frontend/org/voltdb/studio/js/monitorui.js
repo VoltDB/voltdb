@@ -277,9 +277,16 @@ this.RefreshMonitor = function(id, Success)
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
 		dataLat = dataLat.slice(1);
-		var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-		var delta_latency = latency_val / delta;
-		dataLat.push([dataIdx,delta_latency/1000000.0]);
+                if (delta == 0)
+		{
+			dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+		}
+		else
+		{
+			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
+			var delta_latency = latency_val / delta;
+			dataLat.push([dataIdx,delta_latency/1000000.0]);
+		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
