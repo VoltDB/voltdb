@@ -88,9 +88,9 @@ this.AddMonitor = function(tab)
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
-    , 'lastTransactionCount': -1
     , 'lastTimedTransactionCount': -1
     , 'lastLatencyAverage': 0.0
+    , 'noTransactionCount': 0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
@@ -203,7 +203,7 @@ this.RefreshMonitor = function(id, Success)
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
 
-	var currentTimerTick = (new Date()).getTime();
+	var currentTimerTick = 0;
 	var latData = monitor.latData;
 	var tpsData = monitor.tpsData;
 	var memData = monitor.memData;
@@ -229,6 +229,7 @@ this.RefreshMonitor = function(id, Success)
 	{
 		var srcData = table[j];
 		var data = null;
+                currentTimerTick = srcData[0];
 		if (srcData[1] in procStats)
 		{
 			data = procStats[srcData[1]];
@@ -271,26 +272,31 @@ this.RefreshMonitor = function(id, Success)
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
-	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
+	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
 	{
-		var delta = currentTimedTransactionCount - monitor.lastTransactionCount;
+		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
 		dataLat = dataLat.slice(1);
-		if (currentTimedTransactionCount == monitor.lastTimedTransactionCount)
+                if (delta == 0)
 		{
-			if (delta < 10)
-				dataLat.push([dataIdx,0]);
-			else
+			if (monitor.noTransactionCount < 5)
+			{
 				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+				monitor.noTransactionCount++;
+			}
+			else
+			{
+				dataLat.push([dataIdx,0]);
+			}
 		}
 		else
 		{
-		    // Compute delta latency
-		    var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-		    var delta_latency = latency_val / delta;
+			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
+			var delta_latency = latency_val / delta;
 			dataLat.push([dataIdx,delta_latency/1000000.0]);
-        }
+			monitor.noTransactionCount = 0;
+		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -333,7 +339,6 @@ this.RefreshMonitor = function(id, Success)
 	}
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
-	monitor.lastTransactionCount = currentTimedTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
 	monitor.lastLatencyAverage = currentLatencyAverage;
 	
