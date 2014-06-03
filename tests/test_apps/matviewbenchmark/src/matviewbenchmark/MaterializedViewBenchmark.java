@@ -399,7 +399,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_insert");
         } else {
-            printResults("idsWithMatView_insert", fw, "Insert w/ MV");
+            printResults("idsWithMatView_insert", fw, "Insert w MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -418,7 +418,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_delete");
         } else {
-            printResults("idsWithMatView_delete", fw, "Delete w/ MV");
+            printResults("idsWithMatView_delete", fw, "Delete w MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -451,7 +451,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_insert");
         } else {
-            printResults("ids_insert", fw, "Insert w/o MV");
+            printResults("ids_insert", fw, "Insert wo MV");
         }
         System.out.print(HORIZONTAL_RULE);
 
@@ -469,7 +469,7 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_delete");
         } else {
-            printResults("ids_delete", fw, "Delete w/o MV");
+            printResults("ids_delete", fw, "Delete wo MV");
             fw.close();
         }
         benchmarkActive = false;
