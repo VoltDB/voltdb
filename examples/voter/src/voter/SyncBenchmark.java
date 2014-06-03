@@ -84,7 +84,7 @@ public class SyncBenchmark {
 
     // voter benchmark state
     AtomicLong totalVotes = new AtomicLong(0);
-	AtomicLong acceptedVotes = new AtomicLong(0);
+    AtomicLong acceptedVotes = new AtomicLong(0);
     AtomicLong badContestantVotes = new AtomicLong(0);
     AtomicLong badVoteCountVotes = new AtomicLong(0);
     AtomicLong failedVotes = new AtomicLong(0);

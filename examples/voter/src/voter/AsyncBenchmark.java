@@ -344,7 +344,7 @@ public class AsyncBenchmark {
     class VoterCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-	        totalVotes.incrementAndGet();
+            totalVotes.incrementAndGet();
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 long resultCode = response.getResults()[0].asScalarLong();
                 if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
