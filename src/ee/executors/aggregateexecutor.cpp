@@ -586,7 +586,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
     while (it.next(nextTuple)) {
@@ -644,7 +644,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
