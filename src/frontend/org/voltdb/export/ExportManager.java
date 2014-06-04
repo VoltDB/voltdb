@@ -169,10 +169,10 @@ public class ExportManager
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
-                installNewProcessor = true;
+                installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
-                exportLog.info("Finished draining a generation that is not known to export generations.");
+                exportLog.warn("Finished draining a generation that is not known to export generations.");
             }
 
             try {
