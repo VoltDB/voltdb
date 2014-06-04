@@ -86,7 +86,7 @@ protected:
     /// through any additional columns from the input table.
     bool insertOutputTuple(AggregateRow* aggregateRow);
 
-    void advanceAggs(AggregateRow* aggregateRow);
+    void advanceAggs(AggregateRow* aggregateRow, TableTuple & tuple);
 
     /*
      * Create an instance of an aggregator for the specified aggregate type.
@@ -100,6 +100,7 @@ protected:
      * aggregation.
      */
     std::vector<int> m_passThroughColumns;
+    std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
     TupleSchema* m_aggSchema;
@@ -108,7 +109,6 @@ protected:
     std::vector<AbstractExpression*> m_groupByExpressions;
     std::vector<AbstractExpression*> m_inputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
-    std::vector<int> m_aggregateOutputColumns;
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
 };
@@ -125,7 +125,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateHashExecutor() { }
 
-private:
+protected:
     virtual bool p_execute(const NValueArray& params);
 };
 
@@ -141,7 +141,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-private:
+protected:
     virtual bool p_execute(const NValueArray& params);
 };
 
