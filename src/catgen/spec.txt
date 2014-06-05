@@ -67,6 +67,7 @@ end
 
 begin Connector                      "Export connector"
   string loaderclass                 "The class name of the connector"
+  string groupNamePreserveCase       "Case preserving group name"
   bool enabled                       "Is the connector enabled"
   ConnectorTableInfo* tableInfo      "Per table configuration"
   ConnectorProperty* config          "Connector configuration properties"

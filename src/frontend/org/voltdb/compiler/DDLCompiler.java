@@ -52,6 +52,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -338,6 +339,9 @@ public class DDLCompiler {
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
+            "(\\s+GROUP\\s+" +                  // begin optional GROUP clause
+            "([\\w.$]+)" +                      // (2) <export group>
+            ")?" +                              // end optional GROUP clause
             "\\s*;\\z"                          // (end statement)
             );
     /**
@@ -862,7 +866,15 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            m_tracker.addExportedTable(tableName);
+
+            // group names should be the third group captured
+            boolean hasGroupName = (statementMatcher.groupCount() > 1) && (statementMatcher.group(3) != null);
+
+            String groupName = hasGroupName ?
+                    checkIdentifierStart(statementMatcher.group(3), statement) :
+                    Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
+
+            m_tracker.addExportedTable(tableName, groupName);
 
             return true;
         }

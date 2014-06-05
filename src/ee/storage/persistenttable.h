@@ -536,9 +536,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     voltdb::PersistentTableStats stats_;
     voltdb::TableStats* getTableStats();
 
-    // is Export enabled
-    bool m_exportEnabled;
-
     // STORAGE TRACKING
 
     // Map from load to the blocks with level of load

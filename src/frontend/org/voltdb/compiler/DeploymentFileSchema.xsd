@@ -43,6 +43,7 @@
       <xs:element name="replication" minOccurs="0" maxOccurs="1" type="replicationType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
+      <xs:element name="exportgroups" minOccurs="0" maxOccurs="1" type="exportGroupsType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
@@ -242,9 +243,17 @@
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
+    <xs:attribute name="group" type="xs:string" default="0"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="target" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
+  </xs:complexType>
+
+  <!-- <exportgroups> -->
+  <xs:complexType name="exportGroupsType">
+    <xs:choice maxOccurs="unbounded">
+      <xs:element name="export" type="exportType"/>
+    </xs:choice>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">

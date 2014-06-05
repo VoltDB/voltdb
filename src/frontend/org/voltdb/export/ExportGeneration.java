@@ -48,6 +48,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
@@ -194,7 +195,7 @@ public class ExportGeneration {
         return m_diskBased;
     }
 
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
         m_diskBased = true;
         Set<Integer> partitions = new HashSet<Integer>();
 
@@ -374,24 +375,27 @@ public class ExportGeneration {
     }
 
     void initializeGenerationFromCatalog(
-            final Connector conn,
+            final CatalogMap<Connector> connectors,
             int hostId,
             HostMessenger messenger,
             List<Pair<Integer, Long>> partitions)
     {
+        //Only populate partitions in use if export is actually happening
+        Set<Integer> partitionsInUse = new HashSet<Integer>();
+
         /*
          * Now create datasources based on the catalog
          */
-        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-        //Only populate partitions in use if export is actually happening
-        Set<Integer> partitionsInUse = new HashSet<Integer>();
-        while (tableInfoIt.hasNext()) {
-            ConnectorTableInfo next = tableInfoIt.next();
-            Table table = next.getTable();
-            addDataSources(table, hostId, partitions);
+        for (Connector conn : connectors) {
+            // TODO: might want to not create datasources for disabled export connectors
 
-            for (Pair<Integer, Long> p : partitions) {
-                partitionsInUse.add(p.getFirst());
+            for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                Table table = ti.getTable();
+                addDataSources(table, hostId, partitions);
+
+                for (Pair<Integer, Long> p : partitions) {
+                    partitionsInUse.add(p.getFirst());
+                }
             }
         }
 

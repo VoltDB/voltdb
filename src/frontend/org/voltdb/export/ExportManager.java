@@ -20,6 +20,7 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -39,9 +40,11 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -111,9 +114,11 @@ public class ExportManager
     private static ExportManager m_self;
     private final int m_hostId;
 
-    private String m_loaderClass;
+    // this used to be flexible, but no longer - now m_loaderClass is just null or default value
+    private static final String DEFAULT_LOADER_CLASS = "org.voltdb.export.processors.GuestProcessor";
+    private String m_loaderClass = DEFAULT_LOADER_CLASS;
 
-    private volatile Properties m_processorConfig = new Properties();
+    private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
     /*
      * Issue a permit when a generation is drained so that when we are truncating if a generation
@@ -244,12 +249,21 @@ public class ExportManager
     throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
-        Connector connector = getConnector(catalogContext);
+        CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         m_self = em;
-        if (connector != null && connector.getEnabled() == true) {
-            em.createInitialExportProcessor(catalogContext, connector, true, partitions, isRejoin);
+        if (hasEnabledConnectors(connectors)) {
+            em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
         }
+    }
+
+    static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
+        for (Connector conn : connectors) {
+            if (conn.getEnabled() && !conn.getTableinfo().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -295,11 +309,10 @@ public class ExportManager
         m_messenger = null;
     }
 
-    private static Connector getConnector(CatalogContext catalogContext) {
+    private static CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        return conn;
+        return db.getConnectors();
     }
 
     /**
@@ -316,28 +329,27 @@ public class ExportManager
         m_hostId = myHostId;
         m_messenger = messenger;
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Connector conn = getConnector(catalogContext);
+        final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
-        if (conn == null) {
-            exportLog.info("System is not using any export functionality.");
-            return;
+        if (!hasEnabledConnectors(connectors)) {
+            if (connectors.isEmpty()) {
+                exportLog.info("System is not using any export functionality.");
+                return;
+            }
+            else {
+                exportLog.info("Export is disabled by user configuration.");
+                return;
+            }
         }
 
-        if (conn.getEnabled() == false) {
-            exportLog.info("Export is disabled by user configuration.");
-            return;
-        }
-
-        updateProcessorConfig(conn);
+        updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
-
-        m_loaderClass = conn.getLoaderclass();
     }
 
     private synchronized void createInitialExportProcessor(
             CatalogContext catalogContext,
-            final Connector conn,
+            final CatalogMap<Connector> connectors,
             boolean startup,
             List<Pair<Integer, Long>> partitions,
             boolean isRejoin) {
@@ -359,7 +371,7 @@ public class ExportManager
             if (startup) {
                 initializePersistedGenerations(
                         exportOverflowDirectory,
-                        catalogContext, conn);
+                        catalogContext, connectors);
             }
 
             /*
@@ -371,7 +383,7 @@ public class ExportManager
                             catalogContext.m_uniqueId,
                         exportOverflowDirectory, isRejoin);
                 currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
-                currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
+                currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 if (!m_generations.isEmpty()) {
                     if (m_generations.containsKey(catalogContext.m_uniqueId)) {
                         exportLog.info("Persisted export generation with same timestamp from generation from catalog exists. Catalog generation will be used.");
@@ -433,7 +445,7 @@ public class ExportManager
 
     private void initializePersistedGenerations(
             File exportOverflowDirectory, CatalogContext catalogContext,
-            Connector conn) throws IOException {
+            CatalogMap<Connector> connectors) throws IOException {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : exportOverflowDirectory.listFiles()) {
             if (f.isDirectory()) {
@@ -449,7 +461,7 @@ public class ExportManager
             ExportGeneration generation = new ExportGeneration(generationDirectory);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
-            if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
+            if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
                 String list[] = generationDirectory.list();
@@ -467,31 +479,53 @@ public class ExportManager
         }
     }
 
-    private void updateProcessorConfig(final Connector conn) {
-        Properties newConfig = new Properties();
+    private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
+        Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
 
-        if (conn.getConfig() != null) {
-            Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
-            while (connPropIt.hasNext()) {
-                ConnectorProperty prop = connPropIt.next();
-                newConfig.put(prop.getName(), prop.getValue());
+        for (Connector conn : connectors) {
+            // skip disabled connectors
+            if (!conn.getEnabled() || conn.getTableinfo().isEmpty()) {
+                continue;
             }
+
+            Properties properties = new Properties();
+            Set<String> tables = new HashSet<>();
+
+            String groupName = conn.getTypeName();
+
+            for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                tables.add(ti.getTable().getTypeName().toLowerCase());
+            }
+
+            if (conn.getConfig() != null) {
+                Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
+                while (connPropIt.hasNext()) {
+                    ConnectorProperty prop = connPropIt.next();
+                    properties.put(prop.getName(), prop.getValue());
+                }
+            }
+
+            Pair<Properties, Set<String>> connConfig = new Pair<>(properties, tables);
+            config.put(groupName, connConfig);
         }
-        m_processorConfig = newConfig;
+
+        m_processorConfig = config;
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, List<Pair<Integer, Long>> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        if (conn == null || !conn.getEnabled()) {
+        final CatalogMap<Connector> connectors = db.getConnectors();
+
+        updateProcessorConfig(connectors);
+        if (m_processorConfig.size() == 0) {
             m_loaderClass = null;
             return;
         }
-
-        m_loaderClass = conn.getLoaderclass();
-        updateProcessorConfig(conn);
+        else {
+            m_loaderClass = DEFAULT_LOADER_CLASS;
+        }
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
@@ -503,7 +537,7 @@ public class ExportManager
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
+        newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
 
         m_generations.put(catalogContext.m_uniqueId, newGeneration);
 
@@ -512,7 +546,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            createInitialExportProcessor(catalogContext, conn, false, partitions, false);
+            createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
         }
     }
 
