@@ -86,7 +86,7 @@ protected:
     /// through any additional columns from the input table.
     bool insertOutputTuple(AggregateRow* aggregateRow);
 
-    void advanceAggs(AggregateRow* aggregateRow, TableTuple & tuple);
+    void advanceAggs(AggregateRow* aggregateRow, const TableTuple& tuple);
 
     /*
      * Create an instance of an aggregator for the specified aggregate type.

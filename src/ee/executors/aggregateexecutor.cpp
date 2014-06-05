@@ -393,7 +393,7 @@ struct AggregateRow
         m_passThroughTuple.setNullTuple();
     }
 
-    void recordPassThroughTuple(Pool& memoryPool, TableTuple &tuple) {
+    void recordPassThroughTuple(Pool& memoryPool, const TableTuple &tuple) {
         if (m_passThroughTuple.isNullTuple()) {
             char* storage = reinterpret_cast<char*>(memoryPool.allocateZeroes(tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
             TableTuple tempTuple (storage, tuple.getSchema());
@@ -543,7 +543,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     return inserted;
 }
 
-inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, TableTuple & tuple)
+inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, const TableTuple& tuple)
 {
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
