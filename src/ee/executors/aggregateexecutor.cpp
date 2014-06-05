@@ -655,11 +655,6 @@ struct AggSerialInfo
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     executeAggBase(params);
-    AggregateRow * aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-    aggregateRow->m_filled = false;
-    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
-    ProgressMonitorProxy pmp(m_engine, this);
-
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
 
     // Input table
@@ -668,27 +663,29 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iterator();
     TableTuple nextTuple(input_table->schema());
-    std::vector<NValue> inProgressGroupByValues;
 
+    AggregateRow *aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+    aggregateRow->m_filled = false;
+    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
     AggSerialInfo info;
+    ProgressMonitorProxy pmp(m_engine, this);
 
     while (it.next(nextTuple)) {
         pmp.countdownProgress();
-        p_execute_tuple(nextTuple,aggregateRow, inProgressGroupByValues, &info, &pmp);
+        p_execute_tuple(nextTuple,aggregateRow, &info, &pmp);
     }
     VOLT_TRACE("finalizing..");
-    return p_execute_finish(&info, aggregateRow, &pmp);
+    return p_execute_finish(aggregateRow, &info, &pmp);
 }
 
 void AggregateSerialExecutor::p_execute_tuple(
-        TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue>& inProgressGroupByValues,
-        AggSerialInfo * info, ProgressMonitorProxy* pmpPtr) {
+        TableTuple& nextTuple, AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr) {
 
     // Use the first input tuple to "prime" the system.
     if(info->m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
         if (m_prePredicate == NULL || m_prePredicate->eval(&nextTuple, NULL).isTrue()) {
-            inProgressGroupByValues = getNextGroupByValues(nextTuple);
+            m_inProgressGroupByValues = getNextGroupByValues(nextTuple);
             // Start the aggregation calculation.
             initAggInstances(aggregateRow);
             aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
@@ -702,7 +699,7 @@ void AggregateSerialExecutor::p_execute_tuple(
 
     std::vector<NValue> nextGroupByValues = getNextGroupByValues(nextTuple);
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
-        if (nextGroupByValues.at(ii).compare(inProgressGroupByValues.at(ii)) != 0) {
+        if (nextGroupByValues.at(ii).compare(m_inProgressGroupByValues.at(ii)) != 0) {
             VOLT_TRACE("new group!");
             // Output old row.
             if (insertOutputTuple(aggregateRow)) {
@@ -712,7 +709,7 @@ void AggregateSerialExecutor::p_execute_tuple(
             aggregateRow->resetAggs();
 
             // swap inProgressGroupByValues
-            inProgressGroupByValues = nextGroupByValues;
+            m_inProgressGroupByValues = nextGroupByValues;
             break;
         }
     }
@@ -721,8 +718,7 @@ void AggregateSerialExecutor::p_execute_tuple(
     advanceAggs(aggregateRow, nextTuple);
 }
 
-bool AggregateSerialExecutor::p_execute_finish(AggSerialInfo * info,
-        AggregateRow* aggregateRow, ProgressMonitorProxy* pmpPtr)
+bool AggregateSerialExecutor::p_execute_finish(AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr)
 {
     if (info->zeroInputRowCase()) {
         VOLT_TRACE("finalizing after no input rows..");

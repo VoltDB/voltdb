@@ -77,14 +77,6 @@ public:
     }
 
 
-    TupleSchema* groupByKeySchema() const {
-        return m_groupByKeySchema;
-    }
-
-    Pool* memoryPool() {
-        return &m_memoryPool;
-    }
-
     void resetOutputTable(TempTable* newTempTable) {
         m_tmpOutputTable = newTempTable;
     }
@@ -159,14 +151,16 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
+    // FIXME(xin): aggregateRow and info can be member variables
     void p_execute_tuple(
-            TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue>& inProgressGroupByValues,
-            AggSerialInfo * info, ProgressMonitorProxy* pmpPtr);
+            TableTuple& nextTuple, AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr);
 
-    bool p_execute_finish(AggSerialInfo * info,
-            AggregateRow* aggregateRow, ProgressMonitorProxy* pmpPtr);
+    bool p_execute_finish(AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr);
 protected:
     virtual bool p_execute(const NValueArray& params);
+
+    std::vector<NValue> m_inProgressGroupByValues;
+
 };
 
 }
