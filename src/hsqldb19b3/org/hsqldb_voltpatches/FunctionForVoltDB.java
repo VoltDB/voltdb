@@ -117,6 +117,9 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
+        static final int FUNC_VOLT_GET_JSON               = 20024;
+        static final int FUNC_VOLT_SET_JSON               = 20025;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -171,6 +174,19 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("get_json", Type.SQL_VARCHAR, FUNC_VOLT_GET_JSON, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET}),
+
+            new FunctionId("set_json", Type.SQL_VARCHAR, FUNC_VOLT_SET_JSON, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET })
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -418,6 +434,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 return sb.toString();
             }
             case FunctionId.FUNC_VOLT_FIELD:
+            case FunctionId.FUNC_VOLT_GET_JSON:
             case FunctionId.FUNC_VOLT_ARRAY_ELEMENT: {
                 sb.append(name).append(Tokens.T_OPENBRACKET);
                 sb.append(nodes[0].getSQL()).append(Tokens.T_COMMA).append(nodes[1].getSQL());
@@ -459,6 +476,17 @@ public class FunctionForVoltDB extends FunctionSQL {
             case FunctionId.FUNC_VOLT_FROM_UNIXTIME: {
                 sb.append(name).append(Tokens.T_OPENBRACKET).append(nodes[0].getSQL());
                 sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_SET_JSON: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[2].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
             }
             default :
                 return super.getSQL();

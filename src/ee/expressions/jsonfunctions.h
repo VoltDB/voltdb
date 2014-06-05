@@ -29,6 +29,206 @@
 
 namespace voltdb {
 
+/** a path node is either a field name or an array index */
+struct JsonPathNode {
+    JsonPathNode(int32_t arrayIndex) : m_arrayIndex(arrayIndex) {}
+    JsonPathNode(const char* field) : m_arrayIndex(-1), m_field(field) {}
+
+    int32_t m_arrayIndex;
+    std::string m_field;
+};
+
+/** representation of a JSON document that can be accessed and updated via
+    our path syntax */
+class JsonDocument {
+public:
+    JsonDocument(const char* docChars, int32_t lenDoc) : m_head(NULL), m_tail(NULL) {
+        if (docChars == NULL) {
+            // null documents have null everything, but they turn into objects/arrays
+            // if we try to set their properties
+            m_doc = Json::Value::null;
+        } else if (!m_reader.parse(docChars, docChars + lenDoc, m_doc)) {
+            // we have something real, but it isn't JSON
+            throwJsonFormattingError();
+        }
+    }
+
+    std::string value() { return m_writer.write(m_doc); }
+
+    bool get(const char* pathChars, int32_t lenPath, std::string& serializedValue) {
+        if (m_doc.isNull()) {
+            return false;
+        }
+
+        // get and traverse the path
+        std::vector<JsonPathNode> path = resolveJsonPath(pathChars, lenPath);
+        const Json::Value* node = &m_doc;
+        for (std::vector<JsonPathNode>::const_iterator cit = path.begin(); cit != path.end(); ++cit) {
+            const JsonPathNode& pathNode = *cit;
+            if (pathNode.m_arrayIndex >= 0) {
+                // can't access an array index of something that isn't an array
+                if (!node->isArray()) {
+                    return false;
+                }
+                node = &((*node)[pathNode.m_arrayIndex]);
+                if (node == &Json::Value::null) {
+                    return false;
+                }
+            } else {
+                // this is a field. only objects have fields
+                if (!node->isObject()) {
+                    return false;
+                }
+                node = &((*node)[pathNode.m_field]);
+                if (node == &Json::Value::null) {
+                    return false;
+                }
+            }
+        }
+
+        // return the string representation of what we have obtained
+        if (node->isConvertibleTo(Json::stringValue)) {
+            // 'append' is to standardize that there's something to remove. quicker
+            // than substr on the other one, which incurs an extra copy
+            serializedValue = node->asString().append(1, '\n');
+        } else {
+            serializedValue = m_writer.write(*node);
+        }
+        return true;
+    }
+
+    void set(const char* pathChars, int32_t lenPath, const char* valueChars, int32_t lenValue) {
+        // translate database nulls into JSON nulls, because that's really all that makes
+        // any semantic sense. otherwise, parse the value as JSON
+        Json::Value value;
+        if (lenValue <= 0) {
+            value = Json::Value::null;
+        } else if (!m_reader.parse(valueChars, valueChars + lenValue, value)) {
+            throwJsonFormattingError();
+        }
+
+        std::vector<JsonPathNode> path = resolveJsonPath(pathChars, lenPath);
+        // the non-const version of the Json::Value [] operator creates a new, null node on attempted
+        // access if none already exists
+        Json::Value* node = &m_doc;
+        for (std::vector<JsonPathNode>::const_iterator cit = path.begin(); cit != path.end(); ++cit) {
+            const JsonPathNode& pathNode = *cit;
+            if (pathNode.m_arrayIndex >= 0) {
+                if (!node->isNull() && !node->isArray()) {
+                    // no-op if the update is impossible, I guess?
+                    return;
+                }
+                // get or create the specified node
+                node = &((*node)[pathNode.m_arrayIndex]);
+            } else {
+                if (!node->isNull() && !node->isObject()) {
+                    return;
+                }
+                node = &((*node)[pathNode.m_field]);
+            }
+        }
+        *node = value;
+    }
+
+private:
+    Json::Value m_doc;
+    Json::Reader m_reader;
+    Json::FastWriter m_writer;
+
+    const char* m_head;
+    const char* m_tail;
+    int32_t m_pos;
+
+    /** parse our path to its vector representation */
+    std::vector<JsonPathNode> resolveJsonPath(const char* pathChars, int32_t lenPath) {
+        std::vector<JsonPathNode> path;
+        // if we don't actually specify a path or pass null, this refers to the doc root
+        if (lenPath <= 0) {
+            return path;
+        }
+        m_head = pathChars;
+        m_tail = m_head + lenPath;
+
+        m_pos = -1;
+        char c;
+        char strField[lenPath];
+        while (readChar(c)) {
+            if (c == '\"') {
+                // reading a field identifier
+                int32_t i = 0;
+                bool success = false;
+                while (readChar(c)) {
+                    if (c == '\"') {
+                        readChar(c);
+                        strField[i] = '\0';
+                        assertEndOfPathElement();
+                        success = true;
+                        break;
+                    }
+                    strField[i++] = c;
+                }
+                if (!success) {
+                    throwInvalidPathError("Unterminated literal or invalid character in field name");
+                }
+                path.push_back(JsonPathNode(strField));
+            } else if (c >= '0' && c <= '9') {
+                // reading an array index
+                // basically, do an atoi but make sure we either read to the end or reach a '->'
+                int32_t arrayIndex = c - '0';
+                while (readChar(c) && c >= '0' && c <= '9') {
+                    arrayIndex = 10 * arrayIndex + (c - '0');
+                }
+                assertEndOfPathElement();
+                path.push_back(JsonPathNode(arrayIndex));
+            } else {
+                throwInvalidPathError("Invalid start of JSON path element");
+            }
+        }
+
+        m_head = NULL;
+        m_tail = NULL;
+        return path;
+    }
+
+    bool readChar(char& c) {
+        assert(m_head != NULL && m_tail != NULL);
+        if (m_head == m_tail) {
+            return false;
+        }
+        c = *m_head++;
+        m_pos++;
+        return true;
+    }
+
+    /** assert that we've reached either the end of the path or a '->' specifier;
+        if we've reached '->', advance past it as well */
+    void assertEndOfPathElement() {
+        assert(m_head != NULL && m_tail != NULL);
+        char c = *(m_head - 1);
+        if (m_head != m_tail && (c != '-' || !readChar(c) || c != '>')) {
+            throwInvalidPathError("Encountered an unexpected character in JSON path element");
+        }
+    }
+
+    void throwInvalidPathError(const char* err) const {
+        char msg[1024];
+        snprintf(msg, sizeof(msg), "Invalid JSON path: %s [position %d]", err, m_pos);
+        throw SQLException(SQLException::
+                           data_exception_invalid_parameter,
+                           msg);
+    }
+
+    void throwJsonFormattingError() const {
+        char msg[1024];
+        // getFormatedErrorMessages returns concise message about location
+        // of the error rather than the malformed document itself
+        snprintf(msg, sizeof(msg), "Invalid JSON %s", m_reader.getFormatedErrorMessages().c_str());
+        throw SQLException(SQLException::
+                           data_exception_invalid_parameter,
+                           msg);
+    }
+};
+
 /** implement the 2-argument SQL FIELD function */
 template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -199,6 +399,86 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     int32_t size = static_cast<int32_t>(root.size());
     result.getInteger() = size;
     return result;
+}
+
+/** implement the 2-argument SQL GET_JSON function */
+template<> inline NValue NValue::call<FUNC_VOLT_GET_JSON>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+
+    const NValue& docNVal = arguments[0];
+    const NValue& pathNVal = arguments[1];
+
+    int32_t lenDoc = -1;
+    const char* docChars = NULL;
+    if (!docNVal.isNull()) {
+        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenDoc = docNVal.getObjectLength_withoutNull();
+        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    }
+
+    int32_t lenPath = -1;
+    const char* pathChars = NULL;
+    if (!pathNVal.isNull()) {
+        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenPath = pathNVal.getObjectLength_withoutNull();
+        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    }
+
+    JsonDocument doc(docChars, lenDoc);
+    std::string value;
+    if (!doc.get(pathChars, lenPath, value)) {
+        return getNullStringValue();
+    }
+    return getTempStringValue(value.c_str(), value.length() - 1);
+}
+
+/** implement the 3-argument SQL SET_JSON function */
+template<> inline NValue NValue::call<FUNC_VOLT_SET_JSON>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 3);
+
+    const NValue& docNVal = arguments[0];
+    const NValue& pathNVal = arguments[1];
+    const NValue& valueNVal = arguments[2];
+
+    int32_t lenDoc = -1;
+    const char* docChars = NULL;
+    if (!docNVal.isNull()) {
+        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenDoc = docNVal.getObjectLength_withoutNull();
+        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    }
+
+    int32_t lenPath = -1;
+    const char* pathChars = NULL;
+    if (!pathNVal.isNull()) {
+        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenPath = pathNVal.getObjectLength_withoutNull();
+        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    }
+
+    int32_t lenValue = -1;
+    const char* valueChars = NULL;
+    if (!valueNVal.isNull()) {
+        if (valueNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (valueNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenValue = valueNVal.getObjectLength_withoutNull();
+        valueChars = reinterpret_cast<char*>(valueNVal.getObjectValue_withoutNull());
+    }
+
+    JsonDocument doc(docChars, lenDoc);
+    doc.set(pathChars, lenPath, valueChars, lenValue);
+
+    std::string value = doc.value();
+    return getTempStringValue(value.c_str(), value.length() - 1);
 }
 
 }
