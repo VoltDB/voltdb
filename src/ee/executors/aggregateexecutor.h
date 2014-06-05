@@ -56,8 +56,98 @@
 #include "execution/ProgressMonitorProxy.h"
 
 namespace voltdb {
-struct AggregateRow;
-struct AggSerialInfo;
+
+/*
+ * Base class for an individual aggregate that aggregates a specific
+ * column for a group
+ */
+class Agg
+{
+public:
+    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+    void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    Agg() : m_haveAdvanced(false)
+    {
+        m_value.setNull();
+    }
+    virtual ~Agg()
+    {
+        /* do nothing */
+    }
+    virtual void advance(const NValue& val) = 0;
+    virtual NValue finalize() { return m_value; }
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_value.setNull();
+    }
+protected:
+    bool m_haveAdvanced;
+    NValue m_value;
+};
+
+/**
+ * A collection of aggregates in progress for a specific group.
+ */
+struct AggregateRow
+{
+    void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
+    {
+        // allocate nAggs +1 for null terminator: see resetAggs, and destructor.
+        // Would it be cleaner to have a count data member? Not by much.
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+    }
+    void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    ~AggregateRow()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            // All the aggs inherit no-op delete operators, so, "delete" is really just destructor invocation.
+            // The destructor being invoked is the implicit specialization of Agg's destructor.
+            // The compiler generates it to invoke the destructor (if any) of the distinct value set (if any).
+            // It must be called because the pooled Agg object only embeds the (boost) set's "head".
+            // The "body" is allocated by boost via its defaulted stl allocator as the set grows
+            // -- AND it is not completely deallocated when "clear" is called.
+            // This AggregateRow destructor would not be required at all if distinct was based on a home-grown
+            // pool-aware hash, incapable of leaking outside the pool.
+            delete m_aggregates[ii];
+        }
+    }
+
+    void resetAggs()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            m_aggregates[ii]->resetAgg();
+        }
+        m_passThroughValues.clear();
+        m_filled = false;
+    }
+
+    void recordPassThroughTuple(const TableTuple &tuple,
+            std::vector<int> passThroughColumns,
+            std::vector<AbstractExpression*> outputColumnExpressions)
+    {
+        if (!m_filled) {
+            for (int ii = 0; ii < passThroughColumns.size(); ii++) {
+                int colIndex = passThroughColumns[ii];
+                NValue val = outputColumnExpressions[colIndex]->eval(&tuple);
+                m_passThroughValues.push_back(val);
+            }
+            m_filled = true;
+        }
+    }
+
+    bool m_filled;
+    std::vector<NValue> m_passThroughValues;
+
+    // The aggregates for each column for this group
+    Agg* m_aggregates[0];
+};
 
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
@@ -76,6 +166,7 @@ public:
         }
     }
 
+    AggregateRow* allocateAggregateRow();
 
     void resetOutputTable(TempTable* newTempTable) {
         m_tmpOutputTable = newTempTable;
@@ -137,6 +228,22 @@ public:
 
 protected:
     virtual bool p_execute(const NValueArray& params);
+};
+
+
+struct AggSerialInfo
+{
+    AggSerialInfo() {
+        m_noInputRows = true;
+        m_failOnPrePredicate = false;
+    }
+
+    bool zeroInputRowCase() {
+        return m_noInputRows || m_failOnPrePredicate;
+    }
+
+    bool m_noInputRows;
+    bool m_failOnPrePredicate;
 };
 
 /**
