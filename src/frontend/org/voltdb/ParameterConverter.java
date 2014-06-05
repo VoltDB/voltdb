@@ -951,6 +951,28 @@ public class ParameterConverter {
             else if (inputLength == 0) {
                 return Array.newInstance(byte[].class, 0);
             }
+            // hack to make strings work with input as bytes
+            else if ((paramClz == byte[][].class) && (expectedArrayClass == String[].class)) {
+                String[] values = new String[inputLength];
+                for (int i = 0; i < inputLength; i++) {
+                    try {
+                        values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
+                    } catch (UnsupportedEncodingException ex) {
+                        throw new VoltTypeException(
+                                "tryScalarMakeCompatible: Unsupported encoding:"
+                                + expectedArrayClass.getName() + " to provided " + paramClz.getName());
+                    }
+                }
+                return values;
+            }
+            // hack to make varbinary work with input as hex string
+            else if ((paramClz == String[].class) && (expectedArrayClass == byte[][].class)) {
+                byte[][] values = new byte[inputLength][];
+                for (int i = 0; i < inputLength; i++) {
+                    values[i] = Encoder.hexDecode((String) Array.get(param, i));
+                }
+                return values;
+            }
 
             /*
              * Arrays can be quite large so it doesn't make sense to silently do the conversion
