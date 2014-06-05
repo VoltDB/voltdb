@@ -674,14 +674,14 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 
     while (it.next(nextTuple)) {
         pmp.countdownProgress();
-        p_execute_tuple(nextTuple,aggregateRow,inProgressGroupByValues, &info, &pmp);
+        p_execute_tuple(nextTuple,aggregateRow, inProgressGroupByValues, &info, &pmp);
     }
     VOLT_TRACE("finalizing..");
     return p_execute_finish(&info, aggregateRow, &pmp);
 }
 
 void AggregateSerialExecutor::p_execute_tuple(
-        TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue> inProgressGroupByValues,
+        TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue>& inProgressGroupByValues,
         AggSerialInfo * info, ProgressMonitorProxy* pmpPtr) {
 
     // Use the first input tuple to "prime" the system.

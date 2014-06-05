@@ -160,7 +160,7 @@ public:
     ~AggregateSerialExecutor() { }
 
     void p_execute_tuple(
-            TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue> inProgressGroupByValues,
+            TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue>& inProgressGroupByValues,
             AggSerialInfo * info, ProgressMonitorProxy* pmpPtr);
 
     bool p_execute_finish(AggSerialInfo * info,
