@@ -74,12 +74,28 @@ public:
         }
     }
 
+
+    TupleSchema* groupByKeySchema() const {
+        return m_groupByKeySchema;
+    }
+
+    Pool* memoryPool() {
+        return &m_memoryPool;
+    }
+
+    void resetOutputTable(TempTable* newTempTable) {
+        m_tmpOutputTable = newTempTable;
+    }
+
+
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
     void executeAggBase(const NValueArray& params);
 
     void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
+
+    std::vector<NValue> getNextGroupByValues(const TableTuple& nextTuple);
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
