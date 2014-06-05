@@ -91,11 +91,15 @@ public class ExportGeneration {
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
-    private final Runnable m_onAllSourcesDrained;
+    private Runnable m_onAllSourcesDrained = null;
 
     private final Runnable m_onSourceDrained = new Runnable() {
         @Override
         public void run() {
+            if (m_onAllSourcesDrained == null) {
+                VoltDB.crashLocalVoltDB("No export generation roller found.", true, null);
+                return;
+            }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
@@ -159,8 +163,7 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, Runnable onAllSourcesDrained, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
+    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!isRejoin) {
@@ -183,10 +186,7 @@ public class ExportGeneration {
      * @param generationTimestamp
      * @throws IOException
      */
-    public ExportGeneration(
-            Runnable onAllSourcesDrained,
-            File generationDirectory) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
+    public ExportGeneration(File generationDirectory) throws IOException {
         m_directory = generationDirectory;
     }
 
@@ -229,7 +229,6 @@ public class ExportGeneration {
             }
         }
         createAndRegisterAckMailboxes(partitions, messenger);
-        exportLog.info("Restoring export generation " + m_timestamp);
         return hadValidAd;
     }
 
@@ -799,4 +798,9 @@ public class ExportGeneration {
     public String toString() {
         return "Export Generation - " + m_timestamp.toString();
     }
+
+    public void setGenerationDrainRunnable(Runnable onGenerationDrained) {
+        m_onAllSourcesDrained = onGenerationDrained;
+    }
+
 }

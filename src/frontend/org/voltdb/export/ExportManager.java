@@ -124,7 +124,14 @@ public class ExportManager
      */
     private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
 
-    private final Runnable m_onGenerationDrained = new Runnable() {
+    public class GenerationDrainRunnable implements Runnable {
+
+        private final ExportGeneration m_generation;
+
+        public GenerationDrainRunnable(ExportGeneration generation) {
+            m_generation = generation;
+        }
+
         @Override
         public void run() {
             /*
@@ -139,7 +146,7 @@ public class ExportManager
                 @Override
                 public void run() {
                     try {
-                        rollToNextGeneration();
+                        rollToNextGeneration(m_generation);
                     } catch (RuntimeException e) {
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
@@ -151,25 +158,30 @@ public class ExportManager
 
             });
         }
-    };
 
-    private void rollToNextGeneration() throws Exception {
+    }
+
+    private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
-        ExportGeneration oldGeneration = null;
         synchronized (ExportManager.this) {
-             oldGeneration = m_generations.firstEntry().getValue();
-
-            m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-            exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
+            boolean installNewProcessor = false;
+            if (m_generations.containsValue(drainedGeneration)) {
+                m_generations.remove(drainedGeneration.m_timestamp);
+                m_generationGhosts.add(drainedGeneration.m_timestamp);
+                installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
+                exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
+            } else {
+                exportLog.warn("Finished draining a generation that is not known to export generations.");
+            }
 
             try {
-                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                if (m_loaderClass != null && !m_generations.isEmpty() && installNewProcessor) {
                     exportLog.info("Creating connector " + m_loaderClass);
                     final Class<?> loaderClass = Class.forName(m_loaderClass);
                     //Make it so
                     ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                    newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                    newProcessor = (ExportDataProcessor) loaderClass.newInstance();
                     newProcessor.addLogger(exportLog);
                     newProcessor.setExportGeneration(nextGeneration);
                     newProcessor.setProcessorConfig(m_processorConfig);
@@ -191,25 +203,26 @@ public class ExportManager
                          * We stashed away all the ones we have mastership of
                          * in m_masterOfPartitions
                          */
-                        for( Integer partitionId: m_masterOfPartitions) {
+                        for (Integer partitionId : m_masterOfPartitions) {
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
+                    oldProcessor = m_processor.getAndSet(newProcessor);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
             }
-            oldProcessor = m_processor.getAndSet(newProcessor);
         }
 
-                    /*
-                     * The old processor should not be null since this shutdown task
-                     * is running for this processor
-                     */
-        oldProcessor.shutdown();
+        /*
+         * The old processor should shutdown if we installed a new processor.
+         */
+        if (oldProcessor != null) {
+            oldProcessor.shutdown();
+        }
         try {
-            if (oldGeneration != null)
-                oldGeneration.closeAndDelete();
+            //We close and delete regardless
+            drainedGeneration.closeAndDelete();
         } catch (IOException e) {
             e.printStackTrace();
             exportLog.error(e);
@@ -260,6 +273,8 @@ public class ExportManager
         ExportGeneration gen = m_generations.firstEntry().getValue();
         if (gen != null && !gen.isDiskBased()) {
             gen.acceptMastershipTask(partitionId);
+        } else {
+            exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
         }
     }
 
@@ -354,9 +369,14 @@ public class ExportManager
             if (startup) {
                 final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                            m_onGenerationDrained,
                         exportOverflowDirectory, isRejoin);
+                currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                 currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
+                if (!m_generations.isEmpty()) {
+                    if (m_generations.containsKey(catalogContext.m_uniqueId)) {
+                        exportLog.info("Persisted export generation with same timestamp from generation from catalog exists. Catalog generation will be used.");
+                    }
+                }
                 m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
@@ -426,10 +446,9 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation =
-                new ExportGeneration(
-                        m_onGenerationDrained,
-                        generationDirectory);
+            ExportGeneration generation = new ExportGeneration(generationDirectory);
+            generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
+
             if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
@@ -479,9 +498,8 @@ public class ExportManager
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(
-                    catalogContext.m_uniqueId,
-                    m_onGenerationDrained,
-                    exportOverflowDirectory, false);
+                    catalogContext.m_uniqueId, exportOverflowDirectory, false);
+            newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
