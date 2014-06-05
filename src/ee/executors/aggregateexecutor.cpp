@@ -49,7 +49,6 @@
 #include "common/common.h"
 #include "common/debuglog.h"
 #include "common/SerializableEEException.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "storage/temptable.h"
@@ -611,7 +610,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
         // Group not found. Make a new entry in the hash for this new group.
         if (keyIter == hash.end()) {
             aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-
+            aggregateRow->m_filled = false;
             hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
             initAggInstances(aggregateRow);
             aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
@@ -623,7 +622,6 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
             aggregateRow = keyIter->second;
         }
         // update the aggregation calculation.
-        aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
         advanceAggs(aggregateRow, nextTuple);
     }
 
@@ -639,19 +637,31 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
+struct AggSerialInfo
+{
+    AggSerialInfo() {
+        m_noInputRows = true;
+        m_failOnPrePredicate = false;
+    }
+
+    bool zeroInputRowCase() {
+        return m_noInputRows || m_failOnPrePredicate;
+    }
+
+    bool m_noInputRows;
+    bool m_failOnPrePredicate;
+};
+
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     executeAggBase(params);
     AggregateRow * aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+    aggregateRow->m_filled = false;
     boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
     ProgressMonitorProxy pmp(m_engine, this);
 
-    // Serial aggregates need only one row of Aggs, the "previous" input tuple for pass-through columns,
-    // and the "previous" group key tuple that defines their associated group keys
-    // -- so group transitions can be detected.
-    // In the case of table aggregates that have no grouping keys,
-    // the previous input and group key tuples have no effect and are tracked here for nothing.
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
+
     // Input table
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
@@ -660,17 +670,61 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nextTuple(input_table->schema());
     std::vector<NValue> inProgressGroupByValues;
 
-    VOLT_TRACE("looping...");
-    // Use the first input tuple to "prime" the system.
-    // ENG-1565: for this special case, can have only one input row, apply the predicate here
-    if (it.next(nextTuple) && (m_prePredicate == NULL || m_prePredicate->eval(&nextTuple, NULL).isTrue())) {
-        inProgressGroupByValues = getNextGroupByValues(nextTuple);
+    AggSerialInfo info;
 
-        // Start the aggregation calculation.
-        initAggInstances(aggregateRow);
-        aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
-        advanceAggs(aggregateRow, nextTuple);
-    } else {
+    while (it.next(nextTuple)) {
+        pmp.countdownProgress();
+        p_execute_tuple(nextTuple,aggregateRow,inProgressGroupByValues, &info, &pmp);
+    }
+    VOLT_TRACE("finalizing..");
+    return p_execute_finish(&info, aggregateRow, &pmp);
+}
+
+void AggregateSerialExecutor::p_execute_tuple(
+        TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue> inProgressGroupByValues,
+        AggSerialInfo * info, ProgressMonitorProxy* pmpPtr) {
+
+    // Use the first input tuple to "prime" the system.
+    if(info->m_noInputRows) {
+        // ENG-1565: for this special case, can have only one input row, apply the predicate here
+        if (m_prePredicate == NULL || m_prePredicate->eval(&nextTuple, NULL).isTrue()) {
+            inProgressGroupByValues = getNextGroupByValues(nextTuple);
+            // Start the aggregation calculation.
+            initAggInstances(aggregateRow);
+            aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+            advanceAggs(aggregateRow, nextTuple);
+        } else {
+            info->m_failOnPrePredicate = true;
+        }
+        info->m_noInputRows = false;
+        return;
+    }
+
+    std::vector<NValue> nextGroupByValues = getNextGroupByValues(nextTuple);
+    for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
+        if (nextGroupByValues.at(ii).compare(inProgressGroupByValues.at(ii)) != 0) {
+            VOLT_TRACE("new group!");
+            // Output old row.
+            if (insertOutputTuple(aggregateRow)) {
+                (*pmpPtr).countdownProgress();
+            }
+            // Recycle the aggs to start a new row.
+            aggregateRow->resetAggs();
+
+            // swap inProgressGroupByValues
+            inProgressGroupByValues = nextGroupByValues;
+            break;
+        }
+    }
+    // update the aggregation calculation.
+    aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+    advanceAggs(aggregateRow, nextTuple);
+}
+
+bool AggregateSerialExecutor::p_execute_finish(AggSerialInfo * info,
+        AggregateRow* aggregateRow, ProgressMonitorProxy* pmpPtr)
+{
+    if (info->zeroInputRowCase()) {
         VOLT_TRACE("finalizing after no input rows..");
         // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
         // Note the difference between these two cases:
@@ -680,39 +734,15 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
             VOLT_TRACE("no input row, but output an empty result row for the whole table.");
             initAggInstances(aggregateRow);
             if (insertOutputTuple(aggregateRow)) {
-                pmp.countdownProgress();
+                (*pmpPtr).countdownProgress();
             }
         }
         return true;
     }
 
-    while (it.next(nextTuple)) {
-        pmp.countdownProgress();
-        std::vector<NValue> nextGroupByValues = getNextGroupByValues(nextTuple);
-
-        for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
-            if (nextGroupByValues.at(ii).compare(inProgressGroupByValues.at(ii)) != 0) {
-                VOLT_TRACE("new group!");
-                // Output old row.
-                if (insertOutputTuple(aggregateRow)) {
-                    pmp.countdownProgress();
-                }
-                // Recycle the aggs to start a new row.
-                aggregateRow->resetAggs();
-
-                // swap inProgressGroupByValues
-                inProgressGroupByValues = nextGroupByValues;
-                break;
-            }
-        }
-        // update the aggregation calculation.
-        aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
-        advanceAggs(aggregateRow, nextTuple);
-    }
-    VOLT_TRACE("finalizing..");
     // There's one last group (or table) row in progress that needs to be output.
     if (insertOutputTuple(aggregateRow)) {
-        pmp.countdownProgress();
+        (*pmpPtr).countdownProgress();
     }
     return true;
 }

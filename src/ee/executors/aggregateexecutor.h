@@ -53,9 +53,11 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "execution/ProgressMonitorProxy.h"
 
 namespace voltdb {
 struct AggregateRow;
+struct AggSerialInfo;
 
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
@@ -157,6 +159,12 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
+    void p_execute_tuple(
+            TableTuple& nextTuple, AggregateRow* aggregateRow, std::vector<NValue> inProgressGroupByValues,
+            AggSerialInfo * info, ProgressMonitorProxy* pmpPtr);
+
+    bool p_execute_finish(AggSerialInfo * info,
+            AggregateRow* aggregateRow, ProgressMonitorProxy* pmpPtr);
 protected:
     virtual bool p_execute(const NValueArray& params);
 };
