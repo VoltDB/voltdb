@@ -870,10 +870,9 @@ public class TableHelper {
                 }
                 // make the values the core types of the target table
                 VoltType destColType = dest.getColumnType(i);
-                Class<?> descColClass = destColType.classFromType();
-                row[i] = ParameterConverter.tryToMakeCompatible(descColClass, row[i]);
+                row[i] = ParameterConverter.makeCompatible(destColType.getProcParamType(), row[i]);
                 // check the result type in an assert
-                assert(ParameterConverter.verifyParameterConversion(row[i], descColClass));
+                assert(ParameterConverter.verifyParameterConversion(row[i], destColType.classFromType()));
             }
 
             dest.addRow(row);

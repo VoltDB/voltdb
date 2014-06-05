@@ -258,8 +258,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                         throw new VoltTypeException(errorMsg);
                     }
                     typedUserParams[ii] =
-                            ParameterConverter.tryToMakeCompatible(paramType.classFromType(),
-                                                                   work.userParamSet[ii]);
+                            ParameterConverter.makeCompatible(paramType.getProcParamType(),
+                                                              work.userParamSet[ii]);
                     // System.out.println("DEBUG typed parameter: " + work.userParamSet[ii] +
                     //         "using type: " + paramType + "as: " + typedUserParams[ii]);
                     ii++;
@@ -338,7 +338,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             if (partitionParamType == null) {
                 return userParamValue;
             } else {
-                return ParameterConverter.tryToMakeCompatible(partitionParamType.classFromType(), userParamValue);
+                return ParameterConverter.makeCompatible(partitionParamType.getProcParamType(), userParamValue);
             }
         }
         return partitionParamValue;

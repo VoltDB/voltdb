@@ -24,15 +24,15 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import org.voltdb.ClientResponseImpl;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.HashinatorLite;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader.LoaderSpecificRowCnt;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoaderRow.BulkLoaderNotification;
@@ -310,7 +310,7 @@ public class PerPartitionTable {
             try {
                 for (int i = 0; i < row_args.length; i++) {
                     final VoltType type = m_columnTypes[i];
-                    row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
+                    row_args[i] = ParameterConverter.makeCompatible(type.getProcParamType(),
                             currRow.m_rowData[i]);
                 }
             } catch (VoltTypeException e) {

@@ -166,7 +166,7 @@ class ParameterizationInfo {
         }
 
         // leverage existing (rather heavyweight) code to convert param types
-        Object retval = ParameterConverter.tryToMakeCompatible(type.classFromType(), value);
+        Object retval = ParameterConverter.makeCompatible(type.getProcParamType(), value);
         // check the result type in an assert
         assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
         return retval;

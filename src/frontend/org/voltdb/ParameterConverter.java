@@ -200,6 +200,811 @@ public class ParameterConverter {
         }
     }
 
+    static Object convertToLong(final Object param, Class<?> paramClz)
+    {
+        if (paramClz == Long.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return VoltType.NULL_BIGINT;
+            // remove commas and escape chars
+            stringParam = stringParam.replaceAll("\\,","");
+            try {
+                return Long.parseLong(stringParam);
+            }
+            // ignore the exception and fail through below
+            catch (NumberFormatException nfe) {}
+
+            throw new VoltTypeException(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + stringParam + " to "  + long.class.getName()
+                    + " value for target parameter.");
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return VoltType.NULL_BIGINT;
+            return ((Integer) param).longValue();
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return VoltType.NULL_BIGINT;
+            return ((Short) param).longValue();
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return VoltType.NULL_BIGINT;
+            return ((Byte) param).longValue();
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return VoltType.NULL_BIGINT;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return VoltType.NULL_BIGINT;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), long.class.getName()));
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + long.class.getName());
+    }
+
+    static Object convertToInteger(final Object param, Class<?> paramClz)
+    {
+        // If we make it through this first block, memorize a number value for some range checks later
+        Number numberParam = null;
+
+        if (paramClz == Integer.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return VoltType.NULL_INTEGER;
+            // remove commas and escape chars
+            stringParam = stringParam.replaceAll("\\,","");
+            try {
+                return Integer.parseInt(stringParam);
+            }
+            // ignore the exception and fail through below
+            catch (NumberFormatException nfe) {}
+
+            throw new VoltTypeException(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + stringParam + " to "  + long.class.getName()
+                    + " value for target parameter.");
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return VoltType.NULL_INTEGER;
+            return ((Short) param).intValue();
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return VoltType.NULL_INTEGER;
+            return ((Byte) param).intValue();
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return VoltType.NULL_INTEGER;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return VoltType.NULL_INTEGER;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return VoltType.NULL_INTEGER;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), int.class.getName()));
+        }
+
+        if (numberParam != null) {
+            long val = numberParam.longValue();
+            if (val == VoltType.NULL_INTEGER) {
+                throw new VoltTypeException("tryToMakeCompatible: The provided long value: ("
+                        + param.toString() + ") might be interpreted as integer null. " +
+                                "Try explicitly using a int parameter.");
+            }
+            // if it's in the right range, crop the value and return
+            if ((val <= Integer.MAX_VALUE) && (val > Integer.MIN_VALUE))
+                return numberParam.intValue();
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + int.class.getName());
+    }
+
+    static Object convertToShort(final Object param, Class<?> paramClz)
+    {
+        // If we make it through this first block, memorize a number value for some range checks later
+        Number numberParam = null;
+
+        if (paramClz == Short.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return VoltType.NULL_SMALLINT;
+            // remove commas and escape chars
+            stringParam = stringParam.replaceAll("\\,","");
+            try {
+                return Short.parseShort(stringParam);
+            }
+            // ignore the exception and fail through below
+            catch (NumberFormatException nfe) {}
+
+            throw new VoltTypeException(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + stringParam + " to "  + long.class.getName()
+                    + " value for target parameter.");
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return VoltType.NULL_SMALLINT;
+            return ((Byte) param).shortValue();
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return VoltType.NULL_SMALLINT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return VoltType.NULL_SMALLINT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return VoltType.NULL_SMALLINT;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return VoltType.NULL_SMALLINT;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), short.class.getName()));
+        }
+
+        if (numberParam != null) {
+            long val = numberParam.longValue();
+            if (val == VoltType.NULL_SMALLINT) {
+                throw new VoltTypeException("tryToMakeCompatible: The provided int or long value: ("
+                        + param.toString() + ") might be interpreted as smallint null. " +
+                                "Try explicitly using a short parameter.");
+            }
+            // if it's in the right range, crop the value and return
+            if ((val <= Short.MAX_VALUE) && (val > Short.MIN_VALUE))
+                return numberParam.shortValue();
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + short.class.getName());
+    }
+
+    static Object convertToByte(final Object param, Class<?> paramClz)
+    {
+        // If we make it through this first block, memorize a number value for some range checks later
+        Number numberParam = null;
+
+        if (paramClz == Byte.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return VoltType.NULL_TINYINT;
+            // remove commas and escape chars
+            stringParam = stringParam.replaceAll("\\,","");
+            try {
+                return Byte.parseByte(stringParam);
+            }
+            // ignore the exception and fail through below
+            catch (NumberFormatException nfe) {}
+
+            throw new VoltTypeException(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + stringParam + " to "  + long.class.getName()
+                    + " value for target parameter.");
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return VoltType.NULL_TINYINT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return VoltType.NULL_TINYINT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return VoltType.NULL_TINYINT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return VoltType.NULL_TINYINT;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return VoltType.NULL_TINYINT;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), byte.class.getName()));
+        }
+
+        if (numberParam != null) {
+            long val = numberParam.longValue();
+            if (val == VoltType.NULL_TINYINT) {
+                throw new VoltTypeException("tryToMakeCompatible: The provided short, int or long value: ("
+                        + param.toString() + ") might be interpreted as tinyint null. " +
+                                "Try explicitly using a byte parameter.");
+            }
+            // if it's in the right range, crop the value and return
+            if ((val <= Byte.MAX_VALUE) && (val > Byte.MIN_VALUE))
+                return numberParam.byteValue();
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + byte.class.getName());
+    }
+
+    static Object convertToFloat(final Object param, Class<?> paramClz)
+    {
+        // If we make it through this first block, memorize a number value for some range checks later
+        Number numberParam = null;
+
+        if (paramClz == Double.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return VoltType.NULL_FLOAT;
+            // remove commas and escape chars
+            stringParam = stringParam.replaceAll("\\,","");
+            try {
+                return Double.parseDouble(stringParam);
+            }
+            // ignore the exception and fail through below
+            catch (NumberFormatException nfe) {}
+
+            throw new VoltTypeException(
+                    "tryToMakeCompatible: Unable to convert string "
+                    + stringParam + " to "  + long.class.getName()
+                    + " value for target parameter.");
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return VoltType.NULL_FLOAT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return VoltType.NULL_FLOAT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return VoltType.NULL_FLOAT;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return VoltType.NULL_FLOAT;
+            numberParam = (Number) param;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return VoltType.NULL_FLOAT;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), double.class.getName()));
+        }
+
+        if (numberParam != null) {
+            return numberParam.doubleValue();
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + double.class.getName());
+    }
+
+    static Object convertToDecimal(final Object param, Class<?> paramClz)
+    {
+        // If we make it through this first block, memorize a number value for some range checks later
+        Number numberParam = null;
+
+        if (paramClz == BigDecimal.class) {
+            BigDecimal bd = (BigDecimal) param;
+            bd = VoltDecimalHelper.setDefaultScale(bd);
+            return bd;
+        }
+
+        if (paramClz == String.class) {
+            String stringParam = ((String)param).trim();
+            // We allow all values to be passed as strings for csv loading, json, etc...
+            // detect CSV null
+            if (stringParam.equals(Constants.CSV_NULL)) return null;
+            try {
+                return VoltDecimalHelper.deserializeBigDecimalFromString(stringParam);
+            } catch (IOException ex) {
+                throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
+                        paramClz.getName(), BigDecimal.class.getName()));
+            }
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+            try {
+                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%.12f", param));
+            } catch (IOException ex) {
+                throw new VoltTypeException(String.format("deserialize Float from string failed. (%s to %s)",
+                        paramClz.getName(), BigDecimal.class.getName()));
+            }
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+            numberParam = (Number) param;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+            numberParam = (Number) param;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), BigDecimal.class.getName()));
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+
+        if (numberParam != null) {
+            BigInteger bi = new BigInteger(param.toString());
+            BigDecimal bd = new BigDecimal(bi);
+            bd = VoltDecimalHelper.setDefaultScale(bd);
+            return bd;
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + BigDecimal.class.getName());
+    }
+
+    static Object convertToVoltTable(final Object param, Class<?> paramClz)
+    {
+        if (paramClz == VoltTable.class) {
+            return param;
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + VoltTable.class.getName());
+    }
+
+    /*
+     * Only converts long and int to timestamp
+     */
+    static Object convertToVoltTimestamp(final Object param, Class<?> paramClz)
+    {
+        if (paramClz == TimestampType.class) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            // if a string is given for a date, use java's JDBC parsing
+            String timestring = ((String) param).trim();
+            if (((String) param).equals(Constants.CSV_NULL)) return null;
+            try {
+                return new TimestampType(Long.parseLong(timestring));
+            } catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+            try {
+                return new TimestampType(timestring);
+            }
+            catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+        }
+        else if (paramClz == Date.class) {
+            return new TimestampType((Date) param);
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+            return new TimestampType((Long)param); // null values safe
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+            return new TimestampType((Integer)param); // null values safe
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), TimestampType.class.getName()));
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + TimestampType.class.getName());
+    }
+
+    static Object convertToSqlTimestamp(final Object param, Class<?> paramClz)
+    {
+        if (param instanceof java.sql.Timestamp) {
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            // If a string is given for a date, use java's JDBC parsing.
+            String longtime = ((String) param).trim();
+            if (longtime.equals(Constants.CSV_NULL)) return null;
+            try {
+                return new java.sql.Timestamp(Long.parseLong(longtime));
+            }
+            catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+            try {
+                return java.sql.Timestamp.valueOf(longtime);
+            } catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+
+        }
+        else if (param instanceof java.util.Date) {
+            return new java.sql.Timestamp(((java.util.Date) param).getTime());
+        }
+        else if (param instanceof TimestampType) {
+            return ((TimestampType) param).asJavaTimestamp();
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), java.sql.Timestamp.class.getName()));
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + java.sql.Timestamp.class.getName());
+    }
+
+    static Object convertToSqlDate(final Object param, Class<?> paramClz)
+    {
+        if (param instanceof java.sql.Date) {
+            // covers java.sql.Date and java.sql.Timestamp
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            // If a string is given for a date, use java's JDBC parsing.
+            String millitime = ((String) param).trim();
+            if (millitime.equals(Constants.CSV_NULL)) return null;
+            try {
+                return new java.sql.Date(TimestampType.millisFromJDBCformat(millitime));
+            }
+            catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+        }
+        else if (param instanceof java.util.Date) {
+            return new java.sql.Date(((java.util.Date) param).getTime());
+        }
+        else if (param instanceof TimestampType) {
+            return ((TimestampType) param).asExactJavaSqlDate();
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), java.sql.Date.class.getName()));
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + java.sql.Date.class.getName());
+    }
+
+    static Object convertToJavaDate(final Object param, Class<?> paramClz)
+    {
+        if (param instanceof java.util.Date) {
+            // covers java.sql.Date and java.sql.Timestamp
+            return param;
+        }
+
+        if (paramClz == String.class) {
+            // If a string is given for a date, use the default format parser for the default locale.
+            String millitime = ((String) param).trim();
+            if (millitime.equals(Constants.CSV_NULL)) return null;
+            try {
+                return new java.util.Date(TimestampType.millisFromJDBCformat(millitime));
+            }
+            catch (IllegalArgumentException e) {
+                // Defer errors to the generic Exception throw below, if it's not the right format
+            }
+        }
+        else if (param instanceof TimestampType) {
+            return ((TimestampType) param).asExactJavaDate();
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), java.util.Date.class.getName()));
+        }
+
+        throw new VoltTypeException(
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + paramClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + java.util.Date.class.getName());
+    }
+
+    static Object convertToString(final Object param, Class<?> paramClz)
+    {
+        if (paramClz == String.class) {
+            if (((String) param).equals(Constants.CSV_NULL)) {
+                return null;
+            }
+            return param;
+        }
+        else if (paramClz == byte[].class) {
+            String value = new String((byte[]) param, Constants.UTF8ENCODING);
+            if (value.equals(Constants.CSV_NULL)) {
+                return null;
+            }
+            else {
+                return value;
+            }
+        }
+        else if (paramClz == Long.class) {
+            if ((Long) param == VoltType.NULL_BIGINT) return null;
+        }
+        else if (paramClz == Integer.class) {
+            if ((Integer) param == VoltType.NULL_INTEGER) return null;
+        }
+        else if (paramClz == Short.class) {
+            if ((Short) param == VoltType.NULL_SMALLINT) return null;
+        }
+        else if (paramClz == Byte.class) {
+            if ((Byte) param == VoltType.NULL_TINYINT) return null;
+        }
+        else if (paramClz == Double.class) {
+            if ((Double) param == VoltType.NULL_FLOAT) return null;
+        }
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
+            return null;
+        }
+        else if (paramClz.isArray()) {
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    paramClz.getName(), String.class.getName()));
+        }
+
+        return String.valueOf(param);
+    }
+
+    static Object convertToByteArray(final Object param, Class<?> paramClz)
+    {
+        if (paramClz == byte[].class) {
+            return param;
+        }
+
+        if (paramClz.isArray()) {
+            // handle arrays in a factored-out method
+            int inputLength = Array.getLength(param);
+
+            // if it's an empty array, let it through
+            // this is a bit ugly as it might hide passing
+            //  arrays of the wrong type, but it "does the right thing"
+            //  more often that not I guess...
+            if (inputLength == 0) {
+                return Array.newInstance(byte[].class, 0);
+            }
+            else {
+                /*
+                 * Arrays can be quite large so it doesn't make sense to silently do the conversion
+                 * and incur the performance hit. The client should serialize the correct invocation
+                 * parameters
+                 */
+                throw new VoltTypeException(
+                        "tryScalarMakeCompatible: Unable to match parameter array:"
+                        + byte.class.getName() + " to provided " + paramClz.getComponentType().getName());
+            }
+        }
+        else {
+            if (paramClz == String.class) {
+                if (((String) param).equals(Constants.CSV_NULL)) {
+                    return null;
+                }
+                return Encoder.hexDecode((String) param);
+            }
+            else if (paramClz == Long.class) {
+                if ((Long) param == VoltType.NULL_BIGINT) return null;
+            }
+            else if (paramClz == Integer.class) {
+                if ((Integer) param == VoltType.NULL_INTEGER) return null;
+            }
+            else if (paramClz == Short.class) {
+                if ((Short) param == VoltType.NULL_SMALLINT) return null;
+            }
+            else if (paramClz == Byte.class) {
+                if ((Byte) param == VoltType.NULL_TINYINT) return null;
+            }
+            else if (paramClz == Double.class) {
+                if ((Double) param == VoltType.NULL_FLOAT) return null;
+            }
+            else if (param == VoltType.NULL_TIMESTAMP ||
+                     param == VoltType.NULL_STRING_OR_VARBINARY ||
+                     param == VoltType.NULL_DECIMAL) {
+                return null;
+            }
+
+            throw new VoltTypeException(String.format("Scalar / Array parameter mismatch (%s to %s)",
+                    paramClz.getName(), byte[].class.getName()));
+        }
+    }
+
+    static Object convertToArray(final Object param, Class<?> paramClz, Class<?> expectedArrayClass)
+    {
+        if (paramClz.isArray()) {
+            // handle arrays in a factored-out method
+            int inputLength = Array.getLength(param);
+
+            // It is possible for us to expect byte[][] but receive byte[]
+            if (expectedArrayClass.getComponentType() == paramClz.getComponentType() && paramClz != byte[].class) {
+                return param;
+            }
+            // if it's an empty array, let it through
+            // this is a bit ugly as it might hide passing
+            //  arrays of the wrong type, but it "does the right thing"
+            //  more often that not I guess...
+            else if (inputLength == 0) {
+                return Array.newInstance(byte[].class, 0);
+            }
+
+            /*
+             * Arrays can be quite large so it doesn't make sense to silently do the conversion
+             * and incur the performance hit. The client should serialize the correct invocation
+             * parameters
+             */
+            throw new VoltTypeException(
+                    "tryScalarMakeCompatible: Unable to match parameter array:"
+                    + expectedArrayClass.getName() + " to provided " + paramClz.getComponentType().getName());
+        }
+        else {
+            if (paramClz == Long.class) {
+                if ((Long) param == VoltType.NULL_BIGINT) return null;
+            }
+            else if (paramClz == Integer.class) {
+                if ((Integer) param == VoltType.NULL_INTEGER) return null;
+            }
+            else if (paramClz == Short.class) {
+                if ((Short) param == VoltType.NULL_SMALLINT) return null;
+            }
+            else if (paramClz == Byte.class) {
+                if ((Byte) param == VoltType.NULL_TINYINT) return null;
+            }
+            else if (paramClz == Double.class) {
+                if ((Double) param == VoltType.NULL_FLOAT) return null;
+            }
+            else if (paramClz == String.class) {
+                if (((String) param).equals(Constants.CSV_NULL)) return null;
+            }
+            // null sigils. (ning - if we're not checking if the sigil matches the expected type,
+            // why do we have three sigils for three types??)
+            else if (param == VoltType.NULL_TIMESTAMP ||
+                     param == VoltType.NULL_STRING_OR_VARBINARY ||
+                     param == VoltType.NULL_DECIMAL) {
+                return null;
+            }
+
+            throw new VoltTypeException(String.format("Scalar / Array parameter mismatch (%s to %s)",
+                    paramClz.getName(), expectedArrayClass.getName()));
+        }
+    }
+
+    static Object convertToSystemProcContext(final Object param, Class<?> paramClz, Class<?> systemProcExecClass)
+    {
+        // handle SystemProcedureExecutionContext without linking to it
+        // these are used by system procedures and are ignored here
+        if (systemProcExecClass.isAssignableFrom(paramClz)) {
+            return param;
+        }
+
+        throw new VoltTypeException(String.format("parameter mismatch (%s to %s)",
+                paramClz.getName(), systemProcExecClass.getName()));
+    }
+
     /**
      * Convert the given value to the type given, if possible.
      *
@@ -211,8 +1016,23 @@ public class ParameterConverter {
      *
      * @throws Exception with a message describing why the types are incompatible.
      */
-    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
+    public static Object makeCompatible(final StoredProcParamType expectedType, final Object param)
     throws VoltTypeException
+    {
+        // Get blatant null out of the way fast, as it avoids some inline checks
+        // There are some subtle null values that aren't java null coming up, but wait until
+        // after the basics to check for those.
+        if (param == null) {
+                return expectedType.getNullValue();
+        }
+
+        Class<?> inputClz = param.getClass();
+
+        return expectedType.convertToParamType(param, inputClz);
+    }
+
+    public static Object ryToMakeCompatible(final Class<?> expectedClz, final Object param)
+            throws VoltTypeException
     {
         // uncomment for debugging
         /*System.err.printf("Converting %s of type %s to type %s\n",
@@ -230,12 +1050,12 @@ public class ParameterConverter {
 
         Class<?> inputClz = param.getClass();
 
-        // If we make it through this first block, memoize a number value for some range checks later
+        // If we make it through this first block, memorize a number value for some range checks later
         Number numberParam = null;
 
         // This first code block tries to hit as many common cases as possible
         // Specifically, it does primitive types and strings, which are the most common param types.
-        // Downconversions (e.g. long => short) happen later, but can use the memoized numberParam value.
+        // Downconversions (e.g. long => short) happen later, but can use the memorized numberParam value.
         // Notice this block switches on the type of the given value (different later).
 
         if (inputClz == Long.class) {

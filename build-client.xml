@@ -243,6 +243,7 @@ JAVA COMPILATION
                   org/voltdb/jdbc/**/*.java
                   org/voltdb/LatencyBucketSet.java
                   org/voltdb/ParameterConverter.java
+                  org/voltdb/StoredProcParamType.java
                   org/voltdb/ParameterSet.java
                   org/voltdb/PrivateVoltTableFactory.java
                   org/voltdb/types/TimestampType.java

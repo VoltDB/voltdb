@@ -90,7 +90,7 @@ public class ProcedureRunner {
     protected final String m_procedureName;
     protected final VoltProcedure m_procedure;
     protected Method m_procMethod;
-    protected Class<?>[] m_paramTypes;
+    protected StoredProcParamType[] m_paramTypes;
 
     // per txn state (are reset after call)
     //
@@ -268,19 +268,21 @@ public class ProcedureRunner {
             m_statsCollector.beginProcedure();
 
             VoltTable[] results = null;
+            int paramListInx;
+            int origParamListInx = 0;
+            Object[] combinedParams = null;
 
-            // inject sysproc execution context as the first parameter.
             if (isSystemProcedure()) {
-                final Object[] combinedParams = new Object[paramList.length + 1];
+                combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_systemProcedureContext;
-                for (int i=0; i < paramList.length; ++i) {
-                    combinedParams[i+1] = paramList[i];
-                }
-                // swap the lists.
-                paramList = combinedParams;
+                paramListInx = 1;
+            }
+            else {
+                combinedParams = paramList;
+                paramListInx = 0;
             }
 
-            if (paramList.length != m_paramTypes.length) {
+            if (paramList.length + paramListInx != m_paramTypes.length) {
                 m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
@@ -288,19 +290,21 @@ public class ProcedureRunner {
                 return getErrorResponse(m_statusCode, msg, null);
             }
 
-            for (int i = 0; i < m_paramTypes.length; i++) {
+            for (; origParamListInx < paramList.length; paramListInx++, origParamListInx++) {
                 try {
-                    paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i]);
+                    combinedParams[paramListInx] = ParameterConverter.makeCompatible(m_paramTypes[paramListInx], paramList[origParamListInx]);
                     // check the result type in an assert
-                    assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
+                    assert(ParameterConverter.verifyParameterConversion(combinedParams[paramListInx], m_paramTypes[paramListInx].classFromType()));
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
-                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
+                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + paramListInx +
                             ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(m_statusCode, msg, null);
                 }
             }
+
+            paramList = combinedParams;
 
             boolean error = false;
             boolean abort = false;
@@ -878,12 +882,12 @@ public class ProcedureRunner {
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();
-                m_paramTypes = new Class<?>[numParams];
+                m_paramTypes = new StoredProcParamType[numParams];
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
                     if (param.getIsarray()) {
-                        m_paramTypes[param.getIndex()] = type.vectorClassFromType();
+                        m_paramTypes[param.getIndex()] = StoredProcParamType.typeFromClass(type.vectorClassFromType());
                         continue;
                     }
                     // Paul doesn't understand why single-statement procedures
@@ -900,7 +904,7 @@ public class ProcedureRunner {
                         type = VoltType.FLOAT;
                     }
 
-                    m_paramTypes[param.getIndex()] = type.classFromType();
+                    m_paramTypes[param.getIndex()] = StoredProcParamType.typeFromClass(type.classFromType());
                 }
             } catch (Exception e) {
                 // shouldn't throw anything outside of the compiler
@@ -909,7 +913,12 @@ public class ProcedureRunner {
         }
         else {
             // this is where, in the case of java procedures, m_method is set
-            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
+            Class<?>[] rawParamTypes = m_language.accept(parametersTypeRetriever, this);
+            int paramInx = 0;
+            m_paramTypes = new StoredProcParamType[rawParamTypes.length];
+            for (Class<?> rawParamType : rawParamTypes) {
+                m_paramTypes[paramInx++] = StoredProcParamType.typeFromClass(rawParamType);
+            }
 
             if (m_procMethod == null && m_language == Language.JAVA) {
                 throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());

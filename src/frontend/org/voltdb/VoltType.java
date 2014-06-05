@@ -41,26 +41,29 @@ public enum VoltType {
      * Used for uninitialized types in some places. Not a valid value
      * for actual user data.
      */
-    INVALID   ((byte)0, -1, null, new Class[] {}, null, '0'),
+    INVALID   ((byte)0, StoredProcParamType.INVALID, -1, null, new Class[] {}, null, '0'),
 
     /**
      * Used to type java null values that have no type. Not a valid value
      * for actual user data.
      */
-    NULL      ((byte)1, -1, null, new Class[] {}, null, '0'),
+    NULL      ((byte)1, StoredProcParamType.INVALID, -1, null, new Class[] {}, null, '0'),
 
     /**
      * Used for some literal constants parsed by our SQL parser. Not a
      * valid value for actual user data. See {@link #DECIMAL} for decimal
      * type.
      */
-    NUMERIC   ((byte)2, 0, null, new Class[] {}, null, '0'),
+    NUMERIC   ((byte)2, StoredProcParamType.INVALID, 0, null, new Class[] {}, null, '0'),
 
     /**
      * 1-byte signed 2s-compliment byte.
      * Lowest value means NULL in the database.
      */
-    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, byte[].class, 't',
+    TINYINT   ((byte)3, StoredProcParamType.TINYINT , 1, "tinyint",
+            new Class[] {byte.class,
+                         Byte.class},
+            byte[].class, 't',
             java.sql.Types.TINYINT,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
@@ -76,7 +79,10 @@ public enum VoltType {
      * 2-byte signed 2s-compliment short.
      * Lowest value means NULL in the database.
      */
-    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, short[].class, 's',
+    SMALLINT  ((byte)4, StoredProcParamType.SMALLINT, 2, "smallint",
+            new Class[] {short.class,
+                         Short.class},
+            short[].class, 's',
             java.sql.Types.SMALLINT,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
@@ -92,8 +98,11 @@ public enum VoltType {
      * 4-byte signed 2s-compliment integer.
      * Lowest value means NULL in the database.
      */
-    INTEGER   ((byte)5, 4, "integer",
-               new Class[] {int.class, Integer.class, AtomicInteger.class}, int[].class, 'i',
+    INTEGER   ((byte)5, StoredProcParamType.INTEGER, 4, "integer",
+               new Class[] {int.class,
+                            Integer.class,
+                            AtomicInteger.class},
+            int[].class, 'i',
             java.sql.Types.INTEGER,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
@@ -109,7 +118,7 @@ public enum VoltType {
      * 8-byte signed 2s-compliment long.
      * Lowest value means NULL in the database.
      */
-    BIGINT    ((byte)6, 8, "bigint",
+    BIGINT    ((byte)6, StoredProcParamType.BIGINT, 8, "bigint",
                new Class[] {long.class, Long.class, AtomicLong.class}, long[].class, 'b',
             java.sql.Types.BIGINT,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
@@ -126,8 +135,12 @@ public enum VoltType {
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
-    FLOAT     ((byte)8, 8, "float",
-            new Class[] {double.class, Double.class, float.class, Float.class}, double[].class, 'f',
+    FLOAT     ((byte)8, StoredProcParamType.FLOAT, 8, "float",
+            new Class[] {double.class,
+                         Double.class,
+                         float.class,
+                         Float.class},
+            double[].class, 'f',
             java.sql.Types.FLOAT,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
@@ -144,11 +157,12 @@ public enum VoltType {
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
-    TIMESTAMP ((byte)11, 8, "timestamp",
+    TIMESTAMP ((byte)11, StoredProcParamType.VOLTTIMESTAMP, 8, "timestamp",
             new Class[] {TimestampType.class,
                          java.util.Date.class,
                          java.sql.Date.class,
-                         java.sql.Timestamp.class}, TimestampType[].class, 'p',
+                         java.sql.Timestamp.class},
+            TimestampType[].class, 'p',
             java.sql.Types.TIMESTAMP,  // java.sql.Types DATA_TYPE
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
@@ -165,7 +179,9 @@ public enum VoltType {
      * The database supports char arrays and varchars
      * but the API uses strings.
      */
-    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, String[].class, 'v',
+    STRING    ((byte)9, StoredProcParamType.STRING, -1, "varchar",
+            new Class[] {String.class},
+            String[].class, 'v',
             java.sql.Types.VARCHAR,  // java.sql.Types DATA_TYPE
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
@@ -180,12 +196,16 @@ public enum VoltType {
     /**
      * VoltTable type for Procedure parameters
      */
-    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}, VoltTable[].class, '0'),
+    VOLTTABLE ((byte)21, StoredProcParamType.VOLTTABLE, -1, null,
+            new Class[] {VoltTable.class},
+            VoltTable[].class, '0'),
 
     /**
      * Fixed precision=38, scale=12 storing sign and null-status in a preceding byte
      */
-    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, BigDecimal[].class, 'd',
+    DECIMAL  ((byte)22, StoredProcParamType.DECIMAL, 16, "decimal",
+            new Class[] {BigDecimal.class},
+            BigDecimal[].class, 'd',
             java.sql.Types.DECIMAL,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
@@ -200,10 +220,10 @@ public enum VoltType {
     /**
      * Array of bytes of variable length
      */
-    VARBINARY    ((byte)25, -1, "varbinary",
+    VARBINARY    ((byte)25, StoredProcParamType.VARBINARY, -1, "varbinary",
             new Class[] {byte[].class,
-                         Byte[].class },
-                         byte[][].class, 'l',
+                         Byte[].class},
+            byte[][].class, 'l',
             java.sql.Types.VARBINARY,  // java.sql.Types DATA_TYPE
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
@@ -231,6 +251,7 @@ public enum VoltType {
     }
 
     private final byte m_val;
+    private final StoredProcParamType m_procParamType;
     private final int m_lengthInBytes;
     private final String m_sqlString;
     private final Class<?>[] m_classes;
@@ -260,10 +281,10 @@ public enum VoltType {
     private final String m_jdbcClass;
 
     // Constructor for non-JDBC-visible types
-    private VoltType(byte val, int lengthInBytes, String sqlString,
+    private VoltType(byte val, StoredProcParamType paramType, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar)
     {
-        this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
+        this(val, paramType, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 false,
                 java.sql.Types.OTHER,
                 null,
@@ -280,7 +301,7 @@ public enum VoltType {
 
     // Constructor for JDBC-visible types.  Only types constructed in this way will
     // appear in the JDBC getTypeInfo() metadata.
-    private VoltType(byte val, int lengthInBytes, String sqlString,
+    private VoltType(byte val, StoredProcParamType paramType, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar,
                      int dataType,
                      String literalPrefix,
@@ -293,7 +314,7 @@ public enum VoltType {
                      Integer maximumScale,
                      String jdbcClass)
     {
-        this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
+        this(val, paramType, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 true,
                 dataType,
                 literalPrefix,
@@ -308,7 +329,7 @@ public enum VoltType {
                 jdbcClass);
     }
 
-    private VoltType(byte val, int lengthInBytes, String sqlString,
+    private VoltType(byte val, StoredProcParamType paramType, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar,
                      boolean jdbcVisible,
                      int dataType,
@@ -324,6 +345,7 @@ public enum VoltType {
                      String jdbcClass)
     {
         m_val = val;
+        m_procParamType = paramType;
         m_lengthInBytes = lengthInBytes;
         m_sqlString = sqlString;
         m_classes = classes;
@@ -380,6 +402,9 @@ public enum VoltType {
         return m_val;
     }
 
+    public StoredProcParamType getProcParamType() {
+        return m_procParamType;
+    }
     /**
      * Return the java class that is matched to a given <tt>VoltType</tt>.
      * @return A java class object.

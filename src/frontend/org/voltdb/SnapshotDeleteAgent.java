@@ -92,9 +92,9 @@ public class SnapshotDeleteAgent extends OpsAgent
         }
         String[] paths = null;
         try {
-            paths = (String[])(ParameterConverter.tryToMakeCompatible(
-                        String[].class,
-                        params.toArray()[0]));
+            paths = (String[])(ParameterConverter.makeCompatible(
+                    StoredProcParamType.STRING_VECTOR,
+                    params.toArray()[0]));
         }
         catch (Exception e) {
             return e.getMessage();
@@ -112,9 +112,9 @@ public class SnapshotDeleteAgent extends OpsAgent
 
         String[] nonces = null;
         try {
-            nonces = (String[])(ParameterConverter.tryToMakeCompatible(
-                        String[].class,
-                        params.toArray()[1]));
+            nonces = (String[])(ParameterConverter.makeCompatible(
+                    StoredProcParamType.STRING_VECTOR,
+                    params.toArray()[1]));
         }
         catch (Exception e) {
             return e.getMessage();
