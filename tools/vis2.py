@@ -222,18 +222,20 @@ def generate_index_file(filenames):
         <td %s><a href=#%s>%s</a></td>
     </tr>
 """
+    #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
     h = []
     for x in filenames:
-        tdattr = ""
+        tdattr = "bgcolor=green"
         tdnote = ""
         M = 0.0
         if len(x) == 6:
-            print x[5].values()
             for v in x[5].values():
                 if len(v) > 0:
                     M = max(M, abs(v[0][1]))
         if M > 0.0:
-            tdattr = 'bgcolor=red'
+            tdattr = 'bgcolor=yellow'
+            if M > 10.0:
+                tdattr = 'bgcolor=red'
             tdnote = " (by %.2f%%)" % M
         h.append((tdattr, x[0].replace(' ','%20'), x[0] + tdnote))
     n = 4
@@ -318,6 +320,7 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
+        app = app.replace('/','')
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
@@ -334,7 +337,6 @@ def main():
                        ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
                      ]
 
-        app_filename = app.replace(' ', '_')
         fns = [app]
         flags = dict()
         for r in legend:
