@@ -65,12 +65,17 @@ public:
         const Json::Value* node = &m_doc;
         for (std::vector<JsonPathNode>::const_iterator cit = path.begin(); cit != path.end(); ++cit) {
             const JsonPathNode& pathNode = *cit;
-            if (pathNode.m_arrayIndex >= 0) {
+            if (pathNode.m_arrayIndex != -1) {
                 // can't access an array index of something that isn't an array
                 if (!node->isArray()) {
                     return false;
                 }
-                node = &((*node)[pathNode.m_arrayIndex]);
+                int32_t arrayIndex = pathNode.m_arrayIndex;
+                if (arrayIndex == ARRAY_TAIL) {
+                    unsigned int arraySize = node->size();
+                    arrayIndex = arraySize > 0 ? arraySize - 1 : 0;
+                }
+                node = &((*node)[arrayIndex]);
                 if (node == &Json::Value::null) {
                     return false;
                 }
@@ -113,13 +118,17 @@ public:
         Json::Value* node = &m_doc;
         for (std::vector<JsonPathNode>::const_iterator cit = path.begin(); cit != path.end(); ++cit) {
             const JsonPathNode& pathNode = *cit;
-            if (pathNode.m_arrayIndex >= 0) {
+            if (pathNode.m_arrayIndex != -1) {
                 if (!node->isNull() && !node->isArray()) {
                     // no-op if the update is impossible, I guess?
                     return;
                 }
+                int32_t arrayIndex = pathNode.m_arrayIndex;
+                if (arrayIndex == ARRAY_TAIL) {
+                    arrayIndex = node->size();
+                }
                 // get or create the specified node
-                node = &((*node)[pathNode.m_arrayIndex]);
+                node = &((*node)[arrayIndex]);
             } else {
                 if (!node->isNull() && !node->isObject()) {
                     return;
@@ -138,6 +147,8 @@ private:
     const char* m_head;
     const char* m_tail;
     int32_t m_pos;
+
+    static const int32_t ARRAY_TAIL = -10;
 
     /** parse our path to its vector representation */
     std::vector<JsonPathNode> resolveJsonPath(const char* pathChars, int32_t lenPath) {
@@ -171,6 +182,13 @@ private:
                     throwInvalidPathError("Unterminated literal or invalid character in field name");
                 }
                 path.push_back(JsonPathNode(strField));
+            } else if (c == '$') {
+                // for now, we only recognize '$#' for back of array
+                if (!readChar(c) || c != '#') {
+                    throwInvalidPathError("Invalid control sequence specified");
+                }
+                assertEndOfPathElement();
+                path.push_back(JsonPathNode(ARRAY_TAIL));
             } else if (c >= '0' && c <= '9') {
                 // reading an array index
                 // basically, do an atoi but make sure we either read to the end or reach a '->'
