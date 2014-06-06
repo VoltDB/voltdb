@@ -940,8 +940,7 @@ public class ParameterConverter {
             // handle arrays in a factored-out method
             int inputLength = Array.getLength(param);
 
-            // It is possible for us to expect byte[][] but receive byte[]
-            if (expectedArrayClass.getComponentType() == paramClz.getComponentType() && paramClz != byte[].class) {
+            if (expectedArrayClass.getComponentType() == paramClz.getComponentType()) {
                 return param;
             }
             // if it's an empty array, let it through
@@ -949,7 +948,7 @@ public class ParameterConverter {
             //  arrays of the wrong type, but it "does the right thing"
             //  more often that not I guess...
             else if (inputLength == 0) {
-                return Array.newInstance(byte[].class, 0);
+                return Array.newInstance(expectedArrayClass.getComponentType(), 0);
             }
             // hack to make strings work with input as bytes
             else if ((paramClz == byte[][].class) && (expectedArrayClass == String[].class)) {
