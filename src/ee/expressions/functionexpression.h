@@ -234,8 +234,7 @@ static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
 
 static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
 
-static const int FUNC_VOLT_GET_JSON                    = 20024;
-static const int FUNC_VOLT_SET_JSON                    = 20025;
+static const int FUNC_VOLT_SET_FIELD                   = 20024;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

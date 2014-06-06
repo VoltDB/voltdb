@@ -402,11 +402,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
             break;
-        case FUNC_VOLT_GET_JSON:
-            ret = new GeneralFunctionExpression<FUNC_VOLT_GET_JSON>(*arguments);
-            break;
-        case FUNC_VOLT_SET_JSON:
-            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_JSON>(*arguments);
+        case FUNC_VOLT_SET_FIELD:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
             break;
         default:
             return NULL;

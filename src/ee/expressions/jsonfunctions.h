@@ -153,8 +153,8 @@ private:
     /** parse our path to its vector representation */
     std::vector<JsonPathNode> resolveJsonPath(const char* pathChars, int32_t lenPath) {
         std::vector<JsonPathNode> path;
-        // if we don't actually specify a path or pass null, this refers to the doc root
-        if (lenPath <= 0) {
+        // NULL path refers directly to the doc root
+        if (pathChars == NULL) {
             return path;
         }
         m_head = pathChars;
@@ -162,45 +162,92 @@ private:
 
         m_pos = -1;
         char c;
+        bool first = true;
+        bool expectArrayIndex = false;
+        bool expectField = false;
         char strField[lenPath];
         while (readChar(c)) {
-            if (c == '\"') {
-                // reading a field identifier
-                int32_t i = 0;
+            if (expectArrayIndex) {
+                if (!readChar(c)) {
+                    throwInvalidPathError("Unexpected termination of JSON path");
+                }
+                // -1 to refer to the tail of the array
+                bool neg = false;
+                if (c == '-') {
+                    neg = true;
+                    if (!readChar(c)) {
+                        throwInvalidPathError("Unexpected termination of JSON path");
+                    }
+                }
+                if (c < '0' || c > '9') {
+                    throwInvalidPathError("Unexpected character in JSON path array index");
+                }
+                // atoi while advancing our pointer
+                int32_t arrayIndex = c - '0';
                 bool success = false;
                 while (readChar(c)) {
-                    if (c == '\"') {
-                        readChar(c);
-                        strField[i] = '\0';
-                        assertEndOfPathElement();
+                    if (c == ']') {
                         success = true;
+                        break;
+                    } else if (c < '0' || c > '9') {
+                        throwInvalidPathError("Unexpected character in JSON path array index");
+                    }
+                    arrayIndex = 10 * arrayIndex + (c - '0');
+                }
+                if (neg) {
+                    // other than the special '-1' case, negative indices aren't allowed
+                    if (arrayIndex != 1) {
+                        throwInvalidPathError("Invalid array index in JSON path");
+                    }
+                    arrayIndex = ARRAY_TAIL;
+                }
+                path.push_back(arrayIndex);
+                expectArrayIndex = false;
+            } else if (c == '[') {
+                // handle the case of empty field names. for example, getting the first element of the array
+                // in { "a": { "": [ true, false ] } } would be the path 'a.[0]'
+                if (expectField) {
+                    path.push_back(JsonPathNode(""));
+                    expectField = false;
+                }
+                expectArrayIndex = true;
+            } else if (c == '.') {
+                // a leading '.' also involves accessing the "" property of the root...
+                if (expectField || first) {
+                    path.push_back(JsonPathNode(""));
+                }
+                expectField = true;
+            } else {
+                expectField = false;
+                // read a literal field name
+                int32_t i = 0;
+                do {
+                    if (c == '\\') {
+                        if (!readChar(c)) {
+                            throwInvalidPathError("Unexpected termination of JSON path (empty escape sequence)");
+                        } else if (c != '\\' && c != '[' && c != ']' && c != '.') {
+                            // need to further escape our backslashes to separate our escaped '.' and '['
+                            // from things that are meant to be escaped in the JSON. ']' is only allowed for
+                            // symmetry, since there's really no need to escape it
+                            throwInvalidPathError("Unexpected escape sequence in JSON path");
+                        }
+                    } else if (c == '.') {
+                        expectField = true;
+                        break;
+                    } else if (c == '[') {
+                        expectArrayIndex = true;
                         break;
                     }
                     strField[i++] = c;
-                }
-                if (!success) {
-                    throwInvalidPathError("Unterminated literal or invalid character in field name");
-                }
+                } while (readChar(c));
+                strField[i] = '\0';
                 path.push_back(JsonPathNode(strField));
-            } else if (c == '$') {
-                // for now, we only recognize '$#' for back of array
-                if (!readChar(c) || c != '#') {
-                    throwInvalidPathError("Invalid control sequence specified");
-                }
-                assertEndOfPathElement();
-                path.push_back(JsonPathNode(ARRAY_TAIL));
-            } else if (c >= '0' && c <= '9') {
-                // reading an array index
-                // basically, do an atoi but make sure we either read to the end or reach a '->'
-                int32_t arrayIndex = c - '0';
-                while (readChar(c) && c >= '0' && c <= '9') {
-                    arrayIndex = 10 * arrayIndex + (c - '0');
-                }
-                assertEndOfPathElement();
-                path.push_back(JsonPathNode(arrayIndex));
-            } else {
-                throwInvalidPathError("Invalid start of JSON path element");
             }
+            first = false;
+        }
+        // if we're either empty or ended on a trailing '.', add an empty field name
+        if (expectField || first) {
+            path.push_back(JsonPathNode(""));
         }
 
         m_head = NULL;
@@ -216,16 +263,6 @@ private:
         c = *m_head++;
         m_pos++;
         return true;
-    }
-
-    /** assert that we've reached either the end of the path or a '->' specifier;
-        if we've reached '->', advance past it as well */
-    void assertEndOfPathElement() {
-        assert(m_head != NULL && m_tail != NULL);
-        char c = *(m_head - 1);
-        if (m_head != m_tail && (c != '-' || !readChar(c) || c != '>')) {
-            throwInvalidPathError("Encountered an unexpected character in JSON path element");
-        }
     }
 
     void throwInvalidPathError(const char* err) const {
@@ -252,67 +289,34 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     assert(arguments.size() == 2);
 
     const NValue& docNVal = arguments[0];
-    if (docNVal.isNull()) {
+    const NValue& pathNVal = arguments[1];
+
+    int32_t lenDoc = -1;
+    const char* docChars = NULL;
+    if (!docNVal.isNull()) {
+        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenDoc = docNVal.getObjectLength_withoutNull();
+        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    }
+
+    int32_t lenPath = -1;
+    const char* pathChars = NULL;
+    if (!pathNVal.isNull()) {
+        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        lenPath = pathNVal.getObjectLength_withoutNull();
+        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    }
+
+    JsonDocument doc(docChars, lenDoc);
+    std::string value;
+    if (!doc.get(pathChars, lenPath, value)) {
         return getNullStringValue();
     }
-    if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
-    }
-    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
-
-    const NValue& fieldNVal = arguments[1];
-    if (fieldNVal.isNull()) {
-        return getNullStringValue();
-    }
-    if (fieldNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (fieldNVal.getValueType(), VALUE_TYPE_VARCHAR);
-    }
-    int32_t lenField = fieldNVal.getObjectLength_withoutNull();
-
-    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
-    char *fieldChars = reinterpret_cast<char*>(fieldNVal.getObjectValue_withoutNull());
-
-    const std::string doc(docChars, lenDoc);
-    const std::string field(fieldChars,lenField);
-
-    Json::Value root;
-    Json::Reader reader;
-
-    if( ! reader.parse(doc, root)) {
-        char msg[1024];
-        // getFormatedErrorMessages returns concise message about location
-        // of the error rather than the malformed document itself
-        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
-        throw SQLException(SQLException::
-                           data_exception_invalid_parameter,
-                           msg);
-    }
-
-    // only object type contain fields. primitives, arrays do not
-    if( ! root.isObject()) {
-        return getNullStringValue();
-    }
-
-    // field is not present in the document
-    if( ! root.isMember(field)) {
-        return getNullStringValue();
-    }
-
-    Json::Value fieldValue = root[field];
-
-    if (fieldValue.isNull()) {
-        return getNullStringValue();
-    }
-
-    if (fieldValue.isConvertibleTo(Json::stringValue)) {
-        std::string stringValue(fieldValue.asString());
-        return getTempStringValue(stringValue.c_str(), stringValue.length());
-    }
-
-    Json::FastWriter writer;
-    std::string serializedValue(writer.write(fieldValue));
-    // writer always appends a trailing new line \n
-    return getTempStringValue(serializedValue.c_str(), serializedValue.length() -1);
+    return getTempStringValue(value.c_str(), value.length() - 1);
 }
 
 /** implement the 2-argument SQL ARRAY_ELEMENT function */
@@ -419,43 +423,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     return result;
 }
 
-/** implement the 2-argument SQL GET_JSON function */
-template<> inline NValue NValue::call<FUNC_VOLT_GET_JSON>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
-
-    const NValue& docNVal = arguments[0];
-    const NValue& pathNVal = arguments[1];
-
-    int32_t lenDoc = -1;
-    const char* docChars = NULL;
-    if (!docNVal.isNull()) {
-        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenDoc = docNVal.getObjectLength_withoutNull();
-        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
-    }
-
-    int32_t lenPath = -1;
-    const char* pathChars = NULL;
-    if (!pathNVal.isNull()) {
-        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenPath = pathNVal.getObjectLength_withoutNull();
-        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
-    }
-
-    JsonDocument doc(docChars, lenDoc);
-    std::string value;
-    if (!doc.get(pathChars, lenPath, value)) {
-        return getNullStringValue();
-    }
-    return getTempStringValue(value.c_str(), value.length() - 1);
-}
-
-/** implement the 3-argument SQL SET_JSON function */
-template<> inline NValue NValue::call<FUNC_VOLT_SET_JSON>(const std::vector<NValue>& arguments) {
+/** implement the 3-argument SQL SET_FIELD function */
+template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
 
     const NValue& docNVal = arguments[0];
