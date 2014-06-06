@@ -192,7 +192,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
-        AggregateRow *aggregateRow;
+        AggregateRow *aggregateRow = NULL;
         boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
         AggSerialInfo info;
 
