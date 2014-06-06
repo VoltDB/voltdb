@@ -168,15 +168,15 @@ public:
 
     AggregateRow* allocateAggregateRow();
 
-    void resetOutputTable(TempTable* newTempTable) {
+    void exportAggregateOutputTable(TempTable* newTempTable) {
+        // These two schemas should be equal
         m_tmpOutputTable = newTempTable;
     }
 
+    void executeAggBase(const NValueArray& params);
 
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
-
-    void executeAggBase(const NValueArray& params);
 
     void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
 

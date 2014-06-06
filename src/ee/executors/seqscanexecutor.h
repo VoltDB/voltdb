@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+#include "executors/aggregateexecutor.h"
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb
@@ -65,6 +66,8 @@ namespace voltdb
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
+
+        AggregateSerialExecutor* m_aggSerialExec;
     };
 }
 

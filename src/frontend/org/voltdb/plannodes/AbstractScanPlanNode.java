@@ -287,7 +287,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
-
             if (m_tableScanSchema.size() != 0)
             {
                 // Order the scan columns according to the table schema
@@ -321,6 +320,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
+
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+        if (aggNode != null) {
+            m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = true;
+        }
     }
 
     @Override
@@ -353,7 +359,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // if there was an inline projection we will have copied these already
             // otherwise we need to iterate through the output schema TVEs
             // and sort them by table schema index order.
-
             for (SchemaColumn col : m_outputSchema.getColumns())
             {
                 // At this point, they'd better all be TVEs.
@@ -363,6 +368,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tve.setColumnIndex(index);
             }
             m_outputSchema.sortByTveIndex();
+        }
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+
+        if (aggNode != null) {
+            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
+            m_outputSchema = aggNode.getOutputSchema().clone();
+            // Aggregate plan node change its output schema that should be serialized into Json
+            m_hasSignificantOutputSchema = true;
         }
 
         // The outputschema of an inline limit node is completely irrelevant to the EE except that

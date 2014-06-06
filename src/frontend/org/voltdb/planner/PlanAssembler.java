@@ -776,6 +776,11 @@ public class PlanAssembler {
             return false;
         }
 
+        // check inline aggregate
+        if (root.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
+            return false;
+        }
+
         // Assuming the restrictions: Order by columns are (1) columns from table
         // (2) tag from display columns (3) actual expressions from display columns
         // Currently, we do not allow order by complex expressions that are not in display columns
@@ -1819,8 +1824,18 @@ public class PlanAssembler {
             accessPlanTemp = null;
         }
 
-        distNode.addAndLinkChild(root);
-        root = distNode;
+        boolean opt = false;
+        if (m_parsedSelect.m_having != null) {
+            opt = true;
+        }
+
+        if (!opt && distNode.isAbleInlined(root)) {
+            root.addInlinePlanNode(distNode);
+            opt = true;
+        } else {
+            distNode.addAndLinkChild(root);
+            root = distNode;
+        }
 
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
@@ -1829,13 +1844,17 @@ public class PlanAssembler {
             root = accessPlanTemp;
             // Add the top node
             if (needCoordNode) {
-                coordNode.addAndLinkChild(root);
-                root = coordNode;
+                if (opt && coordNode.isAbleInlined(root)) {
+                    root.addInlinePlanNode(coordNode);
+                } else {
+                    coordNode.addAndLinkChild(root);
+                    root = coordNode;
+                }
             }
         }
         // Set post predicate for top Aggregation node
-        if (needCoordNode) {
-            ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.m_having);
+        if (needCoordNode && accessPlanTemp != null) {
+            coordNode.setPostPredicate(m_parsedSelect.m_having);
         } else {
             distNode.setPostPredicate(m_parsedSelect.m_having);
         }

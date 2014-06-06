@@ -333,8 +333,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getChildren().size() == 1);
-    assert(node->getChildren()[0] != NULL);
 
     m_inputExpressions = node->getAggregateInputExpressions();
     for (int i = 0; i < m_inputExpressions.size(); i++) {

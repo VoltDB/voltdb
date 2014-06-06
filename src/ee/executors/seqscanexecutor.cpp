@@ -51,6 +51,7 @@
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
+#include "plannodes/aggregatenode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
@@ -123,6 +124,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                (int)input_table->activeTupleCount(),
                (int)input_table->allocatedTupleCount());
 
+    bool result = true;
+
     //
     // OPTIMIZATION: NESTED PROJECTION
     //
@@ -146,6 +149,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     //
+    // OPTIMIZATION: INLINE AGGREGATION (serial only)
+    //
+    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
+
+    //
     // OPTIMIZATION:
     //
     // If there is no predicate and no Projection for this SeqScan,
@@ -154,7 +162,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL)
+        limit_node != NULL || agg_serial_node != NULL)
     {
         //
         // Just walk through the table using our iterator and apply
@@ -183,6 +191,22 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_ctr = 0;
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
+
+        AggregateRow *aggregateRow;
+        boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
+        AggSerialInfo info;
+
+        if (agg_serial_node != NULL) {
+            VOLT_TRACE("init inline aggregation stuff...");
+            m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+            assert(m_aggSerialExec);
+            m_aggSerialExec->exportAggregateOutputTable(output_temp_table);
+
+            m_aggSerialExec->executeAggBase(params);
+
+            aggregateRow = m_aggSerialExec->allocateAggregateRow();
+            will_finally_delete_aggregate_row.reset(aggregateRow);
+        }
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
@@ -217,18 +241,32 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                           getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    output_temp_table->insertTupleNonVirtual(temp_tuple);
+
+                    if (agg_serial_node != NULL) {
+                        m_aggSerialExec->p_execute_tuple(temp_tuple,aggregateRow, &info, &pmp);
+                    } else {
+                        output_temp_table->insertTupleNonVirtual(temp_tuple);
+                    }
                 }
                 else
                 {
-                    //
-                    // Insert the tuple into our output table
-                    //
-                    output_temp_table->insertTupleNonVirtual(tuple);
+                    if (agg_serial_node != NULL) {
+                        m_aggSerialExec->p_execute_tuple(tuple,aggregateRow, &info, &pmp);
+                    } else {
+                        //
+                        // Insert the tuple into our output table
+                        //
+                        output_temp_table->insertTupleNonVirtual(tuple);
+                    }
                 }
                 pmp.countdownProgress();
             }
         }
+
+        if (agg_serial_node != NULL) {
+            result = m_aggSerialExec->p_execute_finish(aggregateRow, &info, &pmp);
+        }
+
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
@@ -236,5 +274,5 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 
-    return true;
+    return result;
 }
