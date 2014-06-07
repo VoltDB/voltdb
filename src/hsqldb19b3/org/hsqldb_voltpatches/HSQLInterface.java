@@ -207,8 +207,7 @@ public class HSQLInterface {
     private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
             inFixup(expr);
-            // can return because in can't be nested
-            return;
+            // can't return because in with subquery can be nested
         }
 
         // recursive hunt

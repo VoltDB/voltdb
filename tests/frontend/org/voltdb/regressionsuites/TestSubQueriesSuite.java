@@ -218,6 +218,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     " (select ID from " + tb + " WHERE ID > 3);").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {4,2}, {5,2}});
 
+
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" where ID in " +
+                    " (select ID from " + tb + " WHERE DEPT = 2 limit 1 offset 1);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {5,2}});
+
+            vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" where ID in " +
+                    " (select ID from " + tb + " WHERE ID > 2 limit 3 offset 1);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {4,2}, {5,2}});
+
             vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" T1 where ID in " +
                     " (select ID from " + tb + " WHERE ID > 4) " +
                     "and exists (select 1 from " + tb + " where ID * T1.DEPT  = 10);").getResults()[0];

@@ -410,6 +410,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
+    case PLAN_NODE_TYPE_SEMISEQSCAN: {
+        return "SEMISEQSCAN";
+    }
     }
     return "UNDEFINED";
 }
@@ -458,6 +461,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
+    } else if (str == "SEMISEQSCAN") {
+        return PLAN_NODE_TYPE_SEMISEQSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -494,6 +499,9 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
+    }
+    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
+        return "OPERATOR_EXISTS";
     }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";

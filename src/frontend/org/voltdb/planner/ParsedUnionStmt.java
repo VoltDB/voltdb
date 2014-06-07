@@ -18,10 +18,13 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.types.ExpressionType;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -106,37 +109,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         m_joinOrder = joinOrder;
     }
 
-    /**
-    * Converts each child from the IN union subquery into the equivalent EXISTS
-    *
-    * @param unionStmt set operations subquery from the IN expression
-    * @param inListExpr TVE for the columns from the IN list
-    * @return modified subquery
-    */
-    protected static void rewriteInSubqueryAsExists(ParsedUnionStmt unionStmt, AbstractExpression inListExpr) {
-        if (unionStmt.m_unionType == UnionType.UNION || unionStmt.m_unionType == UnionType.UNION_ALL) {
-            // rewrite for all children
-            for (AbstractParsedStmt childStmt : unionStmt.m_children) {
-                if (childStmt instanceof ParsedSelectStmt) {
-                    ParsedSelectStmt.rewriteInSubqueryAsExists((ParsedSelectStmt) childStmt, inListExpr);
-                } else {
-                    assert(childStmt instanceof ParsedUnionStmt);
-                    ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
-                }
-            }
-        } else {
-            // for everything else it's enough to rewirite the left operand only
-            assert(!unionStmt.m_children.isEmpty());
-            AbstractParsedStmt childStmt = unionStmt.m_children.get(0);
-            if (childStmt instanceof ParsedSelectStmt) {
-                ParsedSelectStmt.rewriteInSubqueryAsExists((ParsedSelectStmt) childStmt, inListExpr);
-            } else {
-                assert(childStmt instanceof ParsedUnionStmt);
-                ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
-            }
-        }
-    }
-
     @Override
     public boolean isOrderDeterministic() {
         for (AbstractParsedStmt childStmt : m_children) {
@@ -166,4 +138,23 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
         return true;
     }
+
+    @Override
+    public List<StmtSubqueryScan> findAllFromSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            subqueries.addAll(childStmt.findAllFromSubqueries());
+        }
+        return subqueries;
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            exprs.addAll(childStmt.findAllSubexpressionsOfType(exprType));
+        }
+        return exprs;
+    }
+
 }

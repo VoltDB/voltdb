@@ -71,6 +71,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     bool isSubquery = node->isSubQuery();
     assert(isSubquery || node->getTargetTable());
     assert((! isSubquery) || (node->getChildren().size() == 1));
+    m_isSemiScan = node->isSemiScan();
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -221,6 +222,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     output_temp_table->insertTupleNonVirtual(tuple);
                 }
                 pmp.countdownProgress();
+                if (m_isSemiScan) {
+                    // We get our first tuple and this is enough for the Semi-Scan
+                    break;
+                }
             }
         }
     }

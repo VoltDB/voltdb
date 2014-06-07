@@ -44,6 +44,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -889,13 +890,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
 
-        // multi-column IN expression is represented as a AND conjunction of expressions
-        // representing individual columns
-        Collection<AbstractExpression> inExprList = ExpressionUtil.uncombineAny(inListExpr.getLeft());
+        // multi-column IN expression is a VectorValueExpression
+        // where each arg represents individual columns
+        List<AbstractExpression> inExprList = null;
+        if (inListExpr instanceof VectorValueExpression) {
+            inExprList = inListExpr.getArgs();
+        } else {
+            inExprList = new ArrayList<AbstractExpression>();
+            inExprList.add(inListExpr);
+        }
         int idx = 0;
         assert(inExprList.size() == selectStmt.displayColumns.size());
         selectStmt.m_aggregationList = new ArrayList<AbstractExpression>();
-        boolean  hasPriorHaving = selectStmt.having != null;
 
         // Iterate over the columns from the IN list and the subquery output schema
         // For each pair create a new equality expression.
@@ -939,51 +945,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             selectStmt.having = ExpressionUtil.combine(havingList);
         }
-        // TODO ENG-451-inexists. If the subselect does not have HAVING expression
-        // it looks safe to remove DISPLAY, ORDER BY, GROUP BY columns, DISTINCT clauses
-        // simply because all we care is whether the result set is empty or nor.
-        // More careful evaluation what can be dropped in the presence of the HAVING
-        // expression is required.
-        if (!hasPriorHaving) {
-            // clear DISPLAY, ORDER BY, GROUP BY columns, remove DISTINCT
-            // The better approach seems to recognize that this SELECT statement
-            // is part of the IN expression (HSQL) and skip the above elements
-            // during the initial parsing
-            selectStmt.distinct = false;
-            selectStmt.hasComplexAgg = false;
-            selectStmt.hasComplexGroupby = false;
-            selectStmt.hasAggregateExpression = false;
-            selectStmt.hasAverage = false;
-            selectStmt.displayColumns.clear();
-            selectStmt.aggResultColumns.clear();
-            selectStmt.orderColumns.clear();
-            selectStmt.groupByColumns.clear();
-
-            selectStmt.projectSchema = null;
-
-            selectStmt.groupByExpressions = null;
-
-            selectStmt.avgPushdownDisplayColumns = null;
-            selectStmt.avgPushdownAggResultColumns = null;
-            selectStmt.avgPushdownOrderColumns = null;
-            selectStmt.avgPushdownHaving = null;
-            selectStmt.avgPushdownNewAggSchema = null;
-
-            // add a single dummy output column
-            ParsedColInfo col = new ParsedColInfo();
-            ConstantValueExpression colExpr = new ConstantValueExpression();
-            colExpr.setValueType(VoltType.NUMERIC);
-            colExpr.setValue("1");
-            col.expression = colExpr;
-            ExpressionUtil.finalizeValueTypes(col.expression);
-
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
-            col.columnName = "$$_EXISTS_$$";
-            col.alias = "$$_EXISTS_$$";
-            col.index = 0;
-            selectStmt.displayColumns.add(col);
-        }
 
         // reprocess HAVING expressions
         if (selectStmt.having != null) {
@@ -1006,6 +967,72 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
+     * Simplify the select statement from the EXISTS expression:
+     *  1. Replace the display columns with a single dummy column "1"
+     *  2. Drop DISTINCT expression
+     *  3. Add LIMIT 1
+     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+     *
+     * @param selectStmt
+     * @return existsExpr
+     */
+    protected static void simplifyExistsExpression(ParsedSelectStmt selectStmt) {
+        // Replace the display columns with a single dummy column "1"
+        boolean hasComplexDisplayColumns = selectStmt.displayColumns.size() > 1;
+        if (selectStmt.displayColumns.size() == 1) {
+            ParsedColInfo col = selectStmt.displayColumns.get(0);
+            hasComplexDisplayColumns = !(col.expression instanceof ConstantValueExpression);
+        }
+        if (hasComplexDisplayColumns) {
+            // add a single dummy output column
+            ParsedColInfo col = new ParsedColInfo();
+            ConstantValueExpression colExpr = new ConstantValueExpression();
+            colExpr.setValueType(VoltType.NUMERIC);
+            colExpr.setValue("1");
+            col.expression = colExpr;
+            ExpressionUtil.finalizeValueTypes(col.expression);
+
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "$$_EXISTS_$$";
+            col.alias = "$$_EXISTS_$$";
+            col.index = 0;
+            selectStmt.displayColumns.add(col);
+        }
+
+        // Drop DISTINCT expression
+        selectStmt.distinct = false;
+
+        // Add LIMIT 1
+        selectStmt.limit = 1;
+
+        // Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+        if (selectStmt.having == null) {
+            selectStmt.hasComplexAgg = false;
+            selectStmt.hasComplexGroupby = false;
+            selectStmt.hasAggregateExpression = false;
+            selectStmt.hasAverage = false;
+            selectStmt.displayColumns.clear();
+            selectStmt.aggResultColumns.clear();
+            selectStmt.orderColumns.clear();
+            selectStmt.groupByColumns.clear();
+
+            selectStmt.projectSchema = null;
+
+            selectStmt.groupByExpressions = null;
+
+            selectStmt.avgPushdownDisplayColumns = null;
+            selectStmt.avgPushdownAggResultColumns = null;
+            selectStmt.avgPushdownOrderColumns = null;
+            selectStmt.avgPushdownHaving = null;
+            selectStmt.avgPushdownNewAggSchema = null;
+
+            selectStmt.aggResultColumns = selectStmt.displayColumns;
+            selectStmt.placeTVEsinColumns();
+        }
+}
+
+    /**
      * Helper method to replace all TVEs and aggregated expressions with the corresponding PVEs.
      * The original expressions are placed into the map to be propagated to the EE.
      * The key to the map is the parameter index.
@@ -1015,7 +1042,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param expr
      * @return
      */
-    private static AbstractExpression replaceExpressionsWithPve(AbstractParsedStmt stmt, AbstractExpression expr,
+    public static AbstractExpression replaceExpressionsWithPve(AbstractParsedStmt stmt, AbstractExpression expr,
             boolean processParentTveOnly) {
         assert(expr != null);
         boolean needToReplace = false;
@@ -1097,8 +1124,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean hasLimitOrOffset() {
-        if ((limit != -1) || (limitParameterId != -1) ||
-            (offset > 0) || (offsetParameterId != -1)) {
+        return hasLimit() || hasOffset();
+    }
+
+    public boolean hasOffset() {
+        if ((offset > 0) || (offsetParameterId != -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean hasLimit() {
+        if ((limit != -1) || (limitParameterId != -1)) {
             return true;
         }
         return false;
@@ -1550,5 +1587,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
+        if (having != null) {
+            exprs.addAll(having.findAllSubexpressionsOfType(exprType));
+        }
+        return exprs;
     }
 }

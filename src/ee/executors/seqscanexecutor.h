@@ -66,6 +66,11 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
+
+    private:
+
+        // If the indicator is set to true, the scan finishes on the first predicate hit
+        bool m_isSemiScan;
     };
 }
 

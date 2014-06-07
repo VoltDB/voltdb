@@ -58,10 +58,10 @@ class AbstractExpression;
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
    public:
-        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
+        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id), m_isSemiScan(false) {
             // Do nothing
         }
-        SeqScanPlanNode() : AbstractScanPlanNode() {
+        SeqScanPlanNode() : AbstractScanPlanNode(), m_isSemiScan(false) {
             // Do nothing
         }
 
@@ -89,6 +89,22 @@ class SeqScanPlanNode : public AbstractScanPlanNode {
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
 
         std::string debugInfo(const std::string &spacer) const;
+
+        void setSemiScanFlag(bool isSemiScan) {
+            m_isSemiScan = isSemiScan;
+            // if it is a semi-scan - IN (SELECT ...) - then it's a subquery
+            if (m_isSemiScan) {
+                m_isSubQuery = true;
+            }
+        }
+
+        bool isSemiScan() const {
+            return m_isSemiScan;
+        }
+
+    private:
+        // If the indicator is set to true, the scan finishes on the first predicate hit
+        bool m_isSemiScan;
 };
 
 }

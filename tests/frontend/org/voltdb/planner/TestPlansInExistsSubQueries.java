@@ -33,9 +33,12 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -55,8 +58,9 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
         assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
         AbstractExpression re = e.getRight();
-        assertEquals(ExpressionType.SUBQUERY, re.getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) re;
+        assertEquals(ExpressionType.OPERATOR_EXISTS, re.getExpressionType());
+        assertEquals(ExpressionType.SUBQUERY, re.getLeft().getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) re.getLeft();
         assertEquals(1, subExpr.getArgs().size());
         assertEquals(1, subExpr.getParameterIdxList().size());
         assertEquals(Integer.valueOf(1), subExpr.getParameterIdxList().get(0));
@@ -82,8 +86,9 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
         // Check param indexes
         AbstractExpression e = spl.getPredicate();
-        assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) e;
+        assertEquals(ExpressionType.OPERATOR_EXISTS, e.getExpressionType());
+        assertEquals(ExpressionType.SUBQUERY, e.getLeft().getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
         assertEquals(1, subExpr.getArgs().size());
         assertEquals(1, subExpr.getParameterIdxList().size());
         assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
@@ -91,6 +96,37 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(tve instanceof TupleValueExpression);
         assertEquals("R2", ((TupleValueExpression)tve).getTableName());
         assertEquals("A", ((TupleValueExpression)tve).getColumnName());
+    }
+
+    public void testInToExistWithUnion() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in (select c from r1 union select c from r3)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
+        // Check param indexes
+        AbstractExpression e = spl.getPredicate();
+        assertEquals(ExpressionType.COMPARE_IN, e.getExpressionType());
+    }
+
+    public void testInToExistWithOffset() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in (select c from r1 limit 1 offset 3)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
+        // Check param indexes
+        AbstractExpression e = spl.getPredicate();
+        assertEquals(ExpressionType.COMPARE_IN, e.getExpressionType());
+    }
+
+    public void testInToExistsComplex() {
+      AbstractPlanNode pn = compile("select * from R1 where (A,C) in (select 2, C from r2 where r2.c > r1.c group by c)");
+      pn = pn.getChild(0);
+      assertTrue(pn instanceof AbstractScanPlanNode);
+      AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
+      AbstractExpression e = spn.getPredicate();
+      SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
+      assertEquals(3, subExpr.getArgs().size());
+      assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
     public void testNotExistsW() {
@@ -101,22 +137,12 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
         assertEquals(ExpressionType.OPERATOR_NOT, e.getExpressionType());
         AbstractExpression le = e.getLeft();
-        assertEquals(ExpressionType.SUBQUERY, le.getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) le;
+        assertEquals(ExpressionType.OPERATOR_EXISTS, le.getExpressionType());
+        assertEquals(ExpressionType.SUBQUERY, le.getLeft().getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) le.getLeft();
         assertEquals(1, subExpr.getArgs().size());
         assertEquals(1, subExpr.getParameterIdxList().size());
         assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
-    }
-
-    public void testInToExistsComplex() {
-      AbstractPlanNode pn = compile("select * from R1 where (A,C) in (select 2, C from r2 where r2.c > r1.c group by c)");
-      pn = pn.getChild(0);
-      assertTrue(pn instanceof AbstractScanPlanNode);
-      AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
-      AbstractExpression e = spn.getPredicate();
-      SubqueryExpression subExpr = (SubqueryExpression) e;
-      assertEquals(3, subExpr.getArgs().size());
-      assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
     public void testExistsJoin() {
@@ -128,7 +154,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
         assertTrue(pred != null);
-        assertTrue(pred instanceof SubqueryExpression);
+        assertTrue(ExpressionType.OPERATOR_EXISTS == pred.getExpressionType());
     }
 
     public void testInAggeregated() {
@@ -138,8 +164,14 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         pn = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractExpression e = ((AbstractScanPlanNode)pn).getPredicate();
-        SubqueryExpression subExpr = (SubqueryExpression) e;
+        assertEquals(ExpressionType.OPERATOR_EXISTS, e.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
         AbstractPlanNode sn = subExpr.getSubqueryNode();
+        assertTrue(sn instanceof ProjectionPlanNode);
+        sn = sn.getChild(0);
+        assertTrue(sn instanceof LimitPlanNode);
+        sn = sn.getChild(0);
+        assertTrue(sn instanceof OrderByPlanNode);
         sn = sn.getChild(0);
         assertTrue(sn instanceof AggregatePlanNode);
         AbstractExpression expr = ((AggregatePlanNode)sn).getPostPredicate();
@@ -157,10 +189,12 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         SchemaColumn aggColumn = ns.getColumns().get(1);
         assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
         AbstractExpression having = aggpn.getPostPredicate();
-        assertTrue(having instanceof SubqueryExpression);
-        assertEquals(1, having.getArgs().size());
-        assertTrue(having.getArgs().get(0) instanceof TupleValueExpression);
-        TupleValueExpression argTve = (TupleValueExpression) having.getArgs().get(0);
+        assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
+        assertEquals(ExpressionType.SUBQUERY, having.getLeft().getExpressionType());
+        AbstractExpression se = having.getLeft();
+        assertEquals(1, se.getArgs().size());
+        assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
+        TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
         assertEquals(1, argTve.getColumnIndex());
         assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
 
@@ -169,16 +203,20 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     public void testHavingInSubqueryHaving() {
         AbstractPlanNode pn = compile("select a from r1 where c in " +
                 " (select max(c) from r2 group by c having min(a) > 0) ");
-      pn = pn.getChild(0);
-      assertTrue(pn instanceof SeqScanPlanNode);
-      AbstractExpression subquery = ((SeqScanPlanNode)pn).getPredicate();
-      assertEquals(ExpressionType.SUBQUERY, subquery.getExpressionType());
-      pn = ((SubqueryExpression)subquery).getSubqueryNode();
-      pn = pn.getChild(0);
-      assertTrue(pn instanceof AggregatePlanNode);
-      assertEquals(3, ((AggregatePlanNode)pn).getOutputSchema().size());
-      AbstractExpression aggrExpr = ((AggregatePlanNode)pn).getPostPredicate();
-      assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        AbstractExpression p = ((SeqScanPlanNode)pn).getPredicate();
+        assertEquals(ExpressionType.OPERATOR_EXISTS, p.getExpressionType());
+        AbstractExpression subquery = p.getLeft();
+        assertEquals(ExpressionType.SUBQUERY, subquery.getExpressionType());
+        pn = ((SubqueryExpression)subquery).getSubqueryNode();
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AggregatePlanNode);
+        assertEquals(3, ((AggregatePlanNode)pn).getOutputSchema().size());
+        AbstractExpression aggrExpr = ((AggregatePlanNode)pn).getPostPredicate();
+        assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
     }
 
 
@@ -244,6 +282,45 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
         }
    }
+
+    //    public void testUpdateWhereIn() {
+////        compileToFragments(" select  c from R1 \n" +
+////                " where exists (select  c from r2 );");
+//
+////        compileToFragments(" select c from R1 \n" +
+////                "    where c in (select c from r2 where "
+////                + "  exists (select 1 from r3 where r3.c = r2.c));");
+//
+//        compileToFragments(" select c from R1 \n" +
+//                "    where c in (select c from r2 where "
+//                + "  a in (select a from r3 where r3.c = r1.c) limit 1 offset 1);");
+//
+////        compileToFragments(" select c from R1 \n" +
+////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
+////                + " and c in (select c from r3 where r3.a = r1.a )"
+////                + " );");
+//
+////        compileToFragments(" select c from R1 \n" +
+////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
+////                + " and c in (select c from r3 where r3.a = r1.a limit 1 offset 2)"
+////                + " limit 1 offset 2);");
+//
+////        compileToFragments(" select c from R1 \n" +
+////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
+////                + " and exists (select c from r3 where r2.c=r3.c and r3.a = r1.a )"
+////                + " limit 1 offset 2);");
+//
+////        compileToFragments(" select c from R1 \n" +
+////                "    where c=? and exists (select a from r2 where r2.a = r1.a and r2.c = r1.c "
+////                + " and exists (select c from r3 where r2.c=r3.c and r3.a = r1.a ));");
+//// check the IN variant params seems don't work
+//        //                "    where c=? and a in (select a from r2 where r2.c = r1.c "
+////                + " and c in (select c from r3 where r3.a = r1.a ));");
+////    "    group by c having max(a) in (select a from r2);");
+////    "    where exists (select 1 from r2 where r2.c = r1.c);");
+////                "                having max(a+c) > 2;");
+//
+//    }
 
     @Override
     protected void setUp() throws Exception {

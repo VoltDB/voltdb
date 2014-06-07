@@ -262,11 +262,11 @@ public class PlanNodeTree implements JSONString {
         if (predicate == null) {
             return;
         }
-        List<AbstractExpression> existsExprs = predicate.findAllSubexpressionsOfType(
-                ExpressionType.OPERATOR_EXISTS);
-        for (AbstractExpression expr : existsExprs) {
-            assert(expr.getLeft() != null && expr.getLeft() instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr.getLeft();
+        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfType(
+                ExpressionType.SUBQUERY);
+        for (AbstractExpression expr : subquerysExprs) {
+            assert(expr instanceof SubqueryExpression);
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
             int subqueryId = subqueryExpr.getSubqueryId();
             int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);

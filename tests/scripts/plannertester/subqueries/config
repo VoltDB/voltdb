@@ -30,6 +30,8 @@ select a from r1 group by a having max(c) in (select c from r2 );
 select a from r1 where c in (select max(c) from r2 group by c having min(a) > 0);
 select a from r1 T1 where exists (SELECT 1 FROM r1 T2 where exists (SELECT c FROM r1 T3 WHERE T1.c * T3.c  = 9));
 select c from r4 where a in (select a from r1);
+select c from r1 where c in (select c from r2 where a in (select a from r3 where r3.c = r1.c) limit 1 offset 1);
+select c from r1 where c in (select a from r2 where a > 2 limit 1 offset 2);
 
 
 #Subqueries on partitioned data are only supported in single partition stored procedures.

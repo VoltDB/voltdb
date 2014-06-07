@@ -103,6 +103,13 @@ public class SubqueryExpression extends AbstractExpression {
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
         m_subqueryNode = subqueryNode;
+        if (m_subquery != null && m_subquery.getBestCostPlan() != null) {
+            m_subquery.getBestCostPlan().rootPlanGraph = m_subqueryNode;
+        }
+        resetSubqueryNodeId();
+    }
+
+    public void resetSubqueryNodeId() {
         m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
     }
 
@@ -198,12 +205,14 @@ public class SubqueryExpression extends AbstractExpression {
         // Nothing to do there
     }
 
-    private void moveUpTVE() {
-        // Get TVE
-        /** Traverse down the expression tree identifying all the TVEs which reference the
-         * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
-         * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
-         * and new PVE which will be required by the back-end executor*/
+    /**
+     * Traverse down the expression tree identifying all the TVEs which reference the
+     * columns from the parent statement (getOrigStmtId() != parentStmt.subqueryId) and replace them with
+     * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
+     * and new PVE which will be required by the back-end executor.
+     * If a TVE references the grandparent, move it up to be resolved at a higher level.
+     */
+    public void moveUpTVE() {
         AbstractParsedStmt subqueryStmt = m_subquery.getSubquery();
         AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
         // we must have a parent -it's a subquery statement
