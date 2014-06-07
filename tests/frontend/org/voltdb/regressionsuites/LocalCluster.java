@@ -279,6 +279,7 @@ public class LocalCluster implements VoltServerConfig {
      * Called after a constructor but before startup.
      */
     public void overrideAnyRequestForValgrind() {
+        Assume.assumeTrue (templateCmdLine.m_backend != BackendTarget.NATIVE_EE_VALGRIND_IPC);
         if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
