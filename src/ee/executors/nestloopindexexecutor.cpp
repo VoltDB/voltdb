@@ -259,7 +259,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     //
     TableTuple outer_tuple(outer_table->schema());
     TableTuple inner_tuple(inner_table->schema());
-    TableIterator outer_iterator = outer_table->iterator();
+    TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());

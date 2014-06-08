@@ -610,7 +610,8 @@ public class PlanAssembler {
         // This case should also not be pushed down
         boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
                 !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.LIMIT);
+                !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
+                !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
         if (subScanCanPushdown) {
             compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
         }
@@ -679,11 +680,11 @@ public class PlanAssembler {
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
 
                 // Edge cases: left outer join with replicated table.
-                if (m_parsedSelect.mvFixInfo.needed()) {
+                if (m_parsedSelect.m_mvFixInfo.needed()) {
                     mvFixInfoCoordinatorNeeded = false;
                     AbstractPlanNode receiveNode = receivers.get(0);
                     if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
-                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
                             return getNextSelectPlan();
                         }
                         List<AbstractPlanNode> nljs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOP);
@@ -709,8 +710,8 @@ public class PlanAssembler {
                 if (m_parsedSelect.mayNeedAvgPushdown()) {
                     m_parsedSelect.switchOptimalSuiteForAvgPushdown();
                 }
-                if (m_parsedSelect.m_tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
-                        && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                if (m_parsedSelect.m_tableList.size() > 1 && m_parsedSelect.m_mvFixInfo.needed()
+                        && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
                     // MV partitioned joined query needs reAggregation work on coordinator.
                     // Index scan on MV table can not be supported.
                     // So, in-lined index scan of Nested loop index join can not be possible.
@@ -721,7 +722,7 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
 
             // Process the re-aggregate plan node and insert it into the plan.
-            if (m_parsedSelect.mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
+            if (m_parsedSelect.m_mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
                 AbstractPlanNode tmpRoot = root;
                 root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
                 if (root != tmpRoot) {
@@ -735,7 +736,7 @@ public class PlanAssembler {
 
             // If there is no receive plan node and no distributed plan has been generated,
             // the fix set for MV is not needed.
-            m_parsedSelect.mvFixInfo.setNeeded(false);
+            m_parsedSelect.m_mvFixInfo.setNeeded(false);
             root = handleAggregationOperators(root);
         }
 
@@ -1164,7 +1165,7 @@ public class PlanAssembler {
      */
     AbstractPlanNode addProjection(AbstractPlanNode rootNode) {
         assert (m_parsedSelect != null);
-        assert (m_parsedSelect.displayColumns != null);
+        assert (m_parsedSelect.m_displayColumns != null);
 
         ProjectionPlanNode projectionNode =
             new ProjectionPlanNode();
@@ -1221,7 +1222,7 @@ public class PlanAssembler {
         }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderColumns) {
+        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_orderColumns) {
             orderByNode.addSort(col.expression,
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
@@ -1245,8 +1246,8 @@ public class PlanAssembler {
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
         LimitPlanNode topLimit = new LimitPlanNode();
-        topLimit.setLimit((int)m_parsedSelect.limit);
-        topLimit.setOffset((int) m_parsedSelect.offset);
+        topLimit.setLimit((int)m_parsedSelect.m_limit);
+        topLimit.setOffset((int) m_parsedSelect.m_offset);
         topLimit.setLimitParameterIndex(limitParamIndex);
         topLimit.setOffsetParameterIndex(offsetParamIndex);
 
@@ -1256,13 +1257,13 @@ public class PlanAssembler {
          */
         AbstractPlanNode sendNode = null;
         // Whether or not we can push the limit node down
-        boolean canPushDown = ! m_parsedSelect.distinct;
+        boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
             sendNode = checkPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
             } else {
-                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
                     AbstractExpression rootExpr = col.expression;
                     if (rootExpr instanceof AggregateExpression) {
                         if (((AggregateExpression)rootExpr).isDistinct()) {
@@ -1274,7 +1275,7 @@ public class PlanAssembler {
             }
         }
 
-        if (m_parsedSelect.mvFixInfo.needed()) {
+        if (m_parsedSelect.m_mvFixInfo.needed()) {
             // Do not push down limit for mv based distributed query.
             canPushDown = false;
         }
@@ -1295,8 +1296,8 @@ public class PlanAssembler {
             LimitPlanNode distLimit = new LimitPlanNode();
             // Offset on a pushed-down limit node makes no sense, just defaults to 0
             // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
-            if (m_parsedSelect.limit != -1) {
-                distLimit.setLimit((int) (m_parsedSelect.limit + m_parsedSelect.offset));
+            if (m_parsedSelect.m_limit != -1) {
+                distLimit.setLimit((int) (m_parsedSelect.m_limit + m_parsedSelect.m_offset));
             }
 
             if (m_parsedSelect.hasLimitOrOffsetParameters()) {
@@ -1346,7 +1347,7 @@ public class PlanAssembler {
 
 
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root, boolean edgeCaseOuterJoin) {
-        MaterializedViewFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
+        MaterializedViewFixInfo mvFixInfo = m_parsedSelect.m_mvFixInfo;
 
         HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.getReAggregationPlanNode());
         reAggNode.clearChildren();
@@ -1493,12 +1494,12 @@ public class PlanAssembler {
             }
             if (needHashAgg) {
                 aggNode = new HashAggregatePlanNode();
-                if ( ! m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
                 aggNode = new AggregatePlanNode();
-                if ( ! m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
@@ -1507,7 +1508,7 @@ public class PlanAssembler {
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
 
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -1609,7 +1610,7 @@ public class PlanAssembler {
                     schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
-                        topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
+                        topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
                     } else {
                         topExpr = col.expression;
                     }
@@ -1621,11 +1622,11 @@ public class PlanAssembler {
                 outputColumnIndex++;
             }
 
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
-                    topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
+                    topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.alias));
                 }
             }
             aggNode.setOutputSchema(agg_schema);
@@ -1640,9 +1641,9 @@ public class PlanAssembler {
 
             NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
-
-
+            root = pushDownAggregate(root, aggNode, topAggNode,
+                    m_parsedSelect.hasComplexAgg(), newSchema,
+                    !m_parsedSelect.hasPartitionColumnInGroupby());
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1661,7 +1662,7 @@ public class PlanAssembler {
     }
 
     private AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
         // Can't use index access to optimize a multi-table-based GROUP BY
         String fromTableAlias = null;
         for (ParsedColInfo col : groupBys) {
@@ -1793,7 +1794,9 @@ public class PlanAssembler {
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
-                                       boolean needProjectionNode, NodeSchema newSchema) {
+                                       boolean needProjectionNode,
+                                       NodeSchema newSchema,
+                                       boolean needCoordNode) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1825,11 +1828,17 @@ public class PlanAssembler {
             accessPlanTemp.getChild(0).addAndLinkChild(root);
             root = accessPlanTemp;
             // Add the top node
-            coordNode.addAndLinkChild(root);
-            root = coordNode;
+            if (needCoordNode) {
+                coordNode.addAndLinkChild(root);
+                root = coordNode;
+            }
         }
         // Set post predicate for top Aggregation node
-        ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.having);
+        if (needCoordNode) {
+            ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.m_having);
+        } else {
+            distNode.setPostPredicate(m_parsedSelect.m_having);
+        }
 
         if (needProjectionNode) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
@@ -1911,7 +1920,7 @@ public class PlanAssembler {
      * @return
      */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
-        if (m_parsedSelect.distinct) {
+        if (m_parsedSelect.hasDistinct()) {
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
             //if (m_parsedSelect.displayColumns.size() > 1)
@@ -1920,7 +1929,7 @@ public class PlanAssembler {
             //}
             AbstractExpression distinctExpr = null;
             AbstractExpression nextExpr = null;
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
                 // Distinct can in theory handle any expression now, but it's
                 // untested so we'll balk on anything other than a TVE here
                 // --izzy
@@ -1964,7 +1973,7 @@ public class PlanAssembler {
     {
         assert(root != null);
         AbstractPlanNode accessPlanTemp = root;
-        if (root instanceof ReceivePlanNode && !m_parsedSelect.mvFixInfo.needed()) {
+        if (root instanceof ReceivePlanNode && !m_parsedSelect.m_mvFixInfo.needed()) {
             // Temporarily strip send/receive pair
             accessPlanTemp = root.getChild(0).getChild(0);
             accessPlanTemp.clearParents();

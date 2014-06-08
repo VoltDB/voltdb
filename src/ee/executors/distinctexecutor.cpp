@@ -91,7 +91,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     TableTuple tuple(input_table->schema());
 
     AbstractExpression *distinctExpression = node->getDistinctExpression();
