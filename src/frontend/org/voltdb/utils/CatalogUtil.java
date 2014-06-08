@@ -339,11 +339,11 @@ public abstract class CatalogUtil {
         return exportTables;
     }
 
-    public static SortedSet<String> getExportTableLowercaseNames(Database db) {
+    public static SortedSet<String> getExportTableNames(Database db) {
         SortedSet<String> exportTables = new TreeSet<>();
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
-                exportTables.add(tinfo.getTable().getTypeName().toLowerCase());
+                exportTables.add(tinfo.getTable().getTypeName());
             }
         }
         return exportTables;
@@ -371,6 +371,23 @@ public abstract class CatalogUtil {
         }
         return false;
     }
+
+    public static String getExportGroupIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
+                                                                    org.voltdb.catalog.Table table)
+    {
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return connector.getTypeName();
+                }
+            }
+        }
+        return null;
+    }
+
 
     /**
      * Return true if a table is the source table for a materialized view.
@@ -826,7 +843,7 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = exportType.isEnabled();
             // Get the group name from the xml attribute "group"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String groupName = exportType.getGroup().toLowerCase();
+            String groupName = exportType.getGroup();
             boolean defaultConnector = groupName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");

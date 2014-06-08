@@ -189,14 +189,14 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
-        // list of all export tables in lowercase
-        SortedSet<String> exportTables = CatalogUtil.getExportTableLowercaseNames(m_catalogDb);
+        // list of all export tables (assume uppercase)
+        SortedSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (exportTables.contains(table.getTypeName().toLowerCase())) {
+            if (exportTables.contains(table.getTypeName())) {
                 return true;
             }
         }

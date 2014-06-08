@@ -143,7 +143,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
           m_hashinator(NULL),
           m_staticParams(MAX_PARAM_COUNT),
           m_currentInputDepId(-1),
-          m_isELEnabled(false),
           m_numResultDependencies(0),
           m_logManager(new StdoutLogProxy()),
           m_templateSingleLongTable(NULL),
@@ -257,9 +256,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         NValueArray& getParameterContainer() { return m_staticParams; }
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
-
-        /** are we sending tuples to another database? */
-        bool isELEnabled() { return m_isELEnabled; }
 
         /** check if this value hashes to the local partition */
         bool isLocalSite(const NValue& value);
@@ -611,9 +607,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods
         int m_currentInputDepId;
-
-        /** EL subsystem on/off, pulled from catalog */
-        bool m_isELEnabled;
 
         /** Stats manager for this execution engine **/
         voltdb::StatsAgent m_statsManager;

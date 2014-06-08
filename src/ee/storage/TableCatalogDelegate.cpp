@@ -361,9 +361,12 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
-    Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames,
-                                                    partitionColumnIndex, exportEnabled,
+    Table *table = TableFactory::getPersistentTable(databaseId,
+                                                    tableName,
+                                                    schema,
+                                                    columnNames,
+                                                    partitionColumnIndex,
+                                                    exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
                                                     catalogTable.tuplelimit(),

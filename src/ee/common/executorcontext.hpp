@@ -43,7 +43,6 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
-                    bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId);
 
@@ -149,7 +148,6 @@ class ExecutorContext {
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;
-    bool m_exportEnabled;
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;

@@ -120,7 +120,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentInputDepId(-1),
-      m_isELEnabled(false),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
       m_logManager(logProxy),
@@ -213,7 +212,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
-                                            m_isELEnabled,
                                             hostname,
                                             hostId);
 
@@ -565,23 +563,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     if (success == false) {
         VOLT_ERROR("Unable to load partition list for cluster");
         return false;
-    }
-
-    // Tables care about EL state.
-    m_executorContext->m_exportEnabled = false;
-    m_isELEnabled = false;
-    std::map<std::string, catalog::Connector*>::const_iterator connIter;
-    for (connIter = m_database->connectors().begin();
-         connIter != m_database->connectors().end();
-         connIter++) {
-
-        catalog::Connector *conn = connIter->second;
-        if (conn->enabled() && (conn->tableInfo().size() > 0)) {
-            VOLT_DEBUG("EL enabled.");
-            m_executorContext->m_exportEnabled = true;
-            m_isELEnabled = true;
-            break;
-        }
     }
 
     // load up all the tables, adding all tables

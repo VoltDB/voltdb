@@ -175,8 +175,8 @@ public class VoltDDLElementTracker {
         assert tableName != null && ! tableName.trim().isEmpty();
         assert groupName != null && ! groupName.trim().isEmpty();
 
-        // store lowercase in the catalog
-        groupName = groupName.toLowerCase();
+        // store uppercase in the catalog as typename
+        groupName = groupName.toUpperCase();
 
         // ensure this table isn't already exported
         if(m_exportedTables.contains(tableName)) {

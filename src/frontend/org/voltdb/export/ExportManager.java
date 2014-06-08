@@ -494,7 +494,7 @@ public class ExportManager
             String groupName = conn.getTypeName();
 
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                tables.add(ti.getTable().getTypeName().toLowerCase());
+                tables.add(ti.getTable().getTypeName());
             }
 
             if (conn.getConfig() != null) {

@@ -339,8 +339,8 @@ public class DDLCompiler {
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
-            "(\\s+GROUP\\s+" +                  // begin optional GROUP clause
-            "([\\w.$]+)" +                      // (2) <export group>
+            "(\\s+GROUP\\s+" +                  // begin optional GROUP clause (also regex group 2)
+            "([\\w.$]+)" +                      // (3) <export group>
             ")?" +                              // end optional GROUP clause
             "\\s*;\\z"                          // (end statement)
             );
