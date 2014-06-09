@@ -169,8 +169,8 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
 
-        @Option(desc = "different ways to handle blank items: {error|null|empty} (default: error)")
-        String blank = "error";
+        @Option(desc = "different ways to handle blank items: {error|null|empty} (default: null)")
+        String blank = "null";
 
         @Option(desc = "delimiter to use for separating entries")
         char separator = DEFAULT_SEPARATOR;

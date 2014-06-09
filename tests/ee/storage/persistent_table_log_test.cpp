@@ -104,20 +104,21 @@ public:
         delete m_table;
     }
 
-    void initTable() {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
-                                                               m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull);
+    void initTable(bool withPK = true) {
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
+                                                              m_tableSchemaColumnSizes,
+                                                              m_tableSchemaAllowNull);
+        m_table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
+        if ( ! withPK ) {
+            return;
+        }
         voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
-                                             voltdb::BALANCED_TREE_INDEX,
+                                             BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
-        std::vector<voltdb::TableIndexScheme> indexes;
-
-        m_table = dynamic_cast<voltdb::PersistentTable*>(
-            voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -125,14 +126,12 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
-
-
-    voltdb::VoltDBEngine *m_engine;
-    voltdb::TupleSchema *m_tableSchema;
-    voltdb::PersistentTable *m_table;
-    voltdb::MockDRTupleStream drStream;
+    VoltDBEngine *m_engine;
+    TupleSchema *m_tableSchema;
+    PersistentTable *m_table;
+    MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
-    std::vector<voltdb::ValueType> m_tableSchemaTypes;
+    std::vector<ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
@@ -315,6 +314,15 @@ TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
     ASSERT_EQ( m_table->activeTupleCount(), 10);
     m_engine->undoUndoToken(INT64_MIN + 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
+}
+
+TEST_F(PersistentTableLogTest, InsertDupsThenUndoWorksTest) {
+    initTable(false);
+    tableutil::addDuplicateRandomTuples(m_table, 2);
+    tableutil::addDuplicateRandomTuples(m_table, 3);
+    ASSERT_EQ(5, m_table->activeTupleCount());
+    m_engine->undoUndoToken(INT64_MIN + 1);
+    ASSERT_EQ(0, m_table->activeTupleCount());
 }
 
 TEST_F(PersistentTableLogTest, FindBlockTest) {

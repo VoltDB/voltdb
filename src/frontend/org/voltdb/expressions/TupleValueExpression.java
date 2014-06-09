@@ -184,6 +184,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_tableAlias;
     }
 
+    public void setTableAlias(String alias) {
+        m_tableAlias = alias;
+    }
+
     public int getTableIndex() {
         return m_tableIdx;
     }

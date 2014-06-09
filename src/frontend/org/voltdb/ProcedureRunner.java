@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
@@ -238,6 +239,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
+    @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
@@ -336,11 +338,18 @@ public class ProcedureRunner {
                     } else {
                         error = true;
                     }
-                    if (ex instanceof Error) {
-                        m_statsCollector.endProcedure(false, true, null, null);
-                        throw (Error)ex;
+                    if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
+                        // If the stored procedure attempted to do something other than linklibraray or instantiate
+                        // a missing object that results in an error, throw the error and let the server deal with
+                        // the condition as best as it can (usually a crashLocalVoltDB).
+                        try {
+                            m_statsCollector.endProcedure(false, true, null, null);
+                        }
+                        finally {
+                            // Ensure that ex is always re-thrown even if endProcedure throws an exception.
+                            throw (Error)ex;
+                        }
                     }
-
                     retval = getErrorResponse(ex);
                 }
             }

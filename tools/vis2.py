@@ -30,7 +30,6 @@ def COLORS(k):
 
 #COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
 COLORS = ['b','g','r','c','m','y','k']
-#print COLORS
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
@@ -87,7 +86,7 @@ class Plot:
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend, linestyle):
-        self.ax.plot(x, y, linestyle, label=str(legend), color=color,
+        self.ax.plot(x, y, linestyle, label=legend, color=color,
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
@@ -121,33 +120,49 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
         datenum = matplotlib.dates.date2num(run['date'])
         plot_data[run['branch']][series].append((datenum,value))
 
-    if series == 'tppn' and run['branch'] == 'master':
-        z1 = plot_data[run['branch']][series]
-        z111 = sorted(z1, key=lambda x: x[0])
-        z2 = np.array(z111)
-        z2a = z2[:,0]
-        z3 = moving_average(z2[:,1], 10)
-        z4 = np.column_stack((z2a, z3))
-        plot_data['master-10dmvavg'] = {'tppn' : z4}
-
     if len(plot_data) == 0:
         return
 
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
+
+    flag = dict()
     for b,bd in plot_data.items():
         for k,v in bd.items():
+            if k not in flag.keys():
+                flag[k] = []
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
             if b not in mc:
-                if b == 'master-10dmvavg':
-                    mc[b] = (mc['master'][0], None)
+                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
+
+            if len(u[0]) > 10:
+                ma = moving_average(u[1], 10)
+                pl.plot(u[0], ma, mc[b][0], None, None, ":")
+                failed = 0
+                if k.startswith('lat'):
+                    cv = np.nanmin(ma)
+                    if ma[-1] > cv * 1.05:
+                        failed = -1
+                        rp = (u[0][np.nanargmin(ma)], cv)
                 else:
-                    mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            if b == 'master-10dmvavg':
-                linestyle=':'
-            else:
-                linestyle='-'
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, linestyle)
+                    cv = np.nanmax(ma)
+                    if ma[-1] < cv * 0.95:
+                        failed = 1
+                        rp = (u[0][np.nanargmax(ma)], cv)
+
+                if failed != 0:
+                    p = (ma[-1]-rp[1])/rp[1]*100.
+                    flag[k].append((b, p))
+                    pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,10*failed),
+                        textcoords='offset points', ha='center', color='red')
+                    pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
+                        textcoords='offset points', ha='left', color='red')
+                    pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
+                        textcoords='offset points', ha='left', color='red')
+                    for pos in ['top', 'bottom', 'right', 'left']:
+                        pl.ax.spines[pos].set_edgecolor("red")
+
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
@@ -166,6 +181,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                         textcoords='offset points', ha='center', va='top', xytext=(0,-5))
             """
     pl.close()
+    return flag
 
 def generate_index_file(filenames):
     row = """
@@ -200,18 +216,32 @@ def generate_index_file(filenames):
 
     hrow = """
     <tr>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
     </tr>
 """
-
-    h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    h = []
+    for x in filenames:
+        tdattr = "bgcolor=green"
+        tdnote = ""
+        M = 0.0
+        if len(x) == 6:
+            for v in x[5].values():
+                if len(v) > 0:
+                    M = max(M, abs(v[0][1]))
+        if M > 0.0:
+            tdattr = 'bgcolor=yellow'
+            if M > 10.0:
+                tdattr = 'bgcolor=red'
+            tdnote = " (by %.2f%%)" % M
+        h.append((tdattr, x[0].replace(' ','%20'), x[0] + tdnote))
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
-        h.append(('',''))
+        h.append(('','',''))
         z -= 1
 
     rows = []
@@ -290,6 +320,7 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
+        app = app.replace('/','')
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
@@ -306,15 +337,17 @@ def main():
                        ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
                      ]
 
-        app_filename = app.replace(' ', '_')
         fns = [app]
+        flags = dict()
         for r in legend:
             title = app + " " + r[1]
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            f = plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            flags.update(f)
 
         fns.append(iorder)
+        fns.append(flags)
         filenames.append(tuple(fns))
 
     filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))

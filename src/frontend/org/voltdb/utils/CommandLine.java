@@ -403,6 +403,14 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public String getJavaProperty(String property)
+    {
+        if (javaProperties == null) {
+            return null;
+        }
+        return javaProperties.get(property);
+    }
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);

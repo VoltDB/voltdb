@@ -236,6 +236,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
+    TableIterator& iteratorDeletingAsWeGo() {
+        m_iter.reset(m_data.begin());
+        m_iter.setTempTableDeleteAsGo(false);
+        return m_iter;
+    }
+
+
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------

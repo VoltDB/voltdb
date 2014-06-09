@@ -62,7 +62,7 @@ public abstract class SubPlanAssembler {
     final Database m_db;
 
     /** Describes the specified and inferred partition context. */
-    final PartitioningForStatement m_partitioning;
+    final StatementPartitioning m_partitioning;
 
     /**
      * A description of a possible error condition that is considered recoverable/recovered
@@ -90,7 +90,7 @@ public abstract class SubPlanAssembler {
     /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;
@@ -805,13 +805,13 @@ public abstract class SubPlanAssembler {
         }
         int nSpoilers = 0;
         ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
-        int countOrderBys = parsedSelectStmt.orderColumns.size();
+        int countOrderBys = parsedSelectStmt.m_orderColumns.size();
         // There need to be enough indexed expressions to provide full sort coverage.
         if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
+            boolean ascending = parsedSelectStmt.m_orderColumns.get(0).ascending;
             retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
             int jj = 0;
-            for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
+            for (ParsedColInfo colInfo : parsedSelectStmt.m_orderColumns) {
                 // This retry loop allows catching special cases that don't perfectly match the
                 // ORDER BY columns but may still be usable for ordering.
                 for ( ; jj < keyComponentCount; ++jj) {
