@@ -479,14 +479,14 @@ public:
         return boost::shared_ptr<ElasticScanner>(new ElasticScanner(*m_table, m_table->m_surgeon.getData()));
     }
 
-    void context(const std::string& msg, ...) {
+    void context(const std::string msg, ...) {
         va_list args;
         va_start(args, msg);
         vsnprintf(m_stage, sizeof m_stage, msg.c_str(), args);
         va_end(args);
     }
 
-    void verror(const std::string& msg, va_list args) {
+    void verror(const std::string msg, va_list args) {
         char buffer[256];
         vsnprintf(buffer, sizeof buffer, msg.c_str(), args);
         if (m_nerrors++ == 0) {
@@ -499,14 +499,14 @@ public:
         std::cerr << m_stage << "): " << buffer << std::endl;
     }
 
-    void error(const std::string& msg, ...) {
+    void error(const std::string msg, ...) {
         va_list args;
         va_start(args, msg);
         verror(msg, args);
         va_end(args);
     }
 
-    void valueError(int32_t* pvalues, const std::string& msg, ...) {
+    void valueError(int32_t* pvalues, const std::string msg, ...) {
         if (m_showTuples) {
             std::cerr << std::endl << "=== Tuples ===" << std::endl;
             size_t n = 0;

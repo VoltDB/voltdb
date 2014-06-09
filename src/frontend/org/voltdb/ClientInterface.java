@@ -2108,7 +2108,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.work.type;
+        task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info

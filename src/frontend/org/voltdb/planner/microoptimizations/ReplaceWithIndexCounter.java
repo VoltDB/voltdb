@@ -23,8 +23,6 @@ import java.util.List;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -79,11 +77,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
             }
-            // TODO: implement a deeper optimization for "SELECT COUNT(*) FROM (...) subquery".
-            // For now, we give up on this case
-            if (((SeqScanPlanNode)child).isSubQuery()) {
-                return plan;
-            }
+
             AbstractExpression postPredicate = aggplan.getPostPredicate();
             if (postPredicate != null) {
                 List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);

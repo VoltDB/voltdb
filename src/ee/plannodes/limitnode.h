@@ -59,31 +59,31 @@ class Table;
  *
  */
 class LimitPlanNode : public AbstractPlanNode {
-    public:
-        LimitPlanNode() : AbstractPlanNode(),
-        limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
-        {}
-        ~LimitPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
+public:
+    LimitPlanNode() : AbstractPlanNode(),
+    limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
+    {}
+    ~LimitPlanNode();
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
 
-        // evaluate possibly parameterized limit and offsets.
-        void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
+    // evaluate possibly parameterized limit and offsets.
+    void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
 
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
 
-    private:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        int limit;
-        int offset;
-        int limitParamIdx;
-        int offsetParamIdx;
+private:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
+    int limit;
+    int offset;
+    int limitParamIdx;
+    int offsetParamIdx;
 
-        /*
-         * If the query has limit and offset, the pushed-down limit node will
-         * have a limit expression of the sum of the limit parameter and the
-         * offset parameter, and offset will be 0
-         */
-        AbstractExpression* limitExpression;
+    /*
+     * If the query has limit and offset, the pushed-down limit node will
+     * have a limit expression of the sum of the limit parameter and the
+     * offset parameter, and offset will be 0
+     */
+    AbstractExpression* limitExpression;
 };
 
 }

@@ -54,7 +54,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockConstants;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
@@ -393,9 +393,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             Statement catalogStmt = procedure.getStatements().add(stmtName);
 
             // compile the statement
-            PartitioningForStatement partitioning =
-                info.singlePartition ? PartitioningForStatement.forceSP() :
-                                       PartitioningForStatement.forceMP();
+            StatementPartitioning partitioning =
+                info.singlePartition ? StatementPartitioning.forceSP() :
+                                       StatementPartitioning.forceMP();
             StatementCompiler.compile(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
@@ -668,9 +668,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
         // compile the statement
-        PartitioningForStatement partitioning =
-            info.singlePartition ? PartitioningForStatement.forceSP() :
-                                   PartitioningForStatement.forceMP();
+        StatementPartitioning partitioning =
+            info.singlePartition ? StatementPartitioning.forceSP() :
+                                   StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
