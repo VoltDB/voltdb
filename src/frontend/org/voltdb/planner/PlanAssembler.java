@@ -1243,18 +1243,11 @@ public class PlanAssembler {
      */
     private AbstractPlanNode handleLimitOperator(AbstractPlanNode root)
     {
-        int limitParamIndex = m_parsedSelect.getLimitParameterIndex();
-        int offsetParamIndex = m_parsedSelect.getOffsetParameterIndex();
-
         // The coordinator's top limit graph fragment for a MP plan.
         // If planning "order by ... limit", getNextSelectPlan()
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
-        LimitPlanNode topLimit = new LimitPlanNode();
-        topLimit.setLimit((int)m_parsedSelect.m_limit);
-        topLimit.setOffset((int) m_parsedSelect.m_offset);
-        topLimit.setLimitParameterIndex(limitParamIndex);
-        topLimit.setOffsetParameterIndex(offsetParamIndex);
+        LimitPlanNode topLimit = m_parsedSelect.getLimitNode(true);
 
         /*
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
@@ -1268,15 +1261,7 @@ public class PlanAssembler {
             if (sendNode == null) {
                 canPushDown = false;
             } else {
-                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
-                    AbstractExpression rootExpr = col.expression;
-                    if (rootExpr instanceof AggregateExpression) {
-                        if (((AggregateExpression)rootExpr).isDistinct()) {
-                            canPushDown = false;
-                            break;
-                        }
-                    }
-                }
+                canPushDown = m_parsedSelect.m_limitCanPushdown;
             }
         }
 
@@ -1298,25 +1283,7 @@ public class PlanAssembler {
              * was not a hard-coded constant and didn't get parameterized.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
-            LimitPlanNode distLimit = new LimitPlanNode();
-            // Offset on a pushed-down limit node makes no sense, just defaults to 0
-            // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
-            if (m_parsedSelect.m_limit != -1) {
-                distLimit.setLimit((int) (m_parsedSelect.m_limit + m_parsedSelect.m_offset));
-            }
-
-            if (m_parsedSelect.hasLimitOrOffsetParameters()) {
-
-                AbstractExpression left = m_parsedSelect.getOffsetExpression();
-                assert (left != null);
-                AbstractExpression right = m_parsedSelect.getLimitExpression();
-                assert (right != null);
-                OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS, left, right);
-                expr.setValueType(VoltType.INTEGER);
-                expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
-                distLimit.setLimitExpression(expr);
-            }
-            // else let the parameterized forms of offset/limit default to unused/invalid.
+            LimitPlanNode distLimit = m_parsedSelect.getLimitNode(false);
 
             // Disconnect the distributed parts of the plan below the SEND node
             AbstractPlanNode distributedPlan = sendNode.getChild(0);
@@ -1644,11 +1611,8 @@ public class PlanAssembler {
 
             }
 
-            NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode,
-                    m_parsedSelect.hasComplexAgg(), newSchema,
-                    !m_parsedSelect.hasPartitionColumnInGroupby());
+            root = pushDownAggregate(root, aggNode, topAggNode,m_parsedSelect);
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1799,9 +1763,9 @@ public class PlanAssembler {
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
-                                       boolean needProjectionNode,
-                                       NodeSchema newSchema,
-                                       boolean needCoordNode) {
+                                       ParsedSelectStmt selectStmt) {
+
+        boolean needCoordNode = !selectStmt.hasPartitionColumnInGroupby();
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1859,10 +1823,10 @@ public class PlanAssembler {
             distNode.setPostPredicate(m_parsedSelect.m_having);
         }
 
-        if (needProjectionNode) {
+        if (selectStmt.hasComplexAgg()) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
             proj.addAndLinkChild(root);
-            proj.setOutputSchema(newSchema);
+            proj.setOutputSchema(selectStmt.getFinalProjectionSchema());
             root = proj;
         }
         return root;
