@@ -159,6 +159,8 @@ public class AsyncCompilerAgentHelper
         VoltCompilerReader ddlReader = null;
         try {
             InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
+            // Yoink the current cluster catalog's canonical DDL and append the supplied
+            // adhoc DDL to it.
             String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                     Constants.UTF8ENCODING);
             StringBuilder sb = new StringBuilder();
@@ -169,6 +171,10 @@ public class AsyncCompilerAgentHelper
                 sb.append(";\n");
             }
             compilerLog.debug("Adhoc-modified DDL:\n" + sb.toString());
+            // Put the new DDL back into the InMemoryJarfile we built because that's
+            // the artifact the compiler is expecting to work on.  This allows us to preserve any
+            // stored procedure classes and the class loader that came with the catalog
+            // before we appended to it.
             ddlReader =
                 new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, sb.toString());
             ddlReader.putInJar(jarfile, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
