@@ -115,7 +115,7 @@ public class StatsProcInputTable
         if (denom == 0L) {
             return 100L;
         } else {
-            return (100L * num / denom);
+            return Math.round(100.0 * num / denom);
         }
     }
 
