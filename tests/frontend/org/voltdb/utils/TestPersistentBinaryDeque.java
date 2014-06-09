@@ -69,6 +69,16 @@ public class TestPersistentBinaryDeque {
         return buf;
     }
 
+    private static ByteBuffer getFilledSmallBuffer(long fillValue) {
+        ByteBuffer buf = ByteBuffer.allocateDirect(1024);
+        while (buf.remaining() > 15) {
+            buf.putLong(fillValue);
+            buf.putLong(fillValue);
+        }
+        buf.clear();
+        return buf;
+    }
+
     private static TreeSet<String> getSortedDirectoryListing() {
         TreeSet<String> names = new TreeSet<String>();
         for (File f : TEST_DIR.listFiles()) {
@@ -580,6 +590,100 @@ public class TestPersistentBinaryDeque {
         } finally {
             bb.discard();
         }
+    }
+
+    @Test
+    public void testOfferCloseReopenOffer() throws Exception {
+        System.out.println("Running testOfferCloseThenReopen");
+        //Make it create two full segments
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals(3, files.length);
+
+        m_pbd.sync();
+        m_pbd.close();
+
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        int cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 96);
+
+        for (int ii = 96; ii < 192; ii++) {
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
+        }
+        m_pbd.sync();
+        cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 192);
+
+        //Now poll all of it and make sure the data is correct
+        for (int ii = 0; ii < 192; ii++) {
+            ByteBuffer defaultBuffer = getFilledBuffer(ii);
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            assertTrue(defaultBuffer.equals(retval.b()));
+            retval.discard();
+            defaultBuffer.clear();
+        }
+
+        //Expect just the current write segment
+        TreeSet<String> names = getSortedDirectoryListing();
+        assertEquals(1, names.size());
+        assertTrue(names.first().equals("pbd_nonce.5.pbd"));
+    }
+
+    @Test
+    public void testOfferCloseReopenOfferSmall() throws Exception {
+        System.out.println("Running testOfferCloseReopenOfferSmall");
+        final String SMALL_TEST_NONCE = "asmall_pbd_nonce";
+
+        PersistentBinaryDeque small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        //Keep in 1 segment.
+        for (int ii = 0; ii < 10; ii++) {
+            small_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(ii)));
+        }
+        File files[] = TEST_DIR.listFiles();
+        //We have the default pbd and new one.
+        assertEquals(2, files.length);
+
+        small_pbd.sync();
+        small_pbd.close();
+        System.gc();
+        System.runFinalization();
+
+        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        int cnt = small_pbd.getNumObjects();
+        assertEquals(cnt, 10);
+
+        for (int ii = 10; ii < 20; ii++) {
+            small_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(ii)));
+        }
+        small_pbd.sync();
+        cnt = small_pbd.getNumObjects();
+        assertEquals(cnt, 20);
+        small_pbd.sync();
+        small_pbd.close();
+        small_pbd = null;
+        System.gc();
+        System.runFinalization();
+
+        TreeSet<String> names = getSortedDirectoryListing();
+        assertEquals(3, names.size());
+        assertTrue(names.first().equals("asmall_pbd_nonce.0.pbd"));
+
+        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        //Now poll all of it and make sure the data is correct dont poll everything out.
+        for (int ii = 0; ii < 10; ii++) {
+            ByteBuffer defaultBuffer = getFilledSmallBuffer(ii);
+            BBContainer retval = small_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            assertTrue(defaultBuffer.equals(retval.b()));
+            retval.discard();
+            defaultBuffer.clear();
+        }
+        small_pbd.sync();
+        small_pbd.close();
+        small_pbd = null;
+        System.gc();
+        System.runFinalization();
     }
 
     @Before

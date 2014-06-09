@@ -367,17 +367,16 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                final ExportGeneration currentGeneration = new ExportGeneration(
+                if (m_generations.containsKey(catalogContext.m_uniqueId)) {
+                    final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                        exportOverflowDirectory, isRejoin);
-                currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
-                currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
-                if (!m_generations.isEmpty()) {
-                    if (m_generations.containsKey(catalogContext.m_uniqueId)) {
-                        exportLog.info("Persisted export generation with same timestamp from generation from catalog exists. Catalog generation will be used.");
-                    }
+                            exportOverflowDirectory, isRejoin);
+                    currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
+                    currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
+                    m_generations.put(catalogContext.m_uniqueId, currentGeneration);
+                } else {
+                    exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used.");
                 }
-                m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
             /*

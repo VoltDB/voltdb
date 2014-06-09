@@ -85,8 +85,8 @@ public class ExportGeneration {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final HashMap<Integer, HashMap<String, ExportDataSource>> m_dataSourcesByPartition =
-        new HashMap<Integer, HashMap<String, ExportDataSource>>();
+    public final HashMap<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
+            = new HashMap<Integer, Map<String, ExportDataSource>>();
 
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
@@ -415,7 +415,7 @@ public class ExportGeneration {
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
 
-                    final HashMap<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
+                    final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +
                                 " which does not exist on this node");
@@ -565,7 +565,7 @@ public class ExportGeneration {
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
-        HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
             /*
@@ -596,28 +596,32 @@ public class ExportGeneration {
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        m_numSources++;
         ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile);
         partitions.add(source.getPartitionId());
         m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
-        HashMap<String, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
+        Map<String, ExportDataSource> dataSourcesForPartition
+                =            m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
             m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+        } else {
+            if (dataSourcesForPartition.get(source.getSignature()) != null) {
+                exportLog.warn("On Disk generation with same table, partition already exists using known data source.");
+                return;
+            }
         }
         dataSourcesForPartition.put( source.getSignature(), source);
+        m_numSources++;
     }
 
     /*
      * An unfortunate test only method for supplying a mock source
      */
     public void addDataSource(ExportDataSource source) {
-        HashMap<String, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
+        Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
             m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
@@ -631,14 +635,13 @@ public class ExportGeneration {
     {
         for (Pair<Integer, Long> p : partitions) {
             Integer partition = p.getFirst();
-            Long site = p.getSecond();
 
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
              */
             try {
-                HashMap<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+                Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
                 if (dataSourcesForPartition == null) {
                     dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                     m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
@@ -648,7 +651,6 @@ public class ExportGeneration {
                         "database",
                         table.getTypeName(),
                         partition,
-                        site,
                         table.getSignature(),
                         m_timestamp,
                         table.getColumns(),
@@ -672,7 +674,7 @@ public class ExportGeneration {
         //        }
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
-        HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
@@ -699,7 +701,7 @@ public class ExportGeneration {
 
     public void closeAndDelete() throws IOException {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
+        for (Map<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
                 tasks.add(source.closeAndDelete());
             }
@@ -728,7 +730,7 @@ public class ExportGeneration {
 
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
-        for (HashMap<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
                 Long truncationPoint = partitionToTxnId.get(source.getPartitionId());
                 if (truncationPoint == null) {
@@ -755,7 +757,7 @@ public class ExportGeneration {
 
     public void close() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
+        for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
                 tasks.add(source.close());
             }
@@ -776,8 +778,7 @@ public class ExportGeneration {
      * @param partitionId
      */
     public void acceptMastershipTask( int partitionId) {
-        HashMap<String, ExportDataSource> partitionDataSourceMap =
-                m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
         if (partitionDataSourceMap == null) {

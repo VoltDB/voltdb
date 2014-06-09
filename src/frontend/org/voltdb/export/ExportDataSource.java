@@ -72,7 +72,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_tableName;
     private final String m_signature;
     private final byte [] m_signatureBytes;
-    private final long m_HSId;
     private final long m_generation;
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
@@ -105,7 +104,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public ExportDataSource(
             final Runnable onDrain,
             String db, String tableName,
-            int partitionId, long HSId, String signature, long generation,
+            int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             String overflowPath
             ) throws IOException
@@ -131,7 +130,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         "ExportDataSource gen " + m_generation
                         + " table " + m_tableName + " partition " + partitionId, 1);
 
-        String nonce = signature + "_" + HSId + "_" + partitionId;
+        String nonce = signature + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -143,7 +142,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_signature = signature;
         m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
         m_partitionId = partitionId;
-        m_HSId = HSId;
 
         // Add the Export meta-data columns to the schema followed by the
         // catalog columns for this table.
@@ -185,7 +183,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key("hsId").value(m_HSId);
             stringer.key("database").value(m_database);
             writeAdvertisementTo(stringer);
             stringer.endObject();
@@ -194,19 +191,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (JSONException e) {
             Throwables.propagate(e);
         }
-        FileOutputStream fos = new FileOutputStream(adFile);
-        fos.write(jsonBytes);
-        fos.getFD().sync();
-        fos.close();
+
+        try (FileOutputStream fos = new FileOutputStream(adFile)) {
+            fos.write(jsonBytes);
+            fos.getFD().sync();
+        }
 
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
-    public ExportDataSource(final Runnable onDrain,
-            File adFile
-            ) throws IOException {
+    public ExportDataSource(final Runnable onDrain, File adFile) throws IOException {
 
         /*
          * Certainly no more data coming if this is coming off of disk
@@ -226,6 +222,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
+        long hsid = -1;
         try {
             JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
 
@@ -233,7 +230,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (version != 0) {
                 throw new IOException("Unsupported ad file version " + version);
             }
-            m_HSId = jsObj.getLong("hsId");
+            try {
+                hsid = jsObj.getLong("hsId");
+                exportLog.info("Found old for export data source file ignoring m_HSId");
+            } catch (JSONException jex) {
+                hsid = -1;
+            }
             m_database = jsObj.getString("database");
             m_generation = jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
@@ -252,7 +254,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             throw new IOException(e);
         }
 
-        String nonce = m_signature + "_" + m_HSId + "_" + m_partitionId;
+        String nonce;
+        if (hsid == -1) {
+            nonce = m_signature + "_" + m_partitionId;
+        } else {
+            nonce = m_signature + "_" + hsid + "_" + m_partitionId;
+        }
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
         // compute the number of bytes necessary to hold one bit per
@@ -305,15 +312,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_signature;
     }
 
-    public long getHSId() {
-        return m_HSId;
-    }
-
     public int getPartitionId() {
         return m_partitionId;
     }
 
-    public void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
+    public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.key("adVersion").value(0);
         stringer.key("generation").value(m_generation);
         stringer.key("partitionId").value(getPartitionId());
@@ -351,11 +354,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        result = Long.signum(m_HSId - o.m_HSId);
-        if (result != 0) {
-            return result;
-        }
-
         result = (m_partitionId - o.m_partitionId);
         if (result != 0) {
             return result;
@@ -383,7 +381,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result = 0;
         result += m_database.hashCode();
         result += m_tableName.hashCode();
-        result += m_HSId;
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
