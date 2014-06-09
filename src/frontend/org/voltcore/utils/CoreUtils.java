@@ -121,7 +121,7 @@ public class CoreUtils {
 
         @Override
         public <T> Future<T> submit(Callable<T> task) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             FutureTask<T> retval = new FutureTask<T>(task);
             retval.run();
             return retval;
@@ -129,7 +129,7 @@ public class CoreUtils {
 
         @Override
         public <T> Future<T> submit(Runnable task, T result) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             FutureTask<T> retval = new FutureTask<T>(task, result);
             retval.run();
             return retval;
@@ -137,7 +137,7 @@ public class CoreUtils {
 
         @Override
         public Future<?> submit(Runnable task) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             FutureTask<Object> retval = new FutureTask<Object>(task, null);
             retval.run();
             return retval;
@@ -147,7 +147,7 @@ public class CoreUtils {
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks)
                 throws InterruptedException {
-            if (tasks == null) throw new NullPointerException();
+            Preconditions.checkNotNull(tasks);
             List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
             for (Callable<T> c : tasks) {
                 FutureTask<T> ft = new FutureTask<T>(c);
@@ -161,7 +161,8 @@ public class CoreUtils {
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks, long timeout,
                 TimeUnit unit) throws InterruptedException {
-            if (tasks == null || unit == null) throw new NullPointerException();
+            Preconditions.checkNotNull(tasks);
+            Preconditions.checkNotNull(unit);
 
             final long end = System.nanoTime() + unit.toNanos(timeout);
 
@@ -275,7 +276,7 @@ public class CoreUtils {
 
         @Override
         public <T> ListenableFuture<T> submit(Callable<T> task) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             ListenableFutureTask<T> retval = ListenableFutureTask.create(task);
             retval.run();
             return retval;
@@ -283,7 +284,7 @@ public class CoreUtils {
 
         @Override
         public <T> ListenableFuture<T> submit(Runnable task, T result) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             ListenableFutureTask<T> retval = ListenableFutureTask.create(task, result);
             retval.run();
             return retval;
@@ -291,7 +292,7 @@ public class CoreUtils {
 
         @Override
         public ListenableFuture<?> submit(Runnable task) {
-            if (task == null) throw new NullPointerException();
+            Preconditions.checkNotNull(task);
             ListenableFutureTask<Object> retval = ListenableFutureTask.create(task, null);
             retval.run();
             return retval;
@@ -301,7 +302,7 @@ public class CoreUtils {
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks)
                 throws InterruptedException {
-            if (tasks == null) throw new NullPointerException();
+            Preconditions.checkNotNull(tasks);
             List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
             for (Callable<T> c : tasks) {
                 FutureTask<T> ft = new FutureTask<T>(c);
@@ -315,7 +316,8 @@ public class CoreUtils {
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks, long timeout,
                 TimeUnit unit) throws InterruptedException {
-            if (tasks == null || unit == null) throw new NullPointerException();
+            Preconditions.checkNotNull(tasks);
+            Preconditions.checkNotNull(unit);
 
             final long end = System.nanoTime() + unit.toNanos(timeout);
 

@@ -217,6 +217,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
     }
 
+    public static class StreamSnapshotTimeoutException extends IOException {
+        public StreamSnapshotTimeoutException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Task run every so often to look for writes that haven't been acked
      * in writeTimeout time.
@@ -245,8 +251,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
                 SendWork work = e.getValue();
                 if ((now - work.m_ts) > m_writeTimeout) {
-                    IOException exception =
-                        new IOException(String.format(
+                    StreamSnapshotTimeoutException exception =
+                        new StreamSnapshotTimeoutException(String.format(
                             "A snapshot write task failed after a timeout (currently %d seconds outstanding). " +
                             "Node rejoin may need to be retried",
                             (now - work.m_ts) / 1000));

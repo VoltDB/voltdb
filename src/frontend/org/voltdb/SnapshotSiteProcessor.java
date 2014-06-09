@@ -53,6 +53,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -581,7 +582,7 @@ public class SnapshotSiteProcessor {
                             writeFutures.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                if (t.getMessage().startsWith("A snapshot write task failed after a timeout")) {
+                                if (t instanceof StreamSnapshotTimeoutException) {
                                     SNAP_LOG.error(t.getMessage());
                                 } else {
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
