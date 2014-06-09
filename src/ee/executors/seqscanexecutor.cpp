@@ -192,20 +192,14 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
-        AggregateRow *aggregateRow = NULL;
         boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
-        AggSerialInfo info;
-
         if (agg_serial_node != NULL) {
             VOLT_TRACE("init inline aggregation stuff...");
             m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
             assert(m_aggSerialExec);
             m_aggSerialExec->exportAggregateOutputTable(output_temp_table);
 
-            m_aggSerialExec->executeAggBase(params);
-
-            aggregateRow = m_aggSerialExec->allocateAggregateRow();
-            will_finally_delete_aggregate_row.reset(aggregateRow);
+            will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params));
         }
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
@@ -243,7 +237,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     }
 
                     if (agg_serial_node != NULL) {
-                        m_aggSerialExec->p_execute_tuple(temp_tuple,aggregateRow, &info, &pmp);
+                        m_aggSerialExec->p_execute_tuple(temp_tuple, &pmp);
                     } else {
                         output_temp_table->insertTupleNonVirtual(temp_tuple);
                     }
@@ -251,7 +245,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 else
                 {
                     if (agg_serial_node != NULL) {
-                        m_aggSerialExec->p_execute_tuple(tuple,aggregateRow, &info, &pmp);
+                        m_aggSerialExec->p_execute_tuple(tuple, &pmp);
                     } else {
                         //
                         // Insert the tuple into our output table
@@ -264,7 +258,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         }
 
         if (agg_serial_node != NULL) {
-            result = m_aggSerialExec->p_execute_finish(aggregateRow, &info, &pmp);
+            result = m_aggSerialExec->p_execute_finish(&pmp);
         }
 
     }

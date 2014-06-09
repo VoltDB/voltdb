@@ -58,6 +58,7 @@
 #include "plannodes/indexscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
+#include "plannodes/aggregatenode.h"
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
@@ -194,6 +195,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // INLINE LIMIT
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+
+    //
+    // OPTIMIZATION: INLINE AGGREGATION (serial only)
+    //
+    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
 
     //
     // SEARCH KEY
@@ -371,6 +377,18 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
+
+    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
+    if (agg_serial_node != NULL) {
+        VOLT_TRACE("init inline aggregation stuff...");
+        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+        assert(m_aggSerialExec);
+        m_aggSerialExec->exportAggregateOutputTable(m_outputTable);
+
+        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params));
+    }
+
+    bool result = true;
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -429,24 +447,37 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
                     }
                 }
-                m_outputTable->insertTupleNonVirtual(temp_tuple);
+                if (agg_serial_node != NULL) {
+                    m_aggSerialExec->p_execute_tuple(temp_tuple, &pmp);
+                } else {
+                    m_outputTable->insertTupleNonVirtual(temp_tuple);
+                }
             }
             else
-                //
-                // Straight Insert
-                //
             {
                 //
                 // Try to put the tuple into our output table
                 //
-                m_outputTable->insertTupleNonVirtual(tuple);
+                if (agg_serial_node != NULL) {
+                    m_aggSerialExec->p_execute_tuple(tuple, &pmp);
+                } else {
+                    //
+                    // Straight Insert
+                    //
+                    m_outputTable->insertTupleNonVirtual(tuple);
+                }
             }
             pmp.countdownProgress();
         }
     }
 
+    if (agg_serial_node != NULL) {
+        result = m_aggSerialExec->p_execute_finish(&pmp);
+    }
+
+
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
-    return true;
+    return result;
 }
 
 IndexScanExecutor::~IndexScanExecutor() {

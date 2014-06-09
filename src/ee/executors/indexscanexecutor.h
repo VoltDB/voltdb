@@ -48,6 +48,7 @@
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+#include "executors/aggregateexecutor.h"
 
 #include "boost/shared_array.hpp"
 
@@ -107,6 +108,8 @@ private:
     boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
+
+    AggregateSerialExecutor* m_aggSerialExec;
 };
 
 }

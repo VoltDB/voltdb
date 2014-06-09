@@ -230,22 +230,6 @@ protected:
     virtual bool p_execute(const NValueArray& params);
 };
 
-
-struct AggSerialInfo
-{
-    AggSerialInfo() {
-        m_noInputRows = true;
-        m_failOnPrePredicate = false;
-    }
-
-    bool zeroInputRowCase() {
-        return m_noInputRows || m_failOnPrePredicate;
-    }
-
-    bool m_noInputRows;
-    bool m_failOnPrePredicate;
-};
-
 /**
  * The concrete executor class for PLAN_NODE_TYPE_AGGREGATE
  * a constant space aggregation that expects the input table to be sorted on the group by key
@@ -258,16 +242,20 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    // FIXME(xin): aggregateRow and info can be member variables
-    void p_execute_tuple(
-            TableTuple& nextTuple, AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr);
+    AggregateRow* p_execute_init(const NValueArray& params);
 
-    bool p_execute_finish(AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr);
+    void p_execute_tuple(TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr);
+
+    bool p_execute_finish(ProgressMonitorProxy* pmpPtr);
 protected:
     virtual bool p_execute(const NValueArray& params);
 
     std::vector<NValue> m_inProgressGroupByValues;
+    AggregateRow * m_aggregateRow;
 
+    // State variables for iteration on input table
+    bool m_noInputRows;
+    bool m_failOnPrePredicate;
 };
 
 }

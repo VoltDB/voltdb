@@ -551,8 +551,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
-    executeAggBase(params);
-    assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
+    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(p_execute_init(params));
 
     // Input table
     Table* input_table = m_abstractNode->getInputTables()[0];
@@ -561,36 +560,44 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iterator();
     TableTuple nextTuple(input_table->schema());
 
-    AggregateRow *aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-    aggregateRow->m_filled = false;
-    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
-    AggSerialInfo info;
     ProgressMonitorProxy pmp(m_engine, this);
-
     while (it.next(nextTuple)) {
         pmp.countdownProgress();
-        p_execute_tuple(nextTuple,aggregateRow, &info, &pmp);
+        p_execute_tuple(nextTuple, &pmp);
     }
     VOLT_TRACE("finalizing..");
-    return p_execute_finish(aggregateRow, &info, &pmp);
+    return p_execute_finish(&pmp);
+}
+
+AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params) {
+
+    executeAggBase(params);
+    assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
+    m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+    m_aggregateRow->m_filled = false;
+
+    m_noInputRows = true;
+    m_failOnPrePredicate = false;
+
+    return m_aggregateRow;
 }
 
 void AggregateSerialExecutor::p_execute_tuple(
-        TableTuple& nextTuple, AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr) {
+        TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr) {
 
     // Use the first input tuple to "prime" the system.
-    if(info->m_noInputRows) {
+    if(m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
         if (m_prePredicate == NULL || m_prePredicate->eval(&nextTuple, NULL).isTrue()) {
             m_inProgressGroupByValues = getNextGroupByValues(nextTuple);
             // Start the aggregation calculation.
-            initAggInstances(aggregateRow);
-            aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
-            advanceAggs(aggregateRow, nextTuple);
+            initAggInstances(m_aggregateRow);
+            m_aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+            advanceAggs(m_aggregateRow, nextTuple);
         } else {
-            info->m_failOnPrePredicate = true;
+            m_failOnPrePredicate = true;
         }
-        info->m_noInputRows = false;
+        m_noInputRows = false;
         return;
     }
 
@@ -599,11 +606,11 @@ void AggregateSerialExecutor::p_execute_tuple(
         if (nextGroupByValues.at(ii).compare(m_inProgressGroupByValues.at(ii)) != 0) {
             VOLT_TRACE("new group!");
             // Output old row.
-            if (insertOutputTuple(aggregateRow)) {
+            if (insertOutputTuple(m_aggregateRow)) {
                 (*pmpPtr).countdownProgress();
             }
             // Recycle the aggs to start a new row.
-            aggregateRow->resetAggs();
+            m_aggregateRow->resetAggs();
 
             // swap inProgressGroupByValues
             m_inProgressGroupByValues = nextGroupByValues;
@@ -611,13 +618,13 @@ void AggregateSerialExecutor::p_execute_tuple(
         }
     }
     // update the aggregation calculation.
-    aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
-    advanceAggs(aggregateRow, nextTuple);
+    m_aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+    advanceAggs(m_aggregateRow, nextTuple);
 }
 
-bool AggregateSerialExecutor::p_execute_finish(AggregateRow* aggregateRow, AggSerialInfo* info, ProgressMonitorProxy* pmpPtr)
+bool AggregateSerialExecutor::p_execute_finish(ProgressMonitorProxy* pmpPtr)
 {
-    if (info->zeroInputRowCase()) {
+    if (m_noInputRows || m_failOnPrePredicate) {
         VOLT_TRACE("finalizing after no input rows..");
         // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
         // Note the difference between these two cases:
@@ -625,8 +632,8 @@ bool AggregateSerialExecutor::p_execute_finish(AggregateRow* aggregateRow, AggSe
         //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
         if (m_groupByKeySchema->columnCount() == 0) {
             VOLT_TRACE("no input row, but output an empty result row for the whole table.");
-            initAggInstances(aggregateRow);
-            if (insertOutputTuple(aggregateRow)) {
+            initAggInstances(m_aggregateRow);
+            if (insertOutputTuple(m_aggregateRow)) {
                 (*pmpPtr).countdownProgress();
             }
         }
@@ -634,7 +641,7 @@ bool AggregateSerialExecutor::p_execute_finish(AggregateRow* aggregateRow, AggSe
     }
 
     // There's one last group (or table) row in progress that needs to be output.
-    if (insertOutputTuple(aggregateRow)) {
+    if (insertOutputTuple(m_aggregateRow)) {
         (*pmpPtr).countdownProgress();
     }
     return true;
