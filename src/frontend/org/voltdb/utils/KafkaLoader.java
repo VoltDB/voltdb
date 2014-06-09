@@ -99,7 +99,7 @@ public class KafkaLoader {
         final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
 
-        m_client = getClient(c_config, serverlist);
+        m_client = getClient(c_config, serverlist, m_config.port);
 
         m_loader = m_client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
@@ -126,8 +126,11 @@ public class KafkaLoader {
         @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
 
-        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost:21212)")
-        String servers = "localhost:21212";
+        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
+        String servers = "localhost";
+
+        @Option(desc = "port to use when connecting to database (default: 21212)")
+        int port = Client.VOLTDB_SERVER_PORT;
 
         @Option(desc = "username when connecting to the servers")
         String user = "";
@@ -135,7 +138,7 @@ public class KafkaLoader {
         @Option(desc = "password to use when connecting to servers")
         String password = "";
 
-        @Option(shortOpt = "z", desc = "kafka zookeeper to connect to.")
+        @Option(shortOpt = "z", desc = "kafka zookeeper to connect to. (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
@@ -172,6 +175,9 @@ public class KafkaLoader {
             }
             if (zookeeper.length() <= 0) {
                 exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
+            }
+            if (port < 0) {
+                exitWithMessageAndUsage("port number must be >= 0");
             }
             //Try and load classes we need and not packaged.
             try {
@@ -303,16 +309,10 @@ public class KafkaLoader {
      * @return client
      * @throws Exception
      */
-    public static Client getClient(ClientConfig config, String[] servers) throws Exception {
+    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
-            int port = Client.VOLTDB_SERVER_PORT;
-            String serverandport[] = server.split(":");
-            String s = serverandport[0];
-            if (serverandport.length > 1) {
-                port = Integer.parseInt(serverandport[1]);
-            }
-            client.createConnection(s.trim(), port);
+            client.createConnection(server.trim(), port);
         }
         return client;
     }

@@ -33,12 +33,12 @@ import org.voltdb.*;
 import org.voltdb.client.*;
 
 public class MaterializedViewBenchmark {
-	
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
-    
+
     final MatViewConfig config;
     long benchmarkStartTS;
     boolean benchmarkActive;
@@ -46,14 +46,14 @@ public class MaterializedViewBenchmark {
     Timer timer;
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
-	
-    long insert_throughput;
+
+    double insert_throughput;
     double insert_execute;
-	
-    long delete_throughput;
+
+    double delete_throughput;
     double delete_execute;
-	
-	/**
+
+    /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
      * and validation.
@@ -71,10 +71,10 @@ public class MaterializedViewBenchmark {
 
         @Option(desc = "Number of transactions to perform during warmup.")
         int warmup = 100000;
-        
+
         @Option(desc = "Number of groupings for materialized view (0 for 1:1 group to id ratio).")
         int group = 0;
-        
+
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
@@ -93,7 +93,7 @@ public class MaterializedViewBenchmark {
                 exitWithMessageAndUsage("group must be 0 or a positive integer");
         }
     }
-	
+
     class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
@@ -103,12 +103,12 @@ public class MaterializedViewBenchmark {
             }
         }
     }
-	
+
     public MaterializedViewBenchmark(MatViewConfig config) {
         this.config = config;
-		
+
         benchmarkActive = false;
-		
+
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
 
         client = ClientFactory.createClient(clientConfig);
@@ -121,7 +121,7 @@ public class MaterializedViewBenchmark {
         delete_throughput = 0;
         delete_execute = 0;
     }
-	
+
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
@@ -172,7 +172,7 @@ public class MaterializedViewBenchmark {
         // block until all have connected
         connections.await();
     }
-    
+
     /**
      * Create a Timer task to display performance data every displayInterval seconds
      */
@@ -202,8 +202,8 @@ public class MaterializedViewBenchmark {
                           stats.kPercentileLatencyAsDouble(0.95));
         System.out.println("");
     }
-	
-    
+
+
     /**
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
@@ -219,21 +219,21 @@ public class MaterializedViewBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput: %,9d txns/sec\n", stats.getTxnThroughput());
-        
+
         VoltTable procStats = client.callProcedure("@Statistics",
                                                    "procedureprofile",
                                                    0).getResults()[0];
-        
+
         while (procStats.advanceRow()) {
             String procName = procStats.getString("PROCEDURE");
             if (procName.equals(procedure)) {
-            	execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
-            	System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
-            	break;
+                execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
+                System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
+                break;
             }
         }
     }
-    
+
     /**
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
@@ -250,57 +250,61 @@ public class MaterializedViewBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput: %,9d txns/sec\n", stats.getTxnThroughput());
-        
+
         VoltTable procStats = client.callProcedure("@Statistics",
                                                    "procedureprofile",
                                                    0).getResults()[0];
-        
+
         while (procStats.advanceRow()) {
             String procName = procStats.getString("PROCEDURE");
             if (procName.equals(procedure)) {
-            	execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
-            	System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
-            	break;
+                execTimeInMicroSec = (procStats.getLong("AVG") / 1000.0);
+                System.out.printf("Average execution time: %,9f usec\n", execTimeInMicroSec);
+                break;
             }
         }
-        
+
         // 3. Write stats to file if requested
         fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
                                 suffix,
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
                                 execTimeInMicroSec));
-        
+
         // Expecting the custom insert/delete procedure names ex. ids_insert
         if (procedure.split("_")[1].equals("insert")) {
             if (insert_throughput > 0) {
-                insert_throughput = Math.abs(insert_throughput - stats.getTxnThroughput());
-                insert_execute = Math.abs(insert_execute - execTimeInMicroSec);
-                fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Insert_Diff",
+                insert_throughput = (((stats.getTxnThroughput() - insert_throughput) /
+                                      stats.getTxnThroughput()) * 100);
+                insert_execute = (((insert_execute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Insert Diff",
                                         stats.getStartTimestamp(),
                                         insert_throughput,
                                         insert_execute));
             } else {
-                insert_throughput = stats.getTxnThroughput();
+                insert_throughput = (double)stats.getTxnThroughput();
                 insert_execute = execTimeInMicroSec;
             }
         } else {
             if (delete_throughput > 0) {
-                delete_throughput = Math.abs(delete_throughput - stats.getTxnThroughput());
-                delete_execute = Math.abs(delete_execute - execTimeInMicroSec);
-                fw.append(String.format("%s,%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Delete_Diff",
+                delete_throughput = (((stats.getTxnThroughput() - delete_throughput) /
+                                      stats.getTxnThroughput()) * 100.0);
+                delete_execute = (((delete_execute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Delete Diff",
                                         stats.getStartTimestamp(),
                                         delete_throughput,
                                         delete_execute));
             } else {
-                delete_throughput = stats.getTxnThroughput();
+                delete_throughput = (double)stats.getTxnThroughput();
                 delete_execute = execTimeInMicroSec;
             }
         }
     }
-    
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -320,7 +324,7 @@ public class MaterializedViewBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-        
+
         benchmarkActive = true;
 
         // Run the benchmark loop for the requested warmup time
@@ -348,12 +352,12 @@ public class MaterializedViewBenchmark {
             }
             client.drain();
         }
-        
+
         int grp = 1;
         FileWriter fw = null;
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
             fw = new FileWriter(config.statsfile);
-        } 
+        }
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
@@ -366,7 +370,7 @@ public class MaterializedViewBenchmark {
         // Run the benchmark for the requested duration.
         System.out.println("\nRunning benchmark...\n");
         System.out.println("\n\nInserting into table w/ materialized view...\n");
-        
+
         if (config.group > 0) {
             for (int i=0; i<config.txn; i++){
                 client.callProcedure(new NullCallback(),
@@ -389,19 +393,19 @@ public class MaterializedViewBenchmark {
         }
         timer.cancel();
         client.drain();
-        
+
         grp = 1;
-    	
+
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_insert");
         } else {
-            printResults("idsWithMatView_insert", fw, "Insert_w/_Materialized_View");
+            printResults("idsWithMatView_insert", fw, "Insert w MV");
         }
         System.out.print(HORIZONTAL_RULE);
-    	
+
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-    	
+
         System.out.println("\n\nDeleting from table w/ materialized view...\n");
         for (int i=0; i<config.txn; i++){
             client.callProcedure(new NullCallback(),
@@ -410,14 +414,14 @@ public class MaterializedViewBenchmark {
         }
         timer.cancel();
         client.drain();
-    	
+
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_delete");
         } else {
-            printResults("idsWithMatView_delete", fw, "Delete_w/_Materialized_View");
+            printResults("idsWithMatView_delete", fw, "Delete w MV");
         }
         System.out.print(HORIZONTAL_RULE);
-    	
+
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
         System.out.println("\n\nInserting into table w/o materialized view...\n");
@@ -443,14 +447,14 @@ public class MaterializedViewBenchmark {
         }
         timer.cancel();
         client.drain();
-    	
+
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_insert");
         } else {
-            printResults("ids_insert", fw, "Insert_w/o_Materialized_View");
+            printResults("ids_insert", fw, "Insert wo MV");
         }
         System.out.print(HORIZONTAL_RULE);
-    	
+
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
         System.out.println("\n\nDeleting from table w/o materialized view...\n");
@@ -461,16 +465,16 @@ public class MaterializedViewBenchmark {
         }
         timer.cancel();
         client.drain();
-    	
+
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_delete");
         } else {
-            printResults("ids_delete", fw, "Delete_w/o_Materialized_View");
+            printResults("ids_delete", fw, "Delete wo MV");
             fw.close();
         }
         benchmarkActive = false;
-    	
-    	// close down the client connections
+
+        // close down the client connections
         client.close();
     }
 
@@ -483,7 +487,7 @@ public class MaterializedViewBenchmark {
     public static void main(String[] args) throws Exception{
         MatViewConfig config = new MatViewConfig();
         config.parse(MaterializedViewBenchmark.class.getName(), args);
-		
+
         MaterializedViewBenchmark benchmark = new MaterializedViewBenchmark(config);
         benchmark.runBenchmark();
     }
