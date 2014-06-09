@@ -168,10 +168,7 @@ private:
         char strField[lenPath];
         while (readChar(c)) {
             if (expectArrayIndex) {
-                if (!readChar(c)) {
-                    throwInvalidPathError("Unexpected termination of JSON path");
-                }
-                // -1 to refer to the tail of the array
+                // -1 index to refer to the tail of the array
                 bool neg = false;
                 if (c == '-') {
                     neg = true;
@@ -225,11 +222,10 @@ private:
                     if (c == '\\') {
                         if (!readChar(c)) {
                             throwInvalidPathError("Unexpected termination of JSON path (empty escape sequence)");
-                        } else if (c != '\\' && c != '[' && c != ']' && c != '.') {
-                            // need to further escape our backslashes to separate our escaped '.' and '['
-                            // from things that are meant to be escaped in the JSON. ']' is only allowed for
-                            // symmetry, since there's really no need to escape it
-                            throwInvalidPathError("Unexpected escape sequence in JSON path");
+                        } else if (c != '[' && c != ']' && c != '.') {
+                            // other than our special escaping cases, we should forward any escapes to
+                            // the actual JSON text
+                            strField[i++] = '\\';
                         }
                     } else if (c == '.') {
                         expectField = true;
@@ -244,6 +240,10 @@ private:
                 path.push_back(JsonPathNode(strField));
             }
             first = false;
+        }
+        // trailing '['
+        if (expectArrayIndex) {
+            throwInvalidPathError("Unexpected termination of JSON path");
         }
         // if we're either empty or ended on a trailing '.', add an empty field name
         if (expectField || first) {
