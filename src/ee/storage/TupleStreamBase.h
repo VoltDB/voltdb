@@ -32,7 +32,11 @@ namespace voltdb {
 class Topend;
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
-const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA;
+//I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care
+//It just reports the size of used bytes and not the size of the allocation
+//Add a 4k page at the end for bytes beyond the 2 meg row limit due to null mask and length prefix and so on
+//Necessary for very large rows
+const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
 
 class TupleStreamBase {
 public:
