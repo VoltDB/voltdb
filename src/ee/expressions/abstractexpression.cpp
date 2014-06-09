@@ -88,24 +88,6 @@ AbstractExpression::~AbstractExpression()
     delete m_right;
 }
 
-void
-AbstractExpression::substitute(const NValueArray &params)
-{
-    if (!m_hasParameter)
-        return;
-
-    // descend. nodes with parameters overload substitute()
-    VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-    if (m_left) {
-        VOLT_TRACE("Substitute processing left child...");
-        m_left->substitute(params);
-    }
-    if (m_right) {
-        VOLT_TRACE("Substitute processing right child...");
-        m_right->substitute(params);
-    }
-}
-
 bool
 AbstractExpression::hasParameter() const
 {

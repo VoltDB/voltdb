@@ -213,10 +213,10 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
+                                            this,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
     return true;
 }
 
