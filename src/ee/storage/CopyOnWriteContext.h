@@ -132,7 +132,6 @@ private:
     int64_t m_serializationBatches;
     int64_t m_inserts;
     int64_t m_updates;
-    int64_t m_deletes;
 
     void checkRemainingTuples(const std::string &label);
 
