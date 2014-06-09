@@ -23,17 +23,17 @@
 
 package org.voltdb;
 
+import org.json_voltpatches.JSONObject;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 
 import junit.framework.TestCase;
 
 public class AdhocDDLTestBase extends TestCase {
 
-    //adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
+    // Still need to write these tests somewhere --izzy
     //adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
-    //adHocQuery = "DROP TABLE PROJ;";
-    //adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
     //adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
     //adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
 
@@ -110,6 +110,27 @@ public class AdhocDDLTestBase extends TestCase {
         VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
         boolean found = moveToMatchingRow(indexinfo, "INDEX_NAME", index);
         return found;
+    }
+
+    protected boolean findProcedureInSystemCatalog(String proc) throws Exception
+    {
+        VoltTable procedures = m_client.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];
+        boolean found = moveToMatchingRow(procedures, "PROCEDURE_NAME", proc);
+        return found;
+    }
+
+    protected boolean verifySinglePartitionProcedure(String proc) throws Exception
+    {
+        VoltTable procedures = m_client.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];
+        boolean found = moveToMatchingRow(procedures, "PROCEDURE_NAME", proc);
+        boolean verified = false;
+        if (found) {
+            String remarks = procedures.getString("REMARKS");
+            System.out.println("REMARKS: " + remarks);
+            JSONObject jsObj = new JSONObject(remarks);
+            verified = (jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION));
+        }
+        return verified;
     }
 
     protected boolean verifyIndexUniqueness(String index, boolean expectedUniq) throws Exception
