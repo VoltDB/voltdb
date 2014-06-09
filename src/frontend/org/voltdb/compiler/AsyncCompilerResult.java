@@ -30,6 +30,21 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
     public int expectedCatalogVersion = -1;
     transient public Object clientData = null;
 
+    /**
+     * Build an error response based on the provided work.
+     */
+    public static AsyncCompilerResult makeErrorResult(AsyncCompilerWork work, String errMsg)
+    {
+        AsyncCompilerResult result = new AsyncCompilerResult();
+        result.clientHandle = work.clientHandle;
+        result.connectionId = work.connectionId;
+        result.hostname = work.hostname;
+        result.adminConnection = work.adminConnection;
+        result.clientData = work.clientData;
+        result.errorMsg = errMsg;
+        return result;
+    }
+
     @Override
     public String toString() {
         String retval = "clientHandle:" + String.valueOf(clientHandle) + ", ";

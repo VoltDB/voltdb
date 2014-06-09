@@ -4242,6 +4242,12 @@ public class ParserDDL extends ParserRoutine {
             }
 
             if (list.size() > 1) {
+                // A VoltDB extension to support establishing or preserving the NOT NULL
+                // attribute of an altered column.
+                if (voltDBacceptNotNullConstraint(list)) {
+                    newCol.setNullable(false);
+                } else
+                // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42524);
             }
         } else {
@@ -5049,5 +5055,32 @@ public class ParserDDL extends ParserRoutine {
         }
         return table.getColumnIndexes(set);
     }
+
+    private boolean voltDBacceptNotNullConstraint(HsqlArrayList list) {
+		if (list.size() != 2) {
+			return false;
+		}
+		if (! (list.get(1) instanceof Constraint)) {
+			return false;
+		}
+        // This replicates the logic that controls the setting of the Consraint.isNotNull member.
+        // Unfortunately that member only gets set a little later.
+		Constraint constraint = (Constraint)list.get(1);
+		if ( constraint.getConstraintType() != Constraint.CHECK ) {
+			return false;
+		}
+		Expression check = constraint.getCheckExpression();
+		if (check.getType() != OpTypes.NOT) {
+			return false;
+		}
+		if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
+			return false;
+		}
+		if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
+			return false;
+		}
+		return true;
+	}
+
     /**********************************************************************/
 }
