@@ -47,11 +47,17 @@ public class MaterializedViewBenchmark {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
-    double insert_throughput;
-    double insert_execute;
+    double insertThroughput;
+    double insertExecute;
+    
+    double updateGroupThroughput;
+    double updateGroupExecute;
+    
+    double updateValueThroughput;
+    double updateValueExecute;
 
-    double delete_throughput;
-    double delete_execute;
+    double deleteThroughput;
+    double deleteExecute;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -116,10 +122,14 @@ public class MaterializedViewBenchmark {
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        insert_throughput = 0;
-        insert_execute = 0;
-        delete_throughput = 0;
-        delete_execute = 0;
+        insertThroughput = 0;
+        insertExecute = 0;
+        updateGroupThroughput = 0;
+        updateGroupExecute = 0;
+        updateValueThroughput = 0;
+        updateValueExecute = 0;
+        deleteThroughput = 0;
+        deleteExecute = 0;
     }
 
     /**
@@ -272,35 +282,66 @@ public class MaterializedViewBenchmark {
                                 execTimeInMicroSec));
 
         // Expecting the custom insert/delete procedure names ex. ids_insert
-        if (procedure.split("_")[1].equals("insert")) {
-            if (insert_throughput > 0) {
-                insert_throughput = (((stats.getTxnThroughput() - insert_throughput) /
+        String[] procArray = procedure.split("_");
+        if (procArray[procArray.length-1].equals("insert")) {
+            if (insertThroughput > 0) {
+                insertThroughput = (((stats.getTxnThroughput() - insertThroughput) /
                                       stats.getTxnThroughput()) * 100);
-                insert_execute = (((insert_execute - execTimeInMicroSec) /
+                insertExecute = (((insertExecute - execTimeInMicroSec) /
                                    execTimeInMicroSec) * 100);
                 fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
                                         "Insert Diff",
                                         stats.getStartTimestamp(),
-                                        insert_throughput,
-                                        insert_execute));
+                                        insertThroughput,
+                                        insertExecute));
             } else {
-                insert_throughput = (double)stats.getTxnThroughput();
-                insert_execute = execTimeInMicroSec;
+                insertThroughput = (double)stats.getTxnThroughput();
+                insertExecute = execTimeInMicroSec;
+            }
+        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("group")) {
+            if (updateGroupThroughput > 0) {
+                updateGroupThroughput = (((stats.getTxnThroughput() - updateGroupThroughput) /
+                                      stats.getTxnThroughput()) * 100);
+                updateGroupExecute = (((updateGroupExecute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Update Group Diff",
+                                        stats.getStartTimestamp(),
+                                        updateGroupThroughput,
+                                        updateGroupExecute));
+            } else {
+                updateGroupThroughput = (double)stats.getTxnThroughput();
+                updateGroupExecute = execTimeInMicroSec;
+            }
+        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("value")) {
+            if (updateValueThroughput > 0) {
+                updateValueThroughput = (((stats.getTxnThroughput() - updateValueThroughput) /
+                                      stats.getTxnThroughput()) * 100);
+                updateValueExecute = (((updateValueExecute - execTimeInMicroSec) /
+                                   execTimeInMicroSec) * 100);
+                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                        "Update Aggregate Diff",
+                                        stats.getStartTimestamp(),
+                                        updateValueThroughput,
+                                        updateValueExecute));
+            } else {
+                updateValueThroughput = (double)stats.getTxnThroughput();
+                updateValueExecute = execTimeInMicroSec;
             }
         } else {
-            if (delete_throughput > 0) {
-                delete_throughput = (((stats.getTxnThroughput() - delete_throughput) /
+            if (deleteThroughput > 0) {
+                deleteThroughput = (((stats.getTxnThroughput() - deleteThroughput) /
                                       stats.getTxnThroughput()) * 100.0);
-                delete_execute = (((delete_execute - execTimeInMicroSec) /
+                deleteExecute = (((deleteExecute - execTimeInMicroSec) /
                                    execTimeInMicroSec) * 100);
                 fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
                                         "Delete Diff",
                                         stats.getStartTimestamp(),
-                                        delete_throughput,
-                                        delete_execute));
+                                        deleteThroughput,
+                                        deleteExecute));
             } else {
-                delete_throughput = (double)stats.getTxnThroughput();
-                delete_execute = execTimeInMicroSec;
+                deleteThroughput = (double)stats.getTxnThroughput();
+                deleteExecute = execTimeInMicroSec;
             }
         }
     }
@@ -335,9 +376,11 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "ids_insert",
                                      i,
+                                     i,
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_insert",
+                                     i,
                                      i,
                                      i);
             }
@@ -376,7 +419,8 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_insert",
                                      i,
-                                     grp);
+                                     grp,
+                                     i);
                 if (grp == config.group) {
                     grp = 1;
                 } else {
@@ -388,13 +432,14 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_insert",
                                      i,
+                                     i,
                                      i);
             }
         }
         timer.cancel();
         client.drain();
 
-        grp = 1;
+        grp = 2;
 
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("idsWithMatView_insert");
@@ -406,6 +451,64 @@ public class MaterializedViewBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
+        System.out.println("\n\nUpdating grouping column in table w/ materialized view...\n");
+
+        if (config.group > 0) {
+            for (int i=0; i<config.txn; i++){
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMatView_group_id_update",
+                                     grp,
+                                     i);
+                if (grp == (config.group + 1)) {
+                    grp = 2;
+                } else {
+                    grp++;
+                }
+            }
+        } else {
+            for (int i=0; i<config.txn; i++){
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMatView_group_id_update",
+                                     (i + 1),
+                                     i);
+            }
+        }
+        timer.cancel();
+        client.drain();
+
+        grp = 1;
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults("idsWithMatView_group_id_update");
+        } else {
+            printResults("idsWithMatView_group_id_update", fw, "Update Group w MV");
+        }
+        System.out.print(HORIZONTAL_RULE);
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+        
+        System.out.println("\n\nUpdating aggregated column in table w/ materialized view...\n");
+
+        for (int i=0; i<config.txn; i++){
+            client.callProcedure(new NullCallback(),
+                                 "idsWithMatView_value_update",
+                                 (i + 1),
+                                 i);
+        }
+        timer.cancel();
+        client.drain();
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults("idsWithMatView_value_update");
+        } else {
+            printResults("idsWithMatView_value_update", fw, "Update Aggregate w MV");
+        }
+        System.out.print(HORIZONTAL_RULE);
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+        
         System.out.println("\n\nDeleting from table w/ materialized view...\n");
         for (int i=0; i<config.txn; i++){
             client.callProcedure(new NullCallback(),
@@ -430,7 +533,8 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "ids_insert",
                                      i,
-                                     grp);
+                                     grp,
+                                     i);
                 if (grp == config.group) {
                     grp = 1;
                 } else {
@@ -442,11 +546,14 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "ids_insert",
                                      i,
+                                     i,
                                      i);
             }
         }
         timer.cancel();
         client.drain();
+        
+        grp = 2;
 
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults("ids_insert");
@@ -457,6 +564,63 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
+        
+        System.out.println("\n\nUpdating grouping column in table w/o materialized view...\n");
+
+        if (config.group > 0) {
+            for (int i=0; i<config.txn; i++){
+                client.callProcedure(new NullCallback(),
+                                     "ids_group_id_update",
+                                     grp,
+                                     i);
+                if (grp == (config.group + 1)) {
+                    grp = 2;
+                } else {
+                    grp++;
+                }
+            }
+        } else {
+            for (int i=0; i<config.txn; i++){
+                client.callProcedure(new NullCallback(),
+                                     "ids_group_id_update",
+                                     (i + 1),
+                                     i);
+            }
+        }
+        timer.cancel();
+        client.drain();
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults("ids_group_id_update");
+        } else {
+            printResults("ids_group_id_update", fw, "Update Group wo MV");
+        }
+        System.out.print(HORIZONTAL_RULE);
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+        
+        System.out.println("\n\nUpdating aggregated column in table w/o materialized view...\n");
+
+        for (int i=0; i<config.txn; i++){
+            client.callProcedure(new NullCallback(),
+                                 "ids_value_update",
+                                 (i + 1),
+                                 i);
+        }
+        timer.cancel();
+        client.drain();
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults("ids_value_update");
+        } else {
+            printResults("ids_value_update", fw, "Update Aggregate wo MV");
+        }
+        System.out.print(HORIZONTAL_RULE);
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+        
         System.out.println("\n\nDeleting from table w/o materialized view...\n");
         for (int i=0; i<config.txn; i++){
             client.callProcedure(new NullCallback(),
