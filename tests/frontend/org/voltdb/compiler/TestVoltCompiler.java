@@ -2837,7 +2837,7 @@ public class TestVoltCompiler extends TestCase {
                 "Dropped Procedure \"NotAnnotatedAddBook\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        // Make sure we can't drop a CRUD procedure
+        // Make sure we can't drop a CRUD procedure (full name)
         fbs = checkInvalidProcedureDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
@@ -2847,7 +2847,7 @@ public class TestVoltCompiler extends TestCase {
                 "Dropped Procedure \"PKEY_INTEGER.insert\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        // Make sure we can't drop a CRUD procedure
+        // Make sure we can't drop a CRUD procedure (partial name)
         fbs = checkInvalidProcedureDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +

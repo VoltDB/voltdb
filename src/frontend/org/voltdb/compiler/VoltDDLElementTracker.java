@@ -105,9 +105,9 @@ public class VoltDDLElementTracker {
     }
 
     /**
-     * Tracks the given procedure descriptor if it is not already tracked
-     * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
-     * @throws VoltCompilerException if it is already tracked
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
      */
     void removeProcedure(String procName) throws VoltCompilerException
     {
