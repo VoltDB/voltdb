@@ -322,7 +322,7 @@ this.RefreshMonitor = function(id, Success)
 	else
 	{
 		var src = '<table id="stats-' + id + '" class="sortable tablesorter statstable" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
-		src += '<th>Procedure</th><th>Invocations</th><th>Percent (%)</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
+		src += '<th>Procedure</th><th>Invocations</th><th>Weighted Percentage (%)</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
 		src += '</tr></thead><tbody>';
 		for(var j in procStats)
 		{
