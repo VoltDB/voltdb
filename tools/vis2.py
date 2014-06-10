@@ -225,7 +225,7 @@ def generate_index_file(filenames):
     #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
     h = []
     for x in filenames:
-        tdattr = "bgcolor=green"
+        tdattr = "<span></span>" #"bgcolor=green"
         tdnote = ""
         M = 0.0
         if len(x) == 6:
@@ -233,11 +233,11 @@ def generate_index_file(filenames):
                 if len(v) > 0:
                     M = max(M, abs(v[0][1]))
         if M > 0.0:
-            tdattr = 'bgcolor=yellow'
+            tdattr = '<span style="color:yellow">&#9658;</span>'
             if M > 10.0:
-                tdattr = 'bgcolor=red'
+                tdattr = '<span style="color:red">&#9658;</span>'
             tdnote = " (by %.2f%%)" % M
-        h.append((tdattr, x[0].replace(' ','%20'), x[0] + tdnote))
+        h.append(("", x[0].replace(' ','%20'), tdattr + x[0] + tdnote))
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
