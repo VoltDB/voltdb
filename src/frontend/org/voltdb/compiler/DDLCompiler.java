@@ -263,6 +263,22 @@ public class DDLCompiler {
             );
 
     /**
+     * DROP PROCEDURE  statement regex
+     */
+    static final Pattern procedureDropPattern = Pattern.compile(
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "DROP" +                                // DROP token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (1) class name or procedure name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
+            );
+
+    /**
      * IMPORT CLASS with pattern for matching classfiles in
      * the current classpath.
      */
@@ -370,7 +386,8 @@ public class DDLCompiler {
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "(?:PROCEDURE|ROLE)|" +
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -707,6 +724,15 @@ public class DDLCompiler {
             }
             // track the defined procedure
             m_tracker.add(descriptor);
+
+            return true;
+        }
+
+        // Matches if it is DROP PROCEDURE <proc-name or classname>
+        statementMatcher = procedureDropPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
+            m_tracker.removeProcedure(classOrProcName);
 
             return true;
         }

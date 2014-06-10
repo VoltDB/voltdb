@@ -105,6 +105,26 @@ public class VoltDDLElementTracker {
     }
 
     /**
+     * Tracks the given procedure descriptor if it is not already tracked
+     * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
+     * @throws VoltCompilerException if it is already tracked
+     */
+    void removeProcedure(String procName) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
+    }
+
+    /**
      * Associates the given partition info to the given tracked procedure
      * @param procedureName the short name of the procedure name
      * @param partitionInfo the partition info to associate with the procedure

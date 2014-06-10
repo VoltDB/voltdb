@@ -2774,6 +2774,90 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(proc);
     }
 
+    public void testDropProcedure() throws Exception {
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
+
+        // Make sure we can drop a GROOVY procedure
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;\n" +
+                "DROP PROCEDURE Foo;"
+                );
+        Procedure proc = db.getProcedures().get("Foo");
+        assertNull(proc);
+
+        // Make sure we can drop a non-annotated stored procedure
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
+                "DROP PROCEDURE org.voltdb.compiler.procedures.AddBook;"
+                );
+        proc = db.getProcedures().get("AddBook");
+        assertNull(proc);
+        proc = db.getProcedures().get("NotAnnotatedAddBook");
+        assertNotNull(proc);
+
+        // Make sure we can drop an annotated stored procedure
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
+                "DROP PROCEDURE NotAnnotatedAddBook;"
+                );
+        proc = db.getProcedures().get("NotAnnotatedAddBook");
+        assertNull(proc);
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+
+        // Make sure we can drop a single-statement procedure
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1;"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
+
+        ArrayList<Feedback> fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "DROP PROCEDURE NotAnnotatedAddBook;");
+        String expectedError =
+                "Dropped Procedure \"NotAnnotatedAddBook\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // Make sure we can't drop a CRUD procedure
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "DROP PROCEDURE PKEY_INTEGER.insert;"
+                );
+        expectedError =
+                "Dropped Procedure \"PKEY_INTEGER.insert\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // Make sure we can't drop a CRUD procedure
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "DROP PROCEDURE insert;"
+                );
+        expectedError =
+                "Dropped Procedure \"insert\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+    }
+
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
