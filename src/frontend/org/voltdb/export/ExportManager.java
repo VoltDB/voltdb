@@ -36,7 +36,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.COWSortedMap;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
@@ -240,8 +239,8 @@ public class ExportManager
             CatalogContext catalogContext,
             boolean isRejoin,
             HostMessenger messenger,
-            List<Pair<Integer, Long>> partitions)
-    throws ExportManager.SetupException
+            List<Integer> partitions)
+            throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
         Connector connector = getConnector(catalogContext);
@@ -310,7 +309,7 @@ public class ExportManager
             int myHostId,
             CatalogContext catalogContext,
             HostMessenger messenger,
-            List<Pair<Integer, Long>> partitions)
+            List<Integer> partitions)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
@@ -339,7 +338,7 @@ public class ExportManager
             CatalogContext catalogContext,
             final Connector conn,
             boolean startup,
-            List<Pair<Integer, Long>> partitions,
+            List<Integer> partitions,
             boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
@@ -367,7 +366,7 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                if (m_generations.isEmpty() || !m_generations.containsKey(catalogContext.m_uniqueId)) {
+                if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
                             exportOverflowDirectory, isRejoin);
@@ -479,7 +478,7 @@ public class ExportManager
         m_processorConfig = newConfig;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Pair<Integer, Long>> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -499,12 +498,11 @@ public class ExportManager
             newGeneration = new ExportGeneration(
                     catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
+            newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
+            m_generations.put(catalogContext.m_uniqueId, newGeneration);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
-
-        m_generations.put(catalogContext.m_uniqueId, newGeneration);
 
         /*
          * If there is no existing export processor, create an initial one.

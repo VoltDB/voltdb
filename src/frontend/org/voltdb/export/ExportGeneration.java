@@ -61,6 +61,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -132,7 +133,7 @@ public class ExportGeneration {
                     }, null);
                     removeLeadership.addListener(
                             m_onAllSourcesDrained,
-                            CoreUtils.SAMETHREADEXECUTOR);
+                            MoreExecutors.sameThreadExecutor());
                 }
 
                 ;
@@ -376,7 +377,7 @@ public class ExportGeneration {
             final Connector conn,
             int hostId,
             HostMessenger messenger,
-            List<Pair<Integer, Long>> partitions)
+            List<Integer> partitions)
     {
         /*
          * Now create datasources based on the catalog
@@ -389,9 +390,7 @@ public class ExportGeneration {
             Table table = next.getTable();
             addDataSources(table, hostId, partitions);
 
-            for (Pair<Integer, Long> p : partitions) {
-                partitionsInUse.add(p.getFirst());
-            }
+            partitionsInUse.addAll(partitions);
         }
 
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
@@ -601,8 +600,7 @@ public class ExportGeneration {
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
-        Map<String, ExportDataSource> dataSourcesForPartition
-                =            m_dataSourcesByPartition.get(source.getPartitionId());
+        Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
             m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
@@ -630,10 +628,9 @@ public class ExportGeneration {
 
     // silly helper to add datasources for a table catalog object
     private void addDataSources(
-            Table table, int hostId, List<Pair<Integer, Long>> partitions)
+            Table table, int hostId, List<Integer> partitions)
     {
-        for (Pair<Integer, Long> p : partitions) {
-            Integer partition = p.getFirst();
+        for (Integer partition : partitions) {
 
             /*
              * IOException can occur if there is a problem
