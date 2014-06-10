@@ -31,30 +31,21 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class TRUPTruncateTableSP extends VoltProcedure {
     final SQLStmt count = new SQLStmt("select count(*) from trup;");
-    final SQLStmt scanmax = new SQLStmt("select max(id) from trup;");
     final SQLStmt scancount = new SQLStmt("select count(*) from trup where p >= 0;");
     final SQLStmt truncate = new SQLStmt("truncate table trup;");
 
     public VoltTable[] run(long p, byte shouldRollback) {
-        voltQueueSQL(scanmax);
         voltQueueSQL(truncate);
-        voltQueueSQL(scanmax);
         voltQueueSQL(count);
         voltQueueSQL(scancount);
         VoltTable[] results = voltExecuteSQL(true);
-        if (results[0].getRowCount() != 1) {
-            throw new VoltAbortException("row count for max not one");
-        }
-        if (results[2].getRowCount() != 1) {
-            throw new VoltAbortException("row count for max not one(2)");
-        }
-        VoltTable data = results[3];
+        VoltTable data = results[1];
         VoltTableRow row = data.fetchRow(0);
         long optCount = row.getLong(0);
         if (optCount != 0) {
             throw new VoltAbortException("after truncate (opt) count not zero");
         }
-        data = results[4];
+        data = results[2];
         row = data.fetchRow(0);
         long scanCount = row.getLong(0);
         if (scanCount != 0) {
