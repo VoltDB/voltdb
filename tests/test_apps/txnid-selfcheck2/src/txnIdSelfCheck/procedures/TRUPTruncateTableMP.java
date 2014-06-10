@@ -29,23 +29,32 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class BIGPTruncateTableMP extends VoltProcedure {
-    final SQLStmt count = new SQLStmt("select count(*) from bigp;");
-    final SQLStmt scancount = new SQLStmt("select count(*) from bigp where p >= 0;");
-    final SQLStmt truncate = new SQLStmt("truncate table bigp;");
+public class TRUPTruncateTableMP extends VoltProcedure {
+    final SQLStmt count = new SQLStmt("select count(*) from trup;");
+    final SQLStmt scanmax = new SQLStmt("select max(id) from trup;");
+    final SQLStmt scancount = new SQLStmt("select count(*) from trup where p >= 0;");
+    final SQLStmt truncate = new SQLStmt("truncate table trup;");
 
     public VoltTable[] run(long p, byte shouldRollback) {
+        voltQueueSQL(scanmax);
         voltQueueSQL(truncate);
+        voltQueueSQL(scanmax);
         voltQueueSQL(count);
         voltQueueSQL(scancount);
         VoltTable[] results = voltExecuteSQL(true);
-        VoltTable data = results[1];
+        if (results[0].getRowCount() != 1) {
+            throw new VoltAbortException("row count for max not one");
+        }
+        if (results[2].getRowCount() != 1) {
+            throw new VoltAbortException("row count for max not one");
+        }
+        VoltTable data = results[3];
         VoltTableRow row = data.fetchRow(0);
         long optCount = row.getLong(0);
         if (optCount != 0) {
             throw new VoltAbortException("after truncate (opt) count not zero");
         }
-        data = results[2];
+        data = results[4];
         row = data.fetchRow(0);
         long scanCount = row.getLong(0);
         if (scanCount != 0) {

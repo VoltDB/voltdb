@@ -406,7 +406,7 @@ public class Benchmark {
 
         log.info(String.format("Executed %d%s", txnCount.get(),
                 madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds, last at " +
-                        (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
+                        (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
 
         if (diffInSeconds > config.progresstimeout) {
             log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
@@ -524,6 +524,13 @@ public class Benchmark {
         }
 
 
+        TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
+        partitionedTruncater.start();
+        TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
+        replicatedTruncater.start();
+
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         plt.start();
@@ -563,6 +570,8 @@ public class Benchmark {
         /* XXX/PSR
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
+        replicatedTruncater.shutdown();
+        partitionedTruncater.shutdown();
         readThread.shutdown();
         adHocMayhemThread.shutdown();
         idpt.shutdown();

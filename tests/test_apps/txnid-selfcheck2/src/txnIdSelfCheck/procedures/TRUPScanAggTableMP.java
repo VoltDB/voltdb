@@ -29,27 +29,15 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class BIGRTruncateTable extends VoltProcedure {
-    final SQLStmt count = new SQLStmt("select count(*) from bigr;");
-    final SQLStmt scancount = new SQLStmt("select count(*) from bigr where p >= 0;");
-    final SQLStmt truncate = new SQLStmt("truncate table bigr;");
+public class TRUPScanAggTableMP extends VoltProcedure {
+    final SQLStmt max = new SQLStmt("select max(id) from (select * from trup) t;");
+
 
     public VoltTable[] run(long p, byte shouldRollback) {
-        voltQueueSQL(truncate);
-        voltQueueSQL(count);
-        voltQueueSQL(scancount);
+        voltQueueSQL(max);
         VoltTable[] results = voltExecuteSQL(true);
-        VoltTable data = results[1];
-        VoltTableRow row = data.fetchRow(0);
-        long optCount = row.getLong(0);
-        if (optCount != 0) {
-            throw new VoltAbortException("after truncate (opt) count not zero");
-        }
-        data = results[2];
-        row = data.fetchRow(0);
-        long scanCount = row.getLong(0);
-        if (scanCount != 0) {
-            throw new VoltAbortException("after truncate (scan) count not zero");
+        if (results[0].getRowCount() != 1) {
+            throw new VoltAbortException("rowcount for max is not one");
         }
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
@@ -57,3 +45,4 @@ public class BIGRTruncateTable extends VoltProcedure {
         return results;
     }
 }
+
