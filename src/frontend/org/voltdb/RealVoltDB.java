@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.net.Inet4Address;
@@ -412,6 +413,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+
+            // Output command line and JVM arguments
+            hostLog.info("========== command line arguments ============");
+            hostLog.info(System.getProperty("sun.java.command"));
+            hostLog.info("========== JVM args ================");
+            RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
+            List<String> arguments = runtimeMxBean.getInputArguments();
+            for (String s : arguments) {
+                hostLog.info(s);
+            }
+            hostLog.info("==================================");
+
             // use CLI overrides for testing hotfix version compatibility
             if (m_config.m_versionStringOverrideForTest != null) {
                 m_versionString = m_config.m_versionStringOverrideForTest;
