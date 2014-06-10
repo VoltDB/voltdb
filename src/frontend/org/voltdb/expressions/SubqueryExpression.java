@@ -193,7 +193,7 @@ public class SubqueryExpression extends AbstractExpression {
             // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "EXISTS (" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString() + SUBQUERY_TAG +
+            return "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString() + SUBQUERY_TAG +
             m_subqueryId + ")";
         } else {
             return "(Subquery: null)";

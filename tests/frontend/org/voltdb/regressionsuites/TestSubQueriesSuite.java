@@ -292,7 +292,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
  }
 
 
-  /**
+ /**
   * SELECT FROM SELECT FROM SELECT
   * @throws NoConnectionsException
   * @throws IOException
@@ -312,10 +312,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
      for (String tb: tbs) {
          vt = client.callProcedure("@AdHoc",
                  "select dept, sum(wage) as sw1 from " + tb + " where (id, dept + 2) in " +
-                 "( SELECT dept, count(dept) " +
-                 "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
-       System.out.println(vt.toString());
-       validateTableOfLongs(vt, new long[][] {{1,10}});
+                         "( SELECT dept, count(dept) " +
+                         "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{1,10}});
 
          // having with subquery
          vt = client.callProcedure("@AdHoc",
@@ -324,29 +324,52 @@ public class TestSubQueriesSuite extends RegressionSuite {
          System.out.println(vt.toString());
          validateTableOfLongs(vt, new long[][] {{2}, {1}});
 
-       // subquery with having
-       vt = client.callProcedure("@AdHoc",
-               "select id from " + tb + " TBA where exists " +
-               " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
-                       " min(wage) = TBA.wage)").getResults()[0];
-       System.out.println(vt.toString());
-       validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
+         // subquery with having
+         vt = client.callProcedure("@AdHoc",
+                 "select id from " + tb + " TBA where exists " +
+                         " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
+                 " min(wage) = TBA.wage)").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
 
-       // having with subquery with having
-      String sql = "select id from " + tb + " where wage " +
-              " in (select max(wage) from R1 group by dept " +
-              " having max(wage) > 10)";
-      System.out.println(sql);
-       vt = client.callProcedure("@AdHoc",
-               "select id from " + tb + " where wage " +
-               " in (select max(wage) from R1 group by dept " +
-                     " having max(wage) > 30) ").getResults()[0];
-       System.out.println(vt.toString());
-       validateTableOfLongs(vt, new long[][] {{5}});
+         // having with subquery with having
+         String sql = "select id from " + tb + " where wage " +
+                 " in (select max(wage) from R1 group by dept " +
+                 " having max(wage) > 10)";
+         System.out.println(sql);
+         vt = client.callProcedure("@AdHoc",
+                 "select id from " + tb + " where wage " +
+                         " in (select max(wage) from R1 group by dept " +
+                 " having max(wage) > 30) ").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{5}});
 
      }
 
  }
+
+ /**
+ * SELECT FROM SELECT UNION SELECT
+ * @throws NoConnectionsException
+ * @throws IOException
+ * @throws ProcCallException
+ */
+public void testSubExpressions_Unions() throws NoConnectionsException, IOException, ProcCallException
+{
+    Client client = getClient();
+    loadData(client);
+    VoltTable vt;
+
+    for (String tb: tbs) {
+        vt = client.callProcedure("@AdHoc",
+                "select ID from " + tb + " where ID in " +
+                "( (SELECT ID from R1 WHERE ID > 2 LIMIT 3 OFFSET 1) " +
+                  " UNION SELECT ID from R2 WHERE ID <= 2"
+                + " INTERSECT SELECT ID from R1 WHERE ID =1);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{1}, {4}, {5}});
+    }
+}
 
     static public junit.framework.Test suite()
     {

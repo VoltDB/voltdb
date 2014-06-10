@@ -554,7 +554,14 @@ public abstract class AbstractParsedStmt {
                 expr.setValueSize(voltType.getMaxLengthInBytes());
             }
         }
-        if (exprType == ExpressionType.COMPARE_IN || exprType == ExpressionType.OPERATOR_EXISTS) {
+        if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof SubqueryExpression) ||
+                exprType == ExpressionType.OPERATOR_EXISTS) {
+            // weed of IN (values) expression
+            // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
+            // AND/OR operator
+            // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
+            // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
+            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
             expr = optimizeSubqueryExpression(expr);
         }
         return expr;
@@ -563,11 +570,18 @@ public abstract class AbstractParsedStmt {
     /**
      * Perform various optimizations for IN/EXISTS subqueries if possible
      *
-     * @param subqueryExpr to optimize
+     * @param expr to optimize
      * @return optimized expression
      */
-    private AbstractExpression optimizeSubqueryExpression(AbstractExpression subqueryExpr) {
-        AbstractExpression retval = subqueryExpr;
+    private AbstractExpression optimizeSubqueryExpression(AbstractExpression expr) {
+        ExpressionType exprType = expr.getExpressionType();
+        if (ExpressionType.CONJUNCTION_AND == exprType || ExpressionType.CONJUNCTION_OR == exprType) {
+            AbstractExpression optimizedLeft = optimizeSubqueryExpression(expr.getLeft());
+            expr.setLeft(optimizedLeft);
+            AbstractExpression optimizedRight = optimizeSubqueryExpression(expr.getRight());
+            expr.setRight(optimizedRight);
+        }
+        AbstractExpression retval = expr;
         if (ExpressionType.COMPARE_IN == retval.getExpressionType()) {
             retval = optimizeInExpression(retval);
             // Do not return here because the original IN expressions

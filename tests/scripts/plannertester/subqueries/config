@@ -32,6 +32,8 @@ select a from r1 T1 where exists (SELECT 1 FROM r1 T2 where exists (SELECT c FRO
 select c from r4 where a in (select a from r1);
 select c from r1 where c in (select c from r2 where a in (select a from r3 where r3.c = r1.c) limit 1 offset 1);
 select c from r1 where c in (select a from r2 where a > 2 limit 1 offset 2);
+select r2.c from r2 where r2.a in (select c from r1 union (select c from r3 limit 1 offset 2) intersect select c from r2);
+
 
 
 #Subqueries on partitioned data are only supported in single partition stored procedures.

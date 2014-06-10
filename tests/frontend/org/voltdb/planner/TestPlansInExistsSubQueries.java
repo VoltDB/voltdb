@@ -99,13 +99,23 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     public void testInToExistWithUnion() {
-        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in (select c from r1 union select c from r3)");
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a in (select c from r1 union (select c from r3 limit 1 offset 2) intersect select c from r2)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
         // Check param indexes
         AbstractExpression e = spl.getPredicate();
-        assertEquals(ExpressionType.COMPARE_IN, e.getExpressionType());
+        assertEquals(ExpressionType.CONJUNCTION_OR, e.getExpressionType());
+        AbstractExpression l = e.getLeft();
+        assertEquals(ExpressionType.OPERATOR_EXISTS, l.getExpressionType());
+        AbstractExpression s = l.getLeft();
+        assertEquals(ExpressionType.SUBQUERY, s.getExpressionType());
+        AbstractExpression r = e.getRight();
+        assertEquals(ExpressionType.CONJUNCTION_AND, r.getExpressionType());
+        l = r.getLeft();
+        assertEquals(ExpressionType.COMPARE_IN, l.getExpressionType());
+        r = r.getRight();
+        assertEquals(ExpressionType.OPERATOR_EXISTS, r.getExpressionType());
     }
 
     public void testInToExistWithOffset() {

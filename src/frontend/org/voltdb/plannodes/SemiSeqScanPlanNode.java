@@ -33,11 +33,11 @@ public class SemiSeqScanPlanNode extends AbstractScanPlanNode {
     }
 
     /*
-     * @param subqueryId The subquery id
+     * @param subqueryName The subquery temp table name
      * @param inColumns - expression for each column from the IN list combined by the AND expression
      */
-    public SemiSeqScanPlanNode(int subqueryId, AbstractExpression inColumns) {
-        super("VOLT_IN_SUBQUERY_" + subqueryId, "VOLT_IN_SUBQUERY_" + subqueryId);
+    public SemiSeqScanPlanNode(String subqueryName, AbstractExpression inColumns) {
+        super(subqueryName, subqueryName);
         // we can build the predicate only after the child's output schema is generated
         // the IN expression:
         // outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
@@ -87,7 +87,7 @@ public class SemiSeqScanPlanNode extends AbstractScanPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
-        return "IN SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+        return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 
     private List<AbstractExpression> m_inColumnList ;

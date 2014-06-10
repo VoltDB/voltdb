@@ -529,7 +529,7 @@ public class PlanAssembler {
         // Get the top node from the subquery best plan
         AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
         assert(subqueryNode != null);
-        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getSubqueryId(), inColumnsExpr);
+        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getTable().getTableName(), inColumnsExpr);
         // Add the new node to the top
         inScanNode.addAndLinkChild(subqueryNode);
         subqueryExpr.setSubqueryNode(inScanNode);
