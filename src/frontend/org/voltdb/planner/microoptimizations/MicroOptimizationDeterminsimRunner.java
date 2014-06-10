@@ -19,23 +19,23 @@ package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
 
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
-public class MicroOptimizationRunner {
+public class MicroOptimizationDeterminsimRunner {
 
     // list all of the micro optimizations here
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
-        optimizations.add(new PushdownLimits());
-        optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new ReplaceWithIndexLimit());
+        optimizations.add(new SeqScansToUniqueTreeScans());
     }
 
-    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan,
+            DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
         for (MicroOptimization opt : optimizations) {
-            opt.apply(plan, parsedStmt);
+            opt.apply(plan, detMode, parsedStmt);
         }
     }
 }

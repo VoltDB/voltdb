@@ -57,6 +57,47 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
+    public void testSerialInlineAggregation() {
+        AbstractPlanNode p;
+        pns = compileToFragments("SELECT count(A1), SUM(A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+
+
+        // MIN, MAX, COUNT(*) are special with micro-optimization
+        // AVG is special because the pushed down with sum and count
+
+    }
+
+    public void testSerialInlineAggregation_special() {
+        AbstractPlanNode p;
+        pns = compileToFragments("SELECT AVG(A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+//        p = pns.get(0).getChild(0);
+//        assertTrue(p instanceof AggregatePlanNode);
+//        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+//
+//        p = pns.get(1).getChild(0);
+//        assertTrue(p instanceof SeqScanPlanNode);
+//        assertNotNull(p.getInlinePlanNode(PlanNodeType.PROJECTION));
+//        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+
+        // MIN, MAX, COUNT(*) are special with micro-optimization
+        // AVG is special because the pushed down with sum and count
+    }
+
+
     public void testCountA1() {
         pns = compileToFragments("SELECT count(A1) from T1");
         for (AbstractPlanNode apn: pns) {

@@ -45,6 +45,7 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -648,9 +649,14 @@ public class PlanAssembler {
         return parentPlan;
     }
 
-    private CompiledPlan getNextSelectPlan() {
+    private boolean m_microOptimizedQuery = false;
 
+    private CompiledPlan getNextSelectPlan() {
         assert (subAssembler != null);
+        if (m_microOptimizedQuery) {
+            // Already get the most optimized query, it's safe to return early.
+            return null;
+        }
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
 
@@ -759,14 +765,33 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = root;
-        retval.readOnly = true;
+        // Apply the micro-optimization: Table count, Counting Index, Optimized Min/Max
+
+        CompiledPlan plan = new CompiledPlan();
+        plan.rootPlanGraph = root;
+        plan.readOnly = true;
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
-        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
-        return retval;
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
+
+        plan = applyInlineAggregation(plan);
+
+        return plan;
     }
+
+    private CompiledPlan applyInlineAggregation(CompiledPlan plan) {
+        AbstractPlanNode root = plan.rootPlanGraph;
+
+        root.findAllNodesOfType(PlanNodeType.AGGREGATE);
+        root.findAllNodesOfType(PlanNodeType.HASHAGGREGATE);
+
+
+        return plan;
+    }
+
+
 
     private boolean needProjectionNode (AbstractPlanNode root) {
         if ( (root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
@@ -1612,7 +1637,7 @@ public class PlanAssembler {
             }
 
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode,m_parsedSelect);
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect);
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1788,18 +1813,8 @@ public class PlanAssembler {
             accessPlanTemp = null;
         }
 
-        boolean opt = false;
-        if (m_parsedSelect.m_having != null) {
-            opt = true;
-        }
-
-        if (!opt && distNode.isAbleInlined(root)) {
-            root.addInlinePlanNode(distNode);
-            opt = true;
-        } else {
-            distNode.addAndLinkChild(root);
-            root = distNode;
-        }
+        distNode.addAndLinkChild(root);
+        root = distNode;
 
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
@@ -1808,12 +1823,8 @@ public class PlanAssembler {
             root = accessPlanTemp;
             // Add the top node
             if (needCoordNode) {
-                if (opt && coordNode.isAbleInlined(root)) {
-                    root.addInlinePlanNode(coordNode);
-                } else {
-                    coordNode.addAndLinkChild(root);
-                    root = coordNode;
-                }
+                coordNode.addAndLinkChild(root);
+                root = coordNode;
             }
         }
         // Set post predicate for top Aggregation node
