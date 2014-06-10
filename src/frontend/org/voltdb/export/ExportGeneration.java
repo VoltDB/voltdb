@@ -194,7 +194,7 @@ public class ExportGeneration {
         return m_diskBased;
     }
 
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger, long catalogGeneration) {
         m_diskBased = true;
         Set<Integer> partitions = new HashSet<Integer>();
 
@@ -217,7 +217,7 @@ public class ExportGeneration {
 
                 if (haveDataFiles) {
                     try {
-                        addDataSource(f, partitions);
+                        addDataSource(f, partitions, catalogGeneration);
                         hadValidAd = true;
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
@@ -595,8 +595,8 @@ public class ExportGeneration {
      */
     private void addDataSource(
             File adFile,
-            Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile);
+            Set<Integer> partitions, long catalogGeneration) throws IOException {
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, catalogGeneration);
         partitions.add(source.getPartitionId());
         m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +

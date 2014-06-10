@@ -375,7 +375,7 @@ public class ExportManager
                     currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
                 } else {
-                    exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used.");
+                    exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
                 }
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
@@ -448,7 +448,7 @@ public class ExportManager
             ExportGeneration generation = new ExportGeneration(generationDirectory);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
-            if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
+            if (generation.initializeGenerationFromDisk(conn, m_messenger, catalogContext.m_uniqueId)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
                 String list[] = generationDirectory.list();

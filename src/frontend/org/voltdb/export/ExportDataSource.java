@@ -202,12 +202,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
-    public ExportDataSource(final Runnable onDrain, File adFile) throws IOException {
+    public ExportDataSource(final Runnable onDrain, File adFile, long catalogGeneration) throws IOException {
 
         /*
          * Certainly no more data coming if this is coming off of disk
          */
-        m_endOfStream = true;
         m_onDrain = new Runnable() {
             @Override
             public void run() {
@@ -260,6 +259,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             nonce = m_signature + "_" + hsid + "_" + m_partitionId;
         }
+        //If on disk generation matches catalog generation we dont do end of stream as it will be appended to.
+        m_endOfStream = (m_generation != catalogGeneration);
+
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
         // compute the number of bytes necessary to hold one bit per
