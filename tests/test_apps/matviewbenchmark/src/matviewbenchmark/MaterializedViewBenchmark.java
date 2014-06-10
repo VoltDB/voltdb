@@ -49,10 +49,10 @@ public class MaterializedViewBenchmark {
 
     double insertThroughput;
     double insertExecute;
-    
+
     double updateGroupThroughput;
     double updateGroupExecute;
-    
+
     double updateValueThroughput;
     double updateValueExecute;
 
@@ -487,7 +487,7 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-        
+
         System.out.println("\n\nUpdating aggregated column in table w/ materialized view...\n");
 
         for (int i=0; i<config.txn; i++){
@@ -508,7 +508,7 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-        
+
         System.out.println("\n\nDeleting from table w/ materialized view...\n");
         for (int i=0; i<config.txn; i++){
             client.callProcedure(new NullCallback(),
@@ -552,7 +552,7 @@ public class MaterializedViewBenchmark {
         }
         timer.cancel();
         client.drain();
-        
+
         grp = 2;
 
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
@@ -564,7 +564,7 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-        
+
         System.out.println("\n\nUpdating grouping column in table w/o materialized view...\n");
 
         if (config.group > 0) {
@@ -599,7 +599,7 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-        
+
         System.out.println("\n\nUpdating aggregated column in table w/o materialized view...\n");
 
         for (int i=0; i<config.txn; i++){
@@ -620,7 +620,7 @@ public class MaterializedViewBenchmark {
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-        
+
         System.out.println("\n\nDeleting from table w/o materialized view...\n");
         for (int i=0; i<config.txn; i++){
             client.callProcedure(new NullCallback(),
