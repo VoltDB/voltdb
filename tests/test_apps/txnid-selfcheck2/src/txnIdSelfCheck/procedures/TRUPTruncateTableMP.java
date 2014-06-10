@@ -29,10 +29,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class BIGRTruncateTable extends VoltProcedure {
-    final SQLStmt count = new SQLStmt("select count(*) from bigr;");
-    final SQLStmt scancount = new SQLStmt("select count(*) from bigr where p >= 0;");
-    final SQLStmt truncate = new SQLStmt("truncate table bigr;");
+public class TRUPTruncateTableMP extends VoltProcedure {
+    final SQLStmt count = new SQLStmt("select count(*) from trup;");
+    final SQLStmt scancount = new SQLStmt("select count(*) from trup where p >= 0;");
+    final SQLStmt truncate = new SQLStmt("truncate table trup;");
 
     public VoltTable[] run(long p, byte shouldRollback) {
         voltQueueSQL(truncate);
@@ -57,3 +57,4 @@ public class BIGRTruncateTable extends VoltProcedure {
         return results;
     }
 }
+
