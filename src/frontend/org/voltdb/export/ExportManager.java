@@ -367,7 +367,7 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                if (m_generations.containsKey(catalogContext.m_uniqueId)) {
+                if (m_generations.isEmpty() || !m_generations.containsKey(catalogContext.m_uniqueId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
                             exportOverflowDirectory, isRejoin);
