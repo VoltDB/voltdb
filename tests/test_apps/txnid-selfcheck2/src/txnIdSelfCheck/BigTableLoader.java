@@ -158,7 +158,7 @@ public class BigTableLoader extends Thread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
-                    log.info("BigTableLoader " + tableName.toUpperCase() + " count " + currentRowCount);
+                    log.debug("BigTableLoader " + tableName.toUpperCase() + " count " + currentRowCount);
                 }
             }
             catch (Exception e) {

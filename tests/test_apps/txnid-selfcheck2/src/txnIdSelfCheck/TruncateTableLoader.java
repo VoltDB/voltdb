@@ -157,13 +157,12 @@ public class TruncateTableLoader extends Thread {
             // truncate the table, check for zero rows
             try {
                 currentRowCount = getRowCount();
-                log.info("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
+                log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
                 String tp = this.truncateProcedure;
                 if (tableName == "trup")
                     tp += r.nextInt(10) == 0 ? "MP" : "SP";
-                log.info("truncate " + tp + " ptn " + p + " srb " + shouldRollback);
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
@@ -209,13 +208,12 @@ public class TruncateTableLoader extends Thread {
             // scan-agg table
             try {
                 currentRowCount = getRowCount();
-                log.info("TruncateTableLoader scan agg table..." + tableName + " current row count is " + currentRowCount);
+                log.debug("TruncateTableLoader scan agg table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
                 String sp = this.scanAggProcedure;
                 if (tableName == "trup")
                     sp += r.nextInt(10) == 0 ? "MP" : "SP";
-                log.info("scan agg " + sp + " ptn " + p + " srb " + shouldRollback);
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
