@@ -125,7 +125,6 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
-            expression_array[ctr]->substitute(params);
             VOLT_TRACE("predicate[%d]: %s", ctr,
                        expression_array[ctr]->debug(true).c_str());
         }

@@ -170,4 +170,19 @@ public void testAllZeros() throws Exception {
         loadEmUpNoDeDup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
+
+    @Test
+    public void testRounding() throws Exception {
+        ProcOutputRow data[] = {     //proc/part/time/invok/min/max/avg
+            new ProcOutputRow("A", 0L, 12345L, 10000000*mB, 3L, 5L, 4L),
+            new ProcOutputRow("B", 0L, 12345L, 1*mB, 1L, 4L, 2L)
+        };
+        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
+            new ResultRow(12345L, "A", 100L, 10000000*mB, 3L, 5L, 4L, 40000000L),
+            new ResultRow(12345L, "B", 0L, 1*mB, 1L, 4L, 2L, 2L)
+        };
+        StatsProcOutputTable dut = new StatsProcOutputTable();
+        loadEmUp(dut, data);
+        validateEmGood("testRounding", dut, result);
+    }
 }
