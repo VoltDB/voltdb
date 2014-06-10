@@ -84,7 +84,11 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {}
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+        if (block != NULL) {
+            delete []block->rawPtr();
+        }
+    }
 
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level

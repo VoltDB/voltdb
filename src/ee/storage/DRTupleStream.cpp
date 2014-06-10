@@ -42,7 +42,7 @@ const int MAX_BUFFER_AGE = 4000;
 
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
-      m_enabled(true),
+      m_enabled(false),
       m_partitionId(0)
 {}
 
