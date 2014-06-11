@@ -425,9 +425,12 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
         // set this back to -1 for error handling
         m_currentInputDepId = -1;
+        m_currExecutorVec = NULL;
+
         return ENGINE_ERRORCODE_ERROR;
     }
     assert(execsForFrag);
+    m_currExecutorVec = execsForFrag;
 
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
@@ -447,6 +450,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
                 cleanupExecutors(execsForFrag);
+                m_currExecutorVec = NULL;
 
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -457,6 +461,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
             cleanupExecutors(execsForFrag);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
+            m_currExecutorVec = NULL;
 
             return ENGINE_ERRORCODE_ERROR;
         }
@@ -488,7 +493,9 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
+    m_currExecutorVec = NULL;
     VOLT_DEBUG("Finished executing.");
+
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
@@ -1753,6 +1760,10 @@ static std::string dummy_last_accessed_plan_node_name("no plan node in progress"
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
+
+    // TODO: is it OK?
+    assert(m_currExecutorVec);
+
     if (m_lastAccessedTable == NULL) {
         tableName = "None";
         tableSize = 0;
@@ -1769,7 +1780,9 @@ void VoltDBEngine::reportProgessToTopend() {
                                         planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
+                                        m_currExecutorVec->limits.getCurrMemoryInBytes(),
+                                        m_currExecutorVec->limits.getCurrMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
     if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");

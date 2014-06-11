@@ -46,6 +46,7 @@ namespace voltdb
         int64_t getLogThreshold() const;
         void setMemoryLimit(int64_t limit);
         int64_t getMemoryLimit() const;
+        int64_t getCurrMemoryInBytes() const;
 
     private:
         // The current amount of memory used by temp tables for this

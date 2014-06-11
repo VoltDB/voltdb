@@ -99,3 +99,9 @@ TempTableLimits::getMemoryLimit() const
 {
     return m_memoryLimit;
 }
+
+int64_t
+TempTableLimits::getCurrMemoryInBytes() const
+{
+    return m_currMemoryInBytes;
+}

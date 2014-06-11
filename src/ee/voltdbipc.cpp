@@ -778,7 +778,7 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
-int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+/*int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string targetTableName,
         int64_t targetTableSize,
@@ -812,6 +812,78 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     offset += sizeof(targetTableSize);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+    offset += sizeof(tuplesProcessed);
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(length)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(length));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(length));
+    assert(length > 0);
+
+    int64_t nextStep;
+    bytes = read(m_fd, &nextStep, sizeof(nextStep));
+    if (bytes != sizeof(nextStep)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(nextStep));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    nextStep = ntohll(nextStep);
+
+    return nextStep;
+}*/
+
+int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+        std::string planNodeName,
+        std::string targetTableName,
+        int64_t targetTableSize,
+        int64_t tuplesProcessed,
+        int64_t currMemoryInBytes,
+        int64_t peakMemoryInBytes) {
+    char message[sizeof(int8_t) +
+                 sizeof(int16_t) +
+                 planNodeName.size() +
+                 sizeof(int16_t) +
+                 targetTableName.size() +
+                 sizeof(targetTableSize) +
+                 sizeof(tuplesProcessed) +
+                 sizeof(currMemoryInBytes) +
+                 sizeof(peakMemoryInBytes)];
+    message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
+    size_t offset = 1;
+
+    *reinterpret_cast<int32_t*>(&message[offset]) = htonl(batchIndex);
+    offset += sizeof(batchIndex);
+
+    int16_t strSize = static_cast<int16_t>(planNodeName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += sizeof(strSize);
+    ::memcpy( &message[offset], planNodeName.c_str(), strSize);
+    offset += strSize;
+
+    strSize = static_cast<int16_t>(targetTableName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += sizeof(strSize);
+    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
+    offset += strSize;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
+    offset += sizeof(targetTableSize);
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+    offset += sizeof(tuplesProcessed);
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(currMemoryInBytes);
+    offset += sizeof(tuplesProcessed);
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(peakMemoryInBytes);
     offset += sizeof(tuplesProcessed);
 
     int32_t length;

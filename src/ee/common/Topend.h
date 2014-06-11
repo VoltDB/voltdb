@@ -40,8 +40,11 @@ class Topend {
     // query to stop.
     // Return 0 if the Topend wants the EE to stop processing the current fragment
     // or the number of tuples the EE should process before repeating this call.
+    /*virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;*/
     virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed,
+                int64_t currMemoryInBytes, int64_t peakMemoryInBytes) = 0;
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
