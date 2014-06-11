@@ -522,12 +522,10 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     return getTempStringValue(resultStr.c_str(), resultStr.length());
 }
 
+/** the facet used to group three digits */
 struct money_numpunct : std::numpunct<char> {
     std::string do_grouping() const {return "\03";}
-    //char do_thousands_sep() const {return ',';}
 };
-
-//std::locale newloc(std::cout.getloc(), &three_digits_format);
 
 /** implement the Volt SQL Format_Currency function for all numeric values */
 // TODO: Can we do this with boost?
@@ -537,12 +535,10 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
         num = this->castAsDoubleAndGetValue();
     }
 
-    //money_numpunct three_digits_format;
     std::ostringstream out;
-    // TODO:memory leakage?
+    // TODO: Although there should be only one copy of newloc (and money_numpunct),
+    // we still need to test and make sure no memory leakage in this piece of code.
     static std::locale newloc(std::cout.getloc(), new money_numpunct);
-    // TODO: check the three_digits_format is not freed after call
-    //static std::locale newloc(std::cout.getloc(), &three_digits_format);
     out.imbue(newloc);
     out << std::fixed << std::setprecision(2) << num;
     return getTempStringValue(out.str().c_str(), out.str().length());
