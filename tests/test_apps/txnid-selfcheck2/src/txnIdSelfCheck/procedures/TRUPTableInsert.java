@@ -27,13 +27,11 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class ReadMP extends VoltProcedure {
+public class TRUPTableInsert extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into trup values (?,?,?);");
 
-    public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
-
-    public VoltTable[] run(byte cid) {
-        voltQueueSQL(r_getCIDData, cid);
+    public VoltTable[] run(long p, byte[] data) {
+        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
         return voltExecuteSQL(true);
     }
 }

@@ -26,14 +26,22 @@ package txnIdSelfCheck.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class ReadMP extends VoltProcedure {
+public class TRUPScanAggTableSP extends VoltProcedure {
+    final SQLStmt max = new SQLStmt("select max(id) from (select * from trup) t;");
 
-    public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
 
-    public VoltTable[] run(byte cid) {
-        voltQueueSQL(r_getCIDData, cid);
-        return voltExecuteSQL(true);
+    public VoltTable[] run(long p, byte shouldRollback) {
+        voltQueueSQL(max);
+        VoltTable[] results = voltExecuteSQL(true);
+        if (results[0].getRowCount() != 1) {
+            throw new VoltAbortException("rowcount for max is not one");
+        }
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+        return results;
     }
 }

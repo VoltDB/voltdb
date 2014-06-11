@@ -61,7 +61,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -133,7 +132,7 @@ public class ExportGeneration {
                     }, null);
                     removeLeadership.addListener(
                             m_onAllSourcesDrained,
-                            MoreExecutors.sameThreadExecutor());
+                            CoreUtils.SAMETHREADEXECUTOR);
                 }
 
                 ;

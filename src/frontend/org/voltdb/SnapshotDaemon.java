@@ -728,7 +728,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
                 if (err != null) {
-                    loggingLog.warn("Snapshot failed with failure response: " + err);
+                    if (err.trim().equalsIgnoreCase("SNAPSHOT IN PROGRESS")) {
+                        loggingLog.info("Snapshot is in progress");
+                    } else {
+                        loggingLog.warn("Snapshot failed with failure response: " + err);
+                    }
                     success = false;
                 }
 
