@@ -132,7 +132,7 @@ struct AggregateRow
         m_passThroughTuple = TableTuple (storage, tuple.getSchema());
         m_passThroughTuple.copy(tuple);
         m_passThroughTuple.setActiveTrue();
-    	VOLT_TRACE("[Update aggregate row tuple]:\n%s", m_passThroughTuple.debugNoHeader().c_str());
+        VOLT_TRACE("[Update aggregate row tuple]:\n%s", m_passThroughTuple.debugNoHeader().c_str());
     }
 
     // A tuple from the group of tuples being aggregated. Source of pass through columns.
