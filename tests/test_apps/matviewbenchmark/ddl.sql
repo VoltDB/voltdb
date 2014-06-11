@@ -2,7 +2,7 @@ CREATE TABLE ids
 (
   id bigint NOT NULL,
   group_id bigint,
-  value bigint, 
+  value bigint,
   PRIMARY KEY (id)
 );
 
