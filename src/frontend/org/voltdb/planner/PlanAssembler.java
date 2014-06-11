@@ -776,22 +776,8 @@ public class PlanAssembler {
 
         MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
 
-        plan = applyInlineAggregation(plan);
-
         return plan;
     }
-
-    private CompiledPlan applyInlineAggregation(CompiledPlan plan) {
-        AbstractPlanNode root = plan.rootPlanGraph;
-
-        root.findAllNodesOfType(PlanNodeType.AGGREGATE);
-        root.findAllNodesOfType(PlanNodeType.HASHAGGREGATE);
-
-
-        return plan;
-    }
-
-
 
     private boolean needProjectionNode (AbstractPlanNode root) {
         if ( (root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||

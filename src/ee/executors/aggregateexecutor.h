@@ -124,26 +124,19 @@ struct AggregateRow
         for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
             m_aggregates[ii]->resetAgg();
         }
-        m_passThroughValues.clear();
-        m_filled = false;
     }
 
-    void recordPassThroughTuple(const TableTuple &tuple,
-            std::vector<int> passThroughColumns,
-            std::vector<AbstractExpression*> outputColumnExpressions)
+    void recordPassThroughTuple(Pool& memoryPool, const TableTuple &tuple)
     {
-        if (!m_filled) {
-            for (int ii = 0; ii < passThroughColumns.size(); ii++) {
-                int colIndex = passThroughColumns[ii];
-                NValue val = outputColumnExpressions[colIndex]->eval(&tuple);
-                m_passThroughValues.push_back(val);
-            }
-            m_filled = true;
-        }
+        char* storage = reinterpret_cast<char*>(memoryPool.allocateZeroes(tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
+        m_passThroughTuple = TableTuple (storage, tuple.getSchema());
+        m_passThroughTuple.copy(tuple);
+        m_passThroughTuple.setActiveTrue();
+    	VOLT_TRACE("[Update aggregate row tuple]:\n%s", m_passThroughTuple.debugNoHeader().c_str());
     }
 
-    bool m_filled;
-    std::vector<NValue> m_passThroughValues;
+    // A tuple from the group of tuples being aggregated. Source of pass through columns.
+    TableTuple m_passThroughTuple;
 
     // The aggregates for each column for this group
     Agg* m_aggregates[0];
@@ -165,8 +158,6 @@ public:
             TupleSchema::freeTupleSchema(m_groupByKeySchema);
         }
     }
-
-    AggregateRow* allocateAggregateRow();
 
     void exportAggregateOutputTable(TempTable* newTempTable) {
         // These two schemas should be equal
@@ -244,7 +235,7 @@ public:
 
     AggregateRow* p_execute_init(const NValueArray& params);
 
-    void p_execute_tuple(TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr);
+    void p_execute_tuple(const TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr);
 
     bool p_execute_finish(ProgressMonitorProxy* pmpPtr);
 protected:

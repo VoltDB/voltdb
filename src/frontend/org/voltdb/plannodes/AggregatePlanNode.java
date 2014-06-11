@@ -132,36 +132,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return true;
     }
 
-    public boolean isAbleInlined(AbstractPlanNode child) {
-        // seqscan
-        if (child.getPlanNodeType() != PlanNodeType.SEQSCAN) return false;
-
-        for (Integer dis: m_aggregateDistinct) {
-            if (dis.intValue() == 1) {
-                // do not handle distinct now
-                return false;
-            }
-        }
-        // serial aggregate
-        if (getPlanNodeType() != PlanNodeType.AGGREGATE) return false;
-
-        // table agg
-        if (m_groupByExpressions.isEmpty() == false) return false;
-
-        // Do not inline for count(*), micro-optimization will deal with that
-        if (isTableCountStar()) {
-            return false;
-        }
-
-        // HAVING with AVG really make it complicated.
-        if (m_postPredicate != null) {
-            return false;
-        }
-
-        return true;
-    }
-
-
     // set predicate for SELECT MAX(X) FROM T WHERE X > / >= ? case
     public void setPrePredicate(AbstractExpression predicate) {
         m_prePredicate = predicate;

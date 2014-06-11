@@ -369,15 +369,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
             m_outputSchema.sortByTveIndex();
         }
-        AggregatePlanNode aggNode =
-                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
-
-        if (aggNode != null) {
-            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
-            m_outputSchema = aggNode.getOutputSchema().clone();
-            // Aggregate plan node change its output schema that should be serialized into Json
-            m_hasSignificantOutputSchema = true;
-        }
 
         // The outputschema of an inline limit node is completely irrelevant to the EE except that
         // serialization will complain if it contains expressions of unresolved columns.
@@ -395,6 +386,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
 
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+
+        if (aggNode != null) {
+            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
+            m_outputSchema = aggNode.getOutputSchema().clone();
+            // Aggregate plan node change its output schema that should be serialized into Json
+            m_hasSignificantOutputSchema = true;
+        }
     }
 
     @Override

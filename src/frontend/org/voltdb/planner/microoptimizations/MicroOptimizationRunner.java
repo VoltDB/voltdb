@@ -27,14 +27,19 @@ public class MicroOptimizationRunner {
     // list all of the micro optimizations here
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
+        // The orders here is important
         optimizations.add(new PushdownLimits());
         optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new ReplaceWithIndexLimit());
+
+        // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
+        optimizations.add(new InlineAggregation());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
     {
-        for (MicroOptimization opt : optimizations) {
+        for (int i = 0; i < optimizations.size(); i++) {
+            MicroOptimization opt = optimizations.get(i);
             opt.apply(plan, parsedStmt);
         }
     }

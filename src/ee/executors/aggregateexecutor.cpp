@@ -321,14 +321,6 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     }
 }
 
-
-AggregateRow* AggregateExecutorBase::allocateAggregateRow() {
-    AggregateRow *aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-    aggregateRow->m_filled = false;
-
-    return aggregateRow;
-}
-
 bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
@@ -422,29 +414,31 @@ inline std::vector<NValue> AggregateExecutorBase::getNextGroupByValues(const Tab
 /// through any additional columns from the input table.
 inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 {
-    TempTable* output_table = m_tmpOutputTable;
-    TableTuple& tmptup = output_table->tempTuple();
+    const TupleSchema * schema =  m_tmpOutputTable->schema();
+    char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    TableTuple tempTuple = TableTuple(storage, schema);
+    tempTuple.setActiveTrue();
+
     // This first pass is to add all columns that were aggregated on.
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        tmptup.setNValue(columnIndex, aggs[ii]->finalize().castAs(tmptup.getSchema()->columnType(columnIndex)));
+        tempTuple.setNValue(columnIndex, aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex)));
     }
+
     VOLT_TRACE("Setting passthrough columns");
-    for (int ii = 0; ii < m_passThroughColumns.size(); ii++) {
-        NValue val = aggregateRow->m_passThroughValues.at(ii);
-        int colIndex = m_passThroughColumns[ii];
-        tmptup.setNValue(colIndex, val);
-        VOLT_TRACE("Passthrough columns: %d", colIndex);
+    BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
+        tempTuple.setNValue(output_col_index,
+                         m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
     }
 
     bool inserted = false;
-    if (m_postPredicate == NULL || m_postPredicate->eval(&tmptup, NULL).isTrue()) {
-        output_table->insertTupleNonVirtual(tmptup);
+    if (m_postPredicate == NULL || m_postPredicate->eval(&tempTuple, NULL).isTrue()) {
+        m_tmpOutputTable->insertTupleNonVirtual(tempTuple);
         inserted = true;
     }
 
-    VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
+    VOLT_TRACE("output_table:\n%s", m_tmpOutputTable->debug().c_str());
     return inserted;
 }
 
@@ -503,10 +497,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
         // Group not found. Make a new entry in the hash for this new group.
         if (keyIter == hash.end()) {
             aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-            aggregateRow->m_filled = false;
             hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
             initAggInstances(aggregateRow);
-            aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+            aggregateRow->recordPassThroughTuple(m_memoryPool, nextTuple);
             // The map is referencing the current key tuple for use by the new group,
             // so force a new tuple allocation to hold the next candidate key.
             nextGroupByKeyTuple.move(NULL);
@@ -551,11 +544,9 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 }
 
 AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params) {
-
     executeAggBase(params);
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-    m_aggregateRow->m_filled = false;
 
     m_noInputRows = true;
     m_failOnPrePredicate = false;
@@ -563,9 +554,7 @@ AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params
     return m_aggregateRow;
 }
 
-void AggregateSerialExecutor::p_execute_tuple(
-        TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr) {
-
+void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr) {
     // Use the first input tuple to "prime" the system.
     if(m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -573,7 +562,7 @@ void AggregateSerialExecutor::p_execute_tuple(
             m_inProgressGroupByValues = getNextGroupByValues(nextTuple);
             // Start the aggregation calculation.
             initAggInstances(m_aggregateRow);
-            m_aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+            m_aggregateRow->recordPassThroughTuple(m_memoryPool, nextTuple);
             advanceAggs(m_aggregateRow, nextTuple);
         } else {
             m_failOnPrePredicate = true;
@@ -590,16 +579,17 @@ void AggregateSerialExecutor::p_execute_tuple(
             if (insertOutputTuple(m_aggregateRow)) {
                 (*pmpPtr).countdownProgress();
             }
-            // Recycle the aggs to start a new row.
             m_aggregateRow->resetAggs();
 
             // swap inProgressGroupByValues
             m_inProgressGroupByValues = nextGroupByValues;
+
+            // update the aggregation calculation.
+            m_aggregateRow->recordPassThroughTuple(m_memoryPool, nextTuple);
             break;
         }
     }
-    // update the aggregation calculation.
-    m_aggregateRow->recordPassThroughTuple(nextTuple, m_passThroughColumns, m_outputColumnExpressions);
+
     advanceAggs(m_aggregateRow, nextTuple);
 }
 

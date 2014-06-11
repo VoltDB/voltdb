@@ -90,21 +90,17 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             static_cast<ProjectionPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
-        m_projectionExpressions =
-            new AbstractExpression*[m_node->getOutputTable()->columnCount()];
+        m_numOfColumns = static_cast<int>(m_projectionNode->getOutputColumnExpressions().size());
 
-        ::memset(m_projectionExpressions, 0,
-                 (sizeof(AbstractExpression*) *
-                  m_node->getOutputTable()->columnCount()));
+        assert(m_projectionNode->getOutputTable()->columnCount() == m_numOfColumns);
+
+        m_projectionExpressions = new AbstractExpression*[m_numOfColumns];
+        ::memset(m_projectionExpressions, 0, (sizeof(AbstractExpression*) * m_numOfColumns));
 
         m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
-
         m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
 
-        for (int ctr = 0;
-             ctr < m_node->getOutputTable()->columnCount();
-             ctr++)
-        {
+        for (int ctr = 0;ctr < m_numOfColumns;ctr++) {
             assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
             m_projectionExpressions[ctr] =
               m_projectionNode->getOutputColumnExpressions()[ctr];
@@ -135,7 +131,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
-    m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
     Table* targetTable = m_node->getTargetTable();
     //target table should be persistenttable
@@ -162,8 +157,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
-    assert(m_outputTable);
-    assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
 
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
@@ -415,23 +408,33 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
             if (m_projectionNode != NULL)
             {
-                TableTuple &temp_tuple = m_outputTable->tempTuple();
-                if (m_projectionAllTupleArray != NULL)
-                {
-                    VOLT_TRACE("sweet, all tuples");
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                    }
-                }
-                else
-                {
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
-                    }
-                }
                 if (agg_serial_node != NULL) {
+                    VOLT_TRACE("inline agg temp tuple");
+                    TableTuple &temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
+
+                    if (m_projectionAllTupleArray != NULL) {
+                        VOLT_TRACE("sweet, all tuples");
+                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                            temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
+                        }
+                    } else {
+                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                            temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
+                        }
+                    }
                     m_aggSerialExec->p_execute_tuple(temp_tuple, &pmp);
                 } else {
+                    TableTuple &temp_tuple = m_outputTable->tempTuple();
+                    if (m_projectionAllTupleArray != NULL) {
+                        VOLT_TRACE("sweet, all tuples");
+                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                            temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
+                        }
+                    } else {
+                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                            temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
+                        }
+                    }
                     m_outputTable->insertTupleNonVirtual(temp_tuple);
                 }
             }

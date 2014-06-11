@@ -133,9 +133,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // change any nodes in our expression tree to be ready for the
     // projection operations in execute
     //
-    int num_of_columns = (int)output_table->columnCount();
+    int num_of_columns = -1;
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-
+    if (projection_node != NULL) {
+    	num_of_columns = projection_node->getOutputColumnExpressions().size();
+    }
     //
     // OPTIMIZATION: NESTED LIMIT
     // How nice! We can also cut off our scanning with a nested limit!
@@ -217,12 +219,16 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 //
                 if (projection_node != NULL)
                 {
-                    TableTuple &temp_tuple = output_table->tempTuple();
-                    for (int ctr = 0; ctr < num_of_columns; ctr++)
-                    {
-                        NValue value =
-                            projection_node->
-                          getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
+                    VOLT_TRACE("inline projection...");
+                    TableTuple temp_tuple;
+                    if (agg_serial_node != NULL) {
+                        temp_tuple = projection_node->getOutputTable()->tempTuple();
+                    } else {
+                        temp_tuple = output_temp_table->tempTuple();
+                    }
+
+                    for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                        NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
 
