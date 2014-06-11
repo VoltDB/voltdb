@@ -1436,6 +1436,62 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testFormatCurrency() throws Exception
+    {
+        System.out.println("STARTING testFormatCurrency");
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable result;
+        String str;
+
+        cr = client.callProcedure("@AdHoc", "Delete from R3;");
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        cr = client.callProcedure("R3.insert", 2, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        //System.out.println("hahahah "+result.getRowCount());
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        //System.out.println("hahahah "+str);
+        assertTrue(str.equals("120.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(123456) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("123,456.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(1234567890.12345) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("1,234,567,890.12"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-120) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-120.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-123456.789) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("hahahah "+str);
+        assertTrue(str.equals("-123,456.79"));
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
