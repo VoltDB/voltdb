@@ -137,6 +137,7 @@ class PBDSegment {
 
     public void closeAndDelete() throws IOException {
         close();
+        LOG.info("Deleting segment at Index " + m_index + " File: " + m_file.getAbsolutePath());
         m_file.delete();
     }
 
