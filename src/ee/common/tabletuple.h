@@ -262,10 +262,6 @@ public:
         return m_data == NULL;
     }
 
-    void setNullTuple() {
-        m_data = NULL;
-    }
-
     /** Get the value of a specified column (const) */
     //not performant because it has to check the schema to see how to
     //return the SlimValue.

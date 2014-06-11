@@ -68,7 +68,7 @@
 using namespace voltdb;
 
 bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
-                               TempTableLimits* limits)
+        TempTableLimits* limits)
 {
     VOLT_TRACE("init IndexScan Executor");
 
@@ -87,8 +87,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL)
     {
         m_projectionNode =
-            static_cast<ProjectionPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+                static_cast<ProjectionPlanNode*>
+        (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
         m_numOfColumns = static_cast<int>(m_projectionNode->getOutputColumnExpressions().size());
 
@@ -103,7 +103,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         for (int ctr = 0;ctr < m_numOfColumns;ctr++) {
             assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
             m_projectionExpressions[ctr] =
-              m_projectionNode->getOutputColumnExpressions()[ctr];
+                    m_projectionNode->getOutputColumnExpressions()[ctr];
         }
     }
 
@@ -112,8 +112,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
     m_searchKeyArrayPtr =
-      boost::shared_array<AbstractExpression*>
-        (new AbstractExpression*[m_numOfSearchkeys]);
+            boost::shared_array<AbstractExpression*>
+    (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyArray = m_searchKeyArrayPtr.get();
 
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
@@ -121,12 +121,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
         {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
-                       " PlanNode '%s'", ctr, m_node->debug().c_str());
+                    " PlanNode '%s'", ctr, m_node->debug().c_str());
             delete [] m_projectionExpressions;
             return false;
         }
         m_searchKeyArrayPtr[ctr] =
-            m_node->getSearchKeyExpressions()[ctr];
+                m_node->getSearchKeyExpressions()[ctr];
     }
 
     //output table should be temptable
@@ -181,9 +181,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
 
+    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
+    if (agg_serial_node != NULL) {
+        VOLT_TRACE("init inline aggregation stuff...");
+        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+        assert(m_aggSerialExec);
+        m_aggSerialExec->exportAggregateOutputTable(m_outputTable);
+
+        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params));
+    }
+
+    ProgressMonitorProxy pmp(m_engine, this, targetTable);
     //
     // SEARCH KEY
     //
+    bool earlyReturn = false;
+
     searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
@@ -206,14 +219,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
             if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                (ctr == (activeNumOfSearchKeys - 1))) {
+                    (ctr == (activeNumOfSearchKeys - 1))) {
 
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                     if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
-                        // gt or gte when key overflows returns nothing
-                        return true;
+                        // gt or gte when key overflows returns nothing except inline agg
+                        earlyReturn = true;
+                        break;
                     }
                     else {
                         // for overflow on reverse scan, we need to
@@ -226,10 +240,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                     if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
-                        // lt or lte when key underflows returns nothing
-                        return true;
+                        // lt or lte when key underflows returns nothing except inline agg
+                        earlyReturn = true;
+                        break;
                     }
                     else {
                         // don't allow GTE because it breaks null handling
@@ -247,11 +262,20 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
-                return true;
+                earlyReturn = true;
+                break;
             }
             break;
         }
     }
+
+    if (earlyReturn) {
+        if (agg_serial_node != NULL) {
+            m_aggSerialExec->p_execute_finish(&pmp);
+        }
+        return true;
+    }
+
     assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
 
@@ -286,7 +310,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
-    ProgressMonitorProxy pmp(m_engine, this, targetTable);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -303,7 +326,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple tuple;
     if (activeNumOfSearchKeys > 0) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
+                localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
             tableIndex->moveToKey(&searchKey);
@@ -352,26 +375,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-
-    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
-    if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline aggregation stuff...");
-        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggSerialExec);
-        m_aggSerialExec->exportAggregateOutputTable(m_outputTable);
-
-        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params));
-    }
-
     bool result = true;
+
     //
     // We have to different nextValue() methods for different lookup types
     //
     while ((limit == -1 || tuple_ctr < limit) &&
-           ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-             !(tuple = tableIndex->nextValueAtKey()).isNullTuple()) ||
-           ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-            !(tuple = tableIndex->nextValue()).isNullTuple()))) {
+            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+                    !(tuple = tableIndex->nextValueAtKey()).isNullTuple()) ||
+                    ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
+                            !(tuple = tableIndex->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
         pmp.countdownProgress();
         //
