@@ -389,6 +389,9 @@ public class StatsAgent extends OpsAgent
         case LATENCY:
             stats = collectLatencyStats(interval);
             break;
+        case LATENCY_HISTOGRAM:
+            stats = collectLatencyHistogramStats(interval);
+            break;
         case MANAGEMENT:
             stats = collectManagementStats(interval);
             break;
@@ -595,6 +598,19 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
+    private VoltTable[] collectLatencyHistogramStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(StatsSelector.LATENCY_HISTOGRAM, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
+        }
+        return stats;
+    }
+
     // This is just a roll-up of MEMORY, TABLE, INDEX, PROCEDURE, INITIATOR, IO, and
     // STARVATION
     private VoltTable[] collectManagementStats(boolean interval)
@@ -723,6 +739,7 @@ public class StatsAgent extends OpsAgent
             final VoltTable table = firstSource.getStatsTable();
             if (table == null)
                 return null;
+            System.out.println("prevResults:" + prevResults + " table column count:" + table.getColumnCount());
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
             for (int i = 0; i < columns.length; i++)
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
