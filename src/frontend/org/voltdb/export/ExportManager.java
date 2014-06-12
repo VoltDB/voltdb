@@ -186,7 +186,7 @@ public class ExportManager
                     newProcessor.setProcessorConfig(m_processorConfig);
                     newProcessor.readyForData();
 
-                    if (nextGeneration.isDiskBased()) {
+                    if (!nextGeneration.isContinueingGeneration()) {
                         /*
                          * Changes in partition count can make the load balancing strategy not capture
                          * all partitions for data that was from a previously larger cluster.
@@ -270,7 +270,7 @@ public class ExportManager
          * makes it safe to accept mastership.
          */
         ExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null && !gen.isDiskBased()) {
+        if (gen != null && gen.isContinueingGeneration()) {
             gen.acceptMastershipTask(partitionId);
         } else {
             exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
@@ -390,7 +390,7 @@ public class ExportManager
                  * and we are using server side export we need to kick off a leader election
                  * to choose which server is going to export each partition
                  */
-                if (nextGeneration.isDiskBased()) {
+                if (!nextGeneration.isContinueingGeneration()) {
                     nextGeneration.kickOffLeaderElection();
                 }
             } else {
@@ -398,7 +398,7 @@ public class ExportManager
                  * When it isn't startup, it is necessary to kick things off with the mastership
                  * settings that already exist
                  */
-                if (nextGeneration.isDiskBased()) {
+                if (!nextGeneration.isContinueingGeneration()) {
                     /*
                      * Changes in partition count can make the load balancing strategy not capture
                      * all partitions for data that was from a previously larger cluster.
@@ -444,7 +444,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory);
+            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(conn, m_messenger, catalogContext.m_uniqueId)) {

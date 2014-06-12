@@ -157,6 +157,7 @@ public class ExportGeneration {
      * instead of being fed data from the current live system
      */
     private boolean m_diskBased = false;
+    private final long m_catalogGen;
 
     /**
      * Constructor to create a new generation of export data
@@ -165,6 +166,7 @@ public class ExportGeneration {
      */
     public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
+        m_catalogGen = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!isRejoin) {
             if (!m_directory.mkdirs()) {
@@ -186,8 +188,14 @@ public class ExportGeneration {
      * @param generationTimestamp
      * @throws IOException
      */
-    public ExportGeneration(File generationDirectory) throws IOException {
+    public ExportGeneration(File generationDirectory, long catalogGen) throws IOException {
         m_directory = generationDirectory;
+        m_catalogGen = catalogGen;
+    }
+
+    //This checks if the on disk generation is a catalog generation.
+    public boolean isContinueingGeneration() {
+        return (m_timestamp == m_catalogGen);
     }
 
     public boolean isDiskBased() {
