@@ -158,6 +158,8 @@ public:
     }
 
     void setAggregateOutputTable(TempTable* newTempTable) {
+        // inlined aggregate will not allocate its own output table, but will use Scan's output table instead
+
         // These two schemas should be equal
         m_tmpOutputTable = newTempTable;
     }

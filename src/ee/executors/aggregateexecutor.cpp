@@ -350,7 +350,9 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
         }
     }
 
-    setTempOutputTable(limits);
+    if (!node->isInline()) {
+        setTempOutputTable(limits);
+    }
 
     m_aggTypes = node->getAggregates();
     m_distinctAggs = node->getDistinctAggregates();
