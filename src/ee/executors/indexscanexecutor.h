@@ -48,7 +48,6 @@
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
-#include "executors/aggregateexecutor.h"
 
 #include "boost/shared_array.hpp"
 
@@ -66,6 +65,8 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
+class AggregateSerialExecutor;
+
 class IndexScanExecutor : public AbstractExecutor
 {
 public:
@@ -73,6 +74,7 @@ public:
         : AbstractExecutor(engine, abstractNode)
         , m_projectionExpressions(NULL)
         , m_searchKeyBackingStore(NULL)
+        , m_aggSerialExec(NULL)
     {}
     ~IndexScanExecutor();
 

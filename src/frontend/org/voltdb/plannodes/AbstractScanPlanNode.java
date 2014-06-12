@@ -392,7 +392,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (aggNode != null) {
             aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
             m_outputSchema = aggNode.getOutputSchema().clone();
-            // Aggregate plan node change its output schema that should be serialized into Json
+            // Aggregate plan node change its output schema, and
+            // EE does not have special code to get output schema from inlined aggregate node.
             m_hasSignificantOutputSchema = true;
         }
     }

@@ -131,8 +131,6 @@ struct AggregateRow
         char* storage = reinterpret_cast<char*>(memoryPool.allocateZeroes(tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
         m_passThroughTuple = TableTuple (storage, tuple.getSchema());
         m_passThroughTuple.copy(tuple);
-        m_passThroughTuple.setActiveTrue();
-        VOLT_TRACE("[Update aggregate row tuple]:\n%s", m_passThroughTuple.debugNoHeader().c_str());
     }
 
     // A tuple from the group of tuples being aggregated. Source of pass through columns.
@@ -159,7 +157,7 @@ public:
         }
     }
 
-    void exportAggregateOutputTable(TempTable* newTempTable) {
+    void setAggregateOutputTable(TempTable* newTempTable) {
         // These two schemas should be equal
         m_tmpOutputTable = newTempTable;
     }
@@ -170,8 +168,6 @@ protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
     void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
-
-    std::vector<NValue> getNextGroupByValues(const TableTuple& nextTuple);
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
@@ -203,6 +199,8 @@ protected:
     std::vector<AbstractExpression*> m_outputColumnExpressions;
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
+
+    ProgressMonitorProxy* m_pmp;
 };
 
 
@@ -233,15 +231,19 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    AggregateRow* p_execute_init(const NValueArray& params);
+    AggregateRow* p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp);
 
-    void p_execute_tuple(const TableTuple& nextTuple, ProgressMonitorProxy* pmpPtr);
+    void p_execute_tuple(const TableTuple& nextTuple);
 
-    bool p_execute_finish(ProgressMonitorProxy* pmpPtr);
+    void p_execute_finish();
 protected:
     virtual bool p_execute(const NValueArray& params);
 
+    void getNextGroupByValues(const TableTuple& nextTuple);
+
     std::vector<NValue> m_inProgressGroupByValues;
+    std::vector<NValue> m_nextGroupByValues;
+
     AggregateRow * m_aggregateRow;
 
     // State variables for iteration on input table

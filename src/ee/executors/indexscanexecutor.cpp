@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
@@ -100,11 +101,18 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
         m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
 
-        for (int ctr = 0;ctr < m_numOfColumns;ctr++) {
+        for (int ctr = 0; ctr < m_numOfColumns; ctr++) {
             assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
             m_projectionExpressions[ctr] =
                     m_projectionNode->getOutputColumnExpressions()[ctr];
         }
+    }
+
+    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
+    if (agg_serial_node != NULL) {
+        VOLT_TRACE("init inline aggregation stuff...");
+        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+        assert(m_aggSerialExec);
     }
 
     //
@@ -176,22 +184,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
-    //
-    // OPTIMIZATION: INLINE AGGREGATION (serial only)
-    //
-    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
+    ProgressMonitorProxy pmp(m_engine, this, targetTable);
 
     boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
-    if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline aggregation stuff...");
-        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggSerialExec);
-        m_aggSerialExec->exportAggregateOutputTable(m_outputTable);
-
-        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params));
+    if (m_aggSerialExec != NULL) {
+        m_aggSerialExec->setAggregateOutputTable(m_outputTable);
+        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params, &pmp));
     }
 
-    ProgressMonitorProxy pmp(m_engine, this, targetTable);
     //
     // SEARCH KEY
     //
@@ -270,8 +270,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     if (earlyReturn) {
-        if (agg_serial_node != NULL) {
-            m_aggSerialExec->p_execute_finish(&pmp);
+        if (m_aggSerialExec != NULL) {
+            m_aggSerialExec->p_execute_finish();
         }
         return true;
     }
@@ -375,8 +375,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    bool result = true;
-
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -421,43 +419,34 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
             if (m_projectionNode != NULL)
             {
-                if (agg_serial_node != NULL) {
-                    VOLT_TRACE("inline agg temp tuple");
-                    TableTuple &temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
-
-                    if (m_projectionAllTupleArray != NULL) {
-                        VOLT_TRACE("sweet, all tuples");
-                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                            temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                        }
-                    } else {
-                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                            temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
-                        }
-                    }
-                    m_aggSerialExec->p_execute_tuple(temp_tuple, &pmp);
+                TableTuple temp_tuple;
+                if (m_aggSerialExec != NULL) {
+                    temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
                 } else {
-                    TableTuple &temp_tuple = m_outputTable->tempTuple();
-                    if (m_projectionAllTupleArray != NULL) {
-                        VOLT_TRACE("sweet, all tuples");
-                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                            temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                        }
-                    } else {
-                        for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                            temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
-                        }
+                    temp_tuple = m_outputTable->tempTuple();
+                }
+
+                if (m_projectionAllTupleArray != NULL) {
+                    VOLT_TRACE("sweet, all tuples");
+                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
                     }
+                } else {
+                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
+                    }
+                }
+
+                if (m_aggSerialExec != NULL) {
+                    m_aggSerialExec->p_execute_tuple(temp_tuple);
+                } else {
                     m_outputTable->insertTupleNonVirtual(temp_tuple);
                 }
             }
             else
             {
-                //
-                // Try to put the tuple into our output table
-                //
-                if (agg_serial_node != NULL) {
-                    m_aggSerialExec->p_execute_tuple(tuple, &pmp);
+                if (m_aggSerialExec != NULL) {
+                    m_aggSerialExec->p_execute_tuple(tuple);
                 } else {
                     //
                     // Straight Insert
@@ -469,13 +458,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    if (agg_serial_node != NULL) {
-        result = m_aggSerialExec->p_execute_finish(&pmp);
+    if (m_aggSerialExec != NULL) {
+        m_aggSerialExec->p_execute_finish();
     }
 
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
-    return result;
+    return true;
 }
 
 IndexScanExecutor::~IndexScanExecutor() {

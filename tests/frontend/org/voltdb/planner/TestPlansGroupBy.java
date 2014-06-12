@@ -82,9 +82,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkSimpleTableInlineAgg(String sql) {
         AbstractPlanNode p;
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
@@ -336,7 +333,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // order of GROUP BY cols is different of them in index definition
         // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        // FIXME(xin): why I think this is not right, even before inline aggregation ?
         checkGroupByOnlyPlan(false, false, true, true);
 
         pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");

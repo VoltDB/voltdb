@@ -49,24 +49,26 @@
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
-#include "executors/aggregateexecutor.h"
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb
 {
     class UndoLog;
     class ReadWriteSet;
+    class AggregateSerialExecutor;
 
     class SeqScanExecutor : public AbstractExecutor {
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
+            , m_aggSerialExec(NULL)
         {}
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
 
+    private:
         AggregateSerialExecutor* m_aggSerialExec;
     };
 }
