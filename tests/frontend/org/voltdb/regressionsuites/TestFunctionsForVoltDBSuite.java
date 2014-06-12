@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -1445,8 +1446,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         String str;
 
         cr = client.callProcedure("@AdHoc", "Delete from R3;");
-        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
-        cr = client.callProcedure("R3.insert", 2, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        long n1 = 9223372036854775807L;
+        BigDecimal bd = new BigDecimal("99999999999999999999999999.999999999999");
+        BigDecimal nbd = new BigDecimal("-99999999999999999999999999.999999999999");
+        cr = client.callProcedure("R3.insert", 1, 11, 32023, 2147483647, n1, 2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", bd);
+        cr = client.callProcedure("R3.insert", 2, -11, -32023, -2147483647, -n1, -2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", nbd);
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120) from R3 where id = 1");
@@ -1489,6 +1493,106 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         // there might be some rounding differences between platforms/environments
         assertTrue(str.equals("-123,456.79"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("11.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-11.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("32,023.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-32,023.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("2,147,483,647.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-2,147,483,647.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("9,223,372,036,854,775,807.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-9,223,372,036,854,775,807.00"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("hahahaha "+str);
+        assertTrue(str.equals("2,147,483,647,999.12"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("hahahaha "+str);
+        assertTrue(str.equals("-2,147,483,647,999.12"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 1");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("hahahaha dec "+str);
+        //assertTrue(str.equals(""));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 2");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("hahahaha dec "+str);
+        //assertTrue(str.equals(""));
     }
 
     //

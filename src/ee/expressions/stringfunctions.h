@@ -530,17 +530,37 @@ struct money_numpunct : std::numpunct<char> {
 /** implement the Volt SQL Format_Currency function for all numeric values */
 // TODO: Can we do this with boost?
 template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
-    double num = 0.0;
-    if (!isNull()) {
-        num = this->castAsDoubleAndGetValue();
+    if (isNull()) {
+        return getNullStringValue();
     }
 
     std::ostringstream out;
+    static std::locale newloc(std::cout.getloc(), new money_numpunct);
+    const ValueType type = getValueType();
+    out.imbue(newloc);
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_SMALLINT:
+        out << std::fixed << castAsIntegerAndGetValue() << ".00";
+        break;
+    case VALUE_TYPE_INTEGER:
+        out << std::fixed << getInteger() << ".00";
+        break;
+    case VALUE_TYPE_BIGINT:
+        out << std::fixed << getBigInt() << ".00";
+        break;
+    case VALUE_TYPE_DOUBLE:
+        out << std::fixed << std::setprecision(2) << getDouble();
+        break;
+    // TODO: find a way to format decimal
+    case VALUE_TYPE_DECIMAL:
+    default:
+        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
+        break;
+    }
+
     // TODO: Although there should be only one copy of newloc (and money_numpunct),
     // we still need to test and make sure no memory leakage in this piece of code.
-    static std::locale newloc(std::cout.getloc(), new money_numpunct);
-    out.imbue(newloc);
-    out << std::fixed << std::setprecision(2) << num;
     return getTempStringValue(out.str().c_str(), out.str().length());
 }
 
