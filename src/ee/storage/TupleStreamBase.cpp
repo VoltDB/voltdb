@@ -92,7 +92,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, bool sync)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, bool sync, bool flush)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -115,6 +115,11 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                     true,
                     false);
         }
+
+        if (flush) {
+            extendBufferChain(0);
+        }
+
         return;
     }
 
@@ -132,6 +137,11 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         // Advance the tip to the new transaction.
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
+
+        if (flush) {
+            extendBufferChain(0);
+        }
+
         beginTransaction(txnId, currentSpHandle);
     }
 
@@ -142,13 +152,28 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     {
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
-        m_committedUso = m_uso;
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
             endTransaction(m_openSpHandle);
         }
+        m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
+
+        if (flush) {
+            extendBufferChain(0);
+        }
     }
 
+    pushPendingBlocks();
+
+    if (sync) {
+        pushExportBuffer(
+                NULL,
+                true,
+                false);
+    }
+}
+
+void TupleStreamBase::pushPendingBlocks() {
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
@@ -172,15 +197,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             break;
         }
     }
-
-    if (sync) {
-        pushExportBuffer(
-                NULL,
-                true,
-                false);
-    }
 }
-
 
 /*
  * Discard all data with a uso gte mark
@@ -244,17 +261,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
-            if (m_committedUso >= (m_currBlock->uso() + m_currBlock->offset()))
-            {
-                //The block is handed off to the topend which is responsible for releasing the
-                //memory associated with the block data. The metadata is deleted here.
-                pushExportBuffer(
-                        m_currBlock, false, false);
-                delete m_currBlock;
-            } else {
-                m_pendingBlocks.push_back(m_currBlock);
-                m_currBlock = NULL;
-            }
+            m_pendingBlocks.push_back(m_currBlock);
+            m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -270,6 +278,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+
+    pushPendingBlocks();
 }
 
 /*
@@ -296,8 +306,7 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * these.
          */
         if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            extendBufferChain(0);
-            commit(lastCommittedSpHandle, currentSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
+            commit(lastCommittedSpHandle, currentSpHandle, currentSpHandle, timeInMillis < 0 ? true : false, true);
         }
     }
 }

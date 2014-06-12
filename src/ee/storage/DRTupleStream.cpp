@@ -42,7 +42,7 @@ const int MAX_BUFFER_AGE = 4000;
 
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
-      m_enabled(false),
+      m_enabled(true),
       m_partitionId(0)
 {}
 
@@ -76,16 +76,17 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId);
+    commit(lastCommittedSpHandle, spHandle, txnId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz) + TXN_RECORD_HEADER_SIZE;
+
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
 
-    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
+    if (m_currBlock->remaining() < tupleMaxLength) {
         extendBufferChain(tupleMaxLength);
     }
 
@@ -127,6 +128,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const size_t startingUso = m_uso;
     m_uso += io.position();
 
+//    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
@@ -148,15 +150,17 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
+    if (sync) return;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
 void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
+//    std::cout << "Beginning txn " << txnId << " spHandle " << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
 
-     if ((m_currBlock->rawLength() + BEGIN_RECORD_SIZE) > m_defaultCapacity) {
+     if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -170,14 +174,16 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
+     m_uso += io.position();
 }
 
 void DRTupleStream::endTransaction(int64_t spHandle) {
+//    std::cout << "Ending txn spHandle " << spHandle << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
 
-     if ((m_currBlock->rawLength() + END_RECORD_SIZE) > m_defaultCapacity) {
+     if (m_currBlock->remaining() < END_RECORD_SIZE) {
          extendBufferChain(END_RECORD_SIZE);
      }
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -190,4 +196,5 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
+     m_uso += io.position();
 }

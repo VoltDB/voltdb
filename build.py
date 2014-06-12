@@ -352,7 +352,7 @@ CTX.THIRD_PARTY_INPUT['murmur3'] = """
 """
 
 CTX.THIRD_PARTY_INPUT['sha1'] = """
- sha1.c
+ sha1.cpp
 """
 
 
@@ -427,6 +427,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      tabletuple_export_test
      TempTableLimitsTest
      ExportTupleStream_test
+     DRTupleStream_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):

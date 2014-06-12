@@ -93,7 +93,7 @@ public:
         partitionIds.push(partitionId);
         signatures.push(signature);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(boost::shared_ptr<char>(block->rawPtr()));
+        data.push_back(boost::shared_array<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
@@ -103,7 +103,7 @@ public:
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
     deque<boost::shared_ptr<StreamBlock> > blocks;
-    vector<boost::shared_ptr<char> > data;
+    vector<boost::shared_array<char> > data;
     bool receivedExportBuffer;
 
 };

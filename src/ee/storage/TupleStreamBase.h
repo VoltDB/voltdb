@@ -71,13 +71,14 @@ public:
                        int64_t currentSpHandle);
 
     void extendBufferChain(size_t minLength);
+    void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
     virtual void beginTransaction(int64_t txnId, int64_t spHandle) {}
     virtual void endTransaction(int64_t spHandle) {}
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
