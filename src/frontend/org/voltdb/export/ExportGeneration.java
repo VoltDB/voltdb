@@ -152,11 +152,7 @@ public class ExportGeneration {
     private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
     private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
 
-    /*
-     * Set to true if this export generation was initialized from disk
-     * instead of being fed data from the current live system
-     */
-    private boolean m_diskBased = false;
+    //This is maintained to detect if this is a continueing generation or not
     private final long m_catalogGen;
 
     /**
@@ -198,12 +194,7 @@ public class ExportGeneration {
         return (m_timestamp == m_catalogGen);
     }
 
-    public boolean isDiskBased() {
-        return m_diskBased;
-    }
-
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger, long catalogGeneration) {
-        m_diskBased = true;
+    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -225,7 +216,7 @@ public class ExportGeneration {
 
                 if (haveDataFiles) {
                     try {
-                        addDataSource(f, partitions, catalogGeneration);
+                        addDataSource(f, partitions, isContinueingGeneration());
                         hadValidAd = true;
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
@@ -601,8 +592,8 @@ public class ExportGeneration {
      */
     private void addDataSource(
             File adFile,
-            Set<Integer> partitions, long catalogGeneration) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, catalogGeneration);
+            Set<Integer> partitions, boolean isContinueingGeneration) throws IOException {
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration);
         partitions.add(source.getPartitionId());
         m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +

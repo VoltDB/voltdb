@@ -447,7 +447,7 @@ public class ExportManager
             ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
-            if (generation.initializeGenerationFromDisk(conn, m_messenger, catalogContext.m_uniqueId)) {
+            if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
                 String list[] = generationDirectory.list();
