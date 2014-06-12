@@ -107,8 +107,8 @@ public class MaterializedViewBenchmark {
     }
 
     /**
-     * Uses included {@link ClientStatusListenerExt} class to
-     * create the connection to the database.
+     * Override for the ClientStatusListenerExt class to exit the test in error if the connection is lost
+     * before the test finishes.
      */
     class StatusListener extends ClientStatusListenerExt {
         @Override
@@ -124,11 +124,11 @@ public class MaterializedViewBenchmark {
      * Class to use for returning values from the diffWriter method to the
      * runBenchmark method.
      */
-    public static class diffRetVals {
+    public static class DiffRetVals {
         double throughput;
         double execute;
 
-        public diffRetVals(double tp, double ex) {
+        public DiffRetVals(double tp, double ex) {
             throughput = tp;
             execute = ex;
         }
@@ -249,10 +249,10 @@ public class MaterializedViewBenchmark {
      *        stats           ClientStats class.
      *        fw              FileWriter object with the csv file.
      * @throws Exception if anything unexpected happens.
-     * @return Returns diffRetVals class containing the throughput/execute values to update
+     * @return Returns DiffRetVals class containing the throughput/execute values to update
      *         the MaterializedViewBenchmark class variables with.
      */
-    public diffRetVals diffWriter(double savedThroughput, double newThroughput, double savedExecute,
+    public DiffRetVals diffWriter(double savedThroughput, double newThroughput, double savedExecute,
                                   double newExecute, String name, ClientStats stats, FileWriter fw) throws Exception {
         if (savedThroughput > 0) {
             savedThroughput = (((newThroughput - savedThroughput) /
@@ -268,7 +268,7 @@ public class MaterializedViewBenchmark {
             savedThroughput = newThroughput;
             savedExecute = newExecute;
         }
-        return new diffRetVals(savedThroughput, savedExecute);
+        return new DiffRetVals(savedThroughput, savedExecute);
     }
 
     /**
@@ -342,22 +342,22 @@ public class MaterializedViewBenchmark {
         // Expecting the custom insert/delete procedure names ex. ids_insert
         String[] procArray = procedure.split("_");
         if (procArray[procArray.length-1].equals("insert")) {
-            diffRetVals ret = diffWriter(insertThroughput, (double)stats.getTxnThroughput(), insertExecute,
+            DiffRetVals ret = diffWriter(insertThroughput, (double)stats.getTxnThroughput(), insertExecute,
                                          execTimeInMicroSec, "Insert Diff", stats, fw);
             insertThroughput = ret.throughput;
             insertExecute = ret.execute;
         } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("group")) {
-            diffRetVals ret = diffWriter(updateGroupThroughput, (double)stats.getTxnThroughput(), updateGroupExecute,
+            DiffRetVals ret = diffWriter(updateGroupThroughput, (double)stats.getTxnThroughput(), updateGroupExecute,
                                          execTimeInMicroSec, "Update Group Diff", stats, fw);
             updateGroupThroughput = ret.throughput;
             updateGroupExecute = ret.execute;
         } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("value")) {
-            diffRetVals ret = diffWriter(updateValueThroughput, (double)stats.getTxnThroughput(), updateValueExecute,
+            DiffRetVals ret = diffWriter(updateValueThroughput, (double)stats.getTxnThroughput(), updateValueExecute,
                                          execTimeInMicroSec, "Update Aggregate Diff", stats, fw);
             updateValueThroughput = ret.throughput;
             updateValueExecute = ret.execute;
         } else {
-            diffRetVals ret = diffWriter(deleteThroughput, (double)stats.getTxnThroughput(), deleteExecute,
+            DiffRetVals ret = diffWriter(deleteThroughput, (double)stats.getTxnThroughput(), deleteExecute,
                                          execTimeInMicroSec, "Delete Diff", stats, fw);
             deleteThroughput = ret.throughput;
             deleteExecute = ret.execute;
