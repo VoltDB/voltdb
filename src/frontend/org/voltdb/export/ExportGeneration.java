@@ -153,7 +153,7 @@ public class ExportGeneration {
     private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
 
     //This is maintained to detect if this is a continueing generation or not
-    private final long m_catalogGen;
+    private final boolean m_isContinueingGeneration;
 
     /**
      * Constructor to create a new generation of export data
@@ -162,7 +162,6 @@ public class ExportGeneration {
      */
     public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
-        m_catalogGen = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!isRejoin) {
             if (!m_directory.mkdirs()) {
@@ -175,26 +174,32 @@ public class ExportGeneration {
                 }
             }
         }
+        m_isContinueingGeneration = true;
         exportLog.info("Creating new export generation " + m_timestamp);
     }
 
     /**
      * Constructor to create a generation based on one that has been persisted to disk
      * @param generationDirectory
-     * @param generationTimestamp
+     * @param catalogGen Generation from catalog.
      * @throws IOException
      */
     public ExportGeneration(File generationDirectory, long catalogGen) throws IOException {
         m_directory = generationDirectory;
-        m_catalogGen = catalogGen;
+        try {
+            m_timestamp = Long.parseLong(generationDirectory.getName());
+        } catch (NumberFormatException ex) {
+            throw new IOException("Invalid Generation directory, directory name must be a number.");
+        }
+        m_isContinueingGeneration = (catalogGen == m_timestamp);
     }
 
     //This checks if the on disk generation is a catalog generation.
     public boolean isContinueingGeneration() {
-        return (m_timestamp == m_catalogGen);
+        return m_isContinueingGeneration;
     }
 
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger, boolean isContinueingGeneration) {
+    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -216,7 +221,7 @@ public class ExportGeneration {
 
                 if (haveDataFiles) {
                     try {
-                        addDataSource(f, partitions, isContinueingGeneration);
+                        addDataSource(f, partitions);
                         hadValidAd = true;
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
@@ -590,12 +595,12 @@ public class ExportGeneration {
     /*
      * Create a datasource based on an ad file
      */
-    private void addDataSource(
-            File adFile,
-            Set<Integer> partitions, boolean isContinueingGeneration) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration);
+    private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration());
         partitions.add(source.getPartitionId());
-        m_timestamp = source.getGeneration();
+        if (source.getGeneration() != this.m_timestamp) {
+            throw new IOException("Failed to load generation from disk invalid data source generation found.");
+        }
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());

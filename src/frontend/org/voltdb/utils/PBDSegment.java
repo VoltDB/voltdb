@@ -16,11 +16,11 @@
  */
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
@@ -138,6 +138,8 @@ class PBDSegment {
     public void closeAndDelete() throws IOException {
         close();
         LOG.info("Deleting segment at Index " + m_index + " File: " + m_file.getAbsolutePath());
+        String stackTrace = Throwables.getStackTraceAsString(new Exception("StackTrace"));
+        LOG.info(stackTrace);
         m_file.delete();
     }
 
