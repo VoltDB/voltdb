@@ -1451,6 +1451,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         BigDecimal nbd = new BigDecimal("-99999999999999999999999999.999999999999");
         cr = client.callProcedure("R3.insert", 1, 11, 32023, 2147483647, n1, 2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", bd);
         cr = client.callProcedure("R3.insert", 2, -11, -32023, -2147483647, -n1, -2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", nbd);
+        bd = new BigDecimal("1.5");
+        cr = client.callProcedure("R3.insert", 3, 11, 32023, 2147483647, n1, 2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", bd);
+        bd = new BigDecimal("-1.5");
+        cr = client.callProcedure("R3.insert", 4, 11, 32023, 2147483647, n1, 2147483647999.123, "2013-07-18 02:00:00.123457", "IBM", bd);
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120) from R3 where id = 1");
@@ -1564,7 +1568,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
-        System.out.println("hahahaha "+str);
         assertTrue(str.equals("2,147,483,647,999.12"));
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio) from R3 where id = 2");
@@ -1573,7 +1576,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
-        System.out.println("hahahaha "+str);
         assertTrue(str.equals("-2,147,483,647,999.12"));
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 1");
@@ -1582,8 +1584,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
-        System.out.println("hahahaha dec "+str);
-        //assertTrue(str.equals(""));
+        assertTrue(str.equals("99,999,999,999,999,999,999,999,999.99"));
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 2");
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
@@ -1591,8 +1592,30 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
-        System.out.println("hahahaha dec "+str);
-        //assertTrue(str.equals(""));
+        assertTrue(str.equals("-99,999,999,999,999,999,999,999,999.99"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 3");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("1.50"));
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 4");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertTrue(str.equals("-1.50"));
+
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY('abc') from R3 where id = 4");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+        }
     }
 
     //
