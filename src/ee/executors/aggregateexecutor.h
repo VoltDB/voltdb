@@ -126,11 +126,10 @@ struct AggregateRow
         }
     }
 
-    void recordPassThroughTuple(Pool& memoryPool, const TableTuple &tuple)
+    void recordPassThroughTuple(TableTuple &passThroughTupleSource, const TableTuple &tuple)
     {
-        char* storage = reinterpret_cast<char*>(memoryPool.allocateZeroes(tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
-        m_passThroughTuple = TableTuple (storage, tuple.getSchema());
-        m_passThroughTuple.copy(tuple);
+        passThroughTupleSource.copy(tuple);
+        m_passThroughTuple = passThroughTupleSource;
     }
 
     // A tuple from the group of tuples being aggregated. Source of pass through columns.
@@ -233,7 +232,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    AggregateRow* p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp);
+    AggregateRow* p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
     void p_execute_tuple(const TableTuple& nextTuple);
 
@@ -248,9 +247,11 @@ protected:
 
     AggregateRow * m_aggregateRow;
 
+    TableTuple m_passThroughTupleSource;
+
     // State variables for iteration on input table
     bool m_noInputRows;
-    bool m_failOnPrePredicate;
+    bool m_failPrePredicateOnFirstRow;
 };
 
 }

@@ -189,7 +189,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
     if (m_aggSerialExec != NULL) {
         m_aggSerialExec->setAggregateOutputTable(m_outputTable);
-        will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params, &pmp));
+
+        const TupleSchema * inputSchema = tableIndex->getTupleSchema();
+        if (m_projectionNode != NULL) {
+            inputSchema = m_projectionNode->getOutputTable()->schema();
+        }
+
+        will_finally_delete_aggregate_row.reset(
+                m_aggSerialExec->p_execute_init(params, &pmp, inputSchema));
     }
 
     //

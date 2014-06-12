@@ -195,7 +195,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
         if (m_aggSerialExec != NULL) {
             m_aggSerialExec->setAggregateOutputTable(output_temp_table);
-            will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params, &pmp));
+            const TupleSchema * inputSchema = input_table->schema();
+            if (projection_node != NULL) {
+                inputSchema = projection_node->getOutputTable()->schema();
+            }
+
+            will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params, &pmp, inputSchema));
         }
 
 
