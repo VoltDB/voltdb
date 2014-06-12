@@ -80,7 +80,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
             byte[] catBytes2 = MiscUtils.fileToBytes(new File(catPath2));
 
             DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
-            depBuilder.setVoltRoot("/tmp/jhugg/foobar");
+            depBuilder.setVoltRoot("/tmp/foobar");
+            // disable logging
+            depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
@@ -103,7 +105,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             client = ClientFactory.createClient(clientConfig);
             client.createConnection("localhost");
 
-            client.callProcedure("@LoadMultipartitionTable", "FOO", t1);
+            TableHelper.loadTable(client, t1);
 
             ClientResponseImpl response = (ClientResponseImpl) client.callProcedure(
                     "@UpdateApplicationCatalog", catBytes2, deployment);
@@ -136,10 +138,14 @@ public class TestLiveTableSchemaMigration extends TestCase {
      * Helper if you have quick schema, rather than tables.
      */
     void migrateSchema(String schema1, String schema2) throws Exception {
+        migrateSchema(schema1, schema2, true);
+    }
+
+    void migrateSchema(String schema1, String schema2, boolean withData) throws Exception {
         VoltTable t1 = TableHelper.quickTable(schema1);
         VoltTable t2 = TableHelper.quickTable(schema2);
 
-        migrateSchema(t1, t2);
+        migrateSchema(t1, t2, withData);
     }
 
     /**
@@ -189,6 +195,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
         // reordering columns
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (C:INTEGER, A:BIGINT, B:TINYINT)");
+
+        // change partitioning on an empty table
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)", false);
     }
 
     public void testFixedSchemasNoData() throws Exception {

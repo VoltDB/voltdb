@@ -36,10 +36,6 @@ import org.voltdb.utils.CatalogSizing;
 
 public class CatalogDiffEngine {
 
-    static final String GENERIC_MAT_VIEW_MODIFIED_ERROR =
-       "May not dynamically modify materialized view definitions." +
-       " They must be dropped and added in separate transactions.\n";
-
     //*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
     /// A flag that controls output for debugging.
     private boolean m_triggeredVerbosity = false;
@@ -291,10 +287,12 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return true if the CatalogType can be dynamically added or removed
-     * from a running system.
+     * @return null if the CatalogType can be dynamically added or removed
+     * from a running system. Return an error string if it can't be changed on
+     * a non-empty table. There will be a subsequent check for empty table
+     * feasability.
      */
-    private boolean checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType)
+    private String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType)
     {
         //Will catch several things that are actually just deployment changes, but don't care
         //to be more specific at this point
@@ -318,8 +316,9 @@ public class CatalogDiffEngine {
             // flagging their changes here would be redundant.
             suspect instanceof Constraint ||
             // Support add/drop of the top level object.
-            suspect instanceof Table) {
-            return true;
+            suspect instanceof Table)
+        {
+            return null;
         }
 
         else if (suspect instanceof ColumnRef) {
@@ -331,15 +330,14 @@ public class CatalogDiffEngine {
                     Index newIndex = newIndexes.get(parent.getTypeName());
 
                     if (!checkNewUniqueIndex(newIndex)) {
-                        m_errors.append("May not dynamically remove columns from unique index: " +
-                                parent.getTypeName() + "\n");
-                        return false;
+                        return "May not dynamically remove columns from unique index: " +
+                                parent.getTypeName();
                     }
                 }
             }
 
             // ColumnRef is not part of an index, index is not unique OR unique index is safe to create
-            return true;
+            return null;
         }
 
         else if (suspect instanceof Column) {
@@ -348,19 +346,17 @@ public class CatalogDiffEngine {
             // sub-components of Procedure, Connector, etc. as checked in the loop, below.
             // Is this safe/correct?
             if (m_inStrictMatViewDiffMode) {
-                m_errors.append("May not dynamically add, drop, or rename materialized view columns.\n");
-                return false;
+                return "May not dynamically add, drop, or rename materialized view columns.";
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
                 if ((! col.getNullable()) && (col.getDefaultvalue() == null)) {
-                    m_errors.append("May not dynamically add non-nullable column without default value.\n");
-                    return false;
+                    return "May not dynamically add non-nullable column without default value.";
                 }
             }
             // adding/dropping a column requires isolation from snapshots
             m_requiresSnapshotIsolation = true;
-            return true;
+            return null;
         }
 
         // allow addition/deletion of indexes except for the addition
@@ -368,29 +364,28 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Index) {
             Index index = (Index) suspect;
             if (!index.m_unique) {
-                return true;
+                return null;
             }
 
             // it's cool to remove unique indexes
             if (changeType == ChangeType.DELETION) {
-                return true;
+                return null;
             }
 
             // if adding a unique index, check if the columns in the new
             // index cover an existing index
             if (checkNewUniqueIndex(index)) {
-                return true;
+                return null;
             }
 
-            m_errors.append("May not dynamically add unique indexes that don't cover existing unique indexes.\n");
-            // Note: "return false;" vs. fall through, here
+            // Note: return error vs. fall through, here
             // overrides the grandfathering-in of (any? possible?) added/dropped Index-typed
             // sub-components of Procedure, Connector, etc. as checked in the loop, below.
-            return false;
+            return "May not dynamically add unique indexes that don't cover existing unique indexes.\n";
         }
 
         else if (suspect instanceof MaterializedViewInfo && ! m_inStrictMatViewDiffMode) {
-            return true;
+            return null;
         }
 
         //TODO: This code is also pretty fishy
@@ -409,12 +404,19 @@ public class CatalogDiffEngine {
                                        " of schema object '" + suspect + "'" +
                                        " rescued by context '" + parent + "'");
                 }
-                return true;
+                return null;
             }
         }
 
-        m_errors.append("May not dynamically add/drop schema object: '" + suspect + "'\n");
-        return false;
+        return "May not dynamically add/drop schema object: '" + suspect + "'\n";
+    }
+
+    /**
+     * @return null if the change is not possible under any circumstances. Return the name of a table if
+     * the change could be made if the table of that name had no tuples.
+     */
+    private String checkAddDropIfEmptyTableWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        return null;
     }
 
     private boolean areTableColumnsMutable(Table table) {
@@ -481,18 +483,20 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return true if CatalogType can be dynamically modified
-     * in a running system.
+     * @return null if CatalogType can be dynamically modified
+     * in a running system. Otherwise return an error message that
+     * can be given if it turns out we really can't make the change.
+     * Return "" if the error has already been handled.
      */
-    private boolean checkModifyWhitelist(final CatalogType suspect,
-                                         final CatalogType prevType,
-                                         final String field)
+    private String checkModifyWhitelist(final CatalogType suspect,
+                                        final CatalogType prevType,
+                                        final String field)
     {
         // should generate this from spec.txt
 
         if (suspect instanceof Systemsettings &&
                 (field.equals("elasticPauseTime") || field.equals("elasticThroughput"))) {
-            return true;
+            return null;
         } else {
             m_canOccurWithElasticRebalance = false;
         }
@@ -505,25 +509,25 @@ public class CatalogDiffEngine {
             suspect instanceof UserRef ||
             suspect instanceof GroupRef ||
             suspect instanceof ColumnRef) {
-            return true;
+            return null;
         }
 
         // Support modification of these specific fields
         if (suspect instanceof Database && field.equals("schema"))
-            return true;
+            return null;
         if (suspect instanceof Database && "securityprovider".equals(field))
-            return true;
+            return null;
         if (suspect instanceof Cluster && field.equals("securityEnabled"))
-            return true;
+            return null;
         if (suspect instanceof Cluster && field.equals("adminstartup"))
-            return true;
+            return null;
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
-            return true;
+            return null;
         if (suspect instanceof Constraint && field.equals("index"))
-            return true;
+            return null;
         if (suspect instanceof Table) {
             if (field.equals("signature") || field.equals("tuplelimit"))
-                return true;
+                return null;
         }
 
 
@@ -536,7 +540,7 @@ public class CatalogDiffEngine {
             CatalogType parent = suspect.getParent();
             // can change statements
             if (parent instanceof Statement) {
-                return true;
+                return null;
             }
 
             // all table column changes require snapshot isolation for now
@@ -549,19 +553,22 @@ public class CatalogDiffEngine {
                 // overrides the grandfathering-in of modified fields of
                 // Column-typed sub-components of Procedure and ColumnRef.
                 // Is this safe/correct?
-                return false; // error msg already appended
+                return ""; // error msg already appended
             }
 
-            if (field.equals("index"))
-                return true;
-            if (field.equals("defaultvalue"))
-                return true;
-            if (field.equals("defaulttype"))
-                return true;
+            if (field.equals("index")) {
+                return null;
+            }
+            if (field.equals("defaultvalue")) {
+                return null;
+            }
+            if (field.equals("defaulttype")) {
+                return null;
+            }
             if (field.equals("nullable")) {
                 Boolean nullable = (Boolean) suspect.getField(field);
                 assert(nullable != null);
-                if (nullable) return true;
+                if (nullable) return null;
                 restrictionQualifier = " from nullable to non-nullable";
             }
             else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
@@ -583,7 +590,7 @@ public class CatalogDiffEngine {
 
                 if (checkIfColumnTypeChangeIsSupported(oldType, oldSize, newType, newSize,
                         oldInBytes, newInBytes)) {
-                    return true;
+                    return null;
                 }
                 if (oldTypeInt == newTypeInt) {
                     if (oldType == VoltType.STRING && oldInBytes == false && newInBytes == true) {
@@ -608,7 +615,7 @@ public class CatalogDiffEngine {
                         field.equals("aggregationExpressionsJson")) {
                     if (AbstractExpression.areOverloadedJSONExpressionLists((String)prevType.getField(field),
                             (String)suspect.getField(field))) {
-                        return true;
+                        return null;
                     }
                 }
             }
@@ -640,13 +647,29 @@ public class CatalogDiffEngine {
                                        restrictionQualifier +
                                        " rescued by context '" + parent + "'");
                 }
-                return true;
+                return null;
             }
         }
 
-        m_errors.append("May not dynamically modify field '" + field +
-                        "' of schema object '" + suspect + "'" + restrictionQualifier + "\n");
-        return false;
+        return "May not dynamically modify field '" + field +
+                        "' of schema object '" + suspect + "'" + restrictionQualifier;
+    }
+
+    /**
+     * @return null if the change is not possible under any circumstances. Return the name of a table if
+     * the change could be made if the table of that name had no tuples.
+     */
+    public String checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
+                                                     final CatalogType prevType,
+                                                     final String field)
+    {
+        if (field.equalsIgnoreCase("isreplicated")) {
+            return suspect.getTypeName();
+        }
+        if (field.equalsIgnoreCase("partitioncolumn")) {
+            return suspect.getTypeName();
+        }
+        return null;
     }
 
     /**
@@ -660,8 +683,32 @@ public class CatalogDiffEngine {
         }
 
         // verify this is possible, write an error and mark return code false if so
-        if (checkModifyWhitelist(newType, prevType, field) == false) {
-            m_supported = false;
+        String errorMessage = checkModifyWhitelist(newType, prevType, field);
+
+        // if it's not possible with non-empty tables, check for possible with empty tables
+        if (errorMessage != null) {
+            String tableName = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
+
+            // if no tablename, then it's just not possible
+            if (tableName == null) {
+                m_supported = false;
+                m_errors.append(errorMessage);
+            }
+            // otherwise, it's possible if a specific table is empty
+            // collect the error message(s) and decide if it can be done inside @UAC
+            else {
+                String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
+                if (errorMessage.length() == 0) {
+                    // the empty string presumes there is already an error for this table
+                    assert(existingErrorMessagesForNonEmptyTable != null);
+                }
+                else {
+                    if (existingErrorMessagesForNonEmptyTable != null) {
+                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                    }
+                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                }
+            }
         }
 
         // write the commands to make it so
@@ -690,8 +737,32 @@ public class CatalogDiffEngine {
         }
 
         // verify this is possible, write an error and mark return code false if so
-        if (checkAddDropWhitelist(prevType, ChangeType.DELETION) == false) {
-            m_supported = false;
+        String errorMessage = checkAddDropWhitelist(prevType, ChangeType.DELETION);
+
+        // if it's not possible with non-empty tables, check for possible with empty tables
+        if (errorMessage != null) {
+            String tableName = checkAddDropIfEmptyTableWhitelist(prevType, ChangeType.DELETION);
+
+            // if no tablename, then it's just not possible
+            if (tableName == null) {
+                m_supported = false;
+                m_errors.append(errorMessage);
+            }
+            // otherwise, it's possible if a specific table is empty
+            // collect the error message(s) and decide if it can be done inside @UAC
+            else {
+                String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
+                if (errorMessage.length() == 0) {
+                    // the empty string presumes there is already an error for this table
+                    assert(existingErrorMessagesForNonEmptyTable != null);
+                }
+                else {
+                    if (existingErrorMessagesForNonEmptyTable != null) {
+                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                    }
+                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                }
+            }
         }
 
         // write the commands to make it so
@@ -713,8 +784,32 @@ public class CatalogDiffEngine {
             return;
         }
         // verify this is possible, write an error and mark return code false if so
-        if (checkAddDropWhitelist(newType, ChangeType.ADDITION) == false) {
-            m_supported = false;
+        String errorMessage = checkAddDropWhitelist(newType, ChangeType.ADDITION);
+
+        // if it's not possible with non-empty tables, check for possible with empty tables
+        if (errorMessage != null) {
+            String tableName = checkAddDropIfEmptyTableWhitelist(newType, ChangeType.ADDITION);
+
+            // if no tablename, then it's just not possible
+            if (tableName == null) {
+                m_supported = false;
+                m_errors.append(errorMessage);
+            }
+            // otherwise, it's possible if a specific table is empty
+            // collect the error message(s) and decide if it can be done inside @UAC
+            else {
+                String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
+                if (errorMessage.length() == 0) {
+                    // the empty string presumes there is already an error for this table
+                    assert(existingErrorMessagesForNonEmptyTable != null);
+                }
+                else {
+                    if (existingErrorMessagesForNonEmptyTable != null) {
+                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                    }
+                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                }
+            }
         }
 
         // write the commands to make it so

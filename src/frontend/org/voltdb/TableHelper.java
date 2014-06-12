@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1092,5 +1093,61 @@ public class TableHelper {
         System.out.printf("Deleted %d odd rows\n", deleteCount.get());
 
         return deleteCount.get();
+    }
+
+    /**
+     * A fairly straighforward loader for tables with metadata and rows. Maybe this could
+     * be faster or have better error messages? Meh.
+     *
+     * @param client Client connected to a VoltDB instance containing a table with same name
+     * and schema as the VoltTable parameter named "t".
+     * @param t A table with extra metadata and presumably some data in it.
+     * @throws Exception
+     */
+    public static void loadTable(Client client, VoltTable t) throws Exception {
+        // ensure table is annotated
+        assert(t.m_name != null);
+
+        // replicated tables
+        if (t.m_partitionColIndex == -1) {
+            client.callProcedure("@LoadMultipartitionTable", t.m_name, t);
+        }
+
+        // partitioned tables
+        else {
+            final AtomicBoolean failed = new AtomicBoolean(false);
+            final CountDownLatch latch = new CountDownLatch(t.getRowCount());
+            int columns = t.getColumnCount();
+            String procedureName = t.m_name.toUpperCase() + ".insert";
+
+            // callback for async row insertion tracks response count + failure
+            final ProcedureCallback insertCallback = new ProcedureCallback() {
+                @Override
+                public void clientCallback(ClientResponse clientResponse) throws Exception {
+                    latch.countDown();
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                        failed.set(true);
+                    }
+                }
+            };
+
+            // async insert all the rows
+            t.resetRowPosition();
+            while (t.advanceRow()) {
+                Object params[] = new Object[columns];
+                for (int i = 0; i < columns; ++i) {
+                    params[i] = t.get(i, t.getColumnType(i));
+                }
+                client.callProcedure(insertCallback, procedureName, params);
+            }
+
+            // block until all inserts are done
+            latch.await();
+
+            // throw a generic exception if anything fails
+            if (failed.get()) {
+                throw new RuntimeException("TableHelper.load failed.");
+            }
+        }
     }
 }
