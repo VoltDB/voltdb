@@ -15,10 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 package org.voltdb.planner;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +29,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * Represents the partitioning of the data underlying a statement.
@@ -79,7 +79,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
  *
  * See the comment in SelectSubPlanAssembler.getSelectSubPlanForJoin
  */
-public class PartitioningForStatement implements Cloneable{
+public class StatementPartitioning implements Cloneable{
     /**
      * This value is only meaningful if m_inferPartitioning is false.
      * It can be set true to force single-partition statement planning and
@@ -103,7 +103,7 @@ public class PartitioningForStatement implements Cloneable{
      * For partitioned table DML, caches the partitioning column for later matching with its prospective value.
      * If that value is constant or a parameter, SP is an option.
      */
-    private Column m_partitionCol; // Not used in SELECT plans.
+    private Column m_partitionColForDML; // Not used in SELECT plans.
     /*
      * For a multi-partition statement that can definitely be run SP, this is a constant partitioning key value
      * inferred from the analysis (suitable for hashinating).
@@ -139,32 +139,25 @@ public class PartitioningForStatement implements Cloneable{
      */
     private String m_fullColumnName;
 
-
-    private List<PartitioningForStatement> m_subqueriesPartitionings = new ArrayList<>();
-
-    public void addPartitioningFromSubquery(PartitioningForStatement partitioning) {
-        m_subqueriesPartitionings.add(partitioning);
-    }
-
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
      */
-    private PartitioningForStatement(boolean inferPartitioning, boolean forceSP) {
+    private StatementPartitioning(boolean inferPartitioning, boolean forceSP) {
         m_inferPartitioning = inferPartitioning;
         m_forceSP = forceSP;
     }
 
-    public static PartitioningForStatement forceSP() {
-        return new PartitioningForStatement(false, true);
+    public static StatementPartitioning forceSP() {
+        return new StatementPartitioning(false, true);
     }
 
-    public static PartitioningForStatement forceMP() {
-        return new PartitioningForStatement(false, false);
+    public static StatementPartitioning forceMP() {
+        return new StatementPartitioning(false, false);
     }
 
-    public static PartitioningForStatement inferPartitioning() {
-        return new PartitioningForStatement(true, /* default to MP */ false);
+    public static StatementPartitioning inferPartitioning() {
+        return new StatementPartitioning(true, /* default to MP */ false);
     }
 
 
@@ -177,7 +170,7 @@ public class PartitioningForStatement implements Cloneable{
      */
     @Override
     public Object clone() {
-        return new PartitioningForStatement(m_inferPartitioning, m_forceSP);
+        return new StatementPartitioning(m_inferPartitioning, m_forceSP);
     }
 
     /**
@@ -192,7 +185,7 @@ public class PartitioningForStatement implements Cloneable{
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
     public void addPartitioningExpression(String fullColumnName, AbstractExpression constExpr,
-                                          VoltType valueType) {
+            VoltType valueType) {
         if (m_fullColumnName == null) {
             m_fullColumnName = fullColumnName;
         }
@@ -291,17 +284,17 @@ public class PartitioningForStatement implements Cloneable{
      * accessor
      * @param partitioncolumn
      */
-    public void setPartitioningColumn(Column partitioncolumn) {
+    public void setPartitioningColumnForDML(Column partitioncolumn) {
         if (m_inferPartitioning) {
-            m_partitionCol = partitioncolumn; // Not used in SELECT plans.
+            m_partitionColForDML = partitioncolumn; // Not used in SELECT plans.
         }
     }
 
     /**
      * @return
      */
-    public Column getColumn() {
-        return m_partitionCol;
+    public Column getPartitionColForDML() {
+        return m_partitionColForDML;
     }
 
     /**
@@ -340,21 +333,20 @@ public class PartitioningForStatement implements Cloneable{
             // The interpretation of this edge case is that the table has "randomly distributed data".
             // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
             // because it has no recognized partitioning join key.
-            String columnNeedingCoverage = tableScan.getPartitionColumnName();
-            String partitionedTableAlias = tableScan.getTableAlias();
-            boolean unfiltered = true;
+            List<SchemaColumn> columnsNeedingCoverage = tableScan.getPartitioningColumns();
 
+            if (tableScan instanceof StmtSubqueryScan) {
+                StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
+                subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
+            }
+
+            boolean unfiltered = true;
             for (AbstractExpression candidateColumn : valueEquivalence.keySet()) {
                 if ( ! (candidateColumn instanceof TupleValueExpression)) {
                     continue;
                 }
                 TupleValueExpression candidatePartitionKey = (TupleValueExpression) candidateColumn;
-                assert(candidatePartitionKey.getTableAlias() != null);
-                if ( ! candidatePartitionKey.getTableAlias().equals(partitionedTableAlias)) {
-                    continue;
-                }
-                String candidateColumnName = candidatePartitionKey.getColumnName();
-                if ( ! candidateColumnName.equals(columnNeedingCoverage)) {
+                if (! canCoverPartitioningColumn(candidatePartitionKey, columnsNeedingCoverage)) {
                     continue;
                 }
                 unfiltered = false;
@@ -383,40 +375,34 @@ public class PartitioningForStatement implements Cloneable{
                     break;
                 }
             }
-        } else {
-            cloneSubqueryPartitionExpressionIfOnlyOne();
         }
 
         return m_countOfIndependentlyPartitionedTables;
     }
 
+    private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,
+            List<SchemaColumn> columnsNeedingCoverage) {
+        if (columnsNeedingCoverage == null)
+            return false;
 
-    private void cloneSubqueryPartitionExpressionIfOnlyOne() {
-        if (m_subqueriesPartitionings.size() == 0) {
-            return;
-        }
+        for (SchemaColumn col: columnsNeedingCoverage) {
+            String partitionedTableAlias = col.getTableAlias();
+            String columnNeedingCoverage = col.getColumnAlias();
 
-        PartitioningForStatement singlePartitionStmt = null;
-        int ct = 0;
-        for (PartitioningForStatement pStmt: m_subqueriesPartitionings) {
-            if (pStmt.requiresTwoFragments()) {
-                return;
+            assert(candidatePartitionKey.getTableAlias() != null);
+            if ( ! candidatePartitionKey.getTableAlias().equals(partitionedTableAlias)) {
+                continue;
             }
-            assert(pStmt.getCountOfIndependentlyPartitionedTables() <= 1);
-            // count sub-selects with partitioned tables
-            if (pStmt.getCountOfIndependentlyPartitionedTables() == 1) {
-                if (++ct > 1) {
-                    return;
-                }
-                singlePartitionStmt = pStmt;
+            String candidateColumnName = candidatePartitionKey.getColumnName();
+            if ( ! candidateColumnName.equals(columnNeedingCoverage)) {
+                continue;
             }
+
+            // Maybe need more checkings
+            return true;
         }
 
-        if (ct != 1) {
-            return;
-        }
-
-        m_inferredExpression.add(singlePartitionStmt.singlePartitioningExpression());
+        return false;
     }
 
     /**

@@ -824,9 +824,9 @@ public class ExpressionColumn extends Expression {
     {
         if (tableName != null) {
             if (rangeVariable != null && rangeVariable.rangeTable != null &&
-                    rangeVariable.tableAlias == null &&
+                    rangeVariable.tableAlias != null &&
                     rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-                exp.attributes.put("table", tableName.toUpperCase() + rangeVariable.rangeTable.getName().hashCode());
+                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
             } else {
                 exp.attributes.put("table", tableName.toUpperCase());
             }

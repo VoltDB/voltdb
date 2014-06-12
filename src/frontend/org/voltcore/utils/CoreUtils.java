@@ -40,8 +40,11 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -49,6 +52,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -63,6 +67,7 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -78,6 +83,316 @@ public class CoreUtils {
         public void run() {
 
         }
+    };
+
+    public static final ExecutorService SAMETHREADEXECUTOR = new ExecutorService() {
+
+        @Override
+        public void execute(Runnable command) {
+            if (command == null) throw new NullPointerException();
+            command.run();
+        }
+
+        @Override
+        public void shutdown() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return false;
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit)
+                throws InterruptedException {
+            return true;
+        }
+
+        @Override
+        public <T> Future<T> submit(Callable<T> task) {
+            Preconditions.checkNotNull(task);
+            FutureTask<T> retval = new FutureTask<T>(task);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public <T> Future<T> submit(Runnable task, T result) {
+            Preconditions.checkNotNull(task);
+            FutureTask<T> retval = new FutureTask<T>(task, result);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public Future<?> submit(Runnable task) {
+            Preconditions.checkNotNull(task);
+            FutureTask<Object> retval = new FutureTask<Object>(task, null);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public <T> List<Future<T>> invokeAll(
+                Collection<? extends Callable<T>> tasks)
+                throws InterruptedException {
+            Preconditions.checkNotNull(tasks);
+            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            for (Callable<T> c : tasks) {
+                FutureTask<T> ft = new FutureTask<T>(c);
+                retval.add(new FutureTask<T>(c));
+                ft.run();
+            }
+            return retval;
+        }
+
+        @Override
+        public <T> List<Future<T>> invokeAll(
+                Collection<? extends Callable<T>> tasks, long timeout,
+                TimeUnit unit) throws InterruptedException {
+            Preconditions.checkNotNull(tasks);
+            Preconditions.checkNotNull(unit);
+
+            final long end = System.nanoTime() + unit.toNanos(timeout);
+
+            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            for (Callable<T> c : tasks) {
+                retval.add(new FutureTask<T>(c));
+            }
+
+            int size = retval.size();
+            int ii = 0;
+            for (; ii < size; ii++) {
+                @SuppressWarnings("rawtypes")
+                FutureTask ft = (FutureTask)retval.get(ii);
+                ft.run();
+                if (System.nanoTime() > end) break;
+            }
+
+            for (; ii < size; ii++) {
+                @SuppressWarnings("rawtypes")
+                FutureTask ft = (FutureTask)retval.get(ii);
+                ft.cancel(false);
+            }
+
+            return retval;
+        }
+
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                throws InterruptedException, ExecutionException {
+            T retval = null;
+            Throwable lastException = null;
+            boolean haveRetval = false;
+            for (Callable<T> c : tasks) {
+                try {
+                    retval = c.call();
+                    haveRetval = true;
+                    break;
+                } catch (Throwable t) {
+                    lastException = t;
+                }
+            }
+
+            if (haveRetval) {
+                return retval;
+            } else {
+                throw new ExecutionException(lastException);
+            }
+        }
+
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                long timeout, TimeUnit unit) throws InterruptedException,
+                ExecutionException, TimeoutException {
+            final long end = System.nanoTime() + unit.toNanos(timeout);
+            T retval = null;
+            Throwable lastException = null;
+            boolean haveRetval = false;
+            for (Callable<T> c : tasks) {
+                if (System.nanoTime() > end) throw new TimeoutException();
+                try {
+                    retval = c.call();
+                    haveRetval = true;
+                    break;
+                } catch (Throwable t) {
+                    lastException = t;
+                }
+            }
+
+            if (haveRetval) {
+                return retval;
+            } else {
+                throw new ExecutionException(lastException);
+            }
+        }
+
+    };
+
+    public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = new ListeningExecutorService() {
+
+        @Override
+        public void execute(Runnable command) {
+            if (command == null) throw new NullPointerException();
+            command.run();
+        }
+
+        @Override
+        public void shutdown() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return false;
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit)
+                throws InterruptedException {
+            return true;
+        }
+
+        @Override
+        public <T> ListenableFuture<T> submit(Callable<T> task) {
+            Preconditions.checkNotNull(task);
+            ListenableFutureTask<T> retval = ListenableFutureTask.create(task);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public <T> ListenableFuture<T> submit(Runnable task, T result) {
+            Preconditions.checkNotNull(task);
+            ListenableFutureTask<T> retval = ListenableFutureTask.create(task, result);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public ListenableFuture<?> submit(Runnable task) {
+            Preconditions.checkNotNull(task);
+            ListenableFutureTask<Object> retval = ListenableFutureTask.create(task, null);
+            retval.run();
+            return retval;
+        }
+
+        @Override
+        public <T> List<Future<T>> invokeAll(
+                Collection<? extends Callable<T>> tasks)
+                throws InterruptedException {
+            Preconditions.checkNotNull(tasks);
+            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            for (Callable<T> c : tasks) {
+                FutureTask<T> ft = new FutureTask<T>(c);
+                retval.add(new FutureTask<T>(c));
+                ft.run();
+            }
+            return retval;
+        }
+
+        @Override
+        public <T> List<Future<T>> invokeAll(
+                Collection<? extends Callable<T>> tasks, long timeout,
+                TimeUnit unit) throws InterruptedException {
+            Preconditions.checkNotNull(tasks);
+            Preconditions.checkNotNull(unit);
+
+            final long end = System.nanoTime() + unit.toNanos(timeout);
+
+            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            for (Callable<T> c : tasks) {
+                retval.add(new FutureTask<T>(c));
+            }
+
+            int size = retval.size();
+            int ii = 0;
+            for (; ii < size; ii++) {
+                @SuppressWarnings("rawtypes")
+                FutureTask ft = (FutureTask)retval.get(ii);
+                ft.run();
+                if (System.nanoTime() > end) break;
+            }
+
+            for (; ii < size; ii++) {
+                @SuppressWarnings("rawtypes")
+                FutureTask ft = (FutureTask)retval.get(ii);
+                ft.cancel(false);
+            }
+
+            return retval;
+        }
+
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                throws InterruptedException, ExecutionException {
+            T retval = null;
+            Throwable lastException = null;
+            boolean haveRetval = false;
+            for (Callable<T> c : tasks) {
+                try {
+                    retval = c.call();
+                    haveRetval = true;
+                    break;
+                } catch (Throwable t) {
+                    lastException = t;
+                }
+            }
+
+            if (haveRetval) {
+                return retval;
+            } else {
+                throw new ExecutionException(lastException);
+            }
+        }
+
+        @Override
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                long timeout, TimeUnit unit) throws InterruptedException,
+                ExecutionException, TimeoutException {
+            final long end = System.nanoTime() + unit.toNanos(timeout);
+            T retval = null;
+            Throwable lastException = null;
+            boolean haveRetval = false;
+            for (Callable<T> c : tasks) {
+                if (System.nanoTime() > end) throw new TimeoutException();
+                try {
+                    retval = c.call();
+                    haveRetval = true;
+                    break;
+                } catch (Throwable t) {
+                    lastException = t;
+                }
+            }
+
+            if (haveRetval) {
+                return retval;
+            } else {
+                throw new ExecutionException(lastException);
+            }
+        }
+
     };
 
     public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
@@ -676,4 +991,20 @@ public class CoreUtils {
             return queue.take();
         }
     }
+
+    /*
+     * This method manages the whitelist of all acceptable Throwables (and Exceptions) that
+     * will not cause the Server harm if they occur while invoking the initializer of a stored
+     * procedure or while calling the stored procedure.
+     */
+    public static final boolean isStoredProcThrowableFatalToServer(Throwable th) {
+        if (th instanceof LinkageError || th instanceof AssertionError) {
+            return false;
+        }
+        if (th instanceof Exception) {
+            return false;
+        }
+        return true;
+    };
+
 }

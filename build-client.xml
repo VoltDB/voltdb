@@ -234,6 +234,7 @@ JAVA COMPILATION
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
                   org/voltcore/utils/Bits.java
+                  org/voltcore/utils/LatencyWatchdog.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java

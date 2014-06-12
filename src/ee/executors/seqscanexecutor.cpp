@@ -132,12 +132,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     int num_of_columns = (int)output_table->columnCount();
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (projection_node != NULL) {
-        for (int ctr = 0; ctr < num_of_columns; ctr++) {
-            assert(projection_node->getOutputColumnExpressions()[ctr]);
-            projection_node->getOutputColumnExpressions()[ctr]->substitute(params);
-        }
-    }
 
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -162,16 +156,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(input_table->schema());
-        TableIterator iterator = input_table->iterator();
+        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
         {
             VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
-            predicate->substitute(params);
-            assert(predicate != NULL);
-            VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
-                       predicate->debug(true).c_str());
         }
 
         int limit = -1;

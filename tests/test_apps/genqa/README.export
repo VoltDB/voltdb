@@ -4,6 +4,7 @@ Quick hacky description on running the long-running export test.
 -- If you are using eclipse build make sure zkclient jars (zkclient-0.3.jar,zookeeper-3.3.4.jar) are in classpath
 -- The jars are not in repo and must be downloaded and added to classpath.
 -- To add zookeeper jars in your classpath set ZKLIB to point to directory where these jars exist.
+-- If running under apprunner export APPRUNNER_CLIENT_CLASSPATH="/home/opt/kafka/libs/zkclient-0.3.jar"
 ./run.sh catalog
 
 TO RUN remote Export Client Test:

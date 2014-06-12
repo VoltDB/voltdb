@@ -30,7 +30,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
@@ -61,7 +61,7 @@ public abstract class StatementCompiler {
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String stmt, String joinOrder,
-            DeterminismMode detMode, PartitioningForStatement partitioning)
+            DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility

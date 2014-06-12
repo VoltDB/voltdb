@@ -1340,7 +1340,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
                     }
                 }
-            }, MoreExecutors.sameThreadExecutor());
+            }, CoreUtils.SAMETHREADEXECUTOR);
         }
     }
 
@@ -2108,7 +2108,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.work.type;
+        task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info
@@ -2335,7 +2335,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     c.writeStream().enqueue(buf);
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
 
         //Return the future task for test code
         return ft;
@@ -2456,7 +2456,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);

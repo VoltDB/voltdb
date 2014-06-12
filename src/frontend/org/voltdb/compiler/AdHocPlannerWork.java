@@ -34,9 +34,6 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     // -- otherwise, it contains one element to support @AdHocSpForTest and
     // ad hoc statements queued within single-partition stored procs.
     final Object[] userPartitionKey;
-    public final ProcedureInvocationType type;
-    public final long originalTxnId;
-    public final long originalUniqueId;
     public final boolean isExplainWork;
 
     public AdHocPlannerWork(long replySiteId, long clientHandle, long connectionId,
@@ -49,7 +46,9 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
-              adminConnection, clientConnection, completionHandler);
+              adminConnection, clientConnection, type,
+              originalTxnId, originalUniqueId,
+              completionHandler);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements;
         this.userParamSet = userParamSet;
@@ -57,9 +56,6 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         this.isExplainWork = isExplain;
         this.inferPartitioning = inferPartitioning;
         this.userPartitionKey = userPartitionKey;
-        this.type = type;
-        this.originalUniqueId = originalUniqueId;
-        this.originalTxnId = originalTxnId;
     }
 
     /**
@@ -80,7 +76,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.isExplainWork,
                 orig.inferPartitioning,
                 orig.userPartitionKey,
-                orig.type,
+                orig.invocationType,
                 orig.originalTxnId,
                 orig.originalUniqueId,
                 completionHandler);
