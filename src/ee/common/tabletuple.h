@@ -282,6 +282,10 @@ public:
         return m_schema;
     }
 
+    inline void setSchema(const TupleSchema * schema) {
+        m_schema = schema;
+    }
+
     /** Print out a human readable description of this tuple */
     std::string debug(const std::string& tableName) const;
     std::string debugNoHeader() const;
@@ -379,7 +383,12 @@ private:
  */
 class PoolBackedTupleStorage {
 public:
-    PoolBackedTupleStorage(const TupleSchema* schema, Pool* pool) : m_tuple(schema), m_pool(pool) { }
+    PoolBackedTupleStorage():m_tuple(), m_pool(NULL) {}
+
+    void init(const TupleSchema* schema, Pool* pool) {
+        m_tuple.setSchema(schema);
+        m_pool = pool;
+    }
 
     void allocateActiveTuple()
     {
