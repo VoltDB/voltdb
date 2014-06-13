@@ -101,14 +101,19 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     }
 
 
-    //
-    // OPTIMIZATION: INLINE AGGREGATION (serial only)
-    //
+    // Inline aggregation can be serial and hash
     AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
     if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline aggregation stuff...");
-        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggSerialExec);
+        VOLT_TRACE("init inline serial aggregation stuff...");
+        m_aggExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+        assert(m_aggExec);
+    } else {
+        AggregatePlanNode* agg_hash_node = dynamic_cast<AggregatePlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE));
+        if (agg_hash_node != NULL) {
+            VOLT_TRACE("init inline hash aggregation stuff...");
+            m_aggExec = dynamic_cast<AggregateHashExecutor*>(agg_hash_node->getExecutor());
+            assert(m_aggExec);
+        }
     }
 
     return true;
@@ -164,7 +169,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL || m_aggSerialExec != NULL)
+        limit_node != NULL || m_aggExec != NULL)
     {
         //
         // Just walk through the table using our iterator and apply
@@ -192,13 +197,13 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
 
-        if (m_aggSerialExec != NULL) {
-            m_aggSerialExec->setAggregateOutputTable(output_temp_table);
+        if (m_aggExec != NULL) {
+            m_aggExec->setAggregateOutputTable(output_temp_table);
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
-            m_aggSerialExec->p_execute_init(params, &pmp, inputSchema);
+            m_aggExec->p_execute_init(params, &pmp, inputSchema);
         }
 
 
@@ -228,7 +233,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 {
                     VOLT_TRACE("inline projection...");
                     TableTuple temp_tuple;
-                    if (m_aggSerialExec != NULL) {
+                    if (m_aggExec != NULL) {
                         temp_tuple = projection_node->getOutputTable()->tempTuple();
                     } else {
                         temp_tuple = output_temp_table->tempTuple();
@@ -239,16 +244,16 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         temp_tuple.setNValue(ctr, value);
                     }
 
-                    if (m_aggSerialExec != NULL) {
-                        m_aggSerialExec->p_execute_tuple(temp_tuple);
+                    if (m_aggExec != NULL) {
+                        m_aggExec->p_execute_tuple(temp_tuple);
                     } else {
                         output_temp_table->insertTupleNonVirtual(temp_tuple);
                     }
                 }
                 else
                 {
-                    if (m_aggSerialExec != NULL) {
-                        m_aggSerialExec->p_execute_tuple(tuple);
+                    if (m_aggExec != NULL) {
+                        m_aggExec->p_execute_tuple(tuple);
                     } else {
                         //
                         // Insert the tuple into our output table
@@ -260,8 +265,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (m_aggSerialExec != NULL) {
-            m_aggSerialExec->p_execute_finish();
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
         }
 
     }
