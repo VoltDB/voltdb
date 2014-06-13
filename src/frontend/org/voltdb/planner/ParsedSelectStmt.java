@@ -912,15 +912,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    public LimitPlanNode getLimitNode(boolean top) {
-        LimitPlanNode tmpNode = m_limitNodeDist;
-        if (top) {
-            tmpNode = m_limitNodeTop;
-        }
-        return new LimitPlanNode(tmpNode);
+    public LimitPlanNode getLimitNodeTop() {
+        return new LimitPlanNode(m_limitNodeTop);
     }
 
-
+    public LimitPlanNode getLimitNodeDist() {
+        return new LimitPlanNode(m_limitNodeDist);
+    }
 
     @Override
     public String toString() {

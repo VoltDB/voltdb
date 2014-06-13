@@ -1249,7 +1249,7 @@ public class PlanAssembler {
         // If planning "order by ... limit", getNextSelectPlan()
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
-        LimitPlanNode topLimit = m_parsedSelect.getLimitNode(true);
+        LimitPlanNode topLimit = m_parsedSelect.getLimitNodeTop();
 
         /*
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
@@ -1285,7 +1285,7 @@ public class PlanAssembler {
              * was not a hard-coded constant and didn't get parameterized.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
-            LimitPlanNode distLimit = m_parsedSelect.getLimitNode(false);
+            LimitPlanNode distLimit = m_parsedSelect.getLimitNodeDist();
 
             // Disconnect the distributed parts of the plan below the SEND node
             AbstractPlanNode distributedPlan = sendNode.getChild(0);

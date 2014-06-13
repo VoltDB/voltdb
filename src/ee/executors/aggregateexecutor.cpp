@@ -554,7 +554,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableIterator it = input_table->iterator();
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
