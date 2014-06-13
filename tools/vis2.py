@@ -84,6 +84,8 @@ class Plot:
         plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
         plt.grid(True)
         self.fig.autofmt_xdate()
+        plt.ylabel(ylabel)
+        plt.xlabel(xlabel)
 
     def plot(self, x, y, color, marker_shape, legend, linestyle):
         self.ax.plot(x, y, linestyle, label=legend, color=color,
@@ -324,26 +326,26 @@ def main():
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
-        resp = proc.call(["select series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
+        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
         conn.close()
 
         app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
 
-        if len(resp.tables[0].tuples) > 0:
-            legend = resp.tables[0].tuples
-        else:
-            legend = [ ('lat95',    "avg latency95",             "Time",     "Latency (ms)"),
-                       ('lat99',    "avg latency99",             "Time",     "latency (ms)"),
-                       ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
-                     ]
+        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
+                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
+                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node")
+                 }
+
+        for r in resp.tables[0].tuples:
+            legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4])
 
         fns = [app]
         flags = dict()
-        for r in legend:
-            title = app + " " + r[1]
+        for r in legend.itervalues():
+            title = app + " " + r['heading']
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            f = plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate)
             flags.update(f)
 
         fns.append(iorder)
