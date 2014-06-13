@@ -86,11 +86,9 @@ class ExecutorContext {
     }
 
     // data available via quiesce()
-    void setupForQuiesce(int64_t lastCommittedSpHandle) {
+    void setupForQuiesce(int64_t lastCommittedSpHandle, int64_t currentSpHadle) {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        if (m_spHandle < lastCommittedSpHandle) {
-            m_spHandle = lastCommittedSpHandle;
-        }
+        m_spHandle = currentSpHadle;
     }
 
     // for test (VoltDBEngine::getExecutorContext())

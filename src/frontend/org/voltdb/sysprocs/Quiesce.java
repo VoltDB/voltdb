@@ -30,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.dtxn.TransactionState;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -58,8 +59,9 @@ public class Quiesce extends VoltSystemProcedure {
     {
         try {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
+                TransactionState txnState = m_runner.getTxnState();
                 // tell each site to quiesce
-                context.getSiteProcedureConnection().quiesce();
+                context.getSiteProcedureConnection().quiesce(txnState.m_spHandle);
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
                 return new DependencyPair(DEP_SITES, results);

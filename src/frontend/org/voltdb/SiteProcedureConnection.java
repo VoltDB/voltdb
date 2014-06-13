@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -162,7 +161,7 @@ public interface SiteProcedureConnection {
 
     public void tick();
 
-    public void quiesce();
+    public void quiesce(long currentSpHandle);
 
     public void exportAction(boolean syncAction,
                              long ackOffset,

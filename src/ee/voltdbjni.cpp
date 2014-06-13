@@ -752,14 +752,14 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick
  * Called to instruct the EE to reach an idle steady state.
  */
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuiesce
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong lastCommittedSpHandle)
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong lastCommittedSpHandle, jlong currentSpHandle)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         // JNIEnv pointer can change between calls, must be updated
         updateJNILogProxy(engine);
-        engine->quiesce(lastCommittedSpHandle);
+        engine->quiesce(lastCommittedSpHandle, currentSpHandle);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }

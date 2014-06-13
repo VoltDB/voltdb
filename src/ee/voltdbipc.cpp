@@ -548,12 +548,13 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     struct quiesce {
         struct ipc_command cmd;
         int64_t lastSpHandle;
+        int64_t currentSpHandle;
     }__attribute__((packed));
 
     struct quiesce *cs = (struct quiesce*)cmd;
 
     try {
-        m_engine->quiesce(ntohll(cs->lastSpHandle));
+        m_engine->quiesce(ntohll(cs->lastSpHandle), ntohll(cs->currentSpHandle));
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }

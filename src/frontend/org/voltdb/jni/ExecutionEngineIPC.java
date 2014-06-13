@@ -749,11 +749,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void quiesce(long lastCommittedSpHandle) {
+    public void quiesce(long lastCommittedSpHandle, long currentSpHandle) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Quiesce.m_id);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(currentSpHandle);
         try {
             m_data.flip();
             m_connection.write();

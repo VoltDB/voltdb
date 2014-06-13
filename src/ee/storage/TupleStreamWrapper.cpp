@@ -47,7 +47,7 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
       // this allows initial ticks to succeed after rejoins
-      m_openSpHandle(0),
+      m_openSpHandle(std::numeric_limits<int64_t>::min()),
       m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
       m_signature(""), m_generation(0)
@@ -59,7 +59,7 @@ void
 TupleStreamWrapper::setDefaultCapacity(size_t capacity)
 {
     assert (capacity > 0);
-    if (m_uso != 0 || m_openSpHandle != 0 ||
+    if (m_uso != 0 || m_openSpHandle != std::numeric_limits<int64_t>::min() ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {
         throwFatalException("setDefaultCapacity only callable before "
@@ -111,7 +111,7 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
          * is not reset and remains constant. USO is really just for transport purposes.
          */
         m_uso = 0;
-        m_openSpHandle = 0;
+        m_openSpHandle = std::numeric_limits<int64_t>::min();
         m_openTransactionUso = 0;
         m_committedSpHandle = 0;
         m_committedUso = 0;
@@ -320,9 +320,7 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            m_lastFlush = timeInMillis;
-        }
+        m_lastFlush = timeInMillis;
 
         /*
          * handle cases when the currentSpHandle was set by rejoin
@@ -331,10 +329,11 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            extendBufferChain(0);
-            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
+        if (currentSpHandle == std::numeric_limits<int64_t>::min()) {
+            currentSpHandle = m_openSpHandle;
         }
+        extendBufferChain(0);
+        commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
     }
 }
 
