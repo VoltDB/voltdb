@@ -165,7 +165,7 @@ public:
 
     void executeAggBase(const NValueArray& params);
 
-    virtual AggregateRow* p_execute_init(const NValueArray& params,
+    virtual void p_execute_init(const NValueArray& params,
             ProgressMonitorProxy* pmp, const TupleSchema * schema) = 0;
     virtual void p_execute_tuple(const TableTuple& nextTuple) = 0;
     virtual void p_execute_finish() = 0;
@@ -227,7 +227,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateHashExecutor() { }
 
-    AggregateRow* p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
@@ -250,7 +250,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    AggregateRow* p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
     void p_execute_tuple(const TableTuple& nextTuple);
 

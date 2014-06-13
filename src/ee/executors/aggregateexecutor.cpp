@@ -459,7 +459,7 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
     }
 }
 
-AggregateRow* AggregateHashExecutor::p_execute_init(const NValueArray& params,
+void AggregateHashExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * schema)
 {
     VOLT_TRACE("hash aggregate executor init..");
@@ -467,8 +467,6 @@ AggregateRow* AggregateHashExecutor::p_execute_init(const NValueArray& params,
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
-
-    return NULL;
 }
 
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
@@ -545,7 +543,7 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
     }
 }
 
-AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params,
+void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * inputSchema) {
     executeAggBase(params);
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
@@ -566,8 +564,6 @@ AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params
     char* storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple (storage, inputSchema);
-
-    return m_aggregateRow;
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
@@ -580,7 +576,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    boost::scoped_ptr<AggregateRow> delete_aggregate_row(p_execute_init(params, &pmp, input_table->schema()));
+    p_execute_init(params, &pmp, input_table->schema());
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
@@ -659,7 +655,8 @@ void AggregateSerialExecutor::p_execute_finish()
         }
     }
 
-    // clean up member variables
+    // clean up the member variables
+    delete m_aggregateRow;
     m_nextGroupByValues.clear();
     m_inProgressGroupByValues.clear();
 }
