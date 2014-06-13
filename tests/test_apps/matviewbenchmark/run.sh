@@ -99,8 +99,7 @@ function matviewbenchmark() {
         --servers=localhost \
         --txn=10000000 \
         --warmup=100000 \
-        --group=5000 \
-        --statsfile=stats.csv
+        --group=5000
 }
 
 function help() {
