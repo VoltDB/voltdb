@@ -381,11 +381,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.
-        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        // Use primary key index
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        //* debug */ System.out.println("DEBUG 0: " + pns.get(0).getChild(0).toExplainPlanString());
-        //* debug */ System.out.println("DEBUG 1: " + pns.get(1).getChild(0).toExplainPlanString());
-        checkGroupByOnlyPlan(true, true, false, false);
+        checkGroupByOnlyPlan(true, true, true, false);
 
         // unoptimized case (only uses second col of the index), will be replaced in
         // SeqScanToIndexScan for determinism.
