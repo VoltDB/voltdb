@@ -65,6 +65,8 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
+class AggregateSerialExecutor;
+
 class IndexScanExecutor : public AbstractExecutor
 {
 public:
@@ -72,6 +74,7 @@ public:
         : AbstractExecutor(engine, abstractNode)
         , m_projectionExpressions(NULL)
         , m_searchKeyBackingStore(NULL)
+        , m_aggSerialExec(NULL)
     {}
     ~IndexScanExecutor();
 
@@ -107,6 +110,8 @@ private:
     boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
+
+    AggregateSerialExecutor* m_aggSerialExec;
 };
 
 }

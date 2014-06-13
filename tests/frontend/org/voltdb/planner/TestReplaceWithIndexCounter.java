@@ -30,6 +30,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class TestReplaceWithIndexCounter extends PlannerTestCase {
     @Override
@@ -64,9 +65,8 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar002() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT POINTS, count(*) from T1 Group by POINTS");
         AbstractPlanNode p = pn.get(0).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
 

@@ -31,6 +31,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -383,7 +384,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1", "A");
         pn = nlpn.getChild(1);
-        assertTrue(pn instanceof SeqScanPlanNode);
+        assertTrue(pn instanceof AbstractScanPlanNode);
 
 
         // Three table joins
@@ -410,7 +411,7 @@ public class TestSubQueries extends PlannerTestCase {
         nlpn = nlpn.getChild(0);
         assertTrue(nlpn instanceof NestLoopIndexPlanNode);
         pn = nlpn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1", "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
         assertEquals(nlpn.getInlinePlanNodes().size(), 1);
         pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
@@ -614,7 +615,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode); // This sounds it could be optimized
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1",  "A", "C" );
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
         planNodes = compileToFragments("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1 ");
         assertEquals(2, planNodes.size());
@@ -716,7 +717,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1", "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
         // Check inlined index scan
         pn = ((NestLoopIndexPlanNode) nlpn).getInlinePlanNode(PlanNodeType.INDEXSCAN);
         checkPrimaryKeySubSelect(pn, "P2", "A","D");
@@ -851,7 +852,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof AggregatePlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "SP4");
+        checkPrimaryKeySubSelect(pn, "SP4");
 
 
         //
@@ -902,7 +903,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "SP4");
+        checkPrimaryKeySubSelect(pn, "SP4");
 
 
 
@@ -1173,7 +1174,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1", "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
 
         // Join locally: inner join case for subselects
@@ -1196,7 +1197,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1", "A", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "A", "C");
 
 
         // Two sub-queries. One is partitioned and the other one is replicated
@@ -1222,7 +1223,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "P1", "C");
+        checkPrimaryKeySubSelect(pn, "P1", "C");
 
         // This is a single fragment plan because planner can detect "A = 3".
         // Join locally
