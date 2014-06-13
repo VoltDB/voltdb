@@ -649,14 +649,8 @@ public class PlanAssembler {
         return parentPlan;
     }
 
-    private boolean m_microOptimizedQuery = false;
-
     private CompiledPlan getNextSelectPlan() {
         assert (subAssembler != null);
-        if (m_microOptimizedQuery) {
-            // Already get the most optimized query, it's safe to return early.
-            return null;
-        }
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
 
@@ -765,8 +759,6 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        // Apply the micro-optimization: Table count, Counting Index, Optimized Min/Max
-
         CompiledPlan plan = new CompiledPlan();
         plan.rootPlanGraph = root;
         plan.readOnly = true;
@@ -774,6 +766,7 @@ public class PlanAssembler {
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
+        // Apply the micro-optimization: Table count, Counting Index, Optimized Min/Max
         MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
 
         return plan;
@@ -787,10 +780,8 @@ public class PlanAssembler {
             return false;
         }
 
-        // check inline aggregate
-        if (root.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
-            return false;
-        }
+        // has not start to inline aggregate
+        assert(root.getInlinePlanNode(PlanNodeType.AGGREGATE) == null);
 
         // Assuming the restrictions: Order by columns are (1) columns from table
         // (2) tag from display columns (3) actual expressions from display columns
@@ -1791,19 +1782,13 @@ public class PlanAssembler {
          * back on top of the node, followed by another top node at the
          * coordinator.
          */
-        AbstractPlanNode accessPlanTemp = root;
         if (coordNode != null && root instanceof ReceivePlanNode) {
+            AbstractPlanNode accessPlanTemp = root;
             root = root.getChild(0).getChild(0);
             root.clearParents();
-        } else {
-            accessPlanTemp = null;
-        }
-
-        distNode.addAndLinkChild(root);
-        root = distNode;
-
-        // Put the send/receive pair back into place
-        if (accessPlanTemp != null) {
+            distNode.addAndLinkChild(root);
+            root = distNode;
+            // Put the send/receive pair back into place
             accessPlanTemp.getChild(0).clearChildren();
             accessPlanTemp.getChild(0).addAndLinkChild(root);
             root = accessPlanTemp;
@@ -1811,12 +1796,16 @@ public class PlanAssembler {
             if (needCoordNode) {
                 coordNode.addAndLinkChild(root);
                 root = coordNode;
+                // Set post predicate for top Aggregation node
+                coordNode.setPostPredicate(m_parsedSelect.m_having);
+            } else {
+                // Set post predicate for final distributed Aggregation node
+                distNode.setPostPredicate(m_parsedSelect.m_having);
             }
-        }
-        // Set post predicate for top Aggregation node
-        if (needCoordNode && accessPlanTemp != null) {
-            coordNode.setPostPredicate(m_parsedSelect.m_having);
         } else {
+            distNode.addAndLinkChild(root);
+            root = distNode;
+            // Set post predicate for final distributed Aggregation node
             distNode.setPostPredicate(m_parsedSelect.m_having);
         }
 
