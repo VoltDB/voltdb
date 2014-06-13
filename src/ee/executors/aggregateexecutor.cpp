@@ -467,6 +467,7 @@ void AggregateHashExecutor::p_execute_init(const NValueArray& params,
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
+    m_inputSchema = schema;
 }
 
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
@@ -507,7 +508,12 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
         m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
         initAggInstances(aggregateRow);
-        aggregateRow->m_passThroughTuple = nextTuple;
+
+        char* storage = reinterpret_cast<char*>(
+                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
+
+        aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
         nextGroupByKeyTuple.move(NULL);
@@ -632,7 +638,6 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregateSerialExecutor::p_execute_finish()
 {
-    bool returned = false;
     if (m_noInputRows || m_failPrePredicateOnFirstRow) {
         VOLT_TRACE("finalizing after no input rows..");
         // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
@@ -646,9 +651,7 @@ void AggregateSerialExecutor::p_execute_finish()
                 m_pmp->countdownProgress();
             }
         }
-        returned = true;
-    }
-    if (!returned) {
+    } else {
         // There's one last group (or table) row in progress that needs to be output.
         if (insertOutputTuple(m_aggregateRow)) {
             m_pmp->countdownProgress();

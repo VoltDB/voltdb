@@ -323,6 +323,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         AggregatePlanNode aggNode =
                 (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+        if (aggNode == null) {
+            aggNode = (HashAggregatePlanNode)getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        }
         if (aggNode != null) {
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = true;
@@ -388,7 +391,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         AggregatePlanNode aggNode =
                 (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
-
+        if (aggNode == null) {
+            aggNode = (HashAggregatePlanNode)getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        }
         if (aggNode != null) {
             aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
             m_outputSchema = aggNode.getOutputSchema().clone();

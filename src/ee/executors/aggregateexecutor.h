@@ -234,6 +234,8 @@ protected:
 private:
     HashAggregateMapType m_hash;
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
+
+    const TupleSchema * m_inputSchema;
 };
 
 /**
