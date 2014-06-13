@@ -419,13 +419,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(sb.toString());
 
             List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Available JVM arguments:");
+            sb.delete(0, sb.length()).append("Command line JVM arguments:");
             for (String iarg : iargs)
                 sb.append(" ").append(iarg);
             if (iargs.size() > 0) hostLog.info(sb.toString());
             else hostLog.info("No JVM command line args known.");
 
-            sb.delete(0, sb.length()).append("JVM class path: ");
+            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
             sb.append(System.getProperty("java.class.path", "[not available]"));
             hostLog.info(sb.toString());
 
