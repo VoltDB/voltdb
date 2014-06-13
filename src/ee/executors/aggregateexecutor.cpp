@@ -525,7 +525,7 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
     }
 }
 
-AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params,
+void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * inputSchema) {
     executeAggBase(params);
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
@@ -546,8 +546,6 @@ AggregateRow*  AggregateSerialExecutor::p_execute_init(const NValueArray& params
     char* storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple (storage, inputSchema);
-
-    return m_aggregateRow;
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
@@ -560,7 +558,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    boost::scoped_ptr<AggregateRow> delete_aggregate_row(p_execute_init(params, &pmp, input_table->schema()));
+    p_execute_init(params, &pmp, input_table->schema());
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
@@ -616,6 +614,7 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregateSerialExecutor::p_execute_finish()
 {
+    bool returned = false;
     if (m_noInputRows || m_failPrePredicateOnFirstRow) {
         VOLT_TRACE("finalizing after no input rows..");
         // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
@@ -629,13 +628,18 @@ void AggregateSerialExecutor::p_execute_finish()
                 m_pmp->countdownProgress();
             }
         }
-        return;
+        returned = true;
     }
 
-    // There's one last group (or table) row in progress that needs to be output.
-    if (insertOutputTuple(m_aggregateRow)) {
-        m_pmp->countdownProgress();
+    if (!returned) {
+        // There's one last group (or table) row in progress that needs to be output.
+        if (insertOutputTuple(m_aggregateRow)) {
+            m_pmp->countdownProgress();
+        }
     }
+
+    // clean up the member variables
+    delete m_aggregateRow;
 }
 
 }

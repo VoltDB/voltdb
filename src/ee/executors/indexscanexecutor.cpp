@@ -186,7 +186,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     ProgressMonitorProxy pmp(m_engine, this, targetTable);
 
-    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
     if (m_aggSerialExec != NULL) {
         m_aggSerialExec->setAggregateOutputTable(m_outputTable);
 
@@ -194,9 +193,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-
-        will_finally_delete_aggregate_row.reset(
-                m_aggSerialExec->p_execute_init(params, &pmp, inputSchema));
+        m_aggSerialExec->p_execute_init(params, &pmp, inputSchema);
     }
 
     //

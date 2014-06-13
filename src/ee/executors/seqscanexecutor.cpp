@@ -192,15 +192,13 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
 
-        boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row;
         if (m_aggSerialExec != NULL) {
             m_aggSerialExec->setAggregateOutputTable(output_temp_table);
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
-
-            will_finally_delete_aggregate_row.reset(m_aggSerialExec->p_execute_init(params, &pmp, inputSchema));
+            m_aggSerialExec->p_execute_init(params, &pmp, inputSchema);
         }
 
 
