@@ -471,7 +471,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        ee.quiesce(lastCommittedTxnId);
+        ee.quiesce(lastCommittedTxnId,0L);
         ee.updateCatalog( context.m_uniqueId, catalogDiffCommands);
 
         return true;
@@ -883,7 +883,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             hostLog.info("Executing local snapshot. Creating new snapshot.");
 
             //Flush export data to the disk before the partition detection snapshot
-            ee.quiesce(lastCommittedTxnId);
+            ee.quiesce(lastCommittedTxnId,0L);
 
             // then initiate the local snapshot
         } else if (message instanceof LocalObjectMessage) {
@@ -1289,9 +1289,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void quiesce()
+    public void quiesce(long currentSpHandle)
     {
-        ee.quiesce(lastCommittedTxnId);
+        ee.quiesce(lastCommittedTxnId,currentSpHandle);
     }
 
     @Override

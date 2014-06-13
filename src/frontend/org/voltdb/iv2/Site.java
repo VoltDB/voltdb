@@ -985,9 +985,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void quiesce()
+    public void quiesce(long currentSpHandle)
     {
-        m_ee.quiesce(m_lastCommittedSpHandle);
+        m_ee.quiesce(m_lastCommittedSpHandle,currentSpHandle);
     }
 
     @Override
@@ -1132,7 +1132,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedSpHandle);
+        m_ee.quiesce(m_lastCommittedSpHandle,Long.MIN_VALUE);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;

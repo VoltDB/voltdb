@@ -272,7 +272,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void tick(int64_t timeInMillis, int64_t lastCommittedSpHandle);
 
         /** flush active work (like EL buffers) */
-        void quiesce(int64_t lastCommittedSpHandle);
+        void quiesce(int64_t lastCommittedSpHandle, int64_t currentSpHandle);
 
         // -------------------------------------------------
         // Save and Restore Table to/from disk functions

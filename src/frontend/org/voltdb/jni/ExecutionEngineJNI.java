@@ -418,8 +418,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) {
-        nativeQuiesce(pointer, lastCommittedTxnId);
+    public void quiesce(long lastCommittedTxnId, long currentSpHandle) {
+        nativeQuiesce(pointer, lastCommittedTxnId, currentSpHandle);
     }
 
     /**

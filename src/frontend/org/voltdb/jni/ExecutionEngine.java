@@ -496,7 +496,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    abstract public void quiesce(long lastCommittedSpHandle);
+    abstract public void quiesce(long lastCommittedSpHandle, long currentSpHandler);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -706,8 +706,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Native implementation of quiesce engine interface method.
      * @param pointer
+     * @param lastCommittedSpHandle last committed sp handle
+     * @param currentSpHandle currently executing sp handle
      */
-    protected native void nativeQuiesce(long pointer, long lastCommittedSpHandle);
+    protected native void nativeQuiesce(long pointer, long lastCommittedSpHandle, long currentSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector ordinal from the StatisticsSelector enum.

@@ -1295,8 +1295,8 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
-void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
-    m_executorContext->setupForQuiesce(lastCommittedSpHandle);
+void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle, int64_t currentSpHandle) {
+    m_executorContext->setupForQuiesce(lastCommittedSpHandle, currentSpHandle);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
