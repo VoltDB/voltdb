@@ -111,17 +111,6 @@ typedef struct {
     int32_t locators[0];
 }__attribute__((packed)) get_stats_cmd;
 
-/*
- * Header for a saveTableToDisk request
- */
-typedef struct {
-    struct ipc_command cmd;
-    int32_t clusterId;
-    int32_t databaseId;
-    int32_t tableId;
-    char data[0];
-}__attribute__((packed)) save_table_to_disk_cmd;
-
 struct undo_token {
     struct ipc_command cmd;
     int64_t token;
