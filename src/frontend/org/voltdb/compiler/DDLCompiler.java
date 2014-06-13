@@ -263,6 +263,22 @@ public class DDLCompiler {
             );
 
     /**
+     * DROP PROCEDURE  statement regex
+     */
+    static final Pattern procedureDropPattern = Pattern.compile(
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "DROP" +                                // DROP token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (1) class name or procedure name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
+            );
+
+    /**
      * IMPORT CLASS with pattern for matching classfiles in
      * the current classpath.
      */
@@ -305,6 +321,16 @@ public class DDLCompiler {
             "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
             "([\\w.$]+)"                        // (2) <table name>
             );
+
+    /**
+     * Regex to match ALTER or DROP TABLE statements. Capture group (1) is operator, (2) is TABLE, but (3) is used.
+     */
+    static final Pattern alterOrDropTablePattern = Pattern.compile(
+            "(?i)" + // (ignore case)
+            "\\A" + // (start statement)
+            "(ALTER|DROP)\\s+(TABLE)\\s+" + // (1) ALTER or DROP TABLE
+            "([\\w.$]+)" // (3) <table name>
+    );
 
     /**
      * NB supports only unquoted table and column names
@@ -370,7 +396,8 @@ public class DDLCompiler {
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "(?:PROCEDURE|ROLE)|" +
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -460,7 +487,7 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE or CREATE VIEW.
+                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
                     // We sometimes choke at parsing statements with newlines, so
                     // check against a newline free version of the stmt.
                     String oneLinerStmt = stmt.statement.replace("\n", " ");
@@ -468,6 +495,22 @@ public class DDLCompiler {
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    } else {
+                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
+                        if (atableMatcher.find()) {
+                            String op = atableMatcher.group(1);
+                            String tableName = atableMatcher.group(3);
+                            if (op.equalsIgnoreCase("DROP")) {
+                                m_tableNameToDDL.remove(tableName.toUpperCase());
+                            } else {
+                                //ALTER - Append the statement
+                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
+                                if (prevStmt != null) {
+                                    //Append the SQL for report...else would blow up compilation.
+                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
+                                }
+                            }
+                        }
                     }
 
                     // kind of ugly.  We hex-encode each statement so we can
@@ -707,6 +750,15 @@ public class DDLCompiler {
             }
             // track the defined procedure
             m_tracker.add(descriptor);
+
+            return true;
+        }
+
+        // Matches if it is DROP PROCEDURE <proc-name or classname>
+        statementMatcher = procedureDropPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
+            m_tracker.removeProcedure(classOrProcName);
 
             return true;
         }

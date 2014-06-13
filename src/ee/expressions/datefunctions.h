@@ -23,6 +23,7 @@
 #include <ctime>
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
+#include "common/NValue.hpp"
 
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00

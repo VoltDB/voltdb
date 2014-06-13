@@ -97,6 +97,7 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx2048m')
     if specifyMinimumHeapSize:
         java_opts.append('-Xms2048m')
+        java_opts.append('-XX:+AlwaysPreTouch')
 
 # Set common options now.
 java_opts.append('-server')

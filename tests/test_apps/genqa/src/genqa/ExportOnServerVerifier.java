@@ -840,7 +840,7 @@ public class ExportOnServerVerifier {
             FileReader fr = new FileReader(file);
             BufferedReader br = new BufferedReader(fr);
             final String firstLine = br.readLine();
-            if (firstLine.contains("PRIVATE KEY")) {
+            if (firstLine != null && firstLine.contains("PRIVATE KEY")) {
                 m_jsch.addIdentity(file.getAbsolutePath());
             }
         }

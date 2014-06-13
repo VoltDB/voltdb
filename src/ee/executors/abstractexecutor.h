@@ -124,11 +124,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
 
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
-
     // run the executor
     return p_execute(params);
 }

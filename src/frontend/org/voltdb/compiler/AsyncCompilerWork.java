@@ -19,6 +19,8 @@ package org.voltdb.compiler;
 
 import java.io.Serializable;
 
+import org.voltdb.client.ProcedureInvocationType;
+
 public class AsyncCompilerWork implements Serializable {
 
     public interface AsyncCompilerWorkCompletionHandler {
@@ -34,12 +36,16 @@ public class AsyncCompilerWork implements Serializable {
     final String hostname;
     final boolean adminConnection;
     final transient public Object clientData;
+    final public ProcedureInvocationType invocationType;
+    public final long originalTxnId;
+    public final long originalUniqueId;
 
     final AsyncCompilerWorkCompletionHandler completionHandler;
 
     public AsyncCompilerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
-            Object clientData,
+            Object clientData, ProcedureInvocationType invocationType,
+            long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         this.replySiteId = replySiteId;
@@ -50,6 +56,9 @@ public class AsyncCompilerWork implements Serializable {
         this.adminConnection = adminConnection;
         this.clientData = clientData;
         this.completionHandler = completionHandler;
+        this.invocationType = invocationType;
+        this.originalTxnId = originalTxnId;
+        this.originalUniqueId = originalUniqueId;
         if (completionHandler == null) {
             throw new IllegalArgumentException("Completion handler can't be null");
         }
