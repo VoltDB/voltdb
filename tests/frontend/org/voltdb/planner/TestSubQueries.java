@@ -434,9 +434,9 @@ public class TestSubQueries extends PlannerTestCase {
         // inline limit and projection node.
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 Limit 3 ) T1 Group by A");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "D" );
+        assertTrue(pn instanceof SeqScanPlanNode);
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
         pn = pn.getChild(0);
         checkSeqScanSubSelects(pn, "R1",  "A", "D" );
         checkPredicateComparisonExpression(pn, "R1");
@@ -447,9 +447,8 @@ public class TestSubQueries extends PlannerTestCase {
         // add order by node, wihtout inline limit and projection node.
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "D" );
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        checkSeqScanSubSelects(pn, "T1" );
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
@@ -462,12 +461,14 @@ public class TestSubQueries extends PlannerTestCase {
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
+        AbstractPlanNode aggNode;
+
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING SUM(D) < 3");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "D" );
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
+        checkSeqScanSubSelects(pn, "T1" );
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
@@ -485,10 +486,11 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "D" );
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
+
+        checkSeqScanSubSelects(pn, "T1");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
@@ -507,10 +509,11 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
-        pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "T1",  "A", "D" );
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
+
+        checkSeqScanSubSelects(pn, "T1");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
@@ -537,10 +540,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         assertTrue(pn instanceof SeqScanPlanNode);
-        checkSeqScanSubSelects(pn, "R1", "A", "C");
+        checkSeqScanSubSelects(pn, "R1");
 
 
         pn = compile("select SC, SUM(A) as SA FROM (SELECT A, SUM(C) as SC, MAX(D) as MD FROM R1 " +
@@ -548,10 +550,9 @@ public class TestSubQueries extends PlannerTestCase {
                 "Group by SC");
 
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         assertTrue(pn instanceof SeqScanPlanNode);
-        checkSeqScanSubSelects(pn, "T1", "A", "SC");
+        checkSeqScanSubSelects(pn, "T1");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
@@ -559,10 +560,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         assertTrue(pn instanceof SeqScanPlanNode);
-        checkSeqScanSubSelects(pn, "R1", "A", "C", "D");
+        checkSeqScanSubSelects(pn, "R1");
     }
 
     public void testPartitionedSameLevel() {
@@ -850,8 +850,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = planNodes.get(1);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof AggregatePlanNode);
-        pn = pn.getChild(0);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
         checkPrimaryKeySubSelect(pn, "SP4");
 
 
