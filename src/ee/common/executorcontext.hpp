@@ -30,6 +30,50 @@ namespace voltdb {
 class AbstractExecutor;
 
 /*
+* Keep track of the actual parameter values coming into a subquery invocation
+* and if they have not changed since last invocation reuses the cached result
+* from the prior invocation.
+* This approach has several interesting effects:
+* -- non-correlated subqueries are always executed once
+* -- subquery filters that had to be applied after a join but that were only correlated
+*    by columns from the join's OUTER side would effectively get run once per OUTER row.
+* -- subqueries that were correlated by a parent's indexed column (producing ordered values)
+*    could get executed once per unique value.
+* The subquery context is registered with the global executor context as candidates for
+* post-fragment cleanup, allowing results to be retained between invocations.
+*/
+struct SubqueryContext {
+    SubqueryContext(int stmtId, NValue result, std::vector<NValue> lastParams) :
+        m_stmtId(stmtId), m_lastResult(result), m_lastParams(lastParams) {
+    }
+
+    int getStatementId() const {
+        return m_stmtId;
+    }
+
+    NValue getResult() const {
+        return m_lastResult;
+    }
+
+    void setResult(NValue result) {
+        m_lastResult = result;
+    }
+
+    std::vector<NValue>& getLastParams() {
+        return m_lastParams;
+    }
+
+  private:
+    // Subquery ID
+    int64_t m_stmtId;
+    // The result (TRUE/FALSE) of the previous IN/EXISTS subquery invocation
+    NValue m_lastResult;
+    // The parameter values that weere used to obtain the last result in the accesinding
+    // order of the parameter indexes
+    std::vector<NValue> m_lastParams;
+};
+
+/*
  * EE site global data required by executors at runtime.
  *
  * This data is factored into common to avoid creating dependencies on
@@ -99,6 +143,7 @@ class ExecutorContext {
     void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
+        m_subqueryContextMap.clear();
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
@@ -143,6 +188,20 @@ class ExecutorContext {
         return *m_executorsMap->find(stmtId)->second;
     }
 
+    /** Return pointer to a subquery context or NULL */
+    SubqueryContext* getSubqueryContext(int stmtId) {
+        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(stmtId);
+        if (it != m_subqueryContextMap.end()) {
+            return &(it->second);
+        } else {
+            return NULL;
+        }
+    }
+
+    /** Set a new subquery context or NULL */
+    void setSubqueryContext(int stmtId, SubqueryContext context) {
+        m_subqueryContextMap.insert(std::make_pair(stmtId, context));
+    }
 
     static ExecutorContext* getExecutorContext();
 
@@ -154,11 +213,17 @@ class ExecutorContext {
     }
 
   private:
+
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+    // Pointer to the static parameters
     NValueArray* m_staticParams;
+    // Executor stack map. The key is the statement id (0 means the main/parent statement)
+    // The value is the pointer to the executor stack for that statement
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, SubqueryContext> m_subqueryContextMap;
+
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;

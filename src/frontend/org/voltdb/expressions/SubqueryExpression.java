@@ -39,7 +39,8 @@ public class SubqueryExpression extends AbstractExpression {
     public enum Members {
         SUBQUERY_ID,
         SUBQUERY_ROOT_NODE_ID,
-        PARAM_IDX;
+        PARAM_IDX,
+        ALL_PARAM_IDX;
     }
 
     public static final String SUBQUERY_TAG = "Subquery_";
@@ -48,9 +49,12 @@ public class SubqueryExpression extends AbstractExpression {
     private int m_subqueryId;
     private int m_subqueryNodeId = -1;
     private AbstractPlanNode m_subqueryNode = null;
-    // TODO ENG_451 - better comment
-    // List of parameter indexes that this subquery depends on
+    // List of correlated parameter indexes that originate at the immediate parent's level
+    // and need to be set by this SubqueryExpression on the EE side prior to the evaluation
     private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
+    // List of all correlated parameter indexes this subquery and its descendants depend on
+    // They may originate at different levels in the subquery hierarchy.
+    private List<Integer> m_allParameterIdxList = new ArrayList<Integer>();
 
     /**
      * Create a new SubqueryExpression
@@ -128,6 +132,7 @@ public class SubqueryExpression extends AbstractExpression {
         }
         clone.m_parameterIdxList = new ArrayList<Integer>();
         clone.m_parameterIdxList.addAll(m_parameterIdxList);
+        clone.m_allParameterIdxList.addAll(m_allParameterIdxList);
         return clone;
     }
 
@@ -170,6 +175,13 @@ public class SubqueryExpression extends AbstractExpression {
             }
             stringer.endArray();
         }
+        if (!m_allParameterIdxList.isEmpty()) {
+            stringer.key(Members.ALL_PARAM_IDX.name()).array();
+            for (Integer idx : m_allParameterIdxList) {
+                stringer.value(idx);
+            }
+            stringer.endArray();
+        }
     }
 
     @Override
@@ -182,6 +194,13 @@ public class SubqueryExpression extends AbstractExpression {
             assert(m_args != null && paramSize == m_args.size());
             for (int i = 0; i < paramSize; ++i) {
                 m_parameterIdxList.add(paramIdxArray.getInt(i));
+            }
+        }
+        if (obj.has(Members.ALL_PARAM_IDX.name())) {
+            JSONArray allParamIdxArray = obj.getJSONArray(Members.ALL_PARAM_IDX.name());
+            int paramSize = allParamIdxArray.length();
+            for (int i = 0; i < paramSize; ++i) {
+                m_allParameterIdxList.add(allParamIdxArray.getInt(i));
             }
         }
     }
@@ -217,6 +236,9 @@ public class SubqueryExpression extends AbstractExpression {
         AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
         // we must have a parent -it's a subquery statement
         assert(parentStmt != null);
+        // Preserve indexes of all parameters this subquery depends on.
+        // It includes parameters from the child subqueries.
+        m_allParameterIdxList.addAll(subqueryStmt.m_parameterTveMap.keySet());
         for (Map.Entry<Integer, AbstractExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
             Integer paramIdx = entry.getKey();
             AbstractExpression expr = entry.getValue();
