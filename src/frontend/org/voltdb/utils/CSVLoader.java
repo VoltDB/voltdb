@@ -112,12 +112,17 @@ public class CSVLoader implements CSVLoaderErrorHandler {
 
     //Errors we keep track only upto maxerrors
     final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+    private static long m_errorCount = 0;
+    private final long ERROR_INFO_FLUSH_THRESHOLD = 500;
     @Override
     public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
             //Dont collect more than we want to report.
-            if (m_errorInfo.size() >= config.maxerrors) {
+            if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {
                 return true;
+            }
+            if (m_errorInfo.size() > ERROR_INFO_FLUSH_THRESHOLD) {
+                flushErrorInfo();
             }
             if (!m_errorInfo.containsKey(metaData.lineNumber)) {
                 String rawLine;
@@ -146,7 +151,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     @Override
     public boolean hasReachedErrorLimit()
     {
-        return m_errorInfo.size() >= config.maxerrors;
+        return m_errorCount + m_errorInfo.size() >= config.maxerrors;
     }
 
     /**
@@ -443,10 +448,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         return client;
     }
 
-    private void produceFiles(long ackCount, long insertCount) {
-        long latency = System.currentTimeMillis() - start;
-        m_log.info("Elapsed time: " + latency / 1000F
-                + " seconds");
+    private void flushErrorInfo() {
 
         int bulkflush = 300; // by default right now
         try {
@@ -466,6 +468,29 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                     out_logfile.flush();
                 }
             }
+            out_invaliderowfile.flush();
+            out_logfile.flush();
+
+            m_errorCount += linect;
+            m_errorInfo.clear();
+
+        } catch (FileNotFoundException e) {
+            m_log.error("CSV report directory '" + config.reportdir
+                    + "' does not exist.");
+        } catch (Exception x) {
+            m_log.error(x.getMessage());
+        }
+
+    }
+
+    private void produceFiles(long ackCount, long insertCount) {
+        long latency = System.currentTimeMillis() - start;
+        m_log.info("Elapsed time: " + latency / 1000F
+                + " seconds");
+
+        try {
+
+            flushErrorInfo();
 
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
@@ -502,7 +527,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
             out_reportfile.write("Number of rows that could not be inserted: "
-                    + m_errorInfo.size() + "\n");
+                    + m_errorCount + "\n");
             out_reportfile.write("CSVLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
