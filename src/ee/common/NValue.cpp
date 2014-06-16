@@ -119,7 +119,7 @@ const double NValue::s_gtMaxDecimalAsDouble = 1E26;
 const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
 TTInt NValue::s_maxInt64AsDecimal(INT64_MAX);
-TTInt NValue::s_minInt64AsDecimal(-INT64_MIN);
+TTInt NValue::s_minInt64AsDecimal(-INT64_MAX);
 
 /*
  * Produce a debugging string describing an NValue.
