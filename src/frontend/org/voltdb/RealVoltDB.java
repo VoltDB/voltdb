@@ -412,6 +412,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+
+            // Replay command line args that we can see
+            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+            sb.append(System.getProperty("sun.java.command", "[not available]"));
+            hostLog.info(sb.toString());
+
+            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+            sb.delete(0, sb.length()).append("Command line JVM arguments:");
+            for (String iarg : iargs)
+                sb.append(" ").append(iarg);
+            if (iargs.size() > 0) hostLog.info(sb.toString());
+            else hostLog.info("No JVM command line args known.");
+
+            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
+            sb.append(System.getProperty("java.class.path", "[not available]"));
+            hostLog.info(sb.toString());
+
             // use CLI overrides for testing hotfix version compatibility
             if (m_config.m_versionStringOverrideForTest != null) {
                 m_versionString = m_config.m_versionStringOverrideForTest;
@@ -1551,18 +1568,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         else {
             hostLog.info("Json API disabled.");
         }
-
-        // replay command line args that we can see
-        List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-        StringBuilder sb = new StringBuilder(2048).append("Available JVM arguments:");
-        for (String iarg : iargs)
-            sb.append(" ").append(iarg);
-        if (iargs.size() > 0) hostLog.info(sb.toString());
-        else hostLog.info("No JVM command line args known.");
-
-        sb.delete(0, sb.length()).append("JVM class path: ");
-        sb.append(System.getProperty("java.class.path", "[not available]"));
-        hostLog.info(sb.toString());
 
         // java heap size
         long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();

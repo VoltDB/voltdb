@@ -28,7 +28,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -151,7 +150,7 @@ public class PlanSelector implements Cloneable {
         //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
         // run the set of microptimizations, which may return many plans (or not)
-        MicroOptimizationRunner.applyAll(plan, m_detMode, parsedStmt);
+        ScanDeterminizer.apply(plan, m_detMode);
 
         // add in the sql to the plan
         plan.sql = m_sql;

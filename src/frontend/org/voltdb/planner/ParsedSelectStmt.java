@@ -41,11 +41,13 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
@@ -127,11 +129,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private NodeSchema m_avgPushdownNewAggSchema;
     private boolean m_hasPartitionColumnInGroupby = false;
 
-    public long m_limit = -1;
-    public long m_offset = 0;
-
+    // Limit plan node information.
+    private LimitPlanNode m_limitNodeTop = null;
+    private LimitPlanNode m_limitNodeDist = null;
+    public boolean m_limitCanPushdown;
+    private long m_limit = -1;
+    private long m_offset = 0;
     private long m_limitParameterId = -1;
     private long m_offsetParameterId = -1;
+
     private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
@@ -206,6 +212,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_aggResultColumns = m_displayColumns;
         }
         placeTVEsinColumns();
+
+        // prepare the limit plan node if it needs one.
+        prepareLimitPlanNode();
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
@@ -849,6 +858,68 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    private void prepareLimitPlanNode () {
+        if (!hasLimitOrOffset()) {
+            return;
+        }
+
+        int limitParamIndex = parameterCountIndexById(m_limitParameterId);
+        int offsetParamIndex = parameterCountIndexById(m_offsetParameterId);;
+
+        // The coordinator's top limit graph fragment for a MP plan.
+        // If planning "order by ... limit", getNextSelectPlan()
+        // will have already added an order by to the coordinator frag.
+        // This is the only limit node in a SP plan
+        m_limitNodeTop = new LimitPlanNode();
+        m_limitNodeTop.setLimit((int) m_limit);
+        m_limitNodeTop.setOffset((int) m_offset);
+        m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
+        m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
+
+        // check if limit can be pushed down
+        m_limitCanPushdown = !m_distinct;
+        if (m_limitCanPushdown) {
+            for (ParsedColInfo col : m_displayColumns) {
+                AbstractExpression rootExpr = col.expression;
+                if (rootExpr instanceof AggregateExpression) {
+                    if (((AggregateExpression)rootExpr).isDistinct()) {
+                        m_limitCanPushdown = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (m_limitCanPushdown) {
+            m_limitNodeDist = new LimitPlanNode();
+            // Offset on a pushed-down limit node makes no sense, just defaults to 0
+            // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
+            if (m_limit != -1) {
+                m_limitNodeDist.setLimit((int) (m_limit + m_offset));
+            }
+
+            if (hasLimitOrOffsetParameters()) {
+                AbstractExpression left = getParameterOrConstantAsExpression(m_offsetParameterId, m_offset);
+                assert (left != null);
+                AbstractExpression right = getParameterOrConstantAsExpression(m_limitParameterId, m_limit);
+                assert (right != null);
+                OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS, left, right);
+                expr.setValueType(VoltType.INTEGER);
+                expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
+                m_limitNodeDist.setLimitExpression(expr);
+            }
+            // else let the parameterized forms of offset/limit default to unused/invalid.
+        }
+    }
+
+    public LimitPlanNode getLimitNodeTop() {
+        return new LimitPlanNode(m_limitNodeTop);
+    }
+
+    public LimitPlanNode getLimitNodeDist() {
+        return new LimitPlanNode(m_limitNodeDist);
+    }
+
     @Override
     public String toString() {
         String retval = super.toString() + "\n";
@@ -981,13 +1052,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return constant;
     }
 
-    public AbstractExpression getLimitExpression() {
-        return getParameterOrConstantAsExpression(m_limitParameterId, m_limit);
-    }
-
-    public AbstractExpression getOffsetExpression() {
-        return getParameterOrConstantAsExpression(m_offsetParameterId, m_offset);
-    }
 
     @Override
     public boolean isOrderDeterministic()
