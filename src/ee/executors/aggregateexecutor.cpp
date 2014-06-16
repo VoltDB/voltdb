@@ -459,63 +459,87 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
     }
 }
 
-typedef boost::unordered_map<TableTuple,
-                             AggregateRow*,
-                             TableTupleHasher,
-                             TableTupleEqualityChecker> HashAggregateMapType;
+void AggregateHashExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema)
+{
+    VOLT_TRACE("hash aggregate executor init..");
+    executeAggBase(params);
+    m_pmp = pmp;
+
+    m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
+    m_inputSchema = schema;
+}
 
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
-    executeAggBase(params);
-    ProgressMonitorProxy pmp(m_engine, this);
-
-    VOLT_TRACE("looping..");
-    HashAggregateMapType hash;
-    PoolBackedTupleStorage m_nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
-    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
-
     // Input table
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
+    const TupleSchema * inputSchema = input_table->schema();
+    assert(inputSchema);
     TableIterator it = input_table->iterator();
-    TableTuple nextTuple(input_table->schema());
+    TableTuple nextTuple(inputSchema);
 
+    ProgressMonitorProxy pmp(m_engine, this);
+    p_execute_init(params, &pmp, inputSchema);
+
+    VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
-        pmp.countdownProgress();
-        initGroupByKeyTuple(m_nextGroupByKeyStorage, nextTuple);
-        AggregateRow *aggregateRow;
-        // Search for the matching group.
-        HashAggregateMapType::const_iterator keyIter = hash.find(nextGroupByKeyTuple);
-
-        // Group not found. Make a new entry in the hash for this new group.
-        if (keyIter == hash.end()) {
-            aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-            hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
-            initAggInstances(aggregateRow);
-            aggregateRow->m_passThroughTuple = nextTuple;
-            // The map is referencing the current key tuple for use by the new group,
-            // so force a new tuple allocation to hold the next candidate key.
-            nextGroupByKeyTuple.move(NULL);
-        } else {
-            // otherwise, the agg row is the second item of the pair...
-            aggregateRow = keyIter->second;
-        }
-        // update the aggregation calculation.
-        advanceAggs(aggregateRow, nextTuple);
+        p_execute_tuple(nextTuple);
     }
 
+    p_execute_finish();
+    return true;
+}
+
+void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+    m_pmp->countdownProgress();
+    initGroupByKeyTuple(m_nextGroupByKeyStorage, nextTuple);
+    AggregateRow* aggregateRow;
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+    // Search for the matching group.
+    HashAggregateMapType::const_iterator keyIter = m_hash.find(nextGroupByKeyTuple);
+
+    // Group not found. Make a new entry in the hash for this new group.
+    if (keyIter == m_hash.end()) {
+        VOLT_TRACE("hash aggregate: new group..");
+        aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+        m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
+        initAggInstances(aggregateRow);
+
+        char* storage = reinterpret_cast<char*>(
+                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
+
+        aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
+        // The map is referencing the current key tuple for use by the new group,
+        // so force a new tuple allocation to hold the next candidate key.
+        nextGroupByKeyTuple.move(NULL);
+    } else {
+        // otherwise, the agg row is the second item of the pair...
+        aggregateRow = keyIter->second;
+    }
+    // update the aggregation calculation.
+    advanceAggs(aggregateRow, nextTuple);
+}
+
+void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
-    for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
+    for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
         AggregateRow *aggregateRow = iter->second;
         if (insertOutputTuple(aggregateRow)) {
-            pmp.countdownProgress();
+            m_pmp->countdownProgress();
         }
         delete aggregateRow;
     }
 
-    return true;
+    // Clean up
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+    nextGroupByKeyTuple.move(NULL);
+
+    m_hash.clear();
 }
 
 inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
@@ -614,7 +638,6 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregateSerialExecutor::p_execute_finish()
 {
-    bool returned = false;
     if (m_noInputRows || m_failPrePredicateOnFirstRow) {
         VOLT_TRACE("finalizing after no input rows..");
         // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
@@ -628,10 +651,7 @@ void AggregateSerialExecutor::p_execute_finish()
                 m_pmp->countdownProgress();
             }
         }
-        returned = true;
-    }
-
-    if (!returned) {
+    } else {
         // There's one last group (or table) row in progress that needs to be output.
         if (insertOutputTuple(m_aggregateRow)) {
             m_pmp->countdownProgress();
@@ -640,6 +660,8 @@ void AggregateSerialExecutor::p_execute_finish()
 
     // clean up the member variables
     delete m_aggregateRow;
+    m_nextGroupByValues.clear();
+    m_inProgressGroupByValues.clear();
 }
 
 }

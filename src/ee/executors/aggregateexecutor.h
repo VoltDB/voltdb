@@ -155,15 +155,18 @@ public:
             TupleSchema::freeTupleSchema(m_groupByKeySchema);
         }
     }
+    void executeAggBase(const NValueArray& params);
+
 
     void setAggregateOutputTable(TempTable* newTempTable) {
         // inlined aggregate will not allocate its own output table, but will use Scan's output table instead
-
-        // These two schemas should be equal
         m_tmpOutputTable = newTempTable;
     }
 
-    void executeAggBase(const NValueArray& params);
+    virtual void p_execute_init(const NValueArray& params,
+            ProgressMonitorProxy* pmp, const TupleSchema * schema) = 0;
+    virtual void p_execute_tuple(const TableTuple& nextTuple) = 0;
+    virtual void p_execute_finish() = 0;
 
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
@@ -202,7 +205,13 @@ protected:
     AbstractExpression* m_postPredicate;
 
     ProgressMonitorProxy* m_pmp;
+    TableTuple m_passThroughTupleSource;
 };
+
+typedef boost::unordered_map<TableTuple,
+                             AggregateRow*,
+                             TableTupleHasher,
+                             TableTupleEqualityChecker> HashAggregateMapType;
 
 
 /**
@@ -216,8 +225,17 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateHashExecutor() { }
 
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    void p_execute_tuple(const TableTuple& nextTuple);
+    void p_execute_finish();
+
 protected:
     virtual bool p_execute(const NValueArray& params);
+private:
+    HashAggregateMapType m_hash;
+    PoolBackedTupleStorage m_nextGroupByKeyStorage;
+
+    const TupleSchema * m_inputSchema;
 };
 
 /**
@@ -242,12 +260,9 @@ protected:
 
     void getNextGroupByValues(const TableTuple& nextTuple);
 
+    AggregateRow * m_aggregateRow;
     std::vector<NValue> m_inProgressGroupByValues;
     std::vector<NValue> m_nextGroupByValues;
-
-    AggregateRow * m_aggregateRow;
-
-    TableTuple m_passThroughTupleSource;
 
     // State variables for iteration on input table
     bool m_noInputRows;
