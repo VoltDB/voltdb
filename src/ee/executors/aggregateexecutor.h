@@ -53,9 +53,91 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "execution/ProgressMonitorProxy.h"
 
 namespace voltdb {
-struct AggregateRow;
+
+/*
+ * Base class for an individual aggregate that aggregates a specific
+ * column for a group
+ */
+class Agg
+{
+public:
+    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+    void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    Agg() : m_haveAdvanced(false)
+    {
+        m_value.setNull();
+    }
+    virtual ~Agg()
+    {
+        /* do nothing */
+    }
+    virtual void advance(const NValue& val) = 0;
+    virtual NValue finalize() { return m_value; }
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_value.setNull();
+    }
+protected:
+    bool m_haveAdvanced;
+    NValue m_value;
+};
+
+/**
+ * A collection of aggregates in progress for a specific group.
+ */
+struct AggregateRow
+{
+    void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
+    {
+        // allocate nAggs +1 for null terminator: see resetAggs, and destructor.
+        // Would it be cleaner to have a count data member? Not by much.
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+    }
+    void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    ~AggregateRow()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            // All the aggs inherit no-op delete operators, so, "delete" is really just destructor invocation.
+            // The destructor being invoked is the implicit specialization of Agg's destructor.
+            // The compiler generates it to invoke the destructor (if any) of the distinct value set (if any).
+            // It must be called because the pooled Agg object only embeds the (boost) set's "head".
+            // The "body" is allocated by boost via its defaulted stl allocator as the set grows
+            // -- AND it is not completely deallocated when "clear" is called.
+            // This AggregateRow destructor would not be required at all if distinct was based on a home-grown
+            // pool-aware hash, incapable of leaking outside the pool.
+            delete m_aggregates[ii];
+        }
+    }
+
+    void resetAggs()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            m_aggregates[ii]->resetAgg();
+        }
+    }
+
+    void recordPassThroughTuple(TableTuple &passThroughTupleSource, const TableTuple &tuple)
+    {
+        passThroughTupleSource.copy(tuple);
+        m_passThroughTuple = passThroughTupleSource;
+    }
+
+    // A tuple from the group of tuples being aggregated. Source of pass through columns.
+    TableTuple m_passThroughTuple;
+
+    // The aggregates for each column for this group
+    Agg* m_aggregates[0];
+};
 
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
@@ -74,10 +156,17 @@ public:
         }
     }
 
-protected:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    void setAggregateOutputTable(TempTable* newTempTable) {
+        // inlined aggregate will not allocate its own output table, but will use Scan's output table instead
+
+        // These two schemas should be equal
+        m_tmpOutputTable = newTempTable;
+    }
 
     void executeAggBase(const NValueArray& params);
+
+protected:
+    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
     void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
 
@@ -86,7 +175,7 @@ protected:
     /// through any additional columns from the input table.
     bool insertOutputTuple(AggregateRow* aggregateRow);
 
-    void advanceAggs(AggregateRow* aggregateRow);
+    void advanceAggs(AggregateRow* aggregateRow, const TableTuple& tuple);
 
     /*
      * Create an instance of an aggregator for the specified aggregate type.
@@ -100,6 +189,7 @@ protected:
      * aggregation.
      */
     std::vector<int> m_passThroughColumns;
+    std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
     TupleSchema* m_aggSchema;
@@ -108,9 +198,10 @@ protected:
     std::vector<AbstractExpression*> m_groupByExpressions;
     std::vector<AbstractExpression*> m_inputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
-    std::vector<int> m_aggregateOutputColumns;
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
+
+    ProgressMonitorProxy* m_pmp;
 };
 
 
@@ -125,7 +216,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateHashExecutor() { }
 
-private:
+protected:
     virtual bool p_execute(const NValueArray& params);
 };
 
@@ -141,8 +232,26 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-private:
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+
+    void p_execute_tuple(const TableTuple& nextTuple);
+
+    void p_execute_finish();
+protected:
     virtual bool p_execute(const NValueArray& params);
+
+    void getNextGroupByValues(const TableTuple& nextTuple);
+
+    std::vector<NValue> m_inProgressGroupByValues;
+    std::vector<NValue> m_nextGroupByValues;
+
+    AggregateRow * m_aggregateRow;
+
+    TableTuple m_passThroughTupleSource;
+
+    // State variables for iteration on input table
+    bool m_noInputRows;
+    bool m_failPrePredicateOnFirstRow;
 };
 
 }

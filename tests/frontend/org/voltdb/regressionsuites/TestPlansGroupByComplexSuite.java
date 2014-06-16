@@ -32,6 +32,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -1002,6 +1003,56 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             assertTrue(vt.getRowCount() == 0);
         }
+    }
+
+    // This test case will trigger temp table "delete as we go" feature on join node
+    public void testAggregateOnJoin() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        long[][] expected;
+
+        // Empty data from table.
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "delete from " + tb);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+        int scale = 10;
+        int numOfRecords = scale * 1000;
+        // Insert records into the table.
+        // id, wage, dept, rate
+        String timeStamp = "2013-06-18 02:00:00.123457";
+
+        String[] myProcs = {"R1.insert", "P1.insert"};
+        for (String insertProc: myProcs) {
+            for (int ii = 1; ii <= numOfRecords; ii++) {
+                client.callProcedure(new NullCallback(),
+                        insertProc, ii,  ii % 1000,  ii % 2 , timeStamp);
+            }
+        }
+
+        try {
+            client.drain();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Serial aggregation because of no group by
+        cr = client.callProcedure("@AdHoc", "SELECT sum(R1.wage) " +
+                " from R1, P1 WHERE R1.id = P1.id ;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        expected = new long[][] {{499500 * scale}};
+        validateTableOfLongs(vt, expected);
+
+
+        // hash aggregation because of no index on group by key
+        cr = client.callProcedure("@AdHoc", "SELECT R1.dept, sum(R1.wage) " +
+                " from R1, P1 WHERE R1.id = P1.id Group by R1.dept order by R1.dept;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        expected = new long[][] {{0, 249500 * scale}, {1, 250000 * scale}};
+        validateTableOfLongs(vt, expected);
     }
 
 
