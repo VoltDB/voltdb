@@ -26,6 +26,7 @@ using namespace voltdb;
 
 TempTableLimits::TempTableLimits()
     : m_currMemoryInBytes(0),
+      m_peakMemoryInBytes(0),
       m_logThreshold(-1),
       m_memoryLimit(1024 * 1024 * 100),
       m_logLatch(false)

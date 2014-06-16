@@ -135,7 +135,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
         assertEquals(524288, m_ee.m_currMemoryInBytes);
-        assertEquals(7219091473607979893L, m_ee.m_peakMemoryInBytes);
+        assertEquals(524288, m_ee.m_peakMemoryInBytes);
     }
 
     private ExecutionEngine m_ee;
