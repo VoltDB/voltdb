@@ -739,7 +739,6 @@ public class StatsAgent extends OpsAgent
             final VoltTable table = firstSource.getStatsTable();
             if (table == null)
                 return null;
-            System.out.println("prevResults:" + prevResults + " table column count:" + table.getColumnCount());
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
             for (int i = 0; i < columns.length; i++)
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),

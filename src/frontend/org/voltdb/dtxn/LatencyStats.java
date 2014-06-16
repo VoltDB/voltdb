@@ -17,7 +17,6 @@
 
 package org.voltdb.dtxn;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -32,8 +31,6 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-
-import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
@@ -104,11 +101,13 @@ public class LatencyStats extends SiteStatsSource {
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
+        columns.add(new ColumnInfo("UNCOMPRESSED_HISTOGRAM", VoltType.VARBINARY));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
         rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes(CompressionStrategySnappy.INSTANCE);
+        rowValues[columnNameToIndex.get("UNCOMPRESSED_HISTOGRAM")] = m_totals.toUncompressedBytes();
         super.updateStatsRow(rowKey, rowValues);
     }
 }
