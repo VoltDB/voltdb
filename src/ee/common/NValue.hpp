@@ -1051,13 +1051,12 @@ class NValue {
           case VALUE_TYPE_DECIMAL:
           {
             TTInt scaledValue = getDecimal();
+            // we only deal with the decimal number within int64_t range here
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            int64_t fraction = getFractionalPart(scaledValue);
             double retval;
-            TTInt whole(scaledValue);
-            TTInt fractional(scaledValue);
-            whole /= kMaxScaleFactor;
-            fractional %= kMaxScaleFactor;
-            retval = static_cast<double>(whole.ToInt()) +
-                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
+            retval = static_cast<double>(whole) +
+                    (static_cast<double>(fractional)/static_cast<double>(kMaxScaleFactor));
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
@@ -1160,9 +1159,7 @@ class NValue {
             retval.getBigInt() = static_cast<int64_t>(getDouble()); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            retval.getBigInt() = whole.ToInt(); break;
+            retval.getBigInt() = narrowDecimalToBigInt(scaledValue); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.getBigInt() = static_cast<int64_t>(getNumberFromString()); break;
@@ -1210,9 +1207,7 @@ class NValue {
             // OR it might be a convenience for some obscure system-generated edge case?
 
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            retval.getTimestamp() = whole.ToInt(); break;
+            retval.getTimestamp() = narrowDecimalToBigInt(scaledValue); break;
         }
         case VALUE_TYPE_VARCHAR: {
             const int32_t length = getObjectLength_withoutNull();
@@ -1255,10 +1250,10 @@ class NValue {
             retval.narrowToInteger(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToInteger(value, type); break;
+            // get the whole part of the decimal
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            // try to convert the whole part, which is a int64_t
+            retval.narrowToInteger(whole, VALUE_TYPE_BIGINT); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToInteger(getNumberFromString(), type); break;
@@ -1298,10 +1293,8 @@ class NValue {
             retval.narrowToSmallInt(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToSmallInt(value, type); break;
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            retval.narrowToSmallInt(whole, VALUE_TYPE_BIGINT); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToSmallInt(getNumberFromString(), type); break;
@@ -1341,10 +1334,8 @@ class NValue {
             retval.narrowToTinyInt(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToTinyInt(value, type); break;
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            retval.narrowToTinyInt(whole, type); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToTinyInt(getNumberFromString(), type); break;
