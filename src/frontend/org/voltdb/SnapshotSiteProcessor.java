@@ -582,8 +582,9 @@ public class SnapshotSiteProcessor {
                             writeFutures.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                if (t instanceof StreamSnapshotTimeoutException) {
-                                    SNAP_LOG.error(t.getMessage());
+                                if (t instanceof StreamSnapshotTimeoutException ||
+                                        t.getCause() instanceof StreamSnapshotTimeoutException) {
+                                    //This error is already logged by the watchdog when it generates the exception
                                 } else {
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
                                 }

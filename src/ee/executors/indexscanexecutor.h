@@ -65,7 +65,7 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
-class AggregateSerialExecutor;
+class AggregateExecutorBase;
 
 class IndexScanExecutor : public AbstractExecutor
 {
@@ -74,7 +74,7 @@ public:
         : AbstractExecutor(engine, abstractNode)
         , m_projectionExpressions(NULL)
         , m_searchKeyBackingStore(NULL)
-        , m_aggSerialExec(NULL)
+        , m_aggExec(NULL)
     {}
     ~IndexScanExecutor();
 
@@ -111,7 +111,7 @@ private:
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
 
-    AggregateSerialExecutor* m_aggSerialExec;
+    AggregateExecutorBase* m_aggExec;
 };
 
 }

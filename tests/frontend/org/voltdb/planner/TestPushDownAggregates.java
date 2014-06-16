@@ -89,7 +89,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testCountStarWithGroupBy() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT A1, count(*) FROM T1 GROUP BY A1");
-        checkPushedDown(pn, false,
+        checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
@@ -108,7 +108,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
         List<AbstractPlanNode> pn =
                 compileToFragments("SELECT A1, count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY)" +
                     " FROM T1 GROUP BY A1");
-        checkPushedDown(pn, false,
+        checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
                                               ExpressionType.AGGREGATE_COUNT,
                                               ExpressionType.AGGREGATE_SUM,
@@ -183,7 +183,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testGroupByNotInDisplayColumn() {
         List<AbstractPlanNode> pn = compileToFragments ("SELECT count(A1) FROM T1 GROUP BY A1");
-        checkPushedDown(pn, false,
+        checkPushedDown(pn, true,
                 new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
                 new ExpressionType[] {ExpressionType.AGGREGATE_SUM}, true);
 
@@ -327,8 +327,15 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
         if (isAggInlined) {
             assertTrue(p instanceof AbstractScanPlanNode);
-            assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-            p =  p.getInlinePlanNode(PlanNodeType.AGGREGATE);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+            if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
+                p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);
+            } else {
+                p  = p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            }
+
         } else {
             assertTrue(p instanceof AggregatePlanNode);
         }

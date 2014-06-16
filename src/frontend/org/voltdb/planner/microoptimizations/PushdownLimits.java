@@ -24,6 +24,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class PushdownLimits extends MicroOptimization {
 
@@ -63,6 +64,14 @@ public class PushdownLimits extends MicroOptimization {
 
         // push into Scans
         if (child instanceof AbstractScanPlanNode) {
+
+            // scan node can not have inline aggregation because ee apply scan limit first
+            // in future, this limit can be aggregate inline node.
+            if (child.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                child.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null ) {
+                return plan;
+            }
+
             plan.clearChildren();
             child.clearParents();
             child.addInlinePlanNode(plan);

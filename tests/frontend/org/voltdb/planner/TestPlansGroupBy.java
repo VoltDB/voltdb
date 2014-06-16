@@ -163,8 +163,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        // No index, inline hash aggregate
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         // Having
         pns = compileToFragments("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3");
@@ -175,134 +176,93 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
+        assertTrue(p instanceof AbstractScanPlanNode);
+        // No index, inline hash aggregate
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        aggNode = (AggregatePlanNode)p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
         assertNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+    }
+
+    private void checkGroupByPartitionKey(boolean topAgg, boolean having) {
+        AbstractPlanNode p;
+        AggregatePlanNode aggNode;
+
+        p = pns.get(0).getChild(0);
+        if (topAgg) {
+            assertTrue(p instanceof AggregatePlanNode);
+            if (having) {
+                aggNode = (AggregatePlanNode)p;
+                assertNotNull(aggNode.getPostPredicate());
+            }
+        } else {
+            assertTrue(p instanceof ProjectionPlanNode);
+        }
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        // inline aggregate
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        if (having && !topAgg) {
+            aggNode = (AggregatePlanNode)p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            assertNotNull(aggNode.getPostPredicate());
+        }
     }
 
     public void testGroupByPartitionKey() {
         // Primary key is equal to partition key
-        AbstractPlanNode p;
-        AggregatePlanNode aggNode;
-
         pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY");
-
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        // "its primary key index (for optimized grouping only)"
+        // Not sure why not use serial aggregate instead
+        checkGroupByPartitionKey(false, false);
 
         // Test Having expression
         pns = compileToFragments("SELECT PKEY, COUNT(*) from T1 group by PKEY Having count(*) > 3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
-        assertNotNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(false, true);
 
         // Primary key is not equal to partition key
         pns = compileToFragments("SELECT A3, COUNT(*) from T3 group by A3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(false, false);
 
         // Test Having expression
         pns = compileToFragments("SELECT A3, COUNT(*) from T3 group by A3 Having count(*) > 3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
-        assertNotNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(false, true);
 
 
         // Group by partition key and others
         pns = compileToFragments("SELECT B3, A3, COUNT(*) from T3 group by B3, A3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(false, false);
 
         // Test Having expression
         pns = compileToFragments("SELECT B3, A3, COUNT(*) from T3 group by B3, A3 Having count(*) > 3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
-        assertNotNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(false, true);
     }
 
     public void testGroupByPartitionKey_Negative() {
-        AbstractPlanNode p;
-        AggregatePlanNode aggNode;
-
         pns = compileToFragments("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY)");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
-
+        checkGroupByPartitionKey(true, false);
 
         pns = compileToFragments("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY) Having count(*) > 3");
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
-        assertNotNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        aggNode = (AggregatePlanNode)p;
-        assertNull(aggNode.getPostPredicate());
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        checkGroupByPartitionKey(true, true);
     }
 
     // Group by with index
     private void checkGroupByOnlyPlan(boolean twoFragments, boolean isHashAggregator,
-            boolean isIndexScan, boolean aggInline) {
+            boolean isIndexScan) {
         AbstractPlanNode apn = pns.get(0).getChild(0);
         if (twoFragments) {
             assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
             apn = pns.get(1).getChild(0);
         }
-        if (aggInline) {
-            assertTrue(apn.getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
-            if (isHashAggregator) {
-                assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-            } else {
-                assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
-            }
+
+        // For a single table aggregate, it is inline always.
+        assertTrue(apn.getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
+        if (isHashAggregator) {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
         } else {
-            assertTrue(apn.getPlanNodeType() == (isHashAggregator ? PlanNodeType.HASHAGGREGATE : PlanNodeType.AGGREGATE));
-            assertTrue(apn.getChild(0).getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
         }
     }
 
@@ -312,78 +272,78 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // only GROUP BY cols in SELECT clause
         pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         // SELECT cols in GROUP BY and other aggregate cols
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         // aggregate cols are part of keys of used index
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         // expr index, full indexed case
         pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         // function index, prefix indexed case
         pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         // order of GROUP BY cols is different of them in index definition
         // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
 
         pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
         //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan(false, false, true, true);
+        checkGroupByOnlyPlan(false, false, true);
         System.out.println("Finishing testGroupByOnly");
 
         // unoptimized case (only use second col of the index), but will be replaced in
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_RF_TREE1 not EXPR_RF_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(false, true, true, false);
+        checkGroupByOnlyPlan(false, true, true);
 
         // unoptimized case: index is not scannable
         pns = compileToFragments("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3");
-        checkGroupByOnlyPlan(false, true, true, false);
+        checkGroupByOnlyPlan(false, true, true);
 
         // unoptimized case: F_D2 is not prefix indexable
         pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
-        checkGroupByOnlyPlan(false, true, true, false);
+        checkGroupByOnlyPlan(false, true, true);
 
         // unoptimized case: no prefix index found for (F_D1, F_D2)
         pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
-        checkGroupByOnlyPlan(false, true, true, false);
+        checkGroupByOnlyPlan(false, true, true);
 
         // Partitioned Table
         pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
         //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
         //*/ debug */ System.out.println("DEBUG: " + pns.get(1).toExplainPlanString());
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // Use primary key index
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(true, true, true, false);
+        checkGroupByOnlyPlan(true, true, true);
 
         // unoptimized case (only uses second col of the index), will be replaced in
         // SeqScanToIndexScan for determinism.
@@ -391,7 +351,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
         //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
         System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
-        checkGroupByOnlyPlan(false, true, true, false);
+        checkGroupByOnlyPlan(false, true, true);
     }
 
     public void testEdgeComplexRelatedCases() {
@@ -425,8 +385,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        // inline aggregate
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
         p = pns.get(0).getChild(0);
@@ -483,7 +444,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof LimitPlanNode);
         assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = p.getChild(0).getChild(0);
+        // inline aggregate
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
     }
 
     public void testComplexAggwithDistinct() {
@@ -537,18 +503,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        // inline aggregate
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         pns = compileToFragments("SELECT A1+PKEY, avg(B1) as tag FROM P1 GROUP BY A1+PKEY ORDER BY ABS(tag), A1+PKEY");
         checkHasComplexAgg(pns);
     }
 
     private void checkOptimizedAgg (List<AbstractPlanNode> pns, boolean optimized) {
-        checkOptimizedAgg(pns, optimized, false);
-    }
-
-    private void checkOptimizedAgg (List<AbstractPlanNode> pns, boolean optimized, boolean inlined) {
         AbstractPlanNode p = pns.get(0).getChild(0);
         if (optimized) {
             assertTrue(p instanceof ProjectionPlanNode);
@@ -556,30 +519,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
             p = pns.get(1).getChild(0);
             // push down for optimization
-            if (inlined) {
-                assertTrue(p instanceof AbstractScanPlanNode);
-                // serial
-                assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-            } else {
-                assertTrue(p instanceof AggregatePlanNode);
-                assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
-            }
+            assertTrue(p instanceof AbstractScanPlanNode);
+
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         } else {
             assertTrue(pns.size() == 1);
-
-            if (inlined) {
-                assertTrue(p instanceof AbstractScanPlanNode);
-                assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-            } else {
-                assertTrue(p instanceof AggregatePlanNode);
-                assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
-            }
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         }
     }
 
     public void testUnOptimizedAVG() {
         pns = compileToFragments("SELECT AVG(A1) FROM R1");
-        checkOptimizedAgg(pns, false, true);
+        checkOptimizedAgg(pns, false);
 
         pns = compileToFragments("SELECT A1, AVG(PKEY) FROM R1 GROUP BY A1");
         checkOptimizedAgg(pns, false);
@@ -588,14 +542,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHasComplexAgg(pns);
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof AbstractScanPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
     }
 
     public void testOptimizedAVG() {
         pns = compileToFragments("SELECT AVG(A1) FROM P1");
         checkHasComplexAgg(pns);
-        checkOptimizedAgg(pns, true, true);
+        checkOptimizedAgg(pns, true);
 
         pns = compileToFragments("SELECT A1, AVG(PKEY) FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
@@ -623,15 +579,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, false,
                 -1, -1,
                 -1, -1,
-                distinctPushdown, true, false);
+                distinctPushdown, true, false, false);
     }
 
     private void checkMVNoFix_NoAgg(
             String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            boolean distinctPushdown, boolean projectionNode, boolean aggPushdown) {
+            boolean distinctPushdown, boolean projectionNode,
+            boolean aggPushdown, boolean aggInline) {
 
         checkMVReaggreateFeature(sql, false, numGroupbyOfTopAggNode, numAggsOfTopAggNode, -1, -1,
-                distinctPushdown, projectionNode, aggPushdown);
+                distinctPushdown, projectionNode, aggPushdown, aggInline);
 
     }
 
@@ -647,9 +604,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Distributed group by query
         checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED GROUP by V_SUM_C1",
-                1, 0, false, false, true);
+                1, 0, false, false, true, true);
         checkMVNoFix_NoAgg("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_NO_FIX_NEEDED " +
-                "GROUP by V_SUM_C1", 1, 1, false, false, true);
+                "GROUP by V_SUM_C1", 1, 1, false, false, true, true);
 
         // (2) Table V_P1 and V_P1_NEW:
         pns = compileToFragments("SELECT SUM(V_SUM_C1) FROM V_P1");
@@ -661,9 +618,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT MAX(V_MAX_D1) FROM V_P1_NEW");
         checkMVReaggregateFeature(false, 0, 1, -1, -1, false, false, true, true);
 
-        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, true, true);
-        checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, false, true);
-        checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, false, true);
+        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, true, true, true);
+        checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, false, true, true);
+        checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, false, true, true);
 
 
         // (3) Join Query
@@ -679,19 +636,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true);
+        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true, false);
 
 
         sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
 
         sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
                 "group by v_p1.v_b1;";
-        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true);
+        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true, false);
 
         sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
     }
 
     public void testMVBasedQuery_EdgeCases() {
@@ -912,12 +869,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
             String newsql = sql.replace("@joinType", joinType[i]);
             pns = compileToFragments(newsql);
             System.out.println("Query:" + newsql);
-            for (AbstractPlanNode apn: pns) {
-                System.out.println(apn.toExplainPlanString());
-            }
             // No join node under receive node.
             checkMVReaggregateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                    numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false);
+                    numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false, false);
 
             checkMVFixWithWhere(aggFilters, scanFilters);
         }
@@ -1136,7 +1090,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, true, false);
+                false, true, false, false);
     }
 
     private void checkMVFix_TopAgg_ReAgg(
@@ -1147,7 +1101,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, false, false);
+                false, false, false, false);
     }
 
     private void checkMVFix_TopAgg_ReAgg_with_TopProjection(
@@ -1158,7 +1112,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, true, false);
+                false, true, false, false);
     }
 
 
@@ -1167,7 +1121,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
             String sql, boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean distinctPushdown, boolean projectionNode, boolean aggPushdown) {
+            boolean distinctPushdown, boolean projectionNode,
+            boolean aggPushdown, boolean aggInline) {
 
         pns = compileToFragments(sql);
         for (AbstractPlanNode apn: pns) {
@@ -1175,22 +1130,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                distinctPushdown, projectionNode, aggPushdown);
+                distinctPushdown, projectionNode, aggPushdown, aggInline);
     }
-
-    // topNode, reAggNode
-    private void checkMVReaggregateFeature(
-            boolean needFix,
-            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean distinctPushdown, boolean projectionNode, boolean aggPushdown) {
-
-        checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                distinctPushdown, projectionNode,
-                aggPushdown, false);
-    }
-
 
     // topNode, reAggNode
     private void checkMVReaggregateFeature(
@@ -1199,6 +1140,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
             boolean distinctPushdown, boolean projectionNode,
             boolean aggPushdown, boolean aggInline) {
+
         assertTrue(pns.size() == 2);
         AbstractPlanNode p = pns.get(0);
         assertTrue(p instanceof SendPlanNode);
@@ -1278,7 +1220,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
             if (aggPushdown) {
                 assertTrue(!needFix);
                 if (aggInline) {
-                    assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+                    assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                            p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
                 } else {
                     assertTrue(p instanceof AggregatePlanNode);
                     p = p.getChild(0);
