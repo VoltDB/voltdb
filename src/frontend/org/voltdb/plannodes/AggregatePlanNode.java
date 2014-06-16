@@ -169,9 +169,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     public void generateOutputSchema(Database db)
     {
-        assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
-        // aggregate's output schema is pre-determined, don't touch
+        if (m_children.size() == 1) {
+            m_children.get(0).generateOutputSchema(db);
+            // aggregate's output schema is pre-determined, don't touch
+        }
         return;
     }
 
@@ -181,10 +182,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Aggregates need to resolve indexes for the output schema but don't need
         // to reorder it.  Some of the outputs may be local aggregate columns and
         // won't have a TVE to resolve.
-        assert(m_children.size() == 1);
+        assert (m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
 
+        resolveColumnIndexesUsingSchema(input_schema);
+    }
+
+    void resolveColumnIndexesUsingSchema(NodeSchema input_schema)
+    {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves = new ArrayList<TupleValueExpression>();
         for (SchemaColumn col : m_outputSchema.getColumns()) {
@@ -242,6 +248,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             int index = m_outputSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+
     }
 
     /**
