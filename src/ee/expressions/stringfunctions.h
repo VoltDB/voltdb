@@ -555,19 +555,14 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
     // TODO: how to handle rounding?
     case VALUE_TYPE_DECIMAL:
     {
-        if ( getDecimal() > s_maxLongAsDecimal || getDecimal() < s_minLongAsDecimal)
-            throwCastSQLValueOutOfRangeException<TTInt>(getDecimal(), VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
         TTInt scaledValue = getDecimal();
-        TTInt whole(scaledValue);
-        TTInt fractional(scaledValue);
-        whole /= kMaxScaleFactor;
-        fractional %= kMaxScaleFactor;
-        long f = fractional.ToInt();
-        if (f < 0)
-            f = -f;
-        f /= kMaxScaleFactor/100;
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
+        if (fraction < 0)
+            fraction = -fraction;
+        fraction /= kMaxScaleFactor/100;
 
-        out << std::fixed << whole.ToInt() << '.' << f;
+        out << std::fixed << whole << '.' << fraction;
     }
         break;
     default:

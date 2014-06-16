@@ -662,9 +662,9 @@ class NValue {
     // closest but not equal to +/-1E26 within the accuracy of a double.
     static const double s_gtMaxDecimalAsDouble;
     static const double s_ltMinDecimalAsDouble;
-    // These for
-    static TTInt s_maxLongAsDecimal;
-    static TTInt s_minLongAsDecimal;
+    // These are the bound of converting decimal
+    static TTInt s_maxInt64AsDecimal;
+    static TTInt s_minInt64AsDecimal;
 
     /**
      * 16 bytes of storage for NValue data.
@@ -925,6 +925,23 @@ class NValue {
                            msg);
     }
 
+    /** return the whole part of a TTInt*/
+    static inline int64_t narrowDecimalToBigInt(TTInt &scaledValue) {
+        if (scaledValue > NValue::s_maxInt64AsDecimal || scaledValue < NValue::s_minInt64AsDecimal) {
+            throwCastSQLValueOutOfRangeException<TTInt>(scaledValue, VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
+        }
+        TTInt whole(scaledValue);
+        whole /= kMaxScaleFactor;
+        return whole.ToInt();
+    }
+
+    /** return the fractional part of a TTInt*/
+    static inline int64_t getFractionalPart(TTInt& scaledValue) {
+        TTInt fractional(scaledValue);
+        fractional %= kMaxScaleFactor;
+        return fractional.ToInt();
+    }
+
     int64_t castAsBigIntAndGetValue() const {
         assert(isNull() == false);
 
@@ -1033,8 +1050,8 @@ class NValue {
             return getDouble();
           case VALUE_TYPE_DECIMAL:
           {
-            double retval;
             TTInt scaledValue = getDecimal();
+            double retval;
             TTInt whole(scaledValue);
             TTInt fractional(scaledValue);
             whole /= kMaxScaleFactor;
