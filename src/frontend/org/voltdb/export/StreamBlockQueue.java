@@ -78,10 +78,10 @@ public class StreamBlockQueue {
      * @param actuallyPoll
      * @return
      */
-    private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
+    private StreamBlock pollPersistentDeque(boolean actuallyPoll, boolean allowEmpty) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, allowEmpty);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -122,7 +122,7 @@ public class StreamBlockQueue {
                 if (m_memoryIterator.hasNext()) {
                     return true;
                 } else {
-                    if (pollPersistentDeque(false) != null) {
+                    if (pollPersistentDeque(false, false) != null) {
                         m_memoryIterator = m_memoryDeque.iterator();
                         for (int ii = 0; ii < m_memoryDeque.size() - 1; ii++) {
                             m_memoryIterator.next();
@@ -139,7 +139,7 @@ public class StreamBlockQueue {
                     return m_memoryIterator.next();
                 }
 
-                StreamBlock block = pollPersistentDeque(false);
+                StreamBlock block = pollPersistentDeque(false, false);
                 if (block == null) {
                     throw new java.util.NoSuchElementException();
                 } else {
@@ -158,11 +158,15 @@ public class StreamBlockQueue {
         };
     }
 
-    public StreamBlock peek() {
+    public StreamBlock peek(boolean allowEmpty) {
         if (m_memoryDeque.peek() != null) {
             return m_memoryDeque.peek();
         }
-        return pollPersistentDeque(false);
+        return pollPersistentDeque(false, allowEmpty);
+    }
+
+    public StreamBlock peek() {
+        return peek(false);
     }
 
     public StreamBlock poll() {
@@ -170,14 +174,21 @@ public class StreamBlockQueue {
         if (m_memoryDeque.peek() != null) {
             sb = m_memoryDeque.poll();
         } else {
-            sb = pollPersistentDeque(true);
+            sb = pollPersistentDeque(true, false);
         }
         return sb;
     }
 
+    //Default pop will always return blocks with data or null
     public StreamBlock pop() {
+        return pop(false);
+    }
+
+    //allowEmpty will indeicate that you want to pop empty blocks as well otherwise
+    //only blocks having any elements will be returned.
+    public StreamBlock pop(boolean allowEmpty) {
         if (m_memoryDeque.isEmpty()) {
-            StreamBlock sb = pollPersistentDeque(true);
+            StreamBlock sb = pollPersistentDeque(true, allowEmpty);
             if (sb == null) {
                 throw new java.util.NoSuchElementException();
             }
@@ -197,7 +208,7 @@ public class StreamBlockQueue {
         } else {
             //Don't offer into the memory deque if there is anything waiting to be
             //polled out of the persistent deque. Check the persistent deque
-            if (pollPersistentDeque(false) != null) {
+            if (pollPersistentDeque(false, false) != null) {
                m_persistentDeque.offer( streamBlock.asBBContainer());
             } else {
             //Persistent deque is empty put this in memory
@@ -229,7 +240,7 @@ public class StreamBlockQueue {
             }
             ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
             for (int ii = 0; ii < buffersToPush.size(); ii++) {
-                blocks.add(pollPersistentDeque(true));
+                blocks.add(pollPersistentDeque(true, false));
             }
             for (int ii = blocks.size() - 1; ii >= 0; ii--) {
                 m_memoryDeque.offerFirst(blocks.get(ii));

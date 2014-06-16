@@ -57,10 +57,21 @@ public interface BinaryDeque {
 
     /**
      * Remove and return the object at the head of the queue
+     * @param ocf
      * @return
      * @throws IOException
      */
     public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+
+    /**
+     * Remove and return the object at the head of the queue
+     *
+     * @param ocf
+     * @param allowEmpty
+     * @return
+     * @throws IOException
+     */
+    public BBContainer poll(OutputContainerFactory ocf, boolean allowEmpty) throws IOException;
 
     /**
      * Persist all objects in the queue to the backing store

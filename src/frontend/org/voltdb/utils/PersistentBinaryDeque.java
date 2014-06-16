@@ -146,6 +146,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         PBDSegment qs = new PBDSegment( index, pathname );
                         try {
                             qs.open(false);
+                            if (qs.getNumEntries() == 0) {
+                                LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
+                                qs.closeAndDelete();
+                                return false;
+                            }
                             m_numObjects += qs.getNumEntries();
                             segments.put( index, qs);
                         } catch (IOException e) {
@@ -216,6 +221,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 tail.closeAndDelete();
             }
             Long nextIndex = tail.m_index + 1;
+            LOG.info("About to create new segment as tail is full: " + nextIndex);
             tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             tail.open(true);
             m_segments.offer(tail);
@@ -286,8 +292,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+    //Allows you to poll for empty blocks if flase only blocks with data are returned.
     @Override
-    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
+    public synchronized BBContainer poll(OutputContainerFactory ocf, boolean allowEmpty) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
@@ -295,23 +302,35 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         BBContainer retcont = null;
         PBDSegment segment = m_segments.peek();
-        if (segment.hasMoreEntries()) {
-            retcont = segment.poll(ocf);
-        } else {
-            for (PBDSegment s : m_segments) {
-                if (s.hasMoreEntries()) {
-                    segment = s;
-                    retcont = segment.poll(ocf);
-                    break;
+        if (!allowEmpty) {
+            if (segment.hasMoreEntries()) {
+                retcont = segment.poll(ocf);
+            } else {
+                for (PBDSegment s : m_segments) {
+                    if (s.hasMoreEntries()) {
+                        segment = s;
+                        retcont = segment.poll(ocf);
+                        break;
+                    }
                 }
             }
+        } else {
+            retcont = segment.poll(ocf);
         }
-        if (retcont == null) return null;
+        if (retcont == null) {
+            return null;
+        }
 
         decrementNumObjects();
         assertions();
-        assert(retcont.b() != null);
+        assert (retcont.b() != null);
         return wrapRetCont(segment, retcont);
+    }
+
+    //Default poll will return blocks with data.
+    @Override
+    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
+        return poll(ocf, false);
     }
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
@@ -330,10 +349,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 assert(m_closed || m_segments.contains(segment));
 
                 //Don't do anything else if we are closed
-                if (m_closed) return;
+                if (m_closed) {
+                    return;
+                }
 
                 //Segment is potentially ready for deletion
                 try {
+                    //Delete empty segment thats not last.
                     if (segment.m_discardCount == segment.getNumEntries()) {
                         if (segment != m_segments.peekLast()) {
                             m_segments.remove(segment);
