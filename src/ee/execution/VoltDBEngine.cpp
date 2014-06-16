@@ -121,7 +121,8 @@ typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
 /**
  * A list of executors for runtime.
  */
-struct ExecutorVector {
+class ExecutorVector {
+public:
     ExecutorVector(int64_t fragmentId,
                    int64_t logThreshold,
                    int64_t memoryLimit,
