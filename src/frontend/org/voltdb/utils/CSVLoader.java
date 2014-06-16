@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.LinkedBlockingQueue;
+
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -110,10 +112,49 @@ public class CSVLoader implements CSVLoaderErrorHandler {
      */
     public static boolean testMode = false;
 
+    private class ErrorInfoItem {
+        public long lineNumber;
+        public String[] errorInfo;
+        ErrorInfoItem(long line, String[] info) {
+            lineNumber = line;
+            errorInfo = info;
+        }
+    }
+
+    private static final int ERROR_INFO_QUEUE_SIZE = 500;
     //Errors we keep track only upto maxerrors
-    final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+    private static final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
     private static long m_errorCount = 0;
-    private final long ERROR_INFO_FLUSH_THRESHOLD = 500;
+   
+    private static class ErrorInfoFlushProcessor extends Thread {
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    ErrorInfoItem currItem;
+                    currItem = m_errorInfo.take();
+
+                    if (currItem.errorInfo.length != 2) {
+                        System.out.println("internal error, information is not enough");
+                    }
+                    out_invaliderowfile.write(currItem.errorInfo[0] + "\n");
+                    String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
+                    m_log.error(message);
+                    out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0] + "\n");
+                
+                    m_errorCount++;
+                
+                } catch (FileNotFoundException e) {
+                    m_log.error("CSV report directory '" + config.reportdir
+                            + "' does not exist.");
+                } catch (Exception x) {
+                    m_log.error(x.getMessage());
+                }
+                
+            }
+        }
+    } 
+
     @Override
     public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
@@ -121,26 +162,31 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {
                 return true;
             }
-            if (m_errorInfo.size() > ERROR_INFO_FLUSH_THRESHOLD) {
-                flushErrorInfo();
+
+            String rawLine;
+            if (metaData.rawLine == null) {
+                rawLine = "Unknown line content";
+            } else {
+                rawLine = metaData.rawLine.toString();
             }
-            if (!m_errorInfo.containsKey(metaData.lineNumber)) {
-                String rawLine;
-                if (metaData.rawLine == null) {
-                    rawLine = "Unknown line content";
-                } else {
-                    rawLine = metaData.rawLine.toString();
+            String infoStr = (response != null) ? response.getStatusString() : error;
+            String[] info = {rawLine, infoStr};
+
+            ErrorInfoItem newErrorInfo = new ErrorInfoItem(metaData.lineNumber, info);
+
+            try {
+                if (!m_errorInfo.offer(newErrorInfo)) {
+                    m_errorInfo.put(newErrorInfo);
                 }
-                String infoStr = (response != null) ? response.getStatusString() : error;
-                String[] info = {rawLine, infoStr};
-                m_errorInfo.put(metaData.lineNumber, info);
-                if (response != null) {
-                    byte status = response.getStatus();
-                    if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
-                        System.out.println("Fatal Response from server for: " + response.getStatusString()
-                                + " for: " + rawLine);
-                        System.exit(1);
-                    }
+            } catch (InterruptedException e) {
+            }
+
+            if (response != null) {
+                byte status = response.getStatus();
+                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                    System.out.println("Fatal Response from server for: " + response.getStatusString()
+                            + " for: " + rawLine);
+                    System.exit(1);
                 }
             }
 
@@ -330,6 +376,9 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             long rowsQueued;
             final CSVLoader errHandler = new CSVLoader();
             final CSVDataLoader dataLoader;
+            final ErrorInfoFlushProcessor m_errorinfoProcessor = new ErrorInfoFlushProcessor();
+            m_errorinfoProcessor.start();
+
 
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
@@ -448,50 +497,12 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         return client;
     }
 
-    private void flushErrorInfo() {
-
-        int bulkflush = 300; // by default right now
-        try {
-            long linect = 0;
-            for (Map.Entry<Long, String[]> irow : m_errorInfo.entrySet()) {
-                String info[] = irow.getValue();
-                if (info.length != 2) {
-                    System.out.println("internal error, information is not enough");
-                }
-                linect++;
-                out_invaliderowfile.write(info[0] + "\n");
-                String message = "Invalid input on line " + irow.getKey() + ". " + info[1];
-                m_log.error(message);
-                out_logfile.write(message + "\n  Content: " + info[0] + "\n");
-                if (linect % bulkflush == 0) {
-                    out_invaliderowfile.flush();
-                    out_logfile.flush();
-                }
-            }
-            out_invaliderowfile.flush();
-            out_logfile.flush();
-
-            m_errorCount += linect;
-            m_errorInfo.clear();
-
-        } catch (FileNotFoundException e) {
-            m_log.error("CSV report directory '" + config.reportdir
-                    + "' does not exist.");
-        } catch (Exception x) {
-            m_log.error(x.getMessage());
-        }
-
-    }
-
     private void produceFiles(long ackCount, long insertCount) {
         long latency = System.currentTimeMillis() - start;
         m_log.info("Elapsed time: " + latency / 1000F
                 + " seconds");
 
         try {
-
-            flushErrorInfo();
-
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
