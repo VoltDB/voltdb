@@ -1463,6 +1463,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("R3.insert", 4, 11, 32023, 2147483647, n1, 2147483647999.123,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        bd = new BigDecimal("12340.596");
+        cr = client.callProcedure("R3.insert", 5, 12, 16000, 1280000011, n1-10, 1.5,
+                "2013-07-18 02:00:00.123457", "IBM", bd);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -1585,21 +1589,20 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-2,147,483,647,999.12");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 1");
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        str = result.getString(0);
-        assertEquals(str, "99,999,999,999,999,999,999,999,999.99");
-
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 2");
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        str = result.getString(0);
-        assertEquals(str, "-99,999,999,999,999,999,999,999,999.99");
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 1");
+            fail("range validity check failed for FORMAT_CURRENCY");
+        }
+        catch (ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 2");
+            fail("range validity check failed for FORMAT_CURRENCY");
+        }
+        catch (ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 3");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -1607,6 +1610,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        System.out.println("haha " + str);
         assertEquals(str, "1.50");
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 4");
@@ -1615,7 +1619,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        System.out.println("haha " + str);
         assertEquals(str, "-1.50");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 5");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        System.out.println("haha " + str);
+        assertEquals(str, "12,340.59");
 
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY('abc') from R3 where id = 4");

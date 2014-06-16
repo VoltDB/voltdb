@@ -114,6 +114,28 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
                        msg, internalFlags);
 }
 
+template<>
+inline void throwCastSQLValueOutOfRangeException<TTInt>(
+                                  const TTInt value,
+                                  const ValueType origType,
+                                  const ValueType newType)
+{
+    char msg[1024];
+    snprintf(msg, 1024, "Type %s with value %s can't be cast as %s because the value is "
+            "out of range for the destination type",
+            valueToString(origType).c_str(),
+            value.ToString().c_str(),
+            valueToString(newType).c_str());
+
+    // record underflow or overflow for executors that catch this (indexes, mostly)
+    int internalFlags = 0;
+    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
+    if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
+
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                       msg, internalFlags);
+}
+
 int warn_if(int condition, const char* message);
 
 // This has been demonstrated to be more reliable than std::isinf
@@ -640,6 +662,9 @@ class NValue {
     // closest but not equal to +/-1E26 within the accuracy of a double.
     static const double s_gtMaxDecimalAsDouble;
     static const double s_ltMinDecimalAsDouble;
+    // These for
+    static TTInt s_maxLongAsDecimal;
+    static TTInt s_minLongAsDecimal;
 
     /**
      * 16 bytes of storage for NValue data.

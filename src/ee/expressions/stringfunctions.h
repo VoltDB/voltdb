@@ -552,37 +552,22 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
     case VALUE_TYPE_DOUBLE:
         out << std::fixed << std::setprecision(2) << getDouble();
         break;
-    // TODO: find a way to format decimal
+    // TODO: how to handle rounding?
     case VALUE_TYPE_DECIMAL:
     {
-        std::string str = getDecimal().ToString();
-        //std::string s = str.substr(0, str.size()-12);
-        //size_t len = s.size();
-        size_t len = str.size() - 12;
-        size_t pos;
+        if ( getDecimal() > s_maxLongAsDecimal || getDecimal() < s_minLongAsDecimal)
+            throwCastSQLValueOutOfRangeException<TTInt>(getDecimal(), VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
+        TTInt scaledValue = getDecimal();
+        TTInt whole(scaledValue);
+        TTInt fractional(scaledValue);
+        whole /= kMaxScaleFactor;
+        fractional %= kMaxScaleFactor;
+        long f = fractional.ToInt();
+        if (f < 0)
+            f = -f;
+        f /= kMaxScaleFactor/100;
 
-        if (str[0] == '-') {
-            pos = 1;
-            out << '-';
-            len--;
-        }
-        else {
-            pos = 0;
-        }
-        size_t first = (len % 3 == 0) ? 3 : (len % 3);
-
-        // output the first group
-        for (int i = 0; i < first; i++) {
-            out << str[pos++];
-        }
-        //output the following groups
-        while (pos < str.size() - 12) {
-            out << ',' << str[pos++];
-            out << str[pos++];
-            out << str[pos++];
-        }
-        // TODO: now we just drop the unused decimal places
-        out<<'.'<<str[str.size()-12]<<str[str.size()-11];
+        out << std::fixed << whole.ToInt() << '.' << f;
     }
         break;
     default:
@@ -592,7 +577,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
 
     // TODO: Although there should be only one copy of newloc (and money_numpunct),
     // we still need to test and make sure no memory leakage in this piece of code.
-    return getTempStringValue(out.str().c_str(), out.str().length());
+    std::string rv = out.str();
+    return getTempStringValue(rv.c_str(), rv.length());
 }
 
 }

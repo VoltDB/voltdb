@@ -118,6 +118,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
 const double NValue::s_gtMaxDecimalAsDouble = 1E26;
 const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
+TTInt NValue::s_maxLongAsDecimal(INT64_MAX);
+TTInt NValue::s_minLongAsDecimal(-INT64_MIN);
+
 /*
  * Produce a debugging string describing an NValue.
  */
