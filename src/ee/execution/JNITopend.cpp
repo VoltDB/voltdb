@@ -221,33 +221,6 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-/*int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
-                std::string planNodeName,
-                std::string targetTableName,
-                int64_t targetTableSize,
-                int64_t tuplesProcessed) {
-        JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
-        if (jni_frame.checkResult() < 0) {
-                VOLT_ERROR("Unable to load dependency: jni frame error.");
-                throw std::exception();
-        }
-
-        jstring jPlanNodeName = m_jniEnv->NewStringUTF(planNodeName.c_str());
-        if (m_jniEnv->ExceptionCheck()) {
-                m_jniEnv->ExceptionDescribe();
-                throw std::exception();
-        }
-        jstring jTargetTableName = m_jniEnv->NewStringUTF(targetTableName.c_str());
-        if (m_jniEnv->ExceptionCheck()) {
-                m_jniEnv->ExceptionDescribe();
-                throw std::exception();
-        }
-
-    jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
-                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed);
-    return (int64_t)nextStep;
-}*/
-
 int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
                 std::string planNodeName,
                 std::string targetTableName,

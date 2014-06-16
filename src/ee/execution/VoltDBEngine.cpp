@@ -1765,7 +1765,6 @@ void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
 
-    // TODO: is it OK?
     assert(m_currExecutorVec);
 
     if (m_lastAccessedTable == NULL) {

@@ -867,7 +867,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long tuplesFound = m_connection.readLong();
                     long currMemoryInBytes = m_connection.readLong();
                     long peakMemoryInBytes = m_connection.readLong();
-                    //long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
                     long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
                             currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
