@@ -100,6 +100,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
     public long m_lastTuplesAccessed = 0;
+    public long m_currMemoryInBytes = 0;
+    public long m_peakMemoryInBytes = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -380,10 +382,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long lastAccessedTableSize,
             long tuplesProcessed,
             long currMemoryInBytes,
-            long peakMemroyInBytes)
+            long peakMemoryInBytes)
     {
         ++m_callsFromEE;
         m_lastTuplesAccessed = tuplesProcessed;
+        m_currMemoryInBytes = currMemoryInBytes;
+        m_peakMemoryInBytes = peakMemoryInBytes;
 
         long currentTime = System.currentTimeMillis();
         if (m_startTime == 0) {
@@ -424,7 +428,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         m_currentBatchIndex,
                         CoreUtils.hsIdToString(m_siteId),
                         currMemoryInBytes,
-                        peakMemroyInBytes);
+                        peakMemoryInBytes);
         log.info(msg);
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;

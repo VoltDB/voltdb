@@ -57,6 +57,11 @@ TempTableLimits::increaseAllocated(int bytes)
         throw SQLException(SQLException::volt_temp_table_memory_overflow,
                            msg);
     }
+
+    if (m_currMemoryInBytes > m_peakMemoryInBytes) {
+        m_peakMemoryInBytes = m_currMemoryInBytes;
+    }
+
     if (!m_logLatch && m_logThreshold > 0 &&
         m_currMemoryInBytes > m_logThreshold)
     {
@@ -101,7 +106,13 @@ TempTableLimits::getMemoryLimit() const
 }
 
 int64_t
-TempTableLimits::getCurrMemoryInBytes() const
+TempTableLimits::getPeakMemoryInBytes() const
 {
-    return m_currMemoryInBytes;
+    return m_peakMemoryInBytes;
+}
+
+void
+TempTableLimits::resetPeakMemory()
+{
+    m_peakMemoryInBytes = m_currMemoryInBytes;
 }
