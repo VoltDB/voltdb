@@ -1053,7 +1053,7 @@ class NValue {
             TTInt scaledValue = getDecimal();
             // we only deal with the decimal number within int64_t range here
             int64_t whole = narrowDecimalToBigInt(scaledValue);
-            int64_t fraction = getFractionalPart(scaledValue);
+            int64_t fractional = getFractionalPart(scaledValue);
             double retval;
             retval = static_cast<double>(whole) +
                     (static_cast<double>(fractional)/static_cast<double>(kMaxScaleFactor));
