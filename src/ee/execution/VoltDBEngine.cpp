@@ -451,8 +451,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
                 cleanupExecutors(execsForFrag);
-                m_currExecutorVec->limits.resetPeakMemory();
-                m_currExecutorVec = NULL;
 
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -463,8 +461,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
             cleanupExecutors(execsForFrag);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
-            m_currExecutorVec->limits.resetPeakMemory();
-            m_currExecutorVec = NULL;
 
             return ENGINE_ERRORCODE_ERROR;
         }
@@ -496,10 +492,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
-    m_currExecutorVec->limits.resetPeakMemory();
-    m_currExecutorVec = NULL;
     VOLT_DEBUG("Finished executing.");
-
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
@@ -514,6 +507,10 @@ void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
     }
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
+    m_currExecutorVec = NULL;
+    if (execsForFrag != NULL) {
+        execsForFrag->limits.resetPeakMemory();
+    }
 }
 
 // -------------------------------------------------
