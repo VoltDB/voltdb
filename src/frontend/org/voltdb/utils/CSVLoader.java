@@ -125,7 +125,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     //Errors we keep track only upto maxerrors
     private final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
     private volatile long m_errorCount = 0;
-   
+
     private class ErrorInfoFlushProcessor extends Thread {
         @Override
         public void run() {
@@ -144,19 +144,19 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                     String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
                     m_log.error(message);
                     out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0] + "\n");
-                
+
                     m_errorCount++;
-                
+
                 } catch (FileNotFoundException e) {
                     m_log.error("CSV report directory '" + config.reportdir
                             + "' does not exist.");
                 } catch (Exception x) {
                     m_log.error(x.getMessage());
                 }
-                
+
             }
         }
-    } 
+    }
 
     private ErrorInfoFlushProcessor m_errorinfoProcessor = null;
 
@@ -169,7 +169,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
 
         //Put an empty ErrorInfoItem
         ErrorInfoItem emptyErrorInfo = new ErrorInfoItem(-1, null);
-        
+
         if (!m_errorInfo.offer(emptyErrorInfo)) {
             m_errorInfo.put(emptyErrorInfo);
         }

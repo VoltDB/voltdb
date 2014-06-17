@@ -532,7 +532,7 @@ public class VoltBulkLoader {
             assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
         }
     }
- 
+
     /**
      * Called to synchronously force the VoltBulkLoader to submit all the partially full batches
      * in all partitions of the table to the Client for insert. This call will wait until all
