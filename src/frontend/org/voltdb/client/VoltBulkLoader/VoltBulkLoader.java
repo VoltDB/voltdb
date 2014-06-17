@@ -111,7 +111,8 @@ public class VoltBulkLoader {
     //Queue of batch entries where some rows failed.
     BlockingQueue<VoltBulkLoaderRow> m_failedQueue = null;
 
-    private final int FAILED_QUEUE_LIMIT = 10;
+    // The max number of failed rows that can be stored in m_failedQueue before blocking insertion
+    private final int FAILED_QUEUE_LIMIT = Integer.getInteger("FAILED_QUEUE_LIMIT", 50);
 
     //Number of rows inserted into the PerPartitionTable queues.
     final AtomicLong m_loaderQueuedRowCnt = new AtomicLong(0);

@@ -121,7 +121,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         }
     }
 
-    private static final int ERROR_INFO_QUEUE_SIZE = 500;
+    private static final int ERROR_INFO_QUEUE_SIZE = Integer.getInteger("ERROR_INFO_QUEUE_SIZE", 500);
     //Errors we keep track only upto maxerrors
     private final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
     private volatile long m_errorCount = 0;
