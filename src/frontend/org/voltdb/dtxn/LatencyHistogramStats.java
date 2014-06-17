@@ -1,20 +1,3 @@
-/* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
@@ -24,19 +7,14 @@ import java.util.List;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
-import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
-import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
-/**
- * Class that provides latency information in buckets. Each bucket contains the
- * number of procedures with latencies in the range.
- */
-public class LatencyStats extends SiteStatsSource {
+public class LatencyHistogramStats extends SiteStatsSource {
+
     /**
      * A dummy iterator that wraps and int and provides the
      * Iterator<Object> necessary for getStatsRowKeyIterator()
@@ -77,14 +55,12 @@ public class LatencyStats extends SiteStatsSource {
 
     private AbstractHistogram m_totals = constructHistogram(false);
 
-    public LatencyStats(long siteId) {
+    public LatencyHistogramStats(long siteId) {
         super(siteId, false);
-        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, this);
     }
 
     @Override
-    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
-    {
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         m_totals.reset();
         ClientInterface ci = VoltDB.instance().getClientInterface();
         if (ci != null) {
@@ -99,12 +75,12 @@ public class LatencyStats extends SiteStatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
+        columns.add(new ColumnInfo("UNCOMPRESSED_HISTOGRAM", VoltType.VARBINARY));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes(CompressionStrategySnappy.INSTANCE);
+        rowValues[columnNameToIndex.get("UNCOMPRESSED_HISTOGRAM")] = m_totals.toUncompressedBytes();
         super.updateStatsRow(rowKey, rowValues);
     }
 }

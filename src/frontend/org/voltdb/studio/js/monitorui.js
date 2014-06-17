@@ -6,6 +6,65 @@ this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
 
+function GetLatencyStats()
+{
+    $.ajax({
+        type: 'GET',
+        url: 'http://localhost:8080/api/1.0/?Procedure=@Statistics&Parameters=[%22LATENCY_HISTOGRAM%22,1]&jsonp=?',
+        async: false,
+        jsonpCallback: 'get_histogram',
+        contentType: "application/json",
+        dataType: 'jsonp',
+        success: function(json) {
+            MonitorUI.json = json;
+        }
+    });
+}
+
+function swap32(val) {
+    return ((val & 0xFF) << 24)
+           | ((val & 0xFF00) << 8)
+           | ((val >> 8) & 0xFF00)
+           | ((val >> 24) & 0xFF);
+}
+
+function read32(str) {
+    var s1 = str.substring(0, 2);
+    var s2 = str.substring(2, 4);
+    var s3 = str.substring(4, 6);
+    var s4 = str.substring(6, 8);
+    return s4 + s3 + s2 + s1;
+}
+
+function read64(str) {
+    var s1 = read32(str);
+    var s2 = read32(str.substring(8, 16));
+    return s2 + s1;
+}
+
+function parseHistogramString(str) {
+    var result = [];
+    var lowestTrackableValue = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    result.push(lowestTrackableValue);
+    var highestTrackableValue = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    result.push(highestTrackableValue);
+    var nSVD = parseInt(read32(str), 16);
+    str = str.substring(8, str.length);
+    result.push(nSVD);
+    var totalCount = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    result.push(totalCount);
+    while (str.length >= 16) {
+        var value = parseInt(read64(str), 16);
+        result.push(value);
+        str = str.substring(16, str.length);
+    }
+
+    return result;
+}
+
 function InitializeChart(id, chart, metric)
 {
 	$('#'+chart+'chart-'+id).empty();
@@ -49,6 +108,12 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 	}
+	// test code
+	GetLatencyStats()
+	if (MonitorUI.json != undefined) {
+        var str = MonitorUI.json.results[0].data[0][4];
+        var results = parseHistogramString(str);
+    }
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
