@@ -123,16 +123,19 @@ public class CSVLoader implements CSVLoaderErrorHandler {
 
     private static final int ERROR_INFO_QUEUE_SIZE = 500;
     //Errors we keep track only upto maxerrors
-    private static final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
-    private static long m_errorCount = 0;
+    private final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
+    private volatile long m_errorCount = 0;
    
-    private static class ErrorInfoFlushProcessor extends Thread {
+    private class ErrorInfoFlushProcessor extends Thread {
         @Override
         public void run() {
             while (true) {
                 try {
                     ErrorInfoItem currItem;
                     currItem = m_errorInfo.take();
+
+                    if (currItem.lineNumber == -1)
+                        return;
 
                     if (currItem.errorInfo.length != 2) {
                         System.out.println("internal error, information is not enough");
@@ -154,6 +157,26 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             }
         }
     } 
+
+    private ErrorInfoFlushProcessor m_errorinfoProcessor = null;
+
+    public void launchErrorFlushProcessor() {
+        m_errorinfoProcessor = new ErrorInfoFlushProcessor();
+        m_errorinfoProcessor.start();
+    }
+
+    public void waitForErrorFlushComplete() throws InterruptedException {
+
+        //Put an empty ErrorInfoItem
+        ErrorInfoItem emptyErrorInfo = new ErrorInfoItem(-1, null);
+        
+        if (!m_errorInfo.offer(emptyErrorInfo)) {
+            m_errorInfo.put(emptyErrorInfo);
+        }
+
+        if (m_errorinfoProcessor != null)
+            m_errorinfoProcessor.join();
+    }
 
     @Override
     public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
@@ -376,8 +399,8 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             long rowsQueued;
             final CSVLoader errHandler = new CSVLoader();
             final CSVDataLoader dataLoader;
-            final ErrorInfoFlushProcessor m_errorinfoProcessor = new ErrorInfoFlushProcessor();
-            m_errorinfoProcessor.start();
+
+            errHandler.launchErrorFlushProcessor();
 
 
             if (config.useSuppliedProcedure) {
@@ -400,6 +423,9 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             insertTimeEnd = System.currentTimeMillis();
 
             csvClient.close();
+
+            errHandler.waitForErrorFlushComplete();
+
             readerTime = (csvReader.m_parsingTime) / 1000000;
             insertCount = dataLoader.getProcessedRows();
             ackCount = insertCount - dataLoader.getFailedRows();
