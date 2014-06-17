@@ -67,7 +67,6 @@ public class LatencyHistogramStats extends SiteStatsSource {
             List<AbstractHistogram> thisci = ci.getLatencyStats();
             for (AbstractHistogram info : thisci) {
                 m_totals.add(info);
-                info.reset();
             }
         }
         return new DummyIterator();
@@ -76,23 +75,12 @@ public class LatencyHistogramStats extends SiteStatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("HISTOGRAM-50", VoltType.INTEGER));
-        columns.add(new ColumnInfo("HISTOGRAM-75", VoltType.INTEGER));
-        columns.add(new ColumnInfo("HISTOGRAM-99", VoltType.INTEGER));
-        columns.add(new ColumnInfo("HISTOGRAM-999", VoltType.INTEGER));
-        columns.add(new ColumnInfo("HISTOGRAM-9999", VoltType.INTEGER));
-        columns.add(new ColumnInfo("HISTOGRAM-99999", VoltType.INTEGER));
+        columns.add(new ColumnInfo("UNCOMPRESSED_HISTOGRAM", VoltType.VARBINARY));
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        long count = m_totals.getHistogramData().getTotalCount();
-        rowValues[columnNameToIndex.get("HISTOGRAM-50")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.5f);
-        rowValues[columnNameToIndex.get("HISTOGRAM-75")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.75f);
-        rowValues[columnNameToIndex.get("HISTOGRAM-99")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.99f);
-        rowValues[columnNameToIndex.get("HISTOGRAM-999")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.999f);
-        rowValues[columnNameToIndex.get("HISTOGRAM-9999")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.9999f);
-        rowValues[columnNameToIndex.get("HISTOGRAM-99999")] = count == 0 ? 0: m_totals.getHistogramData().getValueAtPercentile(0.99999f);
+        rowValues[columnNameToIndex.get("UNCOMPRESSED_HISTOGRAM")] = m_totals.toUncompressedBytes();
         super.updateStatsRow(rowKey, rowValues);
     }
 }
