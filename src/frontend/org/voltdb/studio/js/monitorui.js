@@ -6,21 +6,6 @@ this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
 
-function GetLatencyStats()
-{
-    $.ajax({
-        type: 'GET',
-        url: 'http://localhost:8080/api/1.0/?Procedure=@Statistics&Parameters=[%22LATENCY_HISTOGRAM%22,1]&jsonp=?',
-        async: false,
-        jsonpCallback: 'get_histogram',
-        contentType: "application/json",
-        dataType: 'jsonp',
-        success: function(json) {
-            MonitorUI.json = json;
-        }
-    });
-}
-
 function swap32(val) {
     return ((val & 0xFF) << 24)
            | ((val & 0xFF00) << 8)
@@ -109,7 +94,6 @@ function InitializeChart(id, chart, metric)
 			break;
 	}
 	// test code
-	GetLatencyStats()
 	if (MonitorUI.json != undefined) {
         var str = MonitorUI.json.results[0].data[0][4];
         var results = parseHistogramString(str);
@@ -150,11 +134,12 @@ this.AddMonitor = function(tab)
     , 'memStatsCallback': function(response) {MonitorUI.Monitors[id].memStatsResponse = response;}
     , 'procStatsCallback': function(response) {MonitorUI.Monitors[id].procStatsResponse = response;}
     , 'starvStatsCallback': function(response) {MonitorUI.Monitors[id].starvStatsResponse = response;}
+    , 'latStatsCallback': function(response) {MonitorUI.Monitors[id].latStatsResponse = response;}
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
+    , 'latStatsResponse': null
     , 'lastTimedTransactionCount': -1
-    , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
@@ -240,6 +225,7 @@ this.RefreshMonitorData = function(id)
                 			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
     			            .BeginExecute('@Statistics', ['PROCEDUREPROFILE', 0], MonitorUI.Monitors[id].procStatsCallback)
     			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
+				    .BeginExecute('@Statistics', ['LATENCY_HISTOGRAM', 0], MonitorUI.Monitors[id].latStatsCallback)
     	                	.End(MonitorUI.RefreshMonitor, id);
     }
 }
@@ -285,8 +271,11 @@ this.RefreshMonitor = function(id, Success)
 		Mem += table[j][3]*1.0/1048576.0;
 	dataMem = dataMem.slice(1);
 	dataMem.push([dataIdx, Mem]);
-	var Lat = 0;
-	var TPS = 0;
+
+	// Compute latency statistics 
+	table = monitor.procStatsResponse.results[0].data;
+	var latStats = parseHistogramString(table[0][4])
+
 	var procStats = {};
     // Compute procedure statistics 
 	table = monitor.procStatsResponse.results[0].data;
@@ -324,44 +313,17 @@ this.RefreshMonitor = function(id, Success)
 			data = [table[j][5],1.0];
 		starvStats[table[j][3]] = data;
 	}
-	// Compute latency 
 	var currentTimedTransactionCount = 0.0;
-    var currentLatencySum = 0.0;
-    var currentLatencyAverage = 0.0;
 	for(var proc in procStats)
 	{
 		currentTimedTransactionCount += procStats[proc][1];
-		currentLatencySum += procStats[proc][1]*procStats[proc][4];
-		currentLatencyAverage += procStats[proc][4];
 	}
-	// Compute initial latency averge. We'll compute the delta average next.
-	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
 	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
 	{
 		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
-		dataLat = dataLat.slice(1);
-                if (delta == 0)
-		{
-			if (monitor.noTransactionCount < 5)
-			{
-				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
-				monitor.noTransactionCount++;
-			}
-			else
-			{
-				dataLat.push([dataIdx,0]);
-			}
-		}
-		else
-		{
-			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-			var delta_latency = latency_val / delta;
-			dataLat.push([dataIdx,delta_latency/1000000.0]);
-			monitor.noTransactionCount = 0;
-		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -405,7 +367,6 @@ this.RefreshMonitor = function(id, Success)
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
-	monitor.lastLatencyAverage = currentLatencyAverage;
 	
     var keys = [];
 	for(var k in starvStats)
