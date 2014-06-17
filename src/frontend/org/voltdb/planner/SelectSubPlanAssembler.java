@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Database;
@@ -64,166 +63,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /**
      *
      * @param db The catalog's Database object.
-     * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
+     * @param selectStmt The parsed and dissected statement object describing the sql to execute.
      * @param partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
-    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
+    SelectSubPlanAssembler(Database db, ParsedSelectStmt selectStmt, StatementPartitioning partitioning)
     {
-        super(db, parsedStmt, partitioning);
-        //TODO: refactor all of this join order calculation into an AbstractParsedStmt method that
-        // returns a collection of JoinNode trees, as in:
-        // m_joinOrders.addAll(parsedStmt.generateJoinOrders())
-        //If a join order was provided
-        if (parsedStmt.m_joinOrder != null) {
-            //Extract the table names/aliases from the , separated list
-            ArrayList<String> tableAliases = new ArrayList<String>();
-            //Don't allow dups for now since self joins aren't supported
-            HashSet<String> dupCheck = new HashSet<String>();
-            // Calling trim() up front is important only in the case of a trailing comma.
-            // It allows a trailing comma followed by whitespace as in "A,B, " to be ignored
-            // like a normal trailing comma as in "A,B,". The alternatives would be to treat
-            // these as different cases (strange) or to complain about both -- which could be
-            // accomplished by appending an additional space to the join order here
-            // instead of calling trim.
-            for (String element : parsedStmt.m_joinOrder.trim().split(",")) {
-                String alias = element.trim().toUpperCase();
-                tableAliases.add(alias);
-                if (!dupCheck.add(alias)) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("The specified join order \"").append(parsedStmt.m_joinOrder);
-                    sb.append("\" contains a duplicate element \"").append(alias).append("\".");
-                    throw new PlanningErrorException(sb.toString());
-                }
-            }
-
-            //TODO: now that the table aliases list is built, the remaining validations
-            // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
-            // that generates a JoinNode tree or throws an exception.
-            if (parsedStmt.m_tableAliasMap.size() != tableAliases.size()) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("The specified join order \"");
-                sb.append(parsedStmt.m_joinOrder).append("\" does not contain the correct number of elements\n");
-                sb.append("Expected ").append(parsedStmt.m_tableList.size());
-                sb.append(" but found ").append(tableAliases.size()).append(" elements.");
-                throw new PlanningErrorException(sb.toString());
-            }
-
-            Set<String> aliasSet = parsedStmt.m_tableAliasMap.keySet();
-            Set<String> specifiedNames = new HashSet<String>(tableAliases);
-            specifiedNames.removeAll(aliasSet);
-            if (specifiedNames.isEmpty() == false) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("The specified join order \"");
-                sb.append(parsedStmt.m_joinOrder).append("\" contains ");
-                int i = 0;
-                for (String name : specifiedNames) {
-                    sb.append(name);
-                    if (++i != specifiedNames.size()) {
-                        sb.append(',');
-                    }
-                }
-                sb.append(" which ");
-                if (specifiedNames.size() == 1) {
-                    sb.append("doesn't ");
-                } else {
-                    sb.append("don't ");
-                }
-                sb.append("exist in the FROM clause");
-                throw new PlanningErrorException(sb.toString());
-            }
-            if ( ! isValidJoinOrder(tableAliases)) {
-                throw new PlanningErrorException("The specified join order is invalid for the given query");
-            }
-            //m_parsedStmt.joinTree.m_joinOrder = tables;
-            m_joinOrders.add(m_parsedStmt.m_joinTree);
+        super(db, selectStmt, partitioning);
+        // If a join order was provided or many tables join
+        if (selectStmt.m_joinOrder != null || selectStmt.m_largeJoins) {
+            m_joinOrders.add(selectStmt.generateJoinOrder());
         } else {
             queueAllJoinOrders();
         }
-    }
-
-    /**
-     * Validate the specified join order against the join tree.
-     * In general, outer joins are not associative and commutative. Not all orders are valid.
-     * In case of a valid join order, the initial join tree is rebuilt to match the specified order
-     * @param tables list of table aliases(or tables) to join
-     * @return true if the join order is valid
-     */
-    private boolean isValidJoinOrder(List<String> tableAliases)
-    {
-        assert(m_parsedStmt.m_joinTree != null);
-
-        // Split the original tree into the sub-trees having the same join type for all nodes
-        List<JoinNode> subTrees = m_parsedStmt.m_joinTree.extractSubTrees();
-
-        // For a sub-tree with inner joins only any join order is valid. The only requirement is that
-        // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
-        // The outer joins are associative but changing the join order precedence
-        // includes moving ON clauses to preserve the initial SQL semantics. For example,
-        // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
-        // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
-        // At the moment, such transformations are not supported. The specified joined order must
-        // match the SQL order
-        int tableNameIdx = 0;
-        List<JoinNode> finalSubTrees = new ArrayList<JoinNode>();
-        // we need to process the sub-trees last one first because the top sub-tree is the first one on the list
-        for (int i = subTrees.size() - 1; i >= 0; --i) {
-            JoinNode subTree = subTrees.get(i);
-            // Get all tables for the subTree
-            List<JoinNode> subTableNodes = subTree.generateLeafNodesJoinOrder();
-            JoinNode joinOrderSubTree;
-            if ((subTree instanceof BranchNode) && ((BranchNode)subTree).getJoinType() != JoinType.INNER) {
-                // add the sub-tree as is
-                joinOrderSubTree = subTree;
-                for (JoinNode tableNode : subTableNodes) {
-                    if (tableNode.getId() >= 0) {
-                        String tableAlias = tableNode.getTableAlias();
-                        if ( ! tableAliases.get(tableNameIdx++).equals(tableAlias)) {
-                            return false;
-                        }
-                    }
-                }
-            } else {
-                // Collect all the "real" tables from the sub-tree skipping the nodes representing
-                // the sub-trees with the different join type (id < 0)
-                Map<String, JoinNode> nodeNameMap = new HashMap<String, JoinNode>();
-                for (JoinNode tableNode : subTableNodes) {
-                    if (tableNode.getId() >= 0) {
-                        nodeNameMap.put(tableNode.getTableAlias(), tableNode);
-                    }
-                }
-
-                // rearrange the sub tree to match the order
-                List<JoinNode> joinOrderSubNodes = new ArrayList<JoinNode>();
-                for (int j = 0; j < subTableNodes.size(); ++j) {
-                    if (subTableNodes.get(j).getId() >= 0) {
-                        assert(tableNameIdx < tableAliases.size());
-                        String tableAlias = tableAliases.get(tableNameIdx);
-                        if (tableAlias == null || ! nodeNameMap.containsKey(tableAlias)) {
-                            return false;
-                        }
-                        joinOrderSubNodes.add(nodeNameMap.get(tableAlias));
-                        ++tableNameIdx;
-                    } else {
-                        // It's dummy node
-                        joinOrderSubNodes.add(subTableNodes.get(j));
-                    }
-                }
-                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
-                //Collect all the join/where conditions to reassign them later
-                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
-                if (combinedWhereExpr != null) {
-                    joinOrderSubTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
-                }
-                // The new tree root node id must match the original one to be able to reconnect the
-                // subtrees
-                joinOrderSubTree.setId(subTree.getId());
-            }
-            finalSubTrees.add(0, joinOrderSubTree);
-        }
-        // if we got there the join order is OK. Rebuild the whole tree
-        m_parsedStmt.m_joinTree = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
-        return true;
     }
 
     /**

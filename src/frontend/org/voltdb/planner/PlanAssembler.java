@@ -246,7 +246,7 @@ public class PlanAssembler {
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
 
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
             return;
         }
 

@@ -981,7 +981,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
     }
 
-    public void XXX() {
+    public void testXXX() {
         // Distributed Outer table
         List<AbstractPlanNode> lpn;
         AbstractPlanNode pn;
@@ -1086,12 +1086,6 @@ public class TestPlansJoin extends PlannerTestCase {
                      "VoltDB does not support full outer joins");
        failToCompile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C",
                      "VoltDB does not support full outer joins");
-       // OUTER JOIN with >5 tables.
-       failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
-                     "join of > 5 tables was requested without specifying a join order");
-       // INNER JOIN with >5 tables.
-       failToCompile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C",
-                     "join of > 5 tables was requested without specifying a join order");
    }
 
 
@@ -1215,6 +1209,20 @@ public class TestPlansJoin extends PlannerTestCase {
        assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
        ex = ((NestLoopIndexPlanNode) n).getWherePredicate();
        assertEquals(ex instanceof OperatorExpression, true);
+   }
+
+   public void testMoreThan5TableJoins() {
+       AbstractPlanNode pn;
+
+       // INNER JOIN with >5 tables.
+       pn = compile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C");
+       //* enable for debug */ System.out.println(pn.toExplainPlanString());System.out.println(pn.toExplainPlanString());
+
+
+
+       // OUTER JOIN with >5 tables.
+       pn = compile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A");
+       //* enable for debug */ System.out.println(pn.toExplainPlanString());System.out.println(pn.toExplainPlanString());
    }
 
     @Override

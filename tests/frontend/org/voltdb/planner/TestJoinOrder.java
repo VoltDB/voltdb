@@ -244,7 +244,8 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testInnerOuterJoinOrder() {
-        AbstractPlanNode pn = compileSPWithJoinOrder(
+        AbstractPlanNode pn;
+        pn = compileSPWithJoinOrder(
                 "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
                 "T2, T1, T3, T4, T5, T7, T6");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
@@ -293,6 +294,25 @@ public class TestJoinOrder extends PlannerTestCase {
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
+        }
+    }
+
+    public void testMoreThan5TablesJoin() {
+        AbstractPlanNode pn, n;
+        pn = compile("select * FROM T1, T2, T3, T4, T5, T6, T7");
+        n = pn.getChild(0).getChild(0);
+        for (int ii = 7; ii > 0; ii--) {
+            if (ii == 2) {
+                assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii))
+                        || ((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii - 1)));
+                assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().endsWith(Integer.toString(ii))
+                        || ((SeqScanPlanNode)n.getChild(1)).getTargetTableName().endsWith(Integer.toString(ii - 1)));
+                break;
+            } else {
+                NestLoopPlanNode node = (NestLoopPlanNode)n;
+                assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().endsWith(Integer.toString(ii)));
+                n = node.getChild(0);
+            }
         }
     }
 
