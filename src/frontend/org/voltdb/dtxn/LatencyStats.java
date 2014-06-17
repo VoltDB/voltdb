@@ -32,9 +32,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-
 /**
  * Class that provides latency information in buckets. Each bucket contains the
  * number of procedures with latencies in the range.
@@ -103,7 +100,6 @@ public class LatencyStats extends SiteStatsSource {
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
-
     }
 
     @Override
