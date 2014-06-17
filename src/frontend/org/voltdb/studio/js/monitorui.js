@@ -6,21 +6,6 @@ this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
 
-function GetLatencyStats()
-{
-    $.ajax({
-        type: 'GET',
-        url: 'http://localhost:8080/api/1.0/?Procedure=@Statistics&Parameters=[%22LATENCY_HISTOGRAM%22,1]&jsonp=?',
-        async: false,
-        jsonpCallback: 'get_histogram',
-        contentType: "application/json",
-        dataType: 'jsonp',
-        success: function(json) {
-            MonitorUI.json = json;
-        }
-    });
-}
-
 function InitializeChart(id, chart, metric)
 {
 	$('#'+chart+'chart-'+id).empty();
@@ -63,15 +48,6 @@ function InitializeChart(id, chart, metric)
 		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
 			break;
-	}
-	GetLatencyStats();
-	if (MonitorUI.json != undefined) {
-	    var str = MonitorUI.json.results[0].data[0][4];
-	    var buf = new ArrayBuffer(str.length / 8);
-	    var view = new DataView(buf);
-	    var lowestTrackableValue = view.getInt32(0);
-	    var highestTrackableValue = view.getInt32(8, true); // next 8 bytes as a little endian signed long
-	    var nSVD = view.getInt32(16, true);
 	}
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
