@@ -23,6 +23,7 @@ public enum StatsSelector {
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
+    LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
     IOSTATS,
     MEMORY,           // info about node's memory usage

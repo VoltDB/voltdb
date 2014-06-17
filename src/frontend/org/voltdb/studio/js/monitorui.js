@@ -49,7 +49,6 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 	}
-	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
     MonitorUI.Monitors[id][chart+'Plot'] = plot;
