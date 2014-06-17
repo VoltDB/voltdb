@@ -6,11 +6,66 @@ this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
 
-function swap32(val) {
-    return ((val & 0xFF) << 24)
-           | ((val & 0xFF00) << 8)
-           | ((val >> 8) & 0xFF00)
-           | ((val >> 24) & 0xFF);
+function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
+    this.lowestTrackableValue = lowestTrackableValue;
+    this.highestTrackableValue = highestTrackableValue;
+    this.nSVD = nSVD;
+    this.totalCount = totalCount;
+    this.count = [];
+    this.init();
+}
+
+Histogram.prototype.init = function() {
+    var largestValueWithSingleUnitResolution = 2 * Math.pow(10, this.nSVD);
+    this.unitMagnitude = Math.floor(Math.log(this.lowestTrackableValue)/Math.log(2));
+    var subBucketCountMagnitude = Math.ceil(Math.log(largestValueWithSingleUnitResolution)/Math.log(2));
+    this.subBucketHalfCountMagnitude = ((subBucketCountMagnitude > 1) ? subBucketCountMagnitude : 1) - 1;
+    this.subBucketCount = Math.pow(2, (this.subBucketHalfCountMagnitude + 1));
+    this.subBucketHalfCount = this.subBucketCount / 2;
+    this.subBucketMask = (this.subBucketCount - 1) << this.unitMagnitude;
+    var trackableValue = (this.subBucketCount - 1) << this.unitMagnitude;
+    var bucketsNeeded = 1;
+    while (trackableValue < this.highestTrackableValue) {
+        trackableValue *= 2;
+        bucketsNeeded++;
+    }
+    this.bucketCount = bucketsNeeded;
+
+    this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
+}
+
+Histogram.prototype.diff = function(newer) {
+    var h = new Histogram(newer.lowestTrackableValue, newer.highestTrackableValue, newer.nSVD, newer.totalCount - this.totalCount);
+    for (var i = 0; i < h.countsArrayLength; i++) {
+        h.count[i] = newer.count[i] - this.count[i];
+    }
+    return h;
+}
+
+Histogram.prototype.getCountAt = function(bucketIndex, subBucketIndex) {
+    var bucketBaseIndex = (bucketIndex + 1) << this.subBucketHalfCountMagnitude;
+    var offsetInBucket = subBucketIndex - this.subBucketHalfCount;
+    var countIndex = bucketBaseIndex + offsetInBucket;
+    return this.count[countIndex];
+}
+
+Histogram.prototype.valueFromIndex = function(bucketIndex, subBucketIndex) {
+    return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
+}
+
+Histogram.prototype.getValueAtPercentile = function(percentile) {
+    var totalToCurrentIJ = 0;
+    var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
+    for (var i = 0; i < this.bucketCount; i++) {
+        var j = (i == 0) ? 0 : (this.subBucketCount / 2);
+        for (; j < this.subBucketCount; j++) {
+            totalToCurrentIJ += this.getCountAt(i, j);
+            if (totalToCurrentIJ >= countAtPercentile) {
+                var valueAtIndex = this.valueFromIndex(i, j);
+                return valueAtIndex;
+            }
+        }
+    }
 }
 
 function read32(str) {
@@ -27,27 +82,33 @@ function read64(str) {
     return s2 + s1;
 }
 
-function parseHistogramString(str) {
-    var result = [];
+function convert2Histogram(str) {
+    // Read lowestTrackableValue
     var lowestTrackableValue = parseInt(read64(str), 16);
     str = str.substring(16, str.length);
-    result.push(lowestTrackableValue);
+    
+    // Read highestTrackableValue
     var highestTrackableValue = parseInt(read64(str), 16);
     str = str.substring(16, str.length);
-    result.push(highestTrackableValue);
+    
+    // Read numberOfSignificantValueDigits
     var nSVD = parseInt(read32(str), 16);
     str = str.substring(8, str.length);
-    result.push(nSVD);
+    
+    // Read totalCount
     var totalCount = parseInt(read64(str), 16);
     str = str.substring(16, str.length);
-    result.push(totalCount);
+    
+    var histogram = new Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount);
+    
+    var i = 0;
     while (str.length >= 16) {
         var value = parseInt(read64(str), 16);
-        result.push(value);
+        histogram.count[i] = value;
         str = str.substring(16, str.length);
+        i++;
     }
-
-    return result;
+    return histogram;
 }
 
 function InitializeChart(id, chart, metric)
@@ -93,11 +154,6 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 	}
-	// test code
-	if (MonitorUI.json != undefined) {
-        var str = MonitorUI.json.results[0].data[0][4];
-        var results = parseHistogramString(str);
-    }
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
@@ -144,6 +200,7 @@ this.AddMonitor = function(tab)
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
+    , 'latHistogram': null
     , 'latData': [data]
     , 'tpsData': [data]
     , 'memData': [data]
@@ -273,8 +330,16 @@ this.RefreshMonitor = function(id, Success)
 	dataMem.push([dataIdx, Mem]);
 
 	// Compute latency statistics 
-	table = monitor.procStatsResponse.results[0].data;
-	var latStats = parseHistogramString(table[0][4])
+	table = monitor.latStatsResponse.results[0].data;
+	var latStats = convert2Histogram(table[0][4]);
+	var lat = 0;
+	if (monitor.latHistogram == null)
+		lat = latStats.getValueAtPercentile(99);
+	else
+		lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
+	monitor.latHistogram = latStats;
+	dataLat = dataLat.slice(1);
+	dataLat.push([dataIdx, lat]);
 
 	var procStats = {};
     // Compute procedure statistics 
