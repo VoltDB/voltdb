@@ -85,7 +85,7 @@ public class MaterializedViewBenchmark {
         int warmup = 100000;
 
         @Option(desc = "Number of groupings for materialized view (0 for 1:1 group to id ratio).")
-        int group = 0;
+        int group = 5000;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
@@ -370,21 +370,31 @@ public class MaterializedViewBenchmark {
      *        fw      File writer object to write stats to.
      * @throws Exception if anything unexpected happens.
      */
-    public void runHalf(boolean matView, FileWriter fw) throws Exception {
+    public void runHalf(String matView, FileWriter fw) throws Exception {
         String systemStr;
         String csvStr;
         String procStr;
-        if (matView) {
-            systemStr = "w/";
-            csvStr = "w";
-            procStr = "idsWithMatView";
-        } else {
-            systemStr = "w/o";
-            csvStr = "wo";
-            procStr = "ids";
+        switch (matView) {
+            case "matView":
+                systemStr = "w/";
+                csvStr = "w";
+                procStr = "idsWithMatView";
+                break;
+            case "noMatView":
+                systemStr = "w/o";
+                csvStr = "wo";
+                procStr = "ids";
+                break;
+            default:
+                systemStr = "w/ min";
+                csvStr = "w min";
+                procStr = "idsWithMinMatView";
         }
 
         int grp = 1;
+
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
@@ -417,9 +427,6 @@ public class MaterializedViewBenchmark {
         timer.cancel();
         client.drain();
 
-        // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
-        grp = 2;
-
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults(procStr + "_insert");
         } else {
@@ -427,61 +434,75 @@ public class MaterializedViewBenchmark {
         }
         System.out.print(HORIZONTAL_RULE);
 
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
+        if (!matView.equals("minMatView")) {
+            // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
+            grp = 2;
 
-        System.out.println("\n\nUpdating grouping column in table " + systemStr + " materialized view...\n");
+            fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
 
-        if (config.group > 0) {
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     procStr + "_group_id_update",
-                                     grp,
-                                     i);
-                if (grp == (config.group + 1)) {
-                    grp = 2;
-                } else {
-                    grp++;
+            benchmarkStartTS = System.currentTimeMillis();
+            schedulePeriodicStats();
+
+            System.out.println("\n\nUpdating grouping column in table " + systemStr + " materialized view...\n");
+
+            if (config.group > 0) {
+                for (int i=0; i<config.txn; i++){
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_group_id_update",
+                                         grp,
+                                         i);
+                    if (grp == (config.group + 1)) {
+                        grp = 2;
+                    } else {
+                        grp++;
+                    }
+                }
+            } else {
+                for (int i=0; i<config.txn; i++){
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_group_id_update",
+                                         (i + 1),
+                                         i);
                 }
             }
-        } else {
+            timer.cancel();
+            client.drain();
+
+            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+                printResults(procStr + "_group_id_update");
+            } else {
+                printResults(procStr + "_group_id_update", fw, "Update Group " + csvStr + " MV");
+            }
+            System.out.print(HORIZONTAL_RULE);
+
+            fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+
+            benchmarkStartTS = System.currentTimeMillis();
+            schedulePeriodicStats();
+
+            System.out.println("\n\nUpdating aggregated column in table " + systemStr + " materialized view...\n");
+
             for (int i=0; i<config.txn; i++){
                 client.callProcedure(new NullCallback(),
-                                     procStr + "_group_id_update",
+                                     procStr + "_value_update",
                                      (i + 1),
                                      i);
             }
+            timer.cancel();
+            client.drain();
+
+            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+                printResults(procStr + "_value_update");
+            } else {
+                printResults(procStr + "_value_update", fw, "Update Aggregate " + csvStr + " MV");
+            }
+            System.out.print(HORIZONTAL_RULE);
         }
-        timer.cancel();
-        client.drain();
 
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults(procStr + "_group_id_update");
-        } else {
-            printResults(procStr + "_group_id_update", fw, "Update Group " + csvStr + " MV");
-        }
-        System.out.print(HORIZONTAL_RULE);
-
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-
-        System.out.println("\n\nUpdating aggregated column in table " + systemStr + " materialized view...\n");
-
-        for (int i=0; i<config.txn; i++){
-            client.callProcedure(new NullCallback(),
-                                 procStr + "_value_update",
-                                 (i + 1),
-                                 i);
-        }
-        timer.cancel();
-        client.drain();
-
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults(procStr + "_value_update");
-        } else {
-            printResults(procStr + "_value_update", fw, "Update Aggregate " + csvStr + " MV");
-        }
-        System.out.print(HORIZONTAL_RULE);
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
 
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
@@ -536,6 +557,11 @@ public class MaterializedViewBenchmark {
                                      i,
                                      i,
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatView_insert",
+                                     i,
+                                     i,
+                                     i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -544,6 +570,9 @@ public class MaterializedViewBenchmark {
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatView_delete",
                                      i);
             }
             client.drain();
@@ -554,14 +583,15 @@ public class MaterializedViewBenchmark {
             fw = new FileWriter(config.statsfile);
         }
 
-        // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
-
         System.out.println("\nRunning benchmark...\n");
-        runHalf(true, fw);
+        runHalf("matView", fw);
         System.out.print(HORIZONTAL_RULE);
-        runHalf(false, fw);
+        runHalf("noMatView", fw);
+        System.out.print(HORIZONTAL_RULE);
+
+        // reset class variables so that diff is not written to the csv file
+        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
+        runHalf("minMatView", fw);
         benchmarkActive = false;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
