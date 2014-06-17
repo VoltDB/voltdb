@@ -61,7 +61,7 @@ public class AdHocMayhemThread extends Thread {
 
         // mpRatio % of all adhocs are MP
         boolean replicated = (counter % 100) < (this.mpRatio * 100.);
-        boolean batched = (counter % 11) == 0;
+        boolean batched = (counter % 11) == 0 && this.mpRatio > 0.0;
 
         // batched statements can go rw, wr or ww
         long rwMix = counter % 3;
