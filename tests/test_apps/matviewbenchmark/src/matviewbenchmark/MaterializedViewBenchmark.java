@@ -264,7 +264,6 @@ public class MaterializedViewBenchmark {
                                     stats.getStartTimestamp(),
                                     savedThroughput,
                                     savedExecute));
-            savedThroughput = savedExecute = 0;
         } else {
             savedThroughput = newThroughput;
             savedExecute = newExecute;
@@ -589,6 +588,9 @@ public class MaterializedViewBenchmark {
         System.out.print(HORIZONTAL_RULE);
         runHalf("noMatView", fw);
         System.out.print(HORIZONTAL_RULE);
+
+        // reset class variables so that diff is not written to the csv file
+        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
         runHalf("minMatView", fw);
         benchmarkActive = false;
 
