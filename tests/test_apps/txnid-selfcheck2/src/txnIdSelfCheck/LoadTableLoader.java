@@ -106,7 +106,7 @@ public class LoadTableLoader extends Thread {
         m_random = new Random(curtmms);
         r = new Random(curtmms + 1);
 
-        System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
+        log.info("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
         setPriority(getPriority() + 1);
     }
@@ -247,7 +247,7 @@ public class LoadTableLoader extends Thread {
 
         @Override
         public void run() {
-            System.out.println("Starting Copy Delete Task for table: " + m_tableName);
+            log.info("Starting Copy Delete Task for table: " + m_tableName);
             try {
                 List<Long> workList = new ArrayList<Long>();
                 while (m_shouldContinue.get()) {
@@ -268,7 +268,7 @@ public class LoadTableLoader extends Thread {
                     m_copyDeleteDoneCount += workList.size();
                     workList.clear();
                 }
-                System.out.println("CopyAndDeleteTask row count: " + m_copyDeleteDoneCount);
+                log.info("CopyAndDeleteTask row count: " + m_copyDeleteDoneCount);
             } catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
                 log.error("CopyAndDeleteDataTask failed a procedure call for table " + m_tableName
