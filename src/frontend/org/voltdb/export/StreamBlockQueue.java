@@ -78,10 +78,10 @@ public class StreamBlockQueue {
      * @param actuallyPoll
      * @return
      */
-    private StreamBlock pollPersistentDeque(boolean actuallyPoll, boolean allowEmpty) {
+    private StreamBlock pollPersistentDeque(boolean actuallyPoll, boolean deleteEmpty) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, allowEmpty);
+            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, deleteEmpty);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -158,11 +158,11 @@ public class StreamBlockQueue {
         };
     }
 
-    public StreamBlock peek(boolean allowEmpty) {
+    public StreamBlock peek(boolean deleteEmpty) {
         if (m_memoryDeque.peek() != null) {
             return m_memoryDeque.peek();
         }
-        return pollPersistentDeque(false, allowEmpty);
+        return pollPersistentDeque(false, deleteEmpty);
     }
 
     public StreamBlock peek() {
@@ -179,16 +179,11 @@ public class StreamBlockQueue {
         return sb;
     }
 
-    //Default pop will always return blocks with data or null
-    public StreamBlock pop() {
-        return pop(false);
-    }
-
     //allowEmpty will indeicate that you want to pop empty blocks as well otherwise
     //only blocks having any elements will be returned.
-    public StreamBlock pop(boolean allowEmpty) {
+    public StreamBlock pop() {
         if (m_memoryDeque.isEmpty()) {
-            StreamBlock sb = pollPersistentDeque(true, allowEmpty);
+            StreamBlock sb = pollPersistentDeque(true, false);
             if (sb == null) {
                 throw new java.util.NoSuchElementException();
             }

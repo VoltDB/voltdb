@@ -294,7 +294,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     //Allows you to poll for empty blocks if flase only blocks with data are returned.
     @Override
-    public synchronized BBContainer poll(OutputContainerFactory ocf, boolean allowEmpty) throws IOException {
+    public synchronized BBContainer poll(OutputContainerFactory ocf, boolean deleteEmpty) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
@@ -302,20 +302,21 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         BBContainer retcont = null;
         PBDSegment segment = m_segments.peek();
-        if (!allowEmpty) {
-            if (segment.hasMoreEntries()) {
-                retcont = segment.poll(ocf);
-            } else {
-                for (PBDSegment s : m_segments) {
-                    if (s.hasMoreEntries()) {
-                        segment = s;
-                        retcont = segment.poll(ocf);
-                        break;
+        if (segment.hasMoreEntries()) {
+            retcont = segment.poll(ocf);
+        } else {
+            for (PBDSegment s : m_segments) {
+                if (s.hasMoreEntries()) {
+                    segment = s;
+                    retcont = segment.poll(ocf);
+                    break;
+                } else {
+                    if (deleteEmpty) {
+                        m_segments.remove(segment);
+                        segment.closeAndDelete();
                     }
                 }
             }
-        } else {
-            retcont = segment.poll(ocf);
         }
         if (retcont == null) {
             return null;

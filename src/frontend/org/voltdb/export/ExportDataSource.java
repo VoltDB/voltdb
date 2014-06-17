@@ -277,16 +277,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //This will look and pop blokcs that have data or empty to discard.
     private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek(true).uso()) {
+        // Dont delete empty segments here?
+        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek(false).uso()) {
             return;
         }
 
         long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty()
-                && releaseOffset >= m_committedBuffers.peek(true).uso()) {
+        while (!m_committedBuffers.isEmpty()) {
             StreamBlock sb = m_committedBuffers.peek(true);
+            //it should delete the empty segments.
+            if (sb == null) {
+                m_committedBuffers.pop();
+                continue;
+            }
+            if (releaseOffset < sb.uso()) {
+                break;
+            }
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
-                m_committedBuffers.pop(true);
+                m_committedBuffers.pop();
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
