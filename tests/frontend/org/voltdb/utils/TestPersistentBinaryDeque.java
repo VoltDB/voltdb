@@ -686,6 +686,108 @@ public class TestPersistentBinaryDeque {
         System.runFinalization();
     }
 
+    @Test
+    public void testOfferCloseHoleReopenOffer() throws Exception {
+        System.out.println("Running testOfferCloseHoleReopenOffer");
+        //Make it create two full segments
+        for (int ii = 0; ii < 96; ii++) {
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals(3, files.length);
+        m_pbd.sync();
+        m_pbd.close();
+        m_pbd = null;
+        System.gc();
+        System.runFinalization();
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        int cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 96);
+        for (int ii = 96; ii < 192; ii++) {
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
+        }
+        m_pbd.sync();
+        cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 192);
+
+        //Now poll half of it and make sure the data is correct
+        for (int ii = 0; ii < 96; ii++) {
+            ByteBuffer defaultBuffer = getFilledBuffer(ii);
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            assertTrue(defaultBuffer.equals(retval.b()));
+            retval.discard();
+            defaultBuffer.clear();
+        }
+        m_pbd.sync();
+        m_pbd.close();
+        m_pbd = null;
+        System.gc();
+        System.runFinalization();
+
+        //Expect just the current write segment
+        TreeSet<String> names = getSortedDirectoryListing();
+        assertEquals(3, names.size());
+        assertTrue(names.first().equals("pbd_nonce.3.pbd"));
+
+        //Reload
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 96);
+        //Expect just the current write segment hole should be deleted.
+        names = getSortedDirectoryListing();
+        assertEquals(4, names.size());
+        assertTrue(names.first().equals("pbd_nonce.3.pbd"));
+
+        for (int ii = 96; ii < 192; ii++) {
+            m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
+        }
+        m_pbd.sync();
+        cnt = m_pbd.getNumObjects();
+        assertEquals(cnt, 192);
+        //Now poll half of it and make sure the data is correct
+        for (int ii = 96; ii < 192; ii++) {
+            ByteBuffer defaultBuffer = getFilledBuffer(ii);
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            assertTrue(defaultBuffer.equals(retval.b()));
+            retval.discard();
+            defaultBuffer.clear();
+        }
+        //Expect just the current write segment
+        names = getSortedDirectoryListing();
+        assertEquals(3, names.size());
+        assertTrue(names.first().equals("pbd_nonce.6.pbd"));
+
+        //Poll and leave one behind.
+        for (int ii = 96; ii < 191; ii++) {
+            ByteBuffer defaultBuffer = getFilledBuffer(ii);
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            assertTrue(defaultBuffer.equals(retval.b()));
+            retval.discard();
+            defaultBuffer.clear();
+        }
+        //Expect just the current write segment
+        names = getSortedDirectoryListing();
+        assertEquals(1, names.size());
+        assertTrue(names.first().equals("pbd_nonce.8.pbd"));
+
+        //Push to get more segments at head
+        BBContainer objs[] = new BBContainer[]{
+            DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)),
+            DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32)),
+            DBBPool.wrapBB(ByteBuffer.allocateDirect(1024 * 1024 * 32))};
+        m_pbd.push(objs);
+        names = getSortedDirectoryListing();
+        assertEquals(4, names.size());
+        assertTrue(names.first().equals("pbd_nonce.5.pbd"));
+
+        BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        retval.discard();
+        names = getSortedDirectoryListing();
+        assertEquals(3, names.size());
+        assertTrue(names.first().equals("pbd_nonce.6.pbd"));
+
+    }
+
     @Before
     public void setUp() throws Exception {
         if (TEST_DIR.exists()) {
