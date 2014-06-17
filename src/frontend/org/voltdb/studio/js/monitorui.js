@@ -62,7 +62,7 @@ Histogram.prototype.getValueAtPercentile = function(percentile) {
             totalToCurrentIJ += this.getCountAt(i, j);
             if (totalToCurrentIJ >= countAtPercentile) {
                 var valueAtIndex = this.valueFromIndex(i, j);
-                return valueAtIndex;
+                return valueAtIndex / 1000.0;
             }
         }
     }
