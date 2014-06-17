@@ -354,7 +354,7 @@ public class JDBCBenchmark {
                     voteCS.setLong(3, config.maxvotes);
 
                     try {
-	                    totalVotes.incrementAndGet();
+                        totalVotes.incrementAndGet();
                         voteCS.executeUpdate();
                         acceptedVotes.incrementAndGet();
                     } catch (Exception x) {
