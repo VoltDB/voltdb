@@ -46,11 +46,14 @@ namespace voltdb
         int64_t getLogThreshold() const;
         void setMemoryLimit(int64_t limit);
         int64_t getMemoryLimit() const;
+        int64_t getPeakMemoryInBytes() const;
+        void resetPeakMemory();
 
     private:
         // The current amount of memory used by temp tables for this
         // plan fragment
         int64_t m_currMemoryInBytes;
+        int64_t m_peakMemoryInBytes;
         // The memory allocation at which a log message will be
         // generated.  A negative value with disable this behavior.
         int64_t m_logThreshold;

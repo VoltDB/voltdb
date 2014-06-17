@@ -495,9 +495,11 @@ public class Benchmark {
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
-        BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-        replicatedLoader.start();
+        if (config.mpratio > 0.0) {
+            BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+                             (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
+            replicatedLoader.start();
+        }
 
         // wait for the filler tables to load up
         //partitionedLoader.join();
@@ -525,18 +527,22 @@ public class Benchmark {
 
 
         TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
-        TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
-        replicatedTruncater.start();
+        if (config.mpratio > 0.0) {
+            TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+            replicatedTruncater.start();
+        }
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         plt.start();
+        if (config.mpratio > 0.0) {
         LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
         rlt.start();
+        }
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
