@@ -40,7 +40,7 @@ public interface BinaryDeque {
      * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
-     * @param objects
+     * @param object
      * @throws IOException
      */
     public void offer(BBContainer object) throws IOException;
@@ -52,11 +52,13 @@ public interface BinaryDeque {
      * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
      * If there is an exception attempting to write the buffers then all the buffers will be discarded
      * @param objects Array of buffers representing the objects to be pushed to the head of the queue
+     * @throws java.io.IOException
      */
     public void push(BBContainer objects[]) throws IOException;
 
     /**
      * Remove and return the object at the head of the queue
+     * @param ocf
      * @return
      * @throws IOException
      */
