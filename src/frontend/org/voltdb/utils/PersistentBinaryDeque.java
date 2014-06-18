@@ -359,7 +359,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 //Segment is potentially ready for deletion
                 try {
-                    //Delete empty segment thats not last.
                     if (segment.m_discardCount == segment.getNumEntries()) {
                         if (segment != m_segments.peekLast()) {
                             m_segments.remove(segment);
