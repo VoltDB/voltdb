@@ -292,7 +292,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
-    //Allows you to poll for empty blocks if flase only blocks with data are returned.
+    //Delete empty blocks used when release of export buffers.
     @Override
     public synchronized BBContainer poll(OutputContainerFactory ocf, boolean deleteEmpty) throws IOException {
         assertions();
@@ -305,6 +305,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (segment.hasMoreEntries()) {
             retcont = segment.poll(ocf);
         } else {
+            PBDSegment lastSeg = m_segments.peekLast();
             for (PBDSegment s : m_segments) {
                 if (s.hasMoreEntries()) {
                     segment = s;
@@ -312,8 +313,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     break;
                 } else {
                     if (deleteEmpty) {
-                        m_segments.remove(segment);
-                        segment.closeAndDelete();
+                        if (segment != lastSeg) {
+                            LOG.info("Deleting empty segment: " + segment.m_index);
+                            m_segments.remove(segment);
+                            segment.closeAndDelete();
+                        }
                     }
                 }
             }

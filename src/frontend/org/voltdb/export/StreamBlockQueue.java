@@ -158,6 +158,7 @@ public class StreamBlockQueue {
         };
     }
 
+    //Delete empty blocks used when release of export buffers.
     public StreamBlock peek(boolean deleteEmpty) {
         if (m_memoryDeque.peek() != null) {
             return m_memoryDeque.peek();

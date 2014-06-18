@@ -277,7 +277,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //This will look and pop blokcs that have data or empty to discard.
     private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
-        // Dont delete empty segments here?
+        // peek without delete
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek(false).uso()) {
             return;
         }
