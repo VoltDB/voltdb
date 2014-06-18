@@ -98,7 +98,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>());
 }
 
-    private void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx, ArrayList<JoinNode> currentJoinOrder) {
+    private void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx,
+                                    ArrayList<JoinNode> currentJoinOrder) {
         if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
@@ -129,34 +130,38 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private static ArrayList<ArrayList<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
         ArrayList<ArrayList<JoinNode>> permutations = new ArrayList<ArrayList<JoinNode>>();
         for (JoinNode subTree : subTrees) {
-            ArrayList<JoinNode> treePermutations = new ArrayList<JoinNode>();
-            if (subTree instanceof BranchNode && ((BranchNode)subTree).getJoinType() != JoinType.INNER) {
-                // Permutations for Outer Join are not supported yet
-                treePermutations.add(subTree);
-            } else {
-                // if all joins are inner then join orders can be obtained by the permutation of
-                // the original tables. Get a list of the leaf nodes(tables) to permute them
-                List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
-                List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
-                List<JoinNode> newTrees = new ArrayList<JoinNode>();
-                for (List<JoinNode> joinOrder: joinOrders) {
-                    newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder));
-                }
-                //Collect all the join/where conditions to reassign them later
-                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
-                for (JoinNode newTree : newTrees) {
-                    if (combinedWhereExpr != null) {
-                        newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
-                    }
-                    // The new tree root node id must match the original one to be able to reconnect the
-                    // subtrees
-                    newTree.setId(subTree.getId());
-                    treePermutations.add(newTree);
-                }
-            }
-            permutations.add(treePermutations);
+            permutations.add(generateJoinOrder(subTree));
         }
         return permutations;
+    }
+
+    private static ArrayList<JoinNode> generateJoinOrder(JoinNode subTree) {
+        ArrayList<JoinNode> treePermutations = new ArrayList<JoinNode>();
+        if (subTree instanceof BranchNode && ((BranchNode)subTree).getJoinType() != JoinType.INNER) {
+            // Permutations for Outer Join are not supported yet
+            treePermutations.add(subTree);
+        } else {
+            // if all joins are inner then join orders can be obtained by the permutation of
+            // the original tables. Get a list of the leaf nodes(tables) to permute them
+            List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
+            List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
+            List<JoinNode> newTrees = new ArrayList<JoinNode>();
+            for (List<JoinNode> joinOrder: joinOrders) {
+                newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder));
+            }
+            //Collect all the join/where conditions to reassign them later
+            AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
+            for (JoinNode newTree : newTrees) {
+                if (combinedWhereExpr != null) {
+                    newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
+                }
+                // The new tree root node id must match the original one to be able to reconnect the
+                // subtrees
+                newTree.setId(subTree.getId());
+                treePermutations.add(newTree);
+            }
+        }
+        return treePermutations;
     }
 
     /**
