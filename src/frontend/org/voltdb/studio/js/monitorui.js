@@ -331,7 +331,7 @@ this.RefreshMonitor = function(id, Success)
 
 	// Compute latency statistics 
 	table = monitor.latStatsResponse.results[0].data;
-	var latStats = convert2Histogram(table[0][4]);
+	var latStats = convert2Histogram(table[0][5]);
 	var lat = 0;
 	if (monitor.latHistogram == null)
 		lat = latStats.getValueAtPercentile(99);

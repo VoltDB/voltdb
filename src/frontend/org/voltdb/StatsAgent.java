@@ -25,7 +25,6 @@ import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;

@@ -20,6 +20,7 @@ package org.voltdb.dtxn;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.AtomicHistogram;
@@ -27,10 +28,12 @@ import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
-import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
@@ -76,23 +79,33 @@ public class LatencyStats extends SiteStatsSource {
     }
 
     private AbstractHistogram m_totals = constructHistogram(false);
+    protected Supplier<AbstractHistogram> m_supplier = new Supplier<AbstractHistogram>() {
+        public AbstractHistogram get() {
+            m_totals.reset();
+            ClientInterface ci = VoltDB.instance().getClientInterface();
+            if (ci != null) {
+                List<AbstractHistogram> thisci = ci.getLatencyStats();
+                for (AbstractHistogram info : thisci) {
+                    m_totals.add(info);
+                }
+            }
+            return m_totals;
+        }
+    };
+
+    // Set default to 450ms to match the highest request frequency(500ms) in web studio, make sure web studio to draws continuous graph
+    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 450);
+
+    protected volatile Supplier<AbstractHistogram> m_memorizer = Suppliers.memoizeWithExpiration(m_supplier, EXPIRATION, TimeUnit.MILLISECONDS);
 
     public LatencyStats(long siteId) {
         super(siteId, false);
-        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, this);
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
-        m_totals.reset();
-        ClientInterface ci = VoltDB.instance().getClientInterface();
-        if (ci != null) {
-            List<AbstractHistogram> thisci = ci.getLatencyStats();
-            for (AbstractHistogram info : thisci) {
-                m_totals.add(info);
-            }
-        }
+        Suppliers.memoizeWithExpiration(m_supplier, EXPIRATION, TimeUnit.MILLISECONDS);
         return new DummyIterator();
     }
 
@@ -104,7 +117,7 @@ public class LatencyStats extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_totals.toCompressedBytes(CompressionStrategySnappy.INSTANCE);
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_memorizer.get().toCompressedBytes(CompressionStrategySnappy.INSTANCE);
         super.updateStatsRow(rowKey, rowValues);
     }
 }
