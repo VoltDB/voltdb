@@ -297,10 +297,13 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
-    public void testMoreThan5TablesJoin() {
+
+    private void checkJoinOrder(String sql, int exception) {
         AbstractPlanNode pn, n;
-        pn = compile("select * FROM T1, T2, T3, T4, T5, T6, T7");
+        pn = compile(sql);
         n = pn.getChild(0).getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        // starts from T7
         for (int ii = 7; ii > 0; ii--) {
             if (ii == 2) {
                 assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii))
@@ -310,10 +313,44 @@ public class TestJoinOrder extends PlannerTestCase {
                 break;
             } else {
                 NestLoopPlanNode node = (NestLoopPlanNode)n;
-                assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().endsWith(Integer.toString(ii)));
-                n = node.getChild(0);
+                if (ii == exception) {
+                    assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii)));
+                    n = node.getChild(1);
+                } else {
+                    // starts from T6 on child 1 because of the invalid join
+                    assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().endsWith(Integer.toString(ii)));
+                    n = node.getChild(0);
+                }
             }
         }
+    }
+
+    public void testMoreThan5TablesJoin() {
+        String sql;
+
+        sql = "select * FROM T1, T2, T3, T4, T5, T6, T7";
+        checkJoinOrder(sql, -1);
+
+        // Try the left outer join
+        sql = "select * FROM T1, T2, T3, T4, T5, T6 left outer join T7 on T6.F = T7.G";
+        checkJoinOrder(sql, -1);
+
+        sql = "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7";
+        checkJoinOrder(sql, -1);
+
+        // Try the right outer join
+        sql = "select * FROM T1, T2, T3, T4, T5, T6 right outer join T7 on T6.F = T7.G";
+        checkJoinOrder(sql, 7);
+
+        sql = "select * FROM T1, T2, T3, T4, T5 right outer join T6 on T6.F = T5.E, T7";
+        checkJoinOrder(sql, 6);
+
+        // Sub-queries is an interesting question to test
+
+
+        //
+        // Join order not the input table order
+        //
     }
 
     @Override

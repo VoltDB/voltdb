@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -954,39 +955,61 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return retval;
     }
 
+    public boolean hasJoinOrders() {
+        assert(m_joinOrderList.size() > 0);
+
+        return m_joinOrder != null || m_largeJoins;
+    }
+    private boolean m_largeJoins = false;
+    private ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
+
+    public ArrayList<JoinNode> getJoinOrders() {
+        return m_joinOrderList;
+    }
+
     @Override
     void postParse(String sql, String joinOrder) {
         super.postParse(sql, joinOrder);
 
-        // prepare the join order
-        prepareJoinOrder();
-    }
-
-    public boolean m_largeJoins = false;
-
-    public JoinNode generateJoinOrder() {
-        return m_joinTree;
-    }
-
-    private void prepareJoinOrder() {
-        if (m_joinOrder == null) {
-            if (m_tableList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
-                m_largeJoins = true;
-
-                StringBuilder sb = new StringBuilder();
-                for (int ii = 0; ii < m_tableList.size(); ii++) {
-                    Table table = m_tableList.get(ii);
-                    sb.append(table.getTypeName());
-                    if (ii != m_tableList.size() - 1) {
-                        sb.append(",");
-                    }
-                }
-                m_joinOrder = sb.toString();
-            } else {
-                return;
-            }
+        if (m_joinOrder != null) {
+            // User indicates a join order already
+            tryAddOneJoinOrder(m_joinOrder);
+            return;
         }
 
+        // prepare the join order if needed
+        if (m_joinOrder == null &&
+                m_tableList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
+            // When there are large number of table joins, give up the all permutaions.
+            // Be default, try the join order with the sql query table order first.
+            m_largeJoins = true;
+
+            StringBuilder sb = new StringBuilder();
+            for (int ii = 0; ii < m_tableList.size(); ii++) {
+                Table table = m_tableList.get(ii);
+                sb.append(table.getTypeName());
+                if (ii != m_tableList.size() - 1) {
+                    sb.append(",");
+                }
+            }
+            if (tryAddOneJoinOrder(sb.toString())) {
+                return;
+            }
+
+            // The input join order is not vailid
+            // Find one valid join order to run, which may not be the most efficient.
+            ArrayDeque<JoinNode> joinOrderQueue =
+                    SelectSubPlanAssembler.queueJoinOrders(m_joinTree, false);
+
+            // Currently, we get one join order, but it is easy to change the hard coded number
+            // to get more join orders for large table joins.
+            assert(joinOrderQueue.size() == 1);
+            assert(m_joinOrderList.size() == 0);
+            m_joinOrderList.addAll(joinOrderQueue);
+        }
+    }
+
+    private boolean tryAddOneJoinOrder(String joinOrder) {
         ArrayList<String> tableAliases = new ArrayList<String>();
         //Don't allow dups for now since self joins aren't supported
         HashSet<String> dupCheck = new HashSet<String>();
@@ -996,12 +1019,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // these as different cases (strange) or to complain about both -- which could be
         // accomplished by appending an additional space to the join order here
         // instead of calling trim.
-        for (String element : m_joinOrder.trim().split(",")) {
+        for (String element : joinOrder.trim().split(",")) {
             String alias = element.trim().toUpperCase();
             tableAliases.add(alias);
             if (!dupCheck.add(alias)) {
+                if (m_largeJoins) return false;
+
                 StringBuilder sb = new StringBuilder();
-                sb.append("The specified join order \"").append(m_joinOrder);
+                sb.append("The specified join order \"").append(joinOrder);
                 sb.append("\" contains a duplicate element \"").append(alias).append("\".");
                 throw new PlanningErrorException(sb.toString());
             }
@@ -1011,9 +1036,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
         // that generates a JoinNode tree or throws an exception.
         if (m_tableAliasMap.size() != tableAliases.size()) {
+            if (m_largeJoins) return false;
+
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
-            sb.append(m_joinOrder).append("\" does not contain the correct number of elements\n");
+            sb.append(joinOrder).append("\" does not contain the correct number of elements\n");
             sb.append("Expected ").append(m_tableList.size());
             sb.append(" but found ").append(tableAliases.size()).append(" elements.");
             throw new PlanningErrorException(sb.toString());
@@ -1023,9 +1050,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         Set<String> specifiedNames = new HashSet<String>(tableAliases);
         specifiedNames.removeAll(aliasSet);
         if (specifiedNames.isEmpty() == false) {
+            if (m_largeJoins) return false;
+
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
-            sb.append(m_joinOrder).append("\" contains ");
+            sb.append(joinOrder).append("\" contains ");
             int i = 0;
             for (String name : specifiedNames) {
                 sb.append(name);
@@ -1045,9 +1074,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Now check whether the specified join order is valid or not
         if ( ! isValidJoinOrder(tableAliases)) {
+            if (m_largeJoins) return false;
             throw new PlanningErrorException("The specified join order is invalid for the given query");
         }
 
+        // Inserted one join tree to the list
+        assert(m_joinOrderList.size() > 0);
+        m_joinTree = m_joinOrderList.get(0);
+        return true;
     }
 
     /**
@@ -1130,7 +1164,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             finalSubTrees.add(0, joinOrderSubTree);
         }
         // if we got there the join order is OK. Rebuild the whole tree
-        m_joinTree = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
+        JoinNode newNode = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
+        m_joinOrderList.add(newNode);
         return true;
     }
 

@@ -70,11 +70,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     SelectSubPlanAssembler(Database db, ParsedSelectStmt selectStmt, StatementPartitioning partitioning)
     {
         super(db, selectStmt, partitioning);
-        // If a join order was provided or many tables join
-        if (selectStmt.m_joinOrder != null || selectStmt.m_largeJoins) {
-            m_joinOrders.add(selectStmt.generateJoinOrder());
+        if (selectStmt.hasJoinOrders()) {
+            // If a join order was provided or large number of tables join
+            m_joinOrders.addAll(selectStmt.getJoinOrders());
         } else {
-            queueAllJoinOrders();
+            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
+            m_joinOrders = queueJoinOrders(m_parsedStmt.m_joinTree, true);
         }
     }
 
@@ -82,29 +83,34 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Compute every permutation of the list of involved tables and put them in a deque.
      * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
-    private void queueAllJoinOrders() {
-        // these just shouldn't happen right?
-        assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
-        assert(m_parsedStmt.m_joinTree != null);
+    public static ArrayDeque<JoinNode> queueJoinOrders(JoinNode joinNode, boolean findAll) {
+        assert(joinNode != null);
 
         // Clone the original
-        JoinNode clonedTree = (JoinNode) m_parsedStmt.m_joinTree.clone();
+        JoinNode clonedTree = (JoinNode) joinNode.clone();
         // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
         List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
         // Generate possible join orders for each sub-tree separately
         ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
-        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>());
-}
+        ArrayDeque<JoinNode> joinOrders = new ArrayDeque<JoinNode>();
+        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
+        return joinOrders;
+    }
 
-    private void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx,
-                                    ArrayList<JoinNode> currentJoinOrder) {
+    private static void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx,
+            ArrayList<JoinNode> currentJoinOrder, ArrayDeque<JoinNode> joinOrders, boolean findAll) {
+        if (!findAll && joinOrders.size() > 0) {
+            // At least find one valid join order
+            return;
+        }
+
         if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
             JoinNode joinTree = JoinNode.reconstructJoinTreeFromSubTrees(currentJoinOrder);
-            m_joinOrders.add(joinTree);
+            joinOrders.add(joinTree);
             return;
         }
         // Recursive step
@@ -116,7 +122,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 updatedJoinOrder.add((JoinNode)node.clone());
             }
             updatedJoinOrder.add((JoinNode)headTree.clone());
-            queueSubJoinOrders(joinOrderList, joinOrderListIdx + 1, updatedJoinOrder);
+            queueSubJoinOrders(joinOrderList, joinOrderListIdx + 1, updatedJoinOrder, joinOrders, findAll);
         }
     }
 
