@@ -348,10 +348,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // should propagate an error message identifying partitioning as the problem.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
-                int countOfIndependentlyPartitionedTables =
-                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
+                m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
                                                                       valueEquivalence);
-                if (countOfIndependentlyPartitionedTables > 1) {
+                if ( ! m_partitioning.isValidJoin() ) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.
                     // Don't throw a planning error here, in case the problem is just with this
@@ -359,7 +358,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // the failure is unanimous -- a common case.
                     m_recentErrorMsg =
                         "Join of multiple partitioned tables has insufficient join criteria.";
-                    //System.out.println("DEBUG: bad partitioning for: " + joinTree);
                     // This join order, at least, is not worth trying to plan.
                     continue;
                 }

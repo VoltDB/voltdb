@@ -49,6 +49,8 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     private StatementPartitioning m_subqueriesPartitioning = null;
 
+    private boolean m_needsReceiveNode = false;
+
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
@@ -258,6 +260,15 @@ public class StmtSubqueryScan extends StmtTableScan {
     public void setBestCostPlan(CompiledPlan costPlan) {
         m_bestCostPlan = costPlan;
     }
+
+    public boolean getNeedsReciveNode() {
+        return m_needsReceiveNode;
+    }
+
+    public void setNeedsReceiveNode(boolean hasReceiveNode) {
+        m_needsReceiveNode= hasReceiveNode;
+    }
+
 
     @Override
     public String getColumnName(int m_columnIndex) {

@@ -139,6 +139,8 @@ public class StatementPartitioning implements Cloneable{
      */
     private String m_fullColumnName;
 
+    private boolean m_invalidSubqueryJoin = false;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -313,13 +315,15 @@ public class StatementPartitioning implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
+    public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
+        boolean subqueryHasRecieveNode = false;
+        boolean hasPartitionTableJoined = false;
         // Iterate over the tables to collect partition columns.
         for (StmtTableScan tableScan : collection) {
             // Replicated tables don't need filter coverage.
@@ -338,6 +342,9 @@ public class StatementPartitioning implements Cloneable{
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
+                subqueryHasRecieveNode = subScan.getNeedsReciveNode();
+            } else {
+                hasPartitionTableJoined = true;
             }
 
             boolean unfiltered = true;
@@ -361,6 +368,11 @@ public class StatementPartitioning implements Cloneable{
             }
         }
 
+        if (subqueryHasRecieveNode && hasPartitionTableJoined) {
+            m_invalidSubqueryJoin = true;
+            return;
+        }
+
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
             for (Set<AbstractExpression> partitioningValues : eqSets) {
@@ -376,8 +388,10 @@ public class StatementPartitioning implements Cloneable{
                 }
             }
         }
+    }
 
-        return m_countOfIndependentlyPartitionedTables;
+    public boolean isValidJoin() {
+        return m_countOfIndependentlyPartitionedTables <= 1 && !m_invalidSubqueryJoin;
     }
 
     private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,

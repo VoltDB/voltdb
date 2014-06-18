@@ -607,14 +607,19 @@ public class PlanAssembler {
         // It will be added later for the whole plan
         AbstractPlanNode root = compiledPlan.rootPlanGraph;
 
-        // There should be more cases for Joins have to be done on coordinator
-        // This case should also not be pushed down
-        boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
-                !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
-        if (subScanCanPushdown) {
-            compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
+        List<AbstractPlanNode> receives = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+        if (receives.size() > 0) {
+            assert(receives.size() == 1);
+            // There should be more cases for Joins have to be done on coordinator
+            // This case should also not be pushed down
+            boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
+                    !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                    !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
+                    !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
+            if (subScanCanPushdown) {
+                compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
+            }
+            subqueryScan.setNeedsReceiveNode(! subScanCanPushdown);
         }
         subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
@@ -2012,7 +2017,8 @@ public class PlanAssembler {
         return removeCoordinatorSendReceivePairRecurcive(root, root);
     }
 
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root, AbstractPlanNode current) {
+    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root,
+            AbstractPlanNode current) {
         if (current instanceof ReceivePlanNode) {
             if (current.getChildCount() == 1) {
                 AbstractPlanNode child = current.getChild(0);
