@@ -2997,6 +2997,41 @@ TEST_F(NValueTest, TestTimestampStringParse)
     delete testPool;
 }
 
+TEST_F(NValueTest, TestTimestampStringParseShort)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+
+    char dateStr[11] = {0};
+    char dateStr2[27] = {0};
+    try {
+        // volt does not support date prior to 1583-01-01
+        // see src/ee/expressions/datefunctions.h
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-12-31", century);
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            std::string peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_TRUE(peekString.compare(dateStr2) == 0);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    delete poolHolder;
+    delete testPool;
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
