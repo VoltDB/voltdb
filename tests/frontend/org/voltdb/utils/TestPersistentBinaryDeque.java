@@ -788,30 +788,6 @@ public class TestPersistentBinaryDeque {
 
     }
 
-    @Test
-    public void testSegmentCleanup() throws Exception {
-        System.out.println("Running testSegmentCleanup");
-        m_pbd.sync();
-        m_pbd.close();
-        m_pbd = null;
-        System.gc();
-        System.runFinalization();
-        File f = new File(TEST_DIR.getAbsolutePath() + "/pbd_nonce.0.pbd");
-        File f2 = new File(TEST_DIR.getAbsolutePath() + "/pbd_nonce.1.pbd");
-        PBDSegment s = new PBDSegment(0L, f);
-        s.open(true);
-        PBDSegment s2 = new PBDSegment(1L, f2);
-        s2.open(true);
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, false);
-        TreeSet<String> names = getSortedDirectoryListing();
-        assertEquals(3, names.size());
-        assertTrue(names.first().equals("pbd_nonce.0.pbd"));
-        m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
-        names = getSortedDirectoryListing();
-        assertEquals(1, names.size());
-        assertTrue(names.first().equals("pbd_nonce.2.pbd"));
-    }
-
     @Before
     public void setUp() throws Exception {
         if (TEST_DIR.exists()) {

@@ -274,25 +274,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
-    //This will look and pop blokcs that have data or empty to discard.
     private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
-        // peek without delete
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek(false).uso()) {
+        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
             return;
         }
 
         long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty()) {
-            StreamBlock sb = m_committedBuffers.peek(true);
-            //it should delete the empty segments.
-            if (sb == null) {
-                m_committedBuffers.pop();
-                continue;
-            }
-            if (releaseOffset < sb.uso()) {
-                break;
-            }
+        while (!m_committedBuffers.isEmpty()
+                && releaseOffset >= m_committedBuffers.peek().uso()) {
+            StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
                 m_committedBuffers.pop();
                 try {

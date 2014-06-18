@@ -308,9 +308,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
-    //Delete empty blocks used when release of export buffers.
     @Override
-    public synchronized BBContainer poll(OutputContainerFactory ocf, boolean deleteEmpty) throws IOException {
+    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
@@ -321,20 +320,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (segment.hasMoreEntries()) {
             retcont = segment.poll(ocf);
         } else {
-            PBDSegment lastSeg = m_segments.peekLast();
             for (PBDSegment s : m_segments) {
                 if (s.hasMoreEntries()) {
                     segment = s;
                     retcont = segment.poll(ocf);
                     break;
-                } else {
-                    if (deleteEmpty) {
-                        if (s != lastSeg) {
-                            LOG.info("Deleting empty segment: " + s.m_index);
-                            m_segments.remove(s);
-                            s.closeAndDelete();
-                        }
-                    }
                 }
             }
         }
@@ -346,12 +336,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
         assert (retcont.b() != null);
         return wrapRetCont(segment, retcont);
-    }
-
-    //Default poll will return blocks with data.
-    @Override
-    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
-        return poll(ocf, false);
     }
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
