@@ -156,6 +156,10 @@
 
 </patternset>
 
+<patternset id='junit.other.path'>
+<include name='org/voltdb/TestExportSuite.class'/>
+</patternset>
+
 <patternset id='junit.regression.h1.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/regressionsuites/TestA*.class' />
@@ -1472,8 +1476,7 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.all.path" />
-                <patternset refid="junit.exclude.regression.path" />
+                <patternset refid="junit.other.path" />
             </fileset>
         </tests>
     </run_junit>
