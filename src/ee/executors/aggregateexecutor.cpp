@@ -479,22 +479,22 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(inputSchema);
 
     ProgressMonitorProxy pmp(m_engine, this);
-    p_execute_init(params, &pmp, inputSchema);
+    AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
-        p_execute_tuple(nextTuple);
+        AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
 
-    p_execute_finish();
+    AggregateHashExecutor::p_execute_finish();
     return true;
 }
 
-void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     m_pmp->countdownProgress();
     initGroupByKeyTuple(m_nextGroupByKeyStorage, nextTuple);
     AggregateRow* aggregateRow;
@@ -578,23 +578,23 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine, this);
-    p_execute_init(params, &pmp, input_table->schema());
+    AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema());
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
-        p_execute_tuple(nextTuple);
+        AggregateSerialExecutor::p_execute_tuple(nextTuple);
     }
-    p_execute_finish();
+    AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
     return true;
 }
 
-void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // Use the first input tuple to "prime" the system.
     if (m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
