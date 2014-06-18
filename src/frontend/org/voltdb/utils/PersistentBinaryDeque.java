@@ -221,7 +221,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 tail.closeAndDelete();
             }
             Long nextIndex = tail.m_index + 1;
-            LOG.info("About to create new segment as tail is full: " + nextIndex);
             tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             tail.open(true);
             m_segments.offer(tail);
