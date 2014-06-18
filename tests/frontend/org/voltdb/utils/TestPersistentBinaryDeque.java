@@ -22,12 +22,12 @@
  */
 package org.voltdb.utils;
 
-import static org.junit.Assert.assertNotNull;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertNull;
+import static junit.framework.Assert.fail;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -687,7 +687,7 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testOfferCloseHoleReopenOffer() throws Exception {
+    public void testOfferCloseReopenOfferLeaveData() throws Exception {
         System.out.println("Running testOfferCloseHoleReopenOffer");
         //Make it create two full segments
         for (int ii = 0; ii < 96; ii++) {
@@ -786,6 +786,30 @@ public class TestPersistentBinaryDeque {
         assertEquals(3, names.size());
         assertTrue(names.first().equals("pbd_nonce.6.pbd"));
 
+    }
+
+    @Test
+    public void testSegmentCleanup() throws Exception {
+        System.out.println("Running testSegmentCleanup");
+        m_pbd.sync();
+        m_pbd.close();
+        m_pbd = null;
+        System.gc();
+        System.runFinalization();
+        File f = new File(TEST_DIR.getAbsolutePath() + "/pbd_nonce.0.pbd");
+        File f2 = new File(TEST_DIR.getAbsolutePath() + "/pbd_nonce.1.pbd");
+        PBDSegment s = new PBDSegment(0L, f);
+        s.open(true);
+        PBDSegment s2 = new PBDSegment(1L, f2);
+        s2.open(true);
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, false);
+        TreeSet<String> names = getSortedDirectoryListing();
+        assertEquals(3, names.size());
+        assertTrue(names.first().equals("pbd_nonce.0.pbd"));
+        m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+        names = getSortedDirectoryListing();
+        assertEquals(1, names.size());
+        assertTrue(names.first().equals("pbd_nonce.2.pbd"));
     }
 
     @Before

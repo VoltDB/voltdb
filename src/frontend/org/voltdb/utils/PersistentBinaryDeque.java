@@ -93,13 +93,28 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private volatile boolean m_closed = false;
 
     /**
-     * Create a persistent binary deque with the specified nonce and storage back at the specified path.
-     * Existing files will
+     * Create a persistent binary deque with the specified nonce and storage
+     * back at the specified path. Existing files will
+     *
      * @param nonce
      * @param path
      * @throws IOException
      */
     public PersistentBinaryDeque(final String nonce, final File path) throws IOException {
+        this(nonce, path, true);
+    }
+
+    /**
+     * Create a persistent binary deque with the specified nonce and storage back at the specified path.
+     * This is convenient method for test so that
+     * poll with delete can be tested.
+     *
+     * @param nonce
+     * @param path
+     * @param deleteEmpty
+     * @throws IOException
+     */
+    public PersistentBinaryDeque(final String nonce, final File path, final boolean deleteEmpty) throws IOException {
         EELibraryLoader.loadExecutionEngineLibrary(true);
         m_path = path;
         m_nonce = nonce;
@@ -146,10 +161,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         PBDSegment qs = new PBDSegment( index, pathname );
                         try {
                             qs.open(false);
-                            if (qs.getNumEntries() == 0) {
-                                LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
-                                qs.closeAndDelete();
-                                return false;
+                            if (deleteEmpty) {
+                                if (qs.getNumEntries() == 0) {
+                                    LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
+                                    qs.closeAndDelete();
+                                    return false;
+                                }
                             }
                             m_numObjects += qs.getNumEntries();
                             segments.put( index, qs);
@@ -312,10 +329,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     break;
                 } else {
                     if (deleteEmpty) {
-                        if (segment != lastSeg) {
-                            LOG.info("Deleting empty segment: " + segment.m_index);
-                            m_segments.remove(segment);
-                            segment.closeAndDelete();
+                        if (s != lastSeg) {
+                            LOG.info("Deleting empty segment: " + s.m_index);
+                            m_segments.remove(s);
+                            s.closeAndDelete();
                         }
                     }
                 }
