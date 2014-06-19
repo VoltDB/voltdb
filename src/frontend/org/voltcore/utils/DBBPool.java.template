@@ -138,7 +138,7 @@ public final class DBBPool {
             return b;
         }
 
-        final public void tag() {
+        public void tag() {
 #ifndef NO_MEMCHECK
             if (m_tags == null) m_tags = new ArrayList<Throwable>();
             m_tags.add(new Throwable("Tag " + m_tags.size()));

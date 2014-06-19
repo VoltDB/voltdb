@@ -129,6 +129,13 @@ public class StreamBlock {
 
     private BBContainer getRefCountingContainer(ByteBuffer buf) {
         return new BBContainer(buf) {
+
+            @Override
+            public void tag() {
+                super.tag();
+                m_buffer.tag();
+            }
+
             @Override
             public void discard() {
                 checkDoubleFree();
