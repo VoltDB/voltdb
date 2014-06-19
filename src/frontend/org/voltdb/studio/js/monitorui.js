@@ -37,9 +37,9 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 		case 'str':
-			var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
+			var partCount = VoltDB.GetConnection(id.substr(2)).Metadata['partitionCount'];
 			var seriesStr = [];
-		    for(var j=0;j<siteCount;j++)
+		    for(var j=0;j<partCount+1;j++)
 		    	seriesStr.push({showMarker:false, yaxis:'y2axis', lineWidth: 2, shadow: false, label: (j+1)});
 		    opt = {
 		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%.2f"} } },
@@ -81,7 +81,7 @@ this.AddMonitor = function(tab)
     	tickValues.push(i);
     	
 	var dataStr = [];
-    for(var j=0;j<siteCount;j++)
+    for(var j=0;j<partitionCount+1;j++)
     	dataStr.push(data);
     
     MonitorUI.Monitors[id] = { 'id': id
@@ -111,7 +111,7 @@ this.AddMonitor = function(tab)
     , 'memMax': 1
     , 'strMax': 100
     , 'tickValues': tickValues
-    , 'partitionCount': partitionCount
+    , 'partitionCount': partitionCount+1
     , 'siteCount': siteCount
     };
 
@@ -261,7 +261,7 @@ this.RefreshMonitor = function(id, Success)
 		if(table[j][3] in starvStats)
 		{
 			data = starvStats[table[j][3]];
-			data[0] = table[j][5];
+			data[0] += table[j][5];
 			data[1] += 1.0;
 		}
 		else
@@ -356,7 +356,7 @@ this.RefreshMonitor = function(id, Success)
     var keys = [];
 	for(var k in starvStats)
         keys.push(k);
-    keys.sort();
+    keys.sort(function(a, b){return a-b});
 
     for(var k=0;k<keys.length;k++)
     {
