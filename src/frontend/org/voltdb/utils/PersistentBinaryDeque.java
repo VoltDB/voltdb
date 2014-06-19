@@ -317,13 +317,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
         return new BBContainer(retcont.b()) {
             private boolean m_discarded = false;
-
-            @Override
-            public void tag() {
-                super.tag();
-                retcont.tag();
-            }
-
             @Override
             public void discard() {
                 checkDoubleFree();

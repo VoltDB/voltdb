@@ -512,7 +512,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     pushExportBufferImpl(uso, buffer, sync, endOfStream);
-                    leakCheck();
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {
@@ -528,7 +527,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public Object call() throws Exception {
                 try {
                     m_committedBuffers.closeAndDelete();
-                    leakCheck();
                     return null;
                 } finally {
                     m_es.shutdown();
@@ -556,7 +554,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_onDrain.run();
                         }
                     }
-                    leakCheck();
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
                 }
@@ -666,7 +663,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (Throwable t) {
             fut.setException(t);
         }
-        leakCheck();
     }
 
     class AckingContainer extends BBContainer {
@@ -676,7 +672,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             super(cont.b());
             m_uso = uso;
             m_backingCont = cont;
-            cont.tag();
         }
 
         @Override
@@ -721,7 +716,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     ackImpl(uso);
-                    leakCheck();
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
@@ -729,17 +723,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
-    }
-
-    public static void leakCheck() {
-//        System.gc();
-//        System.runFinalization();
-//        try {
-//            Thread.sleep(10);
-//        } catch (InterruptedException e) {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
     }
 
     private void ackImpl(long uso) {

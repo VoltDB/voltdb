@@ -333,7 +333,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void initialize(VoltDB.Configuration config) {
         ShutdownHooks.enableServerStopLogging();
-        hostLog.fatal("Initialize invoked from ", new Throwable());
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {

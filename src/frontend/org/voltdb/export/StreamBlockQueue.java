@@ -16,19 +16,20 @@
  */
 package org.voltdb.export;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.PersistentBinaryDeque;
+import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
+
+import org.voltcore.utils.DBBPool.BBContainer;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -59,7 +60,6 @@ public class StreamBlockQueue {
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
         m_nonce = nonce;
-        exportLog.info("Creating stream block queue " + this);
     }
 
     public boolean isEmpty() throws IOException {
@@ -89,7 +89,6 @@ public class StreamBlockQueue {
         if (cont == null) {
             return null;
         } else {
-            cont.tag();
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long uso = cont.b().getLong(0);
@@ -118,8 +117,6 @@ public class StreamBlockQueue {
     public Iterator<StreamBlock> iterator() {
         return new Iterator<StreamBlock>() {
             private Iterator<StreamBlock> m_memoryIterator = m_memoryDeque.iterator();
-            private StreamBlock m_lastReturnedBlock;
-
             @Override
             public boolean hasNext() {
                 if (m_memoryIterator.hasNext()) {
@@ -139,8 +136,7 @@ public class StreamBlockQueue {
             @Override
             public StreamBlock next() {
                 if (m_memoryIterator.hasNext()) {
-                    m_lastReturnedBlock = m_memoryIterator.next();
-                    return m_lastReturnedBlock;
+                    return m_memoryIterator.next();
                 }
 
                 StreamBlock block = pollPersistentDeque(false);
@@ -149,18 +145,14 @@ public class StreamBlockQueue {
                 } else {
                     m_memoryIterator = m_memoryDeque.iterator();
                     for (int ii = 0; ii < m_memoryDeque.size(); ii++) {
-                        m_memoryIterator.next().tag();
+                        m_memoryIterator.next();
                     }
-                    m_lastReturnedBlock = block;
                     return block;
                 }
             }
 
             @Override
             public void remove() {
-                if (m_lastReturnedBlock != null) {
-                    m_lastReturnedBlock.tag();
-                }
                 m_memoryIterator.remove();
             }
         };
@@ -180,7 +172,6 @@ public class StreamBlockQueue {
         } else {
             sb = pollPersistentDeque(true);
         }
-        sb.tag();
         return sb;
     }
 
@@ -190,12 +181,9 @@ public class StreamBlockQueue {
             if (sb == null) {
                 throw new java.util.NoSuchElementException();
             }
-            sb.tag();
             return sb;
         } else {
-            StreamBlock sb = m_memoryDeque.pop();
-            sb.tag();
-            return sb;
+            return m_memoryDeque.pop();
         }
     }
 
@@ -264,7 +252,6 @@ public class StreamBlockQueue {
     }
 
     public void close() throws IOException {
-        exportLog.info("Closing stream block queue " + this);
         sync(true);
         m_persistentDeque.close();
         for (StreamBlock sb : m_memoryDeque) {
@@ -274,7 +261,6 @@ public class StreamBlockQueue {
     }
 
     public void closeAndDelete() throws IOException {
-        exportLog.info("Closing and deleting stream block queue " + this);
         m_persistentDeque.closeAndDelete();
         for (StreamBlock sb : m_memoryDeque) {
             sb.discard();

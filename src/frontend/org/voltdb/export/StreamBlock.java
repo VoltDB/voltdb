@@ -18,8 +18,10 @@
 package org.voltdb.export;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 
@@ -129,13 +131,6 @@ public class StreamBlock {
 
     private BBContainer getRefCountingContainer(ByteBuffer buf) {
         return new BBContainer(buf) {
-
-            @Override
-            public void tag() {
-                super.tag();
-                m_buffer.tag();
-            }
-
             @Override
             public void discard() {
                 checkDoubleFree();
@@ -152,9 +147,5 @@ public class StreamBlock {
         m_buffer.b().putLong(0, uso());
         m_buffer.b().position(0);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
-    }
-
-    void tag() {
-        m_buffer.tag();
     }
 }
