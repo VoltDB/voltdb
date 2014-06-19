@@ -59,6 +59,7 @@ public class StreamBlockQueue {
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
         m_nonce = nonce;
+        exportLog.info("Creating stream block queue " + this);
     }
 
     public boolean isEmpty() throws IOException {
@@ -150,6 +151,7 @@ public class StreamBlockQueue {
                     for (int ii = 0; ii < m_memoryDeque.size(); ii++) {
                         m_memoryIterator.next().tag();
                     }
+                    m_lastReturnedBlock = block;
                     return block;
                 }
             }
@@ -262,6 +264,7 @@ public class StreamBlockQueue {
     }
 
     public void close() throws IOException {
+        exportLog.info("Closing stream block queue " + this);
         sync(true);
         m_persistentDeque.close();
         for (StreamBlock sb : m_memoryDeque) {
@@ -271,6 +274,7 @@ public class StreamBlockQueue {
     }
 
     public void closeAndDelete() throws IOException {
+        exportLog.info("Closing and deleting stream block queue " + this);
         m_persistentDeque.closeAndDelete();
         for (StreamBlock sb : m_memoryDeque) {
             sb.discard();
