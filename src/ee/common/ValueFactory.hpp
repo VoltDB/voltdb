@@ -165,6 +165,15 @@ public:
         return value.castAsString();
     }
 
+    static inline NValue castAsTimestamp(NValue value) {
+        if (value.isNull()) {
+            NValue retval(VALUE_TYPE_TIMESTAMP);
+            retval.setNull();
+            return retval;
+        }
+        return value.castAsTimestamp();
+    }
+
     static NValue nvalueFromSQLDefaultType(const ValueType type, std::string &value) {
         switch (type) {
             case VALUE_TYPE_NULL:

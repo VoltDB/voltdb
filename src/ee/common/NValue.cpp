@@ -459,8 +459,8 @@ inline static void throwTimestampFormatError(const std::string &str)
 {
     char message[4096];
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\' "
-             "\'YYYY-MM-DD\'",
+    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
+             "or \'YYYY-MM-DD\'",
              str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
     throw SQLException(SQLException::dynamic_sql_error, message);
 }

@@ -3005,6 +3005,8 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
     Topend* topless = NULL;
     ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
+    std::string peekString;
+
     char dateStr[11] = {0};
     char dateStr2[27] = {0};
     try {
@@ -3016,12 +3018,34 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            std::string peekString = ValuePeeker::peekStringCopy_withoutNull(str);
-            EXPECT_TRUE(peekString.compare(dateStr2) == 0);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        // volt does not support date prior to 1583-01-01
+        // see src/ee/expressions/datefunctions.h
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-12-31", century);
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t base = NValue::parseTimestampString(dateStr2);
+            NValue str = ValueFactory::getStringValue(dateStr);
+            NValue ts = ValueFactory::castAsTimestamp(str);
+            int64_t value = ValuePeeker::peekTimestamp(ts);
+            EXPECT_EQ(base, value);
+            if (base != value) {
+                cout << "Failing for converting ts string " << dateStr << " to the same value as " <<
+                    dateStr2 << endl;
+            }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
