@@ -30,6 +30,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.persistence.Column;
+
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -43,8 +45,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.CatalogUtil;
@@ -676,6 +676,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             super(cont.b());
             m_uso = uso;
             m_backingCont = cont;
+            cont.tag();
         }
 
         @Override
