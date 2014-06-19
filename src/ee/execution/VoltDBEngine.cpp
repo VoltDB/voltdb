@@ -355,6 +355,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 m_currentIndexInBatch == (numFragments - 1)))
         {
             ++failures;
+            break;
         }
 
         // at the end of each frag, rollup and reset counters
@@ -425,9 +426,12 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
         // set this back to -1 for error handling
         m_currentInputDepId = -1;
+        m_currExecutorVec = NULL;
+
         return ENGINE_ERRORCODE_ERROR;
     }
     assert(execsForFrag);
+    m_currExecutorVec = execsForFrag;
 
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
@@ -503,6 +507,10 @@ void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
     }
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
+    m_currExecutorVec = NULL;
+    if (execsForFrag != NULL) {
+        execsForFrag->limits.resetPeakMemory();
+    }
 }
 
 // -------------------------------------------------
@@ -1753,6 +1761,9 @@ static std::string dummy_last_accessed_plan_node_name("no plan node in progress"
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
+
+    assert(m_currExecutorVec);
+
     if (m_lastAccessedTable == NULL) {
         tableName = "None";
         tableSize = 0;
@@ -1769,7 +1780,9 @@ void VoltDBEngine::reportProgessToTopend() {
                                         planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
+                                        m_currExecutorVec->limits.getAllocated(),
+                                        m_currExecutorVec->limits.getPeakMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
     if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");
