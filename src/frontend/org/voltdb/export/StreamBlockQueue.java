@@ -139,7 +139,7 @@ public class StreamBlockQueue {
             public StreamBlock next() {
                 if (m_memoryIterator.hasNext()) {
                     m_lastReturnedBlock = m_memoryIterator.next();
-                    return m_memoryIterator.next();
+                    return m_lastReturnedBlock;
                 }
 
                 StreamBlock block = pollPersistentDeque(false);
@@ -148,7 +148,7 @@ public class StreamBlockQueue {
                 } else {
                     m_memoryIterator = m_memoryDeque.iterator();
                     for (int ii = 0; ii < m_memoryDeque.size(); ii++) {
-                        m_memoryIterator.next();
+                        m_memoryIterator.next().tag();
                     }
                     return block;
                 }
