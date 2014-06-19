@@ -536,6 +536,15 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
 
     std::ostringstream out;
     static std::locale newloc(std::cout.getloc(), new money_numpunct);
+    static TTInt positive_rounding("0000000000"    //10 digits
+                                   "0000000000"    //20 digits
+                                   "0000000100"    //30 digits
+                                   "00000000");    //38 digits
+    static TTInt negative_rounding("-0000000000"   //10 digits
+                                   "0000000000"    //20 digits
+                                   "0000000100"    //30 digits
+                                   "00000000");    //38 digits
+
     const ValueType type = getValueType();
     out.imbue(newloc);
     switch(type) {
@@ -556,13 +565,30 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
     case VALUE_TYPE_DECIMAL:
     {
         TTInt scaledValue = getDecimal();
-        int64_t whole = narrowDecimalToBigInt(scaledValue);
         int64_t fraction = getFractionalPart(scaledValue);
-        if (fraction < 0)
+
+        int64_t third_digit = fraction / (kMaxScaleFactor/1000);
+        third_digit %= 10;
+        if (third_digit > 4) {
+            scaledValue += positive_rounding;
+            fraction = getFractionalPart(scaledValue);
+        }
+        else if (third_digit < -4) {
+            scaledValue += negative_rounding;
+            fraction = getFractionalPart(scaledValue);
+        }
+        else {
+
+        }
+
+        if (fraction < 0) {
             fraction = -fraction;
+        }
+
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
         fraction /= kMaxScaleFactor/100;
 
-        out << std::fixed << whole << '.' << fraction;
+        out << std::fixed << whole << '.' << std::setfill('0') << std::setw(2) << fraction;
     }
         break;
     default:
