@@ -262,7 +262,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
 
-    List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit;
+    List<Integer> m_partitionsToSitesAtStartupForExportInit;
 
     RestoreAgent m_restoreAgent = null;
 
@@ -533,7 +533,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
-            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
+            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
@@ -1096,7 +1096,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 StartAction startAction,
-                                                List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
+                                                List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
@@ -1104,7 +1104,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
             initiators.add(initiator);
-            m_partitionsToSitesAtStartupForExportInit.add(Pair.of(partition, initiator.getInitiatorHSId()));
+            m_partitionsToSitesAtStartupForExportInit.add(partition);
         }
         return initiators;
     }
@@ -1983,10 +1983,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
             List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
 
-            List<Pair<Integer,Long>> partitions = new ArrayList<Pair<Integer, Long>>();
+            List<Integer> partitions = new ArrayList<Integer>();
             for (Long site : sites) {
                 Integer partition = siteTracker.getPartitionForSite(site);
-                partitions.add(Pair.of(partition, site));
+                partitions.add(partition);
             }
 
             // 1. update the export manager.
