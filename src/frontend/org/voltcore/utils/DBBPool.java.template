@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.ArrayList;
 
 import com.google_voltpatches.common.base.Preconditions;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -67,6 +68,7 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
+        private ArrayList<Throwable> m_tags;
 #endif
 
         public BBContainer(ByteBuffer b) {
@@ -136,13 +138,30 @@ public final class DBBPool {
             return b;
         }
 
+        final public void tag() {
+#ifndef NO_MEMCHECK
+            if (m_tags == null) m_tags = new ArrayList<Throwable>();
+            m_tags.add(new Throwable("Tag " + m_tags.size()));
+#endif
+        }
+
 #ifndef NO_MEMCHECK
         @Override
         public void finalize() {
             if (m_freeThrowable == null) {
                 System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
+                if (m_tags != null) {
+                    for (Throwable t : m_tags) {
+                        t.printStackTrace();
+                    }
+                }
                 m_allocationThrowable.printStackTrace();
                 HOST.fatal("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:", m_allocationThrowable);
+                if (m_tags != null) {
+                    for (Throwable t : m_tags) {
+                        HOST.fatal("Tag", t);
+                    }
+                }
                 System.exit(-1);
             }
         }

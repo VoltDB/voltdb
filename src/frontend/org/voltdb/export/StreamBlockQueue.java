@@ -16,20 +16,19 @@
  */
 package org.voltdb.export;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.PersistentBinaryDeque;
-import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
-
-import org.voltcore.utils.DBBPool.BBContainer;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -89,6 +88,7 @@ public class StreamBlockQueue {
         if (cont == null) {
             return null;
         } else {
+            cont.tag();
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long uso = cont.b().getLong(0);
@@ -117,6 +117,8 @@ public class StreamBlockQueue {
     public Iterator<StreamBlock> iterator() {
         return new Iterator<StreamBlock>() {
             private Iterator<StreamBlock> m_memoryIterator = m_memoryDeque.iterator();
+            private StreamBlock m_lastReturnedBlock;
+
             @Override
             public boolean hasNext() {
                 if (m_memoryIterator.hasNext()) {
@@ -136,6 +138,7 @@ public class StreamBlockQueue {
             @Override
             public StreamBlock next() {
                 if (m_memoryIterator.hasNext()) {
+                    m_lastReturnedBlock = m_memoryIterator.next();
                     return m_memoryIterator.next();
                 }
 
@@ -153,6 +156,9 @@ public class StreamBlockQueue {
 
             @Override
             public void remove() {
+                if (m_lastReturnedBlock != null) {
+                    m_lastReturnedBlock.tag();
+                }
                 m_memoryIterator.remove();
             }
         };
@@ -172,6 +178,7 @@ public class StreamBlockQueue {
         } else {
             sb = pollPersistentDeque(true);
         }
+        sb.tag();
         return sb;
     }
 
@@ -181,9 +188,12 @@ public class StreamBlockQueue {
             if (sb == null) {
                 throw new java.util.NoSuchElementException();
             }
+            sb.tag();
             return sb;
         } else {
-            return m_memoryDeque.pop();
+            StreamBlock sb = m_memoryDeque.pop();
+            sb.tag();
+            return sb;
         }
     }
 

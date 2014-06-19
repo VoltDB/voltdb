@@ -731,14 +731,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public static void leakCheck() {
-        System.gc();
-        System.runFinalization();
-        try {
-            Thread.sleep(10);
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+//        System.gc();
+//        System.runFinalization();
+//        try {
+//            Thread.sleep(10);
+//        } catch (InterruptedException e) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
     }
 
     private void ackImpl(long uso) {
