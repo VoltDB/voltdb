@@ -335,7 +335,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        sb.append("AGGREGATION ops: ");
+        String aggType = getPlanNodeType() == PlanNodeType.AGGREGATE ? "Serial": "Hash";
+        sb.append(aggType + " AGGREGATION ops: ");
         int ii = 0;
         for (ExpressionType e : m_aggregateTypes) {
             sb.append(e.symbol());
