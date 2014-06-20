@@ -17,6 +17,7 @@
 
 package org.voltdb.dtxn;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -78,34 +79,55 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
+    private WeakReference<byte[]> m_compressedCache = null;
+    private WeakReference<byte[]> m_serializedCache = null;
+
     private AbstractHistogram m_totals = constructHistogram(false);
-    protected Supplier<AbstractHistogram> m_supplier = new Supplier<AbstractHistogram>() {
-        public AbstractHistogram get() {
-            m_totals.reset();
-            ClientInterface ci = VoltDB.instance().getClientInterface();
-            if (ci != null) {
-                List<AbstractHistogram> thisci = ci.getLatencyStats();
-                for (AbstractHistogram info : thisci) {
-                    m_totals.add(info);
+
+    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 950);
+
+    private Supplier<AbstractHistogram> getHistogramSupplier() {
+        return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
+            @Override
+            public AbstractHistogram get() {
+                m_totals.reset();
+                ClientInterface ci = VoltDB.instance().getClientInterface();
+                if (ci != null) {
+                    List<AbstractHistogram> thisci = ci.getLatencyStats();
+                    for (AbstractHistogram info : thisci) {
+                        m_totals.add(info);
+                    }
                 }
+                m_compressedCache = null;
+                m_serializedCache = null;
+
+                return m_totals;
             }
-            return m_totals;
+        }, EXPIRATION, TimeUnit.MILLISECONDS);
+    }
+    private Supplier<AbstractHistogram> m_histogramSupplier = getHistogramSupplier();
+
+    public byte[] getSerializedCache() {
+        if (m_serializedCache == null || m_serializedCache.get() == null) {
+            m_serializedCache = new WeakReference<byte[]>(m_histogramSupplier.get().toUncompressedBytes());
         }
-    };
+        return m_serializedCache.get();
+    }
 
-    // Set default to 450ms to match the highest request frequency(500ms) in web studio, make sure web studio to draws continuous graph
-    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 450);
-
-    protected volatile Supplier<AbstractHistogram> m_memorizer = Suppliers.memoizeWithExpiration(m_supplier, EXPIRATION, TimeUnit.MILLISECONDS);
+    public byte[] getCompressedCache() {
+        if (m_compressedCache == null || m_compressedCache.get() == null) {
+            m_compressedCache = new WeakReference<byte[]>(AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE));
+        }
+        return m_compressedCache.get();
+    }
 
     public LatencyStats(long siteId) {
         super(siteId, false);
     }
 
     @Override
-    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
-    {
-        Suppliers.memoizeWithExpiration(m_supplier, EXPIRATION, TimeUnit.MILLISECONDS);
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+        m_histogramSupplier.get();
         return new DummyIterator();
     }
 
@@ -117,7 +139,7 @@ public class LatencyStats extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = m_memorizer.get().toCompressedBytes(CompressionStrategySnappy.INSTANCE);
+        rowValues[columnNameToIndex.get("HISTOGRAM")] = getCompressedCache();
         super.updateStatsRow(rowKey, rowValues);
     }
 }

@@ -641,6 +641,14 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
         return buf.array();
     }
 
+    public static byte[] toCompressedBytes(byte bytes[], CompressionStrategy strategy) {
+        try {
+            return strategy.compress(bytes);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static Histogram fromCompressedBytes(byte bytes[], CompressionStrategy strategy) {
         try {
             ByteBuffer buf = ByteBuffer.wrap(strategy.uncompress(bytes));

@@ -1,6 +1,7 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
+
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
@@ -18,7 +19,7 @@ public class LatencyHistogramStats extends LatencyStats {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("UNCOMPRESSED_HISTOGRAM")] = m_memorizer.get().toUncompressedBytes();
+        rowValues[columnNameToIndex.get("UNCOMPRESSED_HISTOGRAM")] = getSerializedCache();
         super.updateStatsRow(rowKey, rowValues);
     }
 }

@@ -252,7 +252,7 @@ this.SetRefreshSpeed = function()
 			}
 		}
 		if ((speed != 'pau') && (MonitorUI.Interval == null))
-			MonitorUI.Interval = setInterval(function() {MonitorUI.RefreshData();}, (speed == 'hig' ? 1 : (speed == 'nor' ? 2 : 10))*500);
+			MonitorUI.Interval = setInterval(function() {MonitorUI.RefreshData();}, (speed == 'hig' ? 1 : (speed == 'nor' ? 2 : 5))*1000);
 		MonitorUI.Speed = speed;
 	}
 }
