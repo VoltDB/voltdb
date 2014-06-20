@@ -455,11 +455,12 @@ public:
 
     virtual voltdb::IndexStats* getIndexStats();
 
-protected:
     const TupleSchema *getTupleSchema() const
     {
         return m_scheme.tupleSchema;
     }
+
+protected:
 
     TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 

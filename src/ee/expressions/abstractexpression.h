@@ -48,7 +48,6 @@
 
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
-#include "common/valuevector.h"
 #include "common/PlannerDomValue.h"
 
 #include <string>
@@ -75,9 +74,6 @@ class AbstractExpression {
     virtual ~AbstractExpression();
 
     virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
-
-    /** set parameter values for this node and its descendents */
-    virtual void substitute(const NValueArray &params);
 
     /** return true if self or descendent should be substitute()'d */
     virtual bool hasParameter() const;

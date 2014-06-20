@@ -26,6 +26,7 @@ using namespace voltdb;
 
 TempTableLimits::TempTableLimits()
     : m_currMemoryInBytes(0),
+      m_peakMemoryInBytes(0),
       m_logThreshold(-1),
       m_memoryLimit(1024 * 1024 * 100),
       m_logLatch(false)
@@ -57,6 +58,11 @@ TempTableLimits::increaseAllocated(int bytes)
         throw SQLException(SQLException::volt_temp_table_memory_overflow,
                            msg);
     }
+
+    if (m_currMemoryInBytes > m_peakMemoryInBytes) {
+        m_peakMemoryInBytes = m_currMemoryInBytes;
+    }
+
     if (!m_logLatch && m_logThreshold > 0 &&
         m_currMemoryInBytes > m_logThreshold)
     {
@@ -98,4 +104,16 @@ int64_t
 TempTableLimits::getMemoryLimit() const
 {
     return m_memoryLimit;
+}
+
+int64_t
+TempTableLimits::getPeakMemoryInBytes() const
+{
+    return m_peakMemoryInBytes;
+}
+
+void
+TempTableLimits::resetPeakMemory()
+{
+    m_peakMemoryInBytes = m_currMemoryInBytes;
 }

@@ -283,25 +283,29 @@ public class TestPushDownAggregates extends PlannerTestCase {
      *
      * @param np
      *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
+     * @param isAggInlined
+     *            Whether or not the aggregate node can be inlined
      * @param aggTypes
      *            The expected aggregate types for the original aggregate node.
      * @param pushDownTypes
      *            The expected aggregate types for the top aggregate node after
      *            pushing the original aggregate node down.
      */
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
-        checkPushedDown(pn, isMultiPart, aggTypes, pushDownTypes, false);
+        checkPushedDown(pn, isAggInlined, aggTypes, pushDownTypes, false);
     }
 
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
-            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes, boolean hasProjectionNode) {
-        assertTrue(pn.size() > 0);
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
+            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes,
+            boolean hasProjectionNode) {
+
+        // Aggregate push down check has to run on two fragments
+        assertTrue(pn.size() == 2);
 
         AbstractPlanNode p = pn.get(0).getChild(0);;
         if (hasProjectionNode) {
+            // Complex aggregation or optimized AVG
             assertTrue(p instanceof ProjectionPlanNode);
             p = p.getChild(0);
         }
@@ -313,18 +317,28 @@ public class TestPushDownAggregates extends PlannerTestCase {
             assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));
         }
 
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-        } else {
-            p = p.getChild(0);
-        }
+        // Check the pushed down aggregation
+        p = pn.get(1).getChild(0);
 
         if (pushDownTypes == null) {
             assertTrue(p instanceof AbstractScanPlanNode);
             return;
         }
-        assertTrue(p instanceof AggregatePlanNode);
+
+        if (isAggInlined) {
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+            if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
+                p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);
+            } else {
+                p  = p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            }
+
+        } else {
+            assertTrue(p instanceof AggregatePlanNode);
+        }
         fragmentString = p.toJSONString();
         for (ExpressionType type : aggTypes) {
             assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));

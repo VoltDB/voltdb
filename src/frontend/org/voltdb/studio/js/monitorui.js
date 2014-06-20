@@ -48,6 +48,12 @@ function InitializeChart(id, chart, metric)
 		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
 			break;
+		case 'tb':
+		    opt = {
+                        seriesDefaults: { renderer: jQuery.jqplot.PieRenderer, rendererOptions: { showDataLabels: true } },
+                        legend: { show: true, location: 'e' }
+		    };
+			break;
 	}
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
@@ -66,6 +72,7 @@ this.AddMonitor = function(tab)
 	var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
 	
 	var data = [];
+	var dataTB = [['Unknown', 100]];
     for(var i = 0;i<121;i++)
     	data[i] = [i,0];
 	
@@ -88,9 +95,9 @@ this.AddMonitor = function(tab)
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
-    , 'lastTransactionCount': -1
     , 'lastTimedTransactionCount': -1
     , 'lastLatencyAverage': 0.0
+    , 'noTransactionCount': 0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
@@ -98,6 +105,7 @@ this.AddMonitor = function(tab)
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
+    , 'tbData': [dataTB]
     , 'latMax': 1
     , 'tpsMax': 1
     , 'memMax': 1
@@ -203,7 +211,7 @@ this.RefreshMonitor = function(id, Success)
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
 
-	var currentTimerTick = (new Date()).getTime();
+	var currentTimerTick = 0;
 	var latData = monitor.latData;
 	var tpsData = monitor.tpsData;
 	var memData = monitor.memData;
@@ -212,6 +220,7 @@ this.RefreshMonitor = function(id, Success)
 	var dataMem = memData[0];
 	var dataLat = latData[0];
 	var dataTPS = tpsData[0];
+	var dataTB = [];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
 	var Mem = 0;
 	// Compute the memory statistics
@@ -229,6 +238,7 @@ this.RefreshMonitor = function(id, Success)
 	{
 		var srcData = table[j];
 		var data = null;
+                currentTimerTick = srcData[0];
 		if (srcData[1] in procStats)
 		{
 			data = procStats[srcData[1]];
@@ -267,30 +277,37 @@ this.RefreshMonitor = function(id, Success)
 		currentTimedTransactionCount += procStats[proc][1];
 		currentLatencySum += procStats[proc][1]*procStats[proc][4];
 		currentLatencyAverage += procStats[proc][4];
+		dataTB.push([procStats[proc][0], procStats[proc][2]]);
 	}
+
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
-	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
+	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
 	{
-		var delta = currentTimedTransactionCount - monitor.lastTransactionCount;
+		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
 		dataLat = dataLat.slice(1);
-		if (currentTimedTransactionCount == monitor.lastTimedTransactionCount)
+                if (delta == 0)
 		{
-			if (delta < 10)
-				dataLat.push([dataIdx,0]);
-			else
+			if (monitor.noTransactionCount < 5)
+			{
 				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+				monitor.noTransactionCount++;
+			}
+			else
+			{
+				dataLat.push([dataIdx,0]);
+			}
 		}
 		else
 		{
-		    // Compute delta latency
-		    var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-		    var delta_latency = latency_val / delta;
+			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
+			var delta_latency = latency_val / delta;
 			dataLat.push([dataIdx,delta_latency/1000000.0]);
-        }
+			monitor.noTransactionCount = 0;
+		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -316,7 +333,7 @@ this.RefreshMonitor = function(id, Success)
 	else
 	{
 		var src = '<table id="stats-' + id + '" class="sortable tablesorter statstable" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
-		src += '<th>Procedure</th><th>Invocations</th><th>Percent (%)</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
+		src += '<th>Procedure</th><th>Invocations</th><th>Weighted Percentage (%)</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
 		src += '</tr></thead><tbody>';
 		for(var j in procStats)
 		{
@@ -333,7 +350,6 @@ this.RefreshMonitor = function(id, Success)
 	}
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
-	monitor.lastTransactionCount = currentTimedTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
 	monitor.lastLatencyAverage = currentLatencyAverage;
 	
@@ -381,6 +397,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.tpsData = [dataTPS];
 	monitor.memData = [dataMem];
 	monitor.strData = strData;
+	monitor.tbData = dataTB;
 
 	monitor.tickValues = tickValues;
 	// Update the monitor graphs
@@ -408,6 +425,10 @@ this.RefreshMonitor = function(id, Success)
             }
 			lmax = 100;
 			break;
+		case 'tb':
+                        monitor.leftPlot.series[0].data = dataTB;
+			left_opt = {};
+			break;
 	}
 	switch(monitor.rightMetric)
 	{
@@ -431,12 +452,24 @@ this.RefreshMonitor = function(id, Success)
             }
 			rmax = 100;
 			break;
+		case 'tb':
+                        monitor.rightPlot.series[0].data = dataTB;
+			right_opt = {};
+			break;
 	}
+
+	if (monitor.leftMetric != 'tb') {
+               left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+        }
+
+        if (monitor.rightMetric != 'tb') {
+               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
+        }
 
 	try
 	{
-		monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-		monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+		monitor.leftPlot.replot(left_opt);
+		monitor.rightPlot.replot(right_opt);
 	} catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);
