@@ -472,7 +472,7 @@ public class ExportManager
             Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
             while (connPropIt.hasNext()) {
                 ConnectorProperty prop = connPropIt.next();
-                newConfig.put(prop.getName(), prop.getValue());
+                newConfig.put(prop.getName(), prop.getValue().trim());
             }
         }
         m_processorConfig = newConfig;
