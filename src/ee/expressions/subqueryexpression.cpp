@@ -14,8 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <iostream>
-
 #include "subqueryexpression.h"
 
 #include "common/debuglog.h"
@@ -25,17 +23,16 @@
 
 namespace voltdb {
 
-    SubqueryExpression::SubqueryExpression(int subqueryId,
-        const std::vector<int>& paramIdxs,
-        const std::vector<int>& allParamIdxs,
+SubqueryExpression::SubqueryExpression(int subqueryId,
+        std::vector<int> paramIdxs,
+        std::vector<int> otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams) :
             AbstractExpression(EXPRESSION_TYPE_SUBQUERY),
             m_subqueryId(subqueryId),
             m_paramIdxs(paramIdxs),
-            m_allParamIdxs(allParamIdxs),
+            m_otherParamIdxs(otherParamIdxs),
             m_tveParams(tveParams),
-            m_parameterContainer(NULL)
-    {
+            m_parameterContainer(NULL) {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
         m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
         assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
@@ -54,7 +51,10 @@ namespace voltdb {
     NValue
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
-std::cout << "========== Running subquery:   " << m_subqueryId << '\n';
+        // Get the subquery context with the last evaluation result and parameters used to obtain that result
+        SubqueryContext* context = ExecutorContext::getExecutorContext()->getSubqueryContext(m_subqueryId);
+        bool hasPriorResult = context != NULL;
+        bool paramsChanged = !hasPriorResult;
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
         // Substitute parameters.
         if (m_tveParams.get() != NULL) {
@@ -62,48 +62,39 @@ std::cout << "========== Running subquery:   " << m_subqueryId << '\n';
             for (size_t i = 0; i < paramsCnt; ++i) {
                 AbstractExpression* tveParam = (*m_tveParams)[i];
                 NValue param = tveParam->eval(tuple1, tuple2);
-                // compare the new param value with the previous one
-                // ENG-451 - how to compare NValues (possible NULLS)
-                // preserver the new value
-                // ENG-451 do we need a special copy there? or default copy is enough?
-                (*m_parameterContainer)[m_paramIdxs[i]] = param;
+                // compare the new param value with the previous one. Since this parameter is set
+                // by this subquery, no other subquery can change it value. So, we don't need to
+                // save its value on a side for future comparisons.
+                    NValue& prevParam = (*m_parameterContainer)[m_paramIdxs[i]];
+                if (hasPriorResult) {
+                    if (param.compare(prevParam) != 0) {
+                        prevParam = NValue::copyNValue(param);
+                        paramsChanged = true;
+                    }
+                } else {
+                    prevParam = NValue::copyNValue(param);
+                }
             }
         }
 
-        // Keep track whether any of them have changed
-        // since the last invocation. If not, the previous invocation result (if available)
-        // can be re-used.
-        SubqueryContext* context = ExecutorContext::getExecutorContext()->getSubqueryContext(m_subqueryId);
-        bool paramsChanged = false;
-        bool hasPriorResult = context != NULL;
-std::cout << "==========Running subquery:   " << m_subqueryId << ", has results= " << hasPriorResult << '\n';
-
+        // Compare the other parameter values since the last invocation.
         if (hasPriorResult) {
             std::vector<NValue>& lastParams = context->getLastParams();
-            assert(lastParams.size() == m_allParamIdxs.size());
+            assert(lastParams.size() == m_otherParamIdxs.size());
             for (size_t i = 0; i < lastParams.size(); ++i) {
-                bool paramChanged = lastParams[i].compare((*m_parameterContainer)[m_allParamIdxs[i]]) != 0;
-std::cout << "Param idx " << m_allParamIdxs[i] << ", changed= " << paramChanged << '\n';
-if (paramChanged) {
-std::cout << "Old val: " << lastParams[i].debug() << '\n';
-std::cout << "New val: " << (*m_parameterContainer)[m_allParamIdxs[i]].debug() << '\n';
-}
+                NValue& prevParam = (*m_parameterContainer)[m_otherParamIdxs[i]];
+                bool paramChanged = lastParams[i].compare(prevParam) != 0;
                 if (paramChanged) {
-                    // ENG-451 do we need a special copy there? or default copy is enough?
-                    lastParams[i] = (*m_parameterContainer)[m_allParamIdxs[i]];
+                    lastParams[i] = NValue::copyNValue(prevParam);
                     paramsChanged = true;
                 }
             }
         }
 
-
-std::cout << "All paramsChanged=" << paramsChanged << '\n';
         // if parameters haven't changed since the last execution try to reuse the result
         if (!paramsChanged && hasPriorResult) {
-std::cout << "Using old results\n";
             return context->getResult();
         }
-std::cout << "Need to calculate results\n";
         // Out of luck. Need to run the executors
         std::vector<AbstractExecutor*>* executionStack =
             &ExecutorContext::getExecutorContext()->getExecutorList(m_subqueryId);
@@ -117,15 +108,19 @@ std::cout << "Need to calculate results\n";
         }
         bool result = executionStack->back()->getPlanNode()->getOutputTable()->activeTupleCount() != 0;
         NValue retval = (result) ? NValue::getTrue() : NValue::getFalse();
-        // Preserve the value for the next run getSubqueryResult
-        std::vector<NValue> lastParams;
-        lastParams.reserve(m_allParamIdxs.size());
-        for (size_t i = 0; i < m_allParamIdxs.size(); ++i) {
-            lastParams.push_back((*m_parameterContainer)[m_allParamIdxs[i]]);
+        if (hasPriorResult) {
+            // simply update the result. All params are already updated
+            context->setResult(retval);
+        } else {
+            // Preserve the value for the next run. Only 'other' parameters need to be copied
+            std::vector<NValue> lastParams;
+            lastParams.reserve(m_otherParamIdxs.size());
+            for (size_t i = 0; i < m_otherParamIdxs.size(); ++i) {
+                lastParams.push_back(NValue::copyNValue((*m_parameterContainer)[m_otherParamIdxs[i]]));
+            }
+            SubqueryContext newContext(m_subqueryId, retval, lastParams);
+            ExecutorContext::getExecutorContext()->setSubqueryContext(m_subqueryId, newContext);
         }
-        SubqueryContext newContext(m_subqueryId, retval, lastParams);
-        ExecutorContext::getExecutorContext()->setSubqueryContext(m_subqueryId, newContext);
-std::cout << "==========Done Running subquery:   " << m_subqueryId << '\n';
         return retval;
     }
 

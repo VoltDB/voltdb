@@ -18,8 +18,10 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -40,7 +42,7 @@ public class SubqueryExpression extends AbstractExpression {
         SUBQUERY_ID,
         SUBQUERY_ROOT_NODE_ID,
         PARAM_IDX,
-        ALL_PARAM_IDX;
+        OTHER_PARAM_IDX;
     }
 
     public static final String SUBQUERY_TAG = "Subquery_";
@@ -168,6 +170,8 @@ public class SubqueryExpression extends AbstractExpression {
         super.toJSONString(stringer);
         stringer.key(Members.SUBQUERY_ID.name()).value(m_subqueryId);
         stringer.key(Members.SUBQUERY_ROOT_NODE_ID.name()).value(m_subqueryNodeId);
+        // Output the correlated parameter ids that originates at this subquery immediate
+        // parent and need to be set before the evaluation
         if (!m_parameterIdxList.isEmpty()) {
             stringer.key(Members.PARAM_IDX.name()).array();
             for (Integer idx : m_parameterIdxList) {
@@ -175,12 +179,21 @@ public class SubqueryExpression extends AbstractExpression {
             }
             stringer.endArray();
         }
+        // Output the correlated parameter ids that this subquery or its descendants
+        // depends upon but originate at the grandparent level and do not need to be set
+        // by this subquery
         if (!m_allParameterIdxList.isEmpty()) {
-            stringer.key(Members.ALL_PARAM_IDX.name()).array();
-            for (Integer idx : m_allParameterIdxList) {
-                stringer.value(idx);
+            // Calculate the difference between two sets of parameters
+            Set<Integer> allParams = new HashSet<Integer>();
+            allParams.addAll(m_allParameterIdxList);
+            allParams.removeAll(m_parameterIdxList);
+            if (!allParams.isEmpty()) {
+                stringer.key(Members.OTHER_PARAM_IDX.name()).array();
+                for (Integer idx : allParams) {
+                    stringer.value(idx);
+                }
+                stringer.endArray();
             }
-            stringer.endArray();
         }
     }
 
@@ -196,8 +209,8 @@ public class SubqueryExpression extends AbstractExpression {
                 m_parameterIdxList.add(paramIdxArray.getInt(i));
             }
         }
-        if (obj.has(Members.ALL_PARAM_IDX.name())) {
-            JSONArray allParamIdxArray = obj.getJSONArray(Members.ALL_PARAM_IDX.name());
+        if (obj.has(Members.OTHER_PARAM_IDX.name())) {
+            JSONArray allParamIdxArray = obj.getJSONArray(Members.OTHER_PARAM_IDX.name());
             int paramSize = allParamIdxArray.length();
             for (int i = 0; i < paramSize; ++i) {
                 m_allParameterIdxList.add(allParamIdxArray.getInt(i));

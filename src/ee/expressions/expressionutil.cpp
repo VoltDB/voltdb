@@ -94,17 +94,18 @@ subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* arg
             paramIdxs.push_back(paramIdx);
         }
     }
-    std::vector<int> allParamIdxs;
-    if (obj.hasNonNullKey("ALL_PARAM_IDX")) {
-        PlannerDomValue allParams = obj.valueForKey("ALL_PARAM_IDX");
-        int allParamSize = allParams.arrayLen();
-        allParamIdxs.reserve(allParamSize);
-        for (int i = 0; i < allParamSize; ++i) {
-            int paramIdx = allParams.valueAtIndex(i).asInt();
-            allParamIdxs.push_back(paramIdx);
+    std::vector<int> otherParamIdxs;
+    if (obj.hasNonNullKey("OTHER_PARAM_IDX")) {
+        PlannerDomValue otherParams = obj.valueForKey("OTHER_PARAM_IDX");
+        int otherParamSize = otherParams.arrayLen();
+        otherParamIdxs.reserve(otherParamSize);
+        otherParamIdxs.reserve(otherParamSize);
+        for (int i = 0; i < otherParamSize; ++i) {
+            int paramIdx = otherParams.valueAtIndex(i).asInt();
+            otherParamIdxs.push_back(paramIdx);
         }
     }
-    return new SubqueryExpression(subqueryId, paramIdxs, allParamIdxs, args);
+    return new SubqueryExpression(subqueryId, paramIdxs, otherParamIdxs, args);
 }
 
 /** Function static helper templated functions to vivify an optimal

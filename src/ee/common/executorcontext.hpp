@@ -24,54 +24,11 @@
 #include "Topend.h"
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
+#include "common/subquerycontext.h"
 
 namespace voltdb {
 
 class AbstractExecutor;
-
-/*
-* Keep track of the actual parameter values coming into a subquery invocation
-* and if they have not changed since last invocation reuses the cached result
-* from the prior invocation.
-* This approach has several interesting effects:
-* -- non-correlated subqueries are always executed once
-* -- subquery filters that had to be applied after a join but that were only correlated
-*    by columns from the join's OUTER side would effectively get run once per OUTER row.
-* -- subqueries that were correlated by a parent's indexed column (producing ordered values)
-*    could get executed once per unique value.
-* The subquery context is registered with the global executor context as candidates for
-* post-fragment cleanup, allowing results to be retained between invocations.
-*/
-struct SubqueryContext {
-    SubqueryContext(int stmtId, NValue result, std::vector<NValue> lastParams) :
-        m_stmtId(stmtId), m_lastResult(result), m_lastParams(lastParams) {
-    }
-
-    int getStatementId() const {
-        return m_stmtId;
-    }
-
-    NValue getResult() const {
-        return m_lastResult;
-    }
-
-    void setResult(NValue result) {
-        m_lastResult = result;
-    }
-
-    std::vector<NValue>& getLastParams() {
-        return m_lastParams;
-    }
-
-  private:
-    // Subquery ID
-    int64_t m_stmtId;
-    // The result (TRUE/FALSE) of the previous IN/EXISTS subquery invocation
-    NValue m_lastResult;
-    // The parameter values that weere used to obtain the last result in the accesinding
-    // order of the parameter indexes
-    std::vector<NValue> m_lastParams;
-};
 
 /*
  * EE site global data required by executors at runtime.
@@ -200,7 +157,12 @@ class ExecutorContext {
 
     /** Set a new subquery context or NULL */
     void setSubqueryContext(int stmtId, SubqueryContext context) {
-        m_subqueryContextMap.insert(std::make_pair(stmtId, context));
+        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
+            m_subqueryContextMap.insert(std::make_pair(stmtId, context));
+        if (!result.second) {
+            // the old context is there
+            result.first->second = context;
+        }
     }
 
     static ExecutorContext* getExecutorContext();
