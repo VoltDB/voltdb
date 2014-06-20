@@ -108,17 +108,21 @@ public class LatencyStats extends SiteStatsSource {
     private Supplier<AbstractHistogram> m_histogramSupplier = getHistogramSupplier();
 
     public byte[] getSerializedCache() {
-        if (m_serializedCache == null || m_serializedCache.get() == null) {
-            m_serializedCache = new WeakReference<byte[]>(m_histogramSupplier.get().toUncompressedBytes());
+        byte[] retval = null;
+        if (m_serializedCache == null || (retval = m_serializedCache.get()) == null) {
+            retval = m_histogramSupplier.get().toUncompressedBytes();
+            m_serializedCache = new WeakReference<byte[]>(retval);
         }
-        return m_serializedCache.get();
+        return retval;
     }
 
     public byte[] getCompressedCache() {
-        if (m_compressedCache == null || m_compressedCache.get() == null) {
-            m_compressedCache = new WeakReference<byte[]>(AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE));
+        byte[] retval = null;
+        if (m_compressedCache == null || (retval = m_compressedCache.get()) == null) {
+            retval = AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE);
+            m_compressedCache = new WeakReference<byte[]>(retval);
         }
-        return m_compressedCache.get();
+        return retval;
     }
 
     public LatencyStats(long siteId) {
