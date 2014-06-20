@@ -350,7 +350,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
                 m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
                                                                       valueEquivalence);
-                if ( ! m_partitioning.isValidJoin() ) {
+                if ( ! m_partitioning.isJoinValid() ) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.
                     // Don't throw a planning error here, in case the problem is just with this

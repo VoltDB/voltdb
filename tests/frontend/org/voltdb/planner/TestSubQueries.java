@@ -815,16 +815,82 @@ public class TestSubQueries extends PlannerTestCase {
 
 
         // Test with LIMIT
-        planNodes = compileToFragments("select A1, A2, D1, D2 " +
+        failToCompile("select A1, A2, D1, D2 " +
                 "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
-                "(SELECT A A2, D D2 FROM P2 ORDER BY D LIMIT 3) T2 where T2.A2=2");
-        assertEquals(2, planNodes.size());
+                "(SELECT A A2, D D2 FROM P2 ORDER BY D LIMIT 3) T2 where T2.A2=2",
+                joinErrorMsg);
     }
 
     public void testPartitionedGroupBy() {
         AbstractPlanNode pn;
         List<AbstractPlanNode> planNodes;
         AbstractPlanNode nlpn;
+
+        // (1) Single partition query, filter on outer query.
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1 " +
+                "where T1.A = 1 ");
+        assertEquals(1, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1", "A", "C");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        // Because it group by the partition column, we can drop the group by column on coordinator
+
+        pn = pn.getChild(0);
+        // Projection node for the aggregate, this may not be needed
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
+        // (2) Single partition query, filter in inner sub-query.
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 WHERE A = 1 GROUP BY A, C) T1");
+        assertEquals(1, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1", "A", "C");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
+        // (3) Sub-query with group by join with replicated table
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM R1 GROUP BY A, C) T1, P1 " +
+                "where T1.A = P1.A ");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeySubSelect(pn, "P1");
+
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        checkSeqScanSubSelects(pn, "R1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
 
         // Top aggregation node on coordinator
         planNodes = compileToFragments(
@@ -856,18 +922,13 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeySubSelect(pn, "SP4");
 
         //
-        // TODO(xin): optimization to make it single partition
+        // (4) Sub-query with group by join with partitioned table
         //
-        planNodes = compileToFragments(
-                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1 " +
-                "where T1.A = 1 ");
-        assertEquals(2, planNodes.size());
 
-
-        // Sub-query with group by join with replicated table
+        // optimize the group by case to join on distributed node.
         planNodes = compileToFragments(
-                "SELECT * FROM (SELECT A, C FROM R1 GROUP BY A, C) T1, P1 " +
-                "where T1.A = P1.A ");
+                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
@@ -882,24 +943,197 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopIndexPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
         pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkPrimaryKeySubSelect(pn, "P1");
+        checkPrimaryKeySubSelect(pn, "P2");
 
         pn = nlpn.getChild(0);
         checkSeqScanSubSelects(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
-        checkSeqScanSubSelects(pn, "R1");
+        // ProjectionNode for the top Aggregate, this may not be needed if without complex aggregates
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
-        // Sub-query with group by join with partitioned table
+
+        // single partition filter inside subquery
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 WHERE A = 3 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A ");
+        assertEquals(1, planNodes.size());
+
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeySubSelect(pn, "P2");
+
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // single partition filter outside subquery
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A and P2.A = 3");
+        assertEquals(1, planNodes.size());
+
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        pn = nlpn.getChild(1);
+        checkPrimaryKeySubSelect(pn, "P2");
+
+
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A and T1.A = 3");
+        assertEquals(1, planNodes.size());
+
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScanSubSelects(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeySubSelect(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        pn = nlpn.getChild(1);
+        checkPrimaryKeySubSelect(pn, "P2");
+
+    }
+
+    /*
+     * LIMIT/OFFSET/DISTINCT/GROUP BY are not always the bad guys.
+     * When they apply on the replicated table only, the subquery contains this case should
+     * be able to drop the receive node if it has partition table in other places.
+     */
+    public void testFineGrainedCases() {
+        List<AbstractPlanNode> planNodes;
+
+        // LIMIT comes from replicated table which has no receive node
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT A, C FROM R2 LIMIT 5) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+
+        // Distinct apply on replicated table only
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT Distinct A, C FROM R2 where A > 3) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+
+
+        // table count
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT COUNT(*) AS A FROM R2 where C > 3) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+
+
+        // group by
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT A, COUNT(*) C FROM R2 where C > 3 GROUP BY A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+
+
+
         //
-        // TODO (xin): optimize the group by case to join on distributed node.
-        //
-//        planNodes = compileToFragments(
-//                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 " +
-//                "where T1.A = P2.A");
-//        assertEquals(2, planNodes.size());
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT A, C FROM R2 where C > 3 ) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+
+    }
+
+    private void checkJoinNode(AbstractPlanNode root, PlanNodeType type, int num) {
+        List<AbstractPlanNode> nodes = root.findAllNodesOfType(type);
+        if (num > 0) {
+            assertEquals(num, nodes.size());
+        }
     }
 
     public void testPartitionedLimitOffset() {
@@ -1006,6 +1240,7 @@ public class TestSubQueries extends PlannerTestCase {
 
     }
 
+    private String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
     public void testUnsupportedCases() {
         // (1)
         // sub-selected table must have an alias
@@ -1024,7 +1259,6 @@ public class TestSubQueries extends PlannerTestCase {
         // (3)
         // sub-selected table must have an valid join criteria.
         //
-        String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
 
         // Joined on different columns (not on their partitioned columns)
         failToCompile("select * from (SELECT A, D D1 FROM P1) T1, P2 where p2.D = T1.D1",
@@ -1071,16 +1305,66 @@ public class TestSubQueries extends PlannerTestCase {
                 "   P3 X, P4 Y " +
                 "WHERE X.A = Y.A and T1.A = X.A",  "T1.A");
 
-        // (6)
-        // TODO(xin):
         //
-        failToCompile(
-                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+        // (6) Subquery with partition table join with partition table on outer level
+        //
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, P2 " +
+                "where T1.A = P2.A", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5 OFFSET 1) T1, P2 " +
+                "where T1.A = P2.A", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A", joinErrorMsg);
+
+        // Without GROUP BY.
+        failToCompile("SELECT * FROM (SELECT COUNT(*) FROM P1) T1, P2 ", joinErrorMsg);
+        failToCompile("SELECT * FROM (SELECT MAX(C) FROM P1) T1, P2 ", joinErrorMsg);
+        failToCompile("SELECT * FROM (SELECT SUM(A) FROM P1) T1, P2 ", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 LIMIT 5) T1, P2 " +
+                "where T1.A = P2.A", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 " +
+                "where T1.A = P2.A", joinErrorMsg);
+
+        // Nested LIMIT/OFFSET/DISTINCT
+        failToCompile("SELECT * FROM (SELECT A, R1.C FROM R1, " +
+                "                     (SELECT A, C FROM P1 LIMIT 5) T0 where R1.A = T0.A ) T1, P2 " +
                 "where T1.A = P2.A", joinErrorMsg);
 
         failToCompile(
-                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, P2 " +
-                        "where T1.A = P2.A", joinErrorMsg);
+                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+
+        // Invalid DISTINCT/LIMIT/OFFSET on parent subquery with partitoned nested subquery
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+
+        failToCompile(
+                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                 (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 " +
+                "                 where R1.A = T0.A  ORDER BY T0.A LIMTI 5) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+
+        // Invalid on the same level
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
+                "                    (SELECT A, C FROM P2) T2 " +
+                "where T1.A = T2.A", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
+                "                    (SELECT A, C FROM P2) T2, P3 " +
+                "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
+
+        failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
+                "                    (SELECT A, C FROM R2) T2, P3 " +
+                "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
     }
 
     public void testEdgeCases() {

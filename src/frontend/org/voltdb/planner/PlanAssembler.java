@@ -587,7 +587,7 @@ public class PlanAssembler {
     }
 
     private ParsedResultAccumulator planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
-        AbstractParsedStmt subQuery = subqueryScan.getSubquery();
+        AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = planId;
@@ -602,26 +602,12 @@ public class PlanAssembler {
             }
             return null;
         }
+        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
 
         // Remove the coordinator send/receive pair.
         // It will be added later for the whole plan
-        AbstractPlanNode root = compiledPlan.rootPlanGraph;
+        compiledPlan.rootPlanGraph = subqueryScan.processRevieveNode(compiledPlan.rootPlanGraph);
 
-        List<AbstractPlanNode> receives = root.findAllNodesOfType(PlanNodeType.RECEIVE);
-        if (receives.size() > 0) {
-            assert(receives.size() == 1);
-            // There should be more cases for Joins have to be done on coordinator
-            // This case should also not be pushed down
-            boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                    !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                    !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
-                    !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
-            if (subScanCanPushdown) {
-                compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
-            }
-            subqueryScan.setNeedsReceiveNode(! subScanCanPushdown);
-        }
-        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
 
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
@@ -2002,53 +1988,6 @@ public class PlanAssembler {
 
     public String getErrorMessage() {
         return m_recentErrorMsg;
-    }
-
-
-
-    /**
-     * Remove the coordinator send/receive pair if any from the graph.
-     *
-     * @param root the complete plan node.
-     * @return the plan without the send/receive pair.
-     */
-    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
-        assert(root != null);
-        return removeCoordinatorSendReceivePairRecurcive(root, root);
-    }
-
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root,
-            AbstractPlanNode current) {
-        if (current instanceof ReceivePlanNode) {
-            if (current.getChildCount() == 1) {
-                AbstractPlanNode child = current.getChild(0);
-                if (child instanceof SendPlanNode) {
-                    assert(child.getChildCount() == 1);
-                    child = child.getChild(0);
-                    if (child instanceof ProjectionPlanNode) {
-                        assert(child.getChildCount() == 1);
-                        child = child.getChild(0);
-                    }
-                    child.clearParents();
-                    if (current.getParentCount() == 0) {
-                        return child;
-                    } else {
-                        assert(current.getParentCount() == 1);
-                        AbstractPlanNode parent = current.getParent(0);
-                        parent.unlinkChild(current);
-                        parent.addAndLinkChild(child);
-                        return root;
-                    }
-                }
-            }
-            return root;
-        } else if (current.getChildCount() == 1) {
-            // This is still a coordinator node
-            return removeCoordinatorSendReceivePairRecurcive(root, current.getChild(0));
-        } else {
-            // We are about to branch and leave the coordinator
-            return root;
-        }
     }
 
     /**
