@@ -333,24 +333,7 @@ public class StmtSubqueryScan extends StmtTableScan {
             // (1) Does not Contain the partition columns: If join with partition table on outer
             //     level, it will violates the join criteria.
             // Detect case (1) to mark receive node.
-            boolean findPartitionColumn = false;
-            for (ParsedSelectStmt.ParsedColInfo col : selectStmt.m_groupByColumns) {
-                if (col.expression instanceof TupleValueExpression == false) {
-                    continue;
-                }
-
-                for (SchemaColumn scol: m_partitioningColumns) {
-                    if (scol.getExpression().equals(col.expression)) {
-                        findPartitionColumn = true;
-                        break;
-                    }
-                }
-
-                if (findPartitionColumn) {
-                    break;
-                }
-            }
-            if (! findPartitionColumn) {
+            if (! selectStmt.hasPartitionColumnInGroupby()) {
                 m_hasReceiveNode = true;
                 return root;
             }

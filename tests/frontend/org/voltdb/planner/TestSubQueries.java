@@ -1018,6 +1018,38 @@ public class TestSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
 
+        // Add aggregate inside of subquery
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, COUNT(*) CT FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeyIndexScan(pn, "P2");
+
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        // ProjectionNode for the top Aggregate, this may not be needed if without complex aggregates
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
         // single partition filter inside subquery
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT A, C FROM P1 WHERE A = 3 GROUP BY A, C) T1, P2 " +
@@ -1248,17 +1280,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
         // Join on distributed node
         checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
-    }
-
-    public void testTry() {
-        AbstractPlanNode pn;
-        List<AbstractPlanNode> planNodes;
-        AbstractPlanNode nlpn;
-
-        // Top aggregation node on coordinator
-        planNodes = compileToFragments(
-                "SELECT * from p1, p2 where p1.a = 1 and p2.a = 1");
-        assertEquals(1, planNodes.size());
     }
 
     private void checkJoinNode(AbstractPlanNode root, PlanNodeType type, int num) {
