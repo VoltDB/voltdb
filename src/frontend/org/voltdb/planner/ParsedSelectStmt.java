@@ -956,8 +956,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean hasJoinOrders() {
-        assert(m_joinOrderList.size() > 0);
-
         return m_joinOrder != null || m_largeJoins;
     }
     private boolean m_largeJoins = false;
@@ -979,16 +977,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // prepare the join order if needed
         if (m_joinOrder == null &&
-                m_tableList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
+                m_tableAliasList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
             // When there are large number of table joins, give up the all permutaions.
             // Be default, try the join order with the sql query table order first.
             m_largeJoins = true;
 
             StringBuilder sb = new StringBuilder();
-            for (int ii = 0; ii < m_tableList.size(); ii++) {
-                Table table = m_tableList.get(ii);
-                sb.append(table.getTypeName());
-                if (ii != m_tableList.size() - 1) {
+            for (int ii = 0; ii < m_tableAliasList.size(); ii++) {
+                String tableAlias = m_tableAliasList.get(ii);
+                sb.append(tableAlias);
+                if (ii != m_tableAliasList.size() - 1) {
                     sb.append(",");
                 }
             }

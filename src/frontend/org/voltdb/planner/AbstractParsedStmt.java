@@ -70,6 +70,8 @@ public abstract class AbstractParsedStmt {
 
     public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
+    protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
+
     protected final String[] m_paramValues;
     public final Database m_db;
 
@@ -586,6 +588,9 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
+        // Hsql rejects name conflicts in a single query
+        m_tableAliasList.add(tableAlias);
+
         // Possible sub-query
         AbstractParsedStmt subquery = parseSubQuery(tableNode);
 

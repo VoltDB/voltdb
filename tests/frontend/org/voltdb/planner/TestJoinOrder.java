@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import java.util.HashSet;
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -297,13 +298,18 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
-
-    private void checkJoinOrder(String sql, int exception) {
+    private void checkJoinOrder(String sql, int... exceptions) {
         AbstractPlanNode pn, n;
         pn = compile(sql);
         n = pn.getChild(0).getChild(0);
         System.out.println(pn.toExplainPlanString());
         // starts from T7
+
+        HashSet<Integer> mySets = new HashSet<>();
+        for (int i : exceptions) {
+            mySets.add(Integer.valueOf(i));
+        }
+
         for (int ii = 7; ii > 0; ii--) {
             if (ii == 2) {
                 assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii))
@@ -313,7 +319,7 @@ public class TestJoinOrder extends PlannerTestCase {
                 break;
             } else {
                 NestLoopPlanNode node = (NestLoopPlanNode)n;
-                if (ii == exception) {
+                if (mySets.contains(Integer.valueOf(ii))) {
                     assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().endsWith(Integer.toString(ii)));
                     n = node.getChild(1);
                 } else {
@@ -322,6 +328,29 @@ public class TestJoinOrder extends PlannerTestCase {
                     n = node.getChild(0);
                 }
             }
+        }
+    }
+
+    public void testTry() {
+        String sql;
+        AbstractPlanNode pn, n;
+
+        sql = "select * FROM T1, T2, (select T4.D from T3 right outer join T4 on T4.D = T3.C) TM1 LEFT OUTER JOIN T5 on T5.E = TM1.D, T6, T7";
+        pn = compile(sql);
+        n = pn.getChild(0).getChild(0);
+        System.out.println(pn.toExplainPlanString());
+
+        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
+    }
+
+
+
+    private void validJoinOrder(String explainPlan, String... joinOrder) {
+        int start = -1;
+        for (String tb: joinOrder) {
+            int idx = explainPlan.indexOf("\"" + tb + "\"");
+            assertTrue(idx > start);
+            start = idx;
         }
     }
 
@@ -345,12 +374,42 @@ public class TestJoinOrder extends PlannerTestCase {
         sql = "select * FROM T1, T2, T3, T4, T5 right outer join T6 on T6.F = T5.E, T7";
         checkJoinOrder(sql, 6);
 
+        sql = "select * FROM T1, T2, T3, T4 right outer join T5 on T5.E = T4.D right outer join T6 on T6.F = T5.E, T7";
+        checkJoinOrder(sql,5, 6);
+
+
         // Sub-queries is an interesting question to test
-
-
+        AbstractPlanNode pn;
+        sql = "select * FROM T1, T2, (select T4.D from T3 right outer join T4 on T4.D = T3.C) TM1 LEFT OUTER JOIN T5 on T5.E = TM1.D, T6, T7";
+        pn = compile(sql);
+        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
+        /*
+        NEST LOOP INNER JOIN
+         NEST LOOP INNER JOIN
+          NEST LOOP LEFT JOIN
+           filter by (T5.E = TM1.D)
+           NEST LOOP INNER JOIN
+            NEST LOOP INNER JOIN
+             SEQUENTIAL SCAN of "T1"
+             SEQUENTIAL SCAN of "T2"
+            SEQUENTIAL SCAN of "TM1"
+             NEST LOOP LEFT JOIN
+              filter by (T4.D = T3.C)
+              SEQUENTIAL SCAN of "T4"
+              SEQUENTIAL SCAN of "T3"
+           SEQUENTIAL SCAN of "T5"
+          SEQUENTIAL SCAN of "T6"
+         SEQUENTIAL SCAN of "T7"
+       */
+        pn = compileSPWithJoinOrder(sql, "T1,T2,TM1,T5,T6,T7");
+        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
         //
         // Join order not the input table order
         //
+
+        // Do we have a case the join order as the input table order that is invalid ?!
+
+
     }
 
     @Override
