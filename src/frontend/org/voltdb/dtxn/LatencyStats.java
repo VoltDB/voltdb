@@ -84,7 +84,7 @@ public class LatencyStats extends SiteStatsSource {
 
     private AbstractHistogram m_totals = constructHistogram(false);
 
-    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 950);
+    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 900);
 
     private Supplier<AbstractHistogram> getHistogramSupplier() {
         return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
