@@ -113,7 +113,7 @@ public:
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2, &m_wrapper)) {
         srand(0);
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

@@ -26,12 +26,32 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
 public class PartitionDRGateway {
+
+    public enum DRRecordType {
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN;
+
+        public static final ImmutableMap<Integer, DRRecordType> conversion;
+        static {
+            ImmutableMap.Builder<Integer, DRRecordType> b = ImmutableMap.builder();
+            for (DRRecordType t : DRRecordType.values()) {
+                b.put(t.ordinal(), t);
+            }
+            conversion = b.build();
+        }
+
+        public static DRRecordType valueOf(int ordinal) {
+            return conversion.get(ordinal);
+        }
+    }
+
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -121,13 +141,13 @@ public class PartitionDRGateway {
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
-                byte type = buf.get();
+                int type = buf.get();
 
                 int checksum = 0;
                 if (version != 0) System.out.println("Remaining is " + buf.remaining());
 
-                switch (type) {
-                case 0: {
+                switch (DRRecordType.valueOf(type)) {
+                case INSERT: {
                     //Insert
                     if (haveOpenTransaction.get() == -1) {
                         System.out.println("Have insert but no open transaction");
@@ -140,7 +160,7 @@ public class PartitionDRGateway {
                     System.out.println("Version " + version + " type INSERT table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
                     break;
                 }
-                case 1: {
+                case DELETE: {
                     //Delete
                     if (haveOpenTransaction.get() == -1) {
                         System.out.println("Have insert but no open transaction");
@@ -153,11 +173,11 @@ public class PartitionDRGateway {
                     System.out.println("Version " + version + " type DELETE table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
                     break;
                 }
-                case 2:
+                case UPDATE:
                     //Update
                     //System.out.println("Version " + version + " type UPDATE " + checksum " + checksum);
                     break;
-                case 3: {
+                case BEGIN_TXN: {
                     //Begin txn
                     final long txnId = buf.getLong();
                     final long spHandle = buf.getLong();
@@ -170,7 +190,7 @@ public class PartitionDRGateway {
                     System.out.println("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
                     break;
                 }
-                case 4: {
+                case END_TXN: {
                     //End txn
                     final long spHandle = buf.getLong();
                     if (haveOpenTransaction.get() == -1 ) {

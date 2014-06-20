@@ -88,7 +88,7 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, DRTupleStream *drStream, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
+PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -98,7 +98,6 @@ PersistentTable::PersistentTable(int partitionColumn, DRTupleStream *drStream, c
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
-    m_drStream(drStream),
     m_isMaterialized(isMaterialized)
 {
     // this happens here because m_data might not be initialized above
@@ -276,7 +275,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     assert(tcd);
 
     catalog::Table *catalogTable = engine->getCatalogTable(m_name);
-    if (tcd->init(*engine->getDatabase(), *catalogTable, m_drStream) != 0) {
+    if (tcd->init(*engine->getDatabase(), *catalogTable) != 0) {
         VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
         return ;
     }
@@ -297,7 +296,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
 
-        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable, m_drStream) != 0) {
+        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable) != 0) {
             VOLT_ERROR("Failed to initialize table '%s' from catalog",targetTable->name().c_str());
             return ;
         }
@@ -400,13 +399,15 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
                 CONSTRAINT_TYPE_UNIQUE);
     }
 
-    size_t drMark = m_drStream->m_uso;
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
     if (!m_isMaterialized && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::INSERT);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -567,14 +568,16 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
-    size_t drMark = m_drStream->m_uso;
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
     if (!m_isMaterialized) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DRTupleStream::DELETE);
-        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DRTupleStream::INSERT);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DRTupleStream::DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DRTupleStream::INSERT);
     }
 
     if (uq) {
@@ -692,13 +695,14 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         m_views[i]->processTupleDelete(target, fallible);
     }
 
-    size_t drMark = m_drStream->m_uso;
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
     if (!m_isMaterialized) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        m_drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DRTupleStream::DELETE);
     }
 
     if (fallible) {

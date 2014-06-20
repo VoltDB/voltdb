@@ -60,13 +60,11 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     // table specific
     int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable,
-             DRTupleStream *drStream);
+             catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
-                             std::map<std::string, CatalogDelegate*> const &tablesByName,
-                             DRTupleStream *drStream);
+                             std::map<std::string, CatalogDelegate*> const &tablesByName);
 
     static void migrateChangedTuples(catalog::Table const &catalogTable,
                                      voltdb::PersistentTable* existingTable,
@@ -110,8 +108,7 @@ class TableCatalogDelegate : public CatalogDelegate {
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                             catalog::Table const &catalogTable,
-                                            const int32_t compactionThreshold,
-                                            DRTupleStream *drStream);
+                                            const int32_t compactionThreshold);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

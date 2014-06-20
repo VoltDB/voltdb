@@ -215,7 +215,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             &m_stringPool,
                                             m_isELEnabled,
                                             hostname,
-                                            hostId);
+                                            hostId,
+                                            &m_drStream);
 
     m_drStream.configure(partitionId);
 
@@ -725,7 +726,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                                                                  m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(*m_database, *catalogTable, &m_drStream) != 0) {
+            if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -786,7 +787,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
-                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, &m_drStream);
+                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());

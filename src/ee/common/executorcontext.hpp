@@ -23,6 +23,8 @@
 
 namespace voltdb {
 
+class DRTupleStream;
+
 /*
  * EE site global data required by executors at runtime.
  *
@@ -45,7 +47,8 @@ class ExecutorContext {
                     Pool* tempStringPool,
                     bool exportEnabled,
                     std::string hostname,
-                    CatalogId hostId);
+                    CatalogId hostId,
+                    DRTupleStream *drTupleStream);
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
@@ -130,6 +133,10 @@ class ExecutorContext {
         return m_lastCommittedSpHandle;
     }
 
+    DRTupleStream* drStream() {
+        return m_drStream;
+    }
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -143,6 +150,7 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+    DRTupleStream *m_drStream;
     int64_t m_txnId;
     int64_t m_spHandle;
     int64_t m_uniqueId;

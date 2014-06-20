@@ -441,7 +441,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn,  DRTupleStream *drStream, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -573,9 +573,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
-
-    //Output stream for DR
-    DRTupleStream *m_drStream;
 
     //Cache config info, is this a materialized view
     bool m_isMaterialized;
@@ -761,7 +758,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 inline void
 PersistentTableSurgeon::DRRollback(size_t drMark) {
     if (!m_table.m_isMaterialized) {
-            m_table.m_drStream->rollbackTo(drMark);
+        ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
     }
 }
 

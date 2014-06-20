@@ -105,13 +105,12 @@ public:
     deque<boost::shared_ptr<StreamBlock> > blocks;
     vector<boost::shared_array<char> > data;
     bool receivedExportBuffer;
-
 };
 
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2, NULL)) {
         srand(0);
 
         // set up the schema used to fill the new buffer
@@ -172,6 +171,7 @@ protected:
     TableTuple* m_tuple;
     DummyTopend m_topend;
     boost::scoped_ptr<ExecutorContext> m_context;
+
 };
 
 // Several of these cases were move to TestExportDataSource in Java

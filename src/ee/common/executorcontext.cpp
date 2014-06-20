@@ -38,9 +38,10 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 Pool* tempStringPool,
                 bool exportEnabled,
                 std::string hostname,
-                CatalogId hostId) :
+                CatalogId hostId,
+                DRTupleStream *drStream) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
-    m_undoQuantum(undoQuantum), m_txnId(0),
+    m_undoQuantum(undoQuantum), m_drStream(drStream), m_txnId(0),
     m_spHandle(0), m_lastCommittedSpHandle(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),

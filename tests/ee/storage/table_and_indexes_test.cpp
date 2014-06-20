@@ -45,7 +45,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0);
+            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0, &drStream);
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;
@@ -193,8 +193,7 @@ class TableAndIndexTest : public Test {
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                       warehouseTupleSchema, warehouseColumnNames,
-                                                                      signature,
-                                                                      &drStream, false,
+                                                                      signature, false,
                                                                       0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
@@ -215,8 +214,7 @@ class TableAndIndexTest : public Test {
 
             customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                      customerTupleSchema, customerColumnNames,
-                                                                     signature,
-                                                                     &drStream, false,
+                                                                     signature, false,
                                                                      0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
