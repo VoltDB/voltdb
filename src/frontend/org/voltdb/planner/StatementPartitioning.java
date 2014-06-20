@@ -322,6 +322,7 @@ public class StatementPartitioning implements Cloneable{
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
+        boolean isThisJoinValid = true;
         boolean subqueryHasRecieveNode = false;
         boolean hasPartitionTableJoined = false;
         // Iterate over the tables to collect partition columns.
@@ -347,12 +348,21 @@ public class StatementPartitioning implements Cloneable{
                     if (subqueryHasRecieveNode) {
                         // Has found another subquery with receive node on the same level
                         // Not going to support this kind of subquery join with 2 fragment plan.
-                        m_JoinValid = false;
+                        isThisJoinValid = false;
 
                         // Still needs to count the independent partition tables
                         break;
                     }
                     subqueryHasRecieveNode = true;
+
+                    if (subScan.isTableAggregate()) {
+                        // Partition Table Aggregate only return one aggregate row.
+                        // It has been marked with receive node, any join or processing based on
+                        // this table aggregate subquery should be done on coordinator.
+                        // Joins: has to be replicated table
+                        // Any process based on this subquery should require 1 fragment only.
+                        continue;
+                    }
                 } else {
                     // this subquery partition table without receive node
                     hasPartitionTableJoined = true;
@@ -385,13 +395,13 @@ public class StatementPartitioning implements Cloneable{
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {
-            m_JoinValid = false;
+            isThisJoinValid = false;
         }
 
         // This is the case that subquery with receive node join with another partition table
         // on outer level. Not going to support this kind of join.
         if (subqueryHasRecieveNode && hasPartitionTableJoined) {
-            m_JoinValid = false;
+            isThisJoinValid = false;
         }
 
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
@@ -409,6 +419,7 @@ public class StatementPartitioning implements Cloneable{
             }
         }
 
+        m_JoinValid = isThisJoinValid;
     }
 
     public boolean isJoinValid() {

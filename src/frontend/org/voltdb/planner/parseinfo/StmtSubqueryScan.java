@@ -56,6 +56,8 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     private boolean m_hasReceiveNode = false;
 
+    private boolean m_tableAggregateSubquery = false;
+
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
@@ -322,21 +324,48 @@ public class StmtSubqueryScan extends StmtTableScan {
 
         // Table aggregate cases should not get rid of the receive node
         if (selectStmt.hasAggregateExpression()) {
-            if (selectStmt.isGrouped()) {
+            if (!selectStmt.isGrouped()) {
+                m_tableAggregateSubquery = true;
                 m_hasReceiveNode = true;
                 return root;
             }
             // For group by queries, there are two cases on group by columns.
             // (1) Does not Contain the partition columns: If join with partition table on outer
             //     level, it will violates the join criteria.
-            // (2) Contain the partition columns:
+            // Detect case (1) to mark receive node.
+            boolean findPartitionColumn = false;
+            for (ParsedSelectStmt.ParsedColInfo col : selectStmt.m_groupByColumns) {
+                if (col.expression instanceof TupleValueExpression == false) {
+                    continue;
+                }
+
+                for (SchemaColumn scol: m_partitioningColumns) {
+                    if (scol.getExpression().equals(col.expression)) {
+                        findPartitionColumn = true;
+                        break;
+                    }
+                }
+
+                if (findPartitionColumn) {
+                    break;
+                }
+            }
+            if (! findPartitionColumn) {
+                m_hasReceiveNode = true;
+                return root;
+            }
+
+            //
+            // (2) Group by columns contain the partition columns:
             //     This is the interesting case that we are going to support.
             //     At this point, subquery does not contain LIMIT/OFFSET/DISTINCT. If join with
             //     partition table on outer level, we are able to push the join down by
             //     removing the send/receive plan node pair.
         }
 
+        //
         // Remove the send/receive pair on distributed node
+        //
         root = removeCoordinatorSendReceivePair(root);
 
         m_hasReceiveNode = false;
@@ -358,6 +387,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         return m_hasReceiveNode;
+    }
+
+    public boolean isTableAggregate() {
+        return m_tableAggregateSubquery;
     }
 
     /**
