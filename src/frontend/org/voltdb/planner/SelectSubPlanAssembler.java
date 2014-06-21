@@ -663,7 +663,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean needInnerSendReceive = (m_partitioning.requiresTwoFragments()) &&
                                        (! innerPlan.hasReplicatedResult()) &&
                                        (outerPlan.hasReplicatedResult()) &&
-                                       (joinNode.getJoinType() != JoinType.INNER || innerPlan.isNonjoinableSubquery())
+                                       (joinNode.getJoinType() != JoinType.INNER)
                                        ;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a

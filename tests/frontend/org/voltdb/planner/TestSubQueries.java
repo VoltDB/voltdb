@@ -1438,7 +1438,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 " +
                 "WHERE T1.A = 1 AND T2.A = 2", joinErrorMsg);
 
-
         // (4)
         // invalid partition
         //
@@ -1667,6 +1666,114 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
 
+        // Group by inside of the subquery
+        // whether it contains group by or not does not matter, because we check it by whether inner side is partitioned or not
+        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "R1", "A", "C");
+        pn = nlpn.getChild(1);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        checkSeqScan(pn, "T1", "C");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // LEFT partition table
+        planNodes = compileToFragments("SELECT T1.CC FROM P1 LEFT JOIN " +
+                "(SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
+
+        pn = nlpn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        pn = nlpn.getChild(1);
+        checkSeqScan(pn, "T1");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P2");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
+        // Right outer join
+        planNodes = compileToFragments("SELECT A, C FROM R1 RIGHT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
+
+        pn = nlpn.getChild(1);
+        checkSeqScan(pn, "R1", "A", "C");
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1", "C");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // RIGHT partition table
+        planNodes = compileToFragments("SELECT T1.CC FROM P1 RIGHT JOIN " +
+                "(SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P2");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         // Join locally: inner join case for subselects
         planNodes = compileToFragments("SELECT A, C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
