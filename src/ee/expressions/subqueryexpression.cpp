@@ -19,7 +19,11 @@
 #include "common/debuglog.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
+#include "common/tabletuple.h"
 #include "executors/executorutil.h"
+#include "storage/table.h"
+#include "storage/tableiterator.h"
+
 
 namespace voltdb {
 
@@ -57,11 +61,15 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
         bool paramsChanged = !hasPriorResult;
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
         // Substitute parameters.
+        bool hasNullParam = false;
         if (m_tveParams.get() != NULL) {
             size_t paramsCnt = m_tveParams->size();
             for (size_t i = 0; i < paramsCnt; ++i) {
                 AbstractExpression* tveParam = (*m_tveParams)[i];
                 NValue param = tveParam->eval(tuple1, tuple2);
+                if (param.isNull()) {
+                    hasNullParam = true;
+                }
                 // compare the new param value with the previous one. Since this parameter is set
                 // by this subquery, no other subquery can change it value. So, we don't need to
                 // save its value on a side for future comparisons.
@@ -106,8 +114,37 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
             snprintf(message, 256, "Failed to execute the subquery '%d'", m_subqueryId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
-        bool result = executionStack->back()->getPlanNode()->getOutputTable()->activeTupleCount() != 0;
-        NValue retval = (result) ? NValue::getTrue() : NValue::getFalse();
+        Table* outputTable = executionStack->back()->getPlanNode()->getOutputTable();
+        assert(table != NULL);
+        NValue retval = NValue::getFalse();
+
+        if (hasNullParam) {
+            size_t size = executionStack->size();
+            assert(size > 1);
+            Table* outputTable = (*executionStack)[size - 2]->getPlanNode()->getOutputTable();
+            if (outputTable->activeTupleCount() != 0) {
+                retval.setNull();
+            }
+        } else {
+            // Check the first tuple if it's NULL tuple or not
+             TableIterator& it = outputTable->iterator();
+             TableTuple tuple(outputTable->schema());
+             if (it.next(tuple)) {
+std::cout << "SubExpr schema: " <<  outputTable->schema()->debug() << '\n';
+                // can get any idx
+std::cout << "SubExpr: " << tuple.debug(outputTable->name()) << ", isNull=" << tuple.isNull(0) << '\n';
+                if (!tuple.isNull(0)) {
+                    retval = NValue::getTrue();
+                } else {
+std::cout << "SubExpr retval is NULL\n ";
+                    retval.setNull();
+                }
+             } else {
+std::cout << "SubExpr is empty\n";
+                retval = NValue::getFalse();
+             }
+        }
+
         if (hasPriorResult) {
             // simply update the result. All params are already updated
             context->setResult(retval);

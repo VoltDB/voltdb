@@ -317,6 +317,9 @@ public abstract class AbstractParsedStmt {
         }
 
         VectorValueExpression vve = new VectorValueExpression();
+        // We can only set the type to be invalid because each child expression
+        // can be of a different type
+        vve.setValueType(VoltType.INVALID);
         vve.setArgs(args);
         return vve;
     }

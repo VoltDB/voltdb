@@ -1012,12 +1012,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             selectStmt.hasComplexGroupby = false;
             selectStmt.hasAggregateExpression = false;
             selectStmt.hasAverage = false;
-            selectStmt.displayColumns.clear();
             selectStmt.aggResultColumns.clear();
             selectStmt.orderColumns.clear();
             selectStmt.groupByColumns.clear();
-
-            selectStmt.projectSchema = null;
 
             selectStmt.groupByExpressions = null;
 

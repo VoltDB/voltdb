@@ -55,6 +55,8 @@
 #include <string>
 #include <cassert>
 
+#include <iostream>
+
 namespace voltdb {
 
 
@@ -72,6 +74,8 @@ public:
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_left);
         NValue operand = m_left->eval(tuple1, tuple2);
+std::cout << "Op Not left: " << operand.debug() << ", isNUll=" << operand.isTrue() <<
+",  isTrue=" << operand.isTrue() << ", isFalse=" << operand.isFalse() << '\n';
         // NOT TRUE is FALSE
         if (operand.isTrue()) {
             return NValue::getFalse();
