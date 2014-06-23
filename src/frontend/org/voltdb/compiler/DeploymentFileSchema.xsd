@@ -84,13 +84,13 @@
     </xs:restriction>
   </xs:simpleType>
 
-    <xs:simpleType name="elasticPauseType">
+  <xs:simpleType name="elasticPauseType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
 
-      <xs:simpleType name="elasticThroughputType">
+  <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
