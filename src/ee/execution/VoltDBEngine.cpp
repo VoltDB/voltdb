@@ -1594,7 +1594,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         PersistentTable * originalTable = currentTable->currentPreTruncateTable();
 
         VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
-                tableStreamTypeToString(streamType));
+                tableStreamTypeToString(streamType).c_str());
 
         remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
@@ -1602,7 +1602,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
             // Reset all the previous table pointers to be NULL.
             currentTable->unsetPreTruncateTable();
             VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
-                    tableStreamTypeToString(streamType));
+                    tableStreamTypeToString(streamType).c_str());
         }
     }
     else {
