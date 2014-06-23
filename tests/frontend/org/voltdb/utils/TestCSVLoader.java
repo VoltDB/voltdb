@@ -733,7 +733,41 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
+    @Test
+    public void testTimestampStringRoundTrip() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "BLAH"
+        };
 
+        String []myData = {
+                "1,,,,,,,7777-12-25",
+                "2,,,,,,,7777-12-25 00:00:00",
+                "3,,,,,,,2000-02-03",
+                "4,,,,,,,2000-02-03 00:00:00.0",
+                "5,,,,,,,2100-04-05",
+                "6,,,,,,,2100-04-05 00:00:00.00",
+                "7,,,,,,,2012-12-31",
+                "8,,,,,,,2012-12-31 00:00:00.000",
+                "9,,,,,,,2001-10-25",
+                "10,,,,,,,2001-10-25 00:00:00.0000",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        while (ts_table.advanceRow()) {
+            TimestampType ts1 = ts_table.getTimestampAsTimestamp(7);
+            if (ts_table.advanceRow()) {
+                TimestampType ts2 = ts_table.getTimestampAsTimestamp(7);
+                assertEquals(ts1, ts2);
+                continue;
+            }
+        }
+
+    }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
