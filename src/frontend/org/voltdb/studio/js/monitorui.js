@@ -153,6 +153,12 @@ function InitializeChart(id, chart, metric)
 		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
 			break;
+		case 'tb':
+		    opt = {
+                        seriesDefaults: { renderer: jQuery.jqplot.PieRenderer, rendererOptions: { showDataLabels: true } },
+                        legend: { show: true, location: 'e' }
+		    };
+			break;
 	}
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
@@ -171,6 +177,7 @@ this.AddMonitor = function(tab)
 	var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
 	
 	var data = [];
+	var dataTB = [['Unknown', 100]];
     for(var i = 0;i<121;i++)
     	data[i] = [i,0];
 	
@@ -205,6 +212,7 @@ this.AddMonitor = function(tab)
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
+    , 'tbData': [dataTB]
     , 'latMax': 1
     , 'tpsMax': 1
     , 'memMax': 1
@@ -320,6 +328,7 @@ this.RefreshMonitor = function(id, Success)
 	var dataMem = memData[0];
 	var dataLat = latData[0];
 	var dataTPS = tpsData[0];
+	var dataTB = [];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
 	var Mem = 0;
 	// Compute the memory statistics
@@ -382,6 +391,7 @@ this.RefreshMonitor = function(id, Success)
 	for(var proc in procStats)
 	{
 		currentTimedTransactionCount += procStats[proc][1];
+		dataTB.push([procStats[proc][0], procStats[proc][2]]);
 	}
 	
 	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
@@ -477,6 +487,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.tpsData = [dataTPS];
 	monitor.memData = [dataMem];
 	monitor.strData = strData;
+	monitor.tbData = dataTB;
 
 	monitor.tickValues = tickValues;
 	// Update the monitor graphs
@@ -504,6 +515,10 @@ this.RefreshMonitor = function(id, Success)
             }
 			lmax = 100;
 			break;
+		case 'tb':
+                        monitor.leftPlot.series[0].data = dataTB;
+			left_opt = {};
+			break;
 	}
 	switch(monitor.rightMetric)
 	{
@@ -527,12 +542,24 @@ this.RefreshMonitor = function(id, Success)
             }
 			rmax = 100;
 			break;
+		case 'tb':
+                        monitor.rightPlot.series[0].data = dataTB;
+			right_opt = {};
+			break;
 	}
+
+	if (monitor.leftMetric != 'tb') {
+               left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+        }
+
+        if (monitor.rightMetric != 'tb') {
+               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
+        }
 
 	try
 	{
-		monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-		monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+		monitor.leftPlot.replot(left_opt);
+		monitor.rightPlot.replot(right_opt);
 	} catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);

@@ -348,12 +348,12 @@ public class MaterializedViewBenchmark {
             insertExecute = ret.execute;
         } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("group")) {
             DiffRetVals ret = diffWriter(updateGroupThroughput, (double)stats.getTxnThroughput(), updateGroupExecute,
-                                         execTimeInMicroSec, "Update Group Diff", stats, fw);
+                                         execTimeInMicroSec, "Update Grp Diff", stats, fw);
             updateGroupThroughput = ret.throughput;
             updateGroupExecute = ret.execute;
         } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("value")) {
             DiffRetVals ret = diffWriter(updateValueThroughput, (double)stats.getTxnThroughput(), updateValueExecute,
-                                         execTimeInMicroSec, "Update Aggregate Diff", stats, fw);
+                                         execTimeInMicroSec, "Update Sum Diff", stats, fw);
             updateValueThroughput = ret.throughput;
             updateValueExecute = ret.execute;
         } else {
@@ -472,7 +472,7 @@ public class MaterializedViewBenchmark {
             if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
                 printResults(procStr + "_group_id_update");
             } else {
-                printResults(procStr + "_group_id_update", fw, "Update Group " + csvStr + " MV");
+                printResults(procStr + "_group_id_update", fw, "Update Grp " + csvStr + " MV");
             }
             System.out.print(HORIZONTAL_RULE);
 
@@ -496,7 +496,7 @@ public class MaterializedViewBenchmark {
             if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
                 printResults(procStr + "_value_update");
             } else {
-                printResults(procStr + "_value_update", fw, "Update Aggregate " + csvStr + " MV");
+                printResults(procStr + "_value_update", fw, "Update Sum " + csvStr + " MV");
             }
             System.out.print(HORIZONTAL_RULE);
         }
