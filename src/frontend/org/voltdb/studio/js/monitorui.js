@@ -142,14 +142,11 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 		case 'str':
-			var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
-			var seriesStr = [];
-		    for(var j=0;j<siteCount;j++)
-		    	seriesStr.push({showMarker:false, yaxis:'y2axis', lineWidth: 2, shadow: false, label: (j+1)});
 		    opt = {
 		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%.2f"} } },
-		    	series: seriesStr,
 		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'},
+			series: [{label: "unknown"}],
+			seriesDefaults: {showMarker:false, yaxis:'y2axis', lineWidth: 2, shadow: false},
 		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
 			break;
@@ -173,7 +170,6 @@ this.ChangeChartMetric = function(id,chart,metric)
 this.AddMonitor = function(tab)
 {
 	var id = $(tab).attr('id');
-	var partitionCount = VoltDB.GetConnection(id.substr(2)).Metadata['partitionCount'];
 	var siteCount = VoltDB.GetConnection(id.substr(2)).Metadata['siteCount'];
 	
 	var data = [];
@@ -185,10 +181,6 @@ this.AddMonitor = function(tab)
     for(var i=0;i<121;i+=6)
     	tickValues.push(i);
     	
-	var dataStr = [];
-    for(var j=0;j<siteCount;j++)
-    	dataStr.push(data);
-    
     MonitorUI.Monitors[id] = { 'id': id
     , 'tab': tab
     , 'leftPlot': null //lplot
@@ -211,15 +203,16 @@ this.AddMonitor = function(tab)
     , 'latData': [data]
     , 'tpsData': [data]
     , 'memData': [data]
-    , 'strData': dataStr
+    , 'strData': [data]
     , 'tbData': [dataTB]
+    , 'strKeys': []
+    , 'emptyData': data
     , 'latMax': 1
     , 'tpsMax': 1
     , 'memMax': 1
     , 'strMax': 100
     , 'tickValues': tickValues
-    , 'partitionCount': partitionCount
-    , 'siteCount': siteCount
+    , 'siteCount': 0
     };
 
     InitializeChart(id, 'left', 'lat');
@@ -371,22 +364,7 @@ this.RefreshMonitor = function(id, Success)
 			data = [srcData[1], srcData[3], srcData[2], srcData[5], srcData[4], srcData[6]];
 		procStats[srcData[1]] = data;
 	}
-    // Compute memory usage 
-	table = monitor.starvStatsResponse.results[0].data;
-	var starvStats = {}
-	for(var j=0;j<table.length;j++)
-	{
-		var data = null;
-		if(table[j][3] in starvStats)
-		{
-			data = starvStats[table[j][3]];
-			data[0] = table[j][5];
-			data[1] += 1.0;
-		}
-		else
-			data = [table[j][5],1.0];
-		starvStats[table[j][3]] = data;
-	}
+    // Compute latency 
 	var currentTimedTransactionCount = 0.0;
 	for(var proc in procStats)
 	{
@@ -443,21 +421,36 @@ this.RefreshMonitor = function(id, Success)
 	
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
 	
-    var keys = [];
-	for(var k in starvStats)
-        keys.push(k);
-    keys.sort();
-
-    for(var k=0;k<keys.length;k++)
-    {
-		var dataStarv = strData[k];
-        if (dataStarv != null)
-        {
-		    dataStarv = dataStarv.slice(1);
-		    dataStarv.push([dataIdx,starvStats[keys[k]][0]/starvStats[keys[k]][1]]);
-		    strData[k] = dataStarv;
-        }
-    }
+	var keys = [];
+	var starvStats = {};
+	table = monitor.starvStatsResponse.results[0].data;
+	for(var j=0;j<table.length;j++)
+    	{
+		var key = table[j][2] + table[j][3];
+		keys.push(key);
+		starvStats[key] = table[j][5];
+    	}
+	keys.sort();
+	
+	var dataStr = [];
+	for(var j=0;j<table.length;j++)
+	{
+		var i = monitor.strKeys.indexOf(keys[j]);
+		if(i == -1) {
+			var dataStarv = monitor.emptyData;
+			dataStarv = dataStarv.slice(1);
+			dataStarv.push([dataIdx,starvStats[keys[j]]]);
+			dataStr.push(dataStarv);
+		}
+		else {
+			var dataStarv = strData[i];
+			dataStarv = dataStarv.slice(1);
+			dataStarv.push([dataIdx,starvStats[keys[j]]]);
+			dataStr.push(dataStarv);
+		}
+	}
+	monitor.strKeys = keys;
+	strData = dataStr;
 
 	var lymax = 0.25;
 	var rymax = 0.05;
@@ -508,16 +501,21 @@ this.RefreshMonitor = function(id, Success)
 			lmax = lymax;
 			break;
 		case 'str':
-			for(var k=0;k<strData.length;k++)
-            {
-				monitor.leftPlot.series[k].data = strData[k];
-				monitor.leftPlot.series[k].label = keys[k];
-            }
+			for(var k=0;k<monitor.siteCount;k++)
+            		{
+				if(k < strData.length) {
+					monitor.leftPlot.series[k].data = strData[k];
+					monitor.leftPlot.series[k].label = keys[k];
+					monitor.leftPlot.series[k].show = true;
+				}
+				else {
+					monitor.leftPlot.series[k].show = false;
+				}
+            		}
 			lmax = 100;
 			break;
 		case 'tb':
                         monitor.leftPlot.series[0].data = dataTB;
-			left_opt = {};
 			break;
 	}
 	switch(monitor.rightMetric)
@@ -535,26 +533,38 @@ this.RefreshMonitor = function(id, Success)
 			rmax = lymax;
 			break;
 		case 'str':
-			for(var k=0;k<strData.length;k++)
-            {
-				monitor.rightPlot.series[k].data = strData[k];
-				monitor.rightPlot.series[k].label = keys[k];
-            }
+			for(var k=0;k<monitor.siteCount;k++)
+            		{
+				if(k < strData.length) {
+					monitor.rightPlot.series[k].data = strData[k];
+					monitor.rightPlot.series[k].label = keys[k];
+					monitor.rightPlot.series[k].show = true;
+				}
+				else {
+					monitor.rightPlot.series[k].show = false;
+				}
+            		}
 			rmax = 100;
 			break;
 		case 'tb':
                         monitor.rightPlot.series[0].data = dataTB;
-			right_opt = {};
 			break;
 	}
+	monitor.siteCount = strData.length;
 
 	if (monitor.leftMetric != 'tb') {
-               left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+               var left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
         }
+	else {
+               var left_opt = {};
+	}
 
         if (monitor.rightMetric != 'tb') {
-               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
+               var right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
         }
+	else {
+               var right_opt = {};
+	}
 
 	try
 	{
