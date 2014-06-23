@@ -59,6 +59,21 @@ public class TestFragmentProgressUpdate extends TestCase {
         testFragmentProgressUpdate(m_ee);
     }
 
+    public void testJNIFragmentProgressUpdate2() throws Exception {
+        m_ee = new ExecutionEngineJNI(
+                CLUSTER_ID,
+                NODE_ID,
+                0,
+                0,
+                "",
+                100,
+                new HashinatorConfig(HashinatorType.LEGACY,
+                                     LegacyHashinator.getConfigureBytes(1),
+                                     0,
+                                     0));
+        testTwoUpdates(m_ee);
+    }
+
     /*public void testIPCFragmentProgressUpdate() throws Exception {
         m_ee = new ExecutionEngineIPC(
                 CLUSTER_ID,
@@ -134,8 +149,139 @@ public class TestFragmentProgressUpdate extends TestCase {
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
-        assertEquals(524288, m_ee.m_currMemoryInBytes);
-        assertEquals(524288, m_ee.m_peakMemoryInBytes);
+        assertTrue(450000 < m_ee.m_currMemoryInBytes);
+        assertTrue(550000 > m_ee.m_currMemoryInBytes);
+        assertTrue(450000 < m_ee.m_peakMemoryInBytes);
+        assertTrue(550000 > m_ee.m_peakMemoryInBytes);
+        assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
+    }
+
+    void testTwoUpdates(ExecutionEngine ee) throws Exception {
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        Catalog catalog = builder.createTPCCSchemaCatalog();
+        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
+                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+
+        m_ee.loadCatalog( 0, catalog.serialize());
+
+        int tableSize = 10000;
+        int longOpThreshold = 10000;
+        VoltTable warehousedata = new VoltTable(
+                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
+                );
+        for (int i = 0; i < tableSize; ++i) {
+            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
+        }
+
+        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
+        Procedure selectProc = procedures.getIgnoreCase("SelectAll");
+        Statement selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
+        PlanFragment selectBottomFrag = null;
+
+        // delete 5000 records
+        // I have no idea what's going on here, and just copy code from the above methods
+        int i = 0;
+        // this kinda assumes the right order
+        for (PlanFragment f : selectStmt.getFragments()) {
+            if (i != 0) selectBottomFrag = f;
+            i++;
+        }
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+        ParameterSet params = ParameterSet.emptyParameterSet();
+
+        m_ee.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, 42, Long.MAX_VALUE);
+
+        // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
+        // one for locating the row and one for retrieving it.
+        assertEquals(2, m_ee.m_callsFromEE);
+        assertEquals(longOpThreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertTrue(900000 < m_ee.m_currMemoryInBytes);
+        assertTrue(1100000 > m_ee.m_currMemoryInBytes);
+        assertTrue(900000 < m_ee.m_peakMemoryInBytes);
+        assertTrue(1100000 > m_ee.m_peakMemoryInBytes);
+        assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
+        long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
+        long previousPeakMemory = m_ee.m_peakMemoryInBytes;
+
+        selectProc = procedures.getIgnoreCase("DeleteRows");
+        assertNotNull(selectProc);
+        selectStmt = selectProc.getStatements().getIgnoreCase("warehouse_half");
+        selectBottomFrag = null;
+
+        i = 0;
+        // this kinda assumes the right order
+        for (PlanFragment f : selectStmt.getFragments()) {
+            if (i != 0) selectBottomFrag = f;
+            i++;
+        }
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+        params = ParameterSet.emptyParameterSet();
+        m_ee.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, 42, Long.MAX_VALUE);
+
+        selectProc = procedures.getIgnoreCase("SelectAll");
+        selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
+        selectBottomFrag = null;
+
+        i = 0;
+        // this kinda assumes the right order
+        for (PlanFragment f : selectStmt.getFragments()) {
+            if (i != 0) selectBottomFrag = f;
+            i++;
+        }
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+        params = ParameterSet.emptyParameterSet();
+        m_ee.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, 42, Long.MAX_VALUE);
+        assertTrue(m_ee.m_callsFromEE > 2);
+        // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
+        assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
+        assertTrue(450000 < m_ee.m_currMemoryInBytes);
+        assertTrue(550000 > m_ee.m_currMemoryInBytes);
+        assertTrue(450000 < m_ee.m_peakMemoryInBytes);
+        assertTrue(550000 > m_ee.m_peakMemoryInBytes);
+        assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
+        // Although it is true, but I don't think we should compare the memory usage here.
+        //assertTrue(m_ee.m_currMemoryInBytes < previousMemoryInBytes);
+        assertTrue(m_ee.m_peakMemoryInBytes < previousPeakMemory);
     }
 
     private ExecutionEngine m_ee;

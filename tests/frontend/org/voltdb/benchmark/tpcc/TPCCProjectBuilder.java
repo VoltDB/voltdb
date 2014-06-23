@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.benchmark.tpcc.procedures.DeleteRows;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouse;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouseReplicated;
 import org.voltdb.benchmark.tpcc.procedures.ResetWarehouse;
@@ -64,7 +65,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         ostatByCustomerName.class, paymentByCustomerIdC.class,
         paymentByCustomerNameC.class, paymentByCustomerIdW.class,
         paymentByCustomerNameW.class, slev.class, SelectAll.class,
-        ResetWarehouse.class, LoadWarehouse.class,
+        ResetWarehouse.class, LoadWarehouse.class, DeleteRows.class,
         LoadWarehouseReplicated.class,
         paymentByCustomerName.class, paymentByCustomerId.class
     };
