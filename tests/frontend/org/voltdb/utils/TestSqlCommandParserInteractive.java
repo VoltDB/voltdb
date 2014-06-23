@@ -351,6 +351,15 @@ public class TestSqlCommandParserInteractive extends TestCase {
         System.out.println("RESULT: " + result.get());
         assertEquals(1, result.get().size());
         assertEquals(create, result.get().get(0));
+
+        // test with role
+        result = cmd.openQuery();
+        create = "create procedure foo allow default,adhoc as select foo, bar from (select goat, chicken from hats) bats where bats.wings > 1";
+        cmd.submitText(create + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(create, result.get().get(0));
     }
 
     public void testSubQuery() throws Exception
