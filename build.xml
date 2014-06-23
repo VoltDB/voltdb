@@ -112,6 +112,11 @@
     <not><isset property="volt.client.memory"/></not>
 </condition>
 
+<!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<condition property="verifycatalogdebug" value="true">
+    <not><isset property="verifycatalogdebug"/></not>
+</condition>
+
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
