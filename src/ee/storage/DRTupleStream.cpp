@@ -95,11 +95,12 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeByte(DR_VERSION);
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
-    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
+
+    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // the nullarray lives in rowheader after the 4 byte header length prefix
     uint8_t *nullArray =
