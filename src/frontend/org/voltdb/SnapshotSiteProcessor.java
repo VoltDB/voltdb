@@ -416,6 +416,12 @@ public class SnapshotSiteProcessor {
      */
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        //Basically asserts that there are no tasks with null targets at this point
+        //getTarget checks and crashes
+        for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
+            t.getTarget();
+        }
+
         ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
