@@ -23,6 +23,9 @@
 
 package org.voltdb.utils;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -47,9 +50,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class TestCSVLoader {
 
@@ -732,6 +732,8 @@ public class TestCSVLoader {
         int validLineCnt = 1;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
     }
+
+
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
