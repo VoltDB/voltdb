@@ -94,6 +94,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
@@ -321,6 +322,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     LicenseApi m_licenseApi;
     @SuppressWarnings("unused")
     private LatencyStats m_latencyStats;
+
+    private LatencyHistogramStats m_latencyHistogramStats;
 
     @Override
     public LicenseApi getLicenseApi() {
@@ -656,6 +659,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
+            m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
+                    0, m_latencyHistogramStats);
+
 
             BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
             getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
@@ -1862,6 +1870,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_catalogContext = null;
                 m_initiatorStats = null;
                 m_latencyStats = null;
+                m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearVersionCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
