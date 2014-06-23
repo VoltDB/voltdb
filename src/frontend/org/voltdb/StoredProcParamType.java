@@ -346,6 +346,36 @@ public enum StoredProcParamType {
         return rslt;
     }
 
+    static public StoredProcParamType typeFromVoltType(VoltType type, boolean isVector) {
+        if (isVector) {
+            switch (type) {
+                case SMALLINT:
+                    return SMALLINT_VECTOR;
+                case INTEGER:
+                    return INTEGER_VECTOR;
+                case BIGINT:
+                    return BIGINT_VECTOR;
+                case FLOAT:
+                    return FLOAT_VECTOR;
+                case TIMESTAMP:
+                    return VOLTTIMESTAMP_VECTOR;
+                case STRING:
+                    return STRING_VECTOR;
+                case VOLTTABLE:
+                    return VOLTTABLE_VECTOR;
+                case DECIMAL:
+                    return DECIMAL_VECTOR;
+                case VARBINARY:
+                    return VARBINARY_VECTOR;
+                default:
+                    return INVALID;
+            }
+        }
+        else {
+            return type.getProcParamType();
+        }
+    }
+
     public Class<?> classFromType() {
         return m_baseClass;
     }

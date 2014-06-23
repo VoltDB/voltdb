@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 
 
@@ -128,8 +129,8 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_invocation.getParams().toArray().length;
     }
 
-    public Object[] getParameters() {
-        return m_invocation.getParams().toArray();
+    public ParameterSet getParameters() {
+        return m_invocation.getParams();
     }
 
     public long getLastSafeTxnId() {

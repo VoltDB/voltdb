@@ -173,8 +173,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Long.parseLong(System.getProperty("MAX_REJOIN_BEHIND_DURATION", "10000"));
     private long m_lastTimeMadeProgress = 0;
     private long m_remainingTasks = 0;
-    private long m_executedTaskCount = 0;
-    private long m_loggedTaskCount = 0;
+    private final long m_executedTaskCount = 0;
+    private final long m_loggedTaskCount = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -1160,7 +1160,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
         else {
             try {
-                Object[] callerParams = null;
+                ParameterSet callerParams = null;
                 /*
                  * Parameters are lazily deserialized. We may not find out until now
                  * that the parameter set is corrupt
@@ -1183,7 +1183,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
                     // call the proc
                     runner.setupTransaction(txnState);
-                    cr = runner.call(itask.getParameters());
+                    cr = runner.call(callerParams);
                     txnState.setHash(cr.getHash());
                     response.setResults(cr);
 

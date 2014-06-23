@@ -17,7 +17,6 @@
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
@@ -38,16 +37,16 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
             return null;
         }
 
-        ParameterSet params = invocation.getParams();
+        Object[] params = invocation.getParams().toArray();
         // Make sure there is at least 1 parameter!  ENG-4921
-        if (params.toArray().length < 1) {
+        if (params.length < 1) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Adhoc system procedure requires at least the query parameter.",
                     invocation.clientHandle);
         }
 
         // check the types are both strings
-        if ((params.toArray()[0] instanceof String) == false) {
+        if ((params[0] instanceof String) == false) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0],
                     "Adhoc system procedure requires the query parameter to be of String type.",

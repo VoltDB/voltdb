@@ -240,7 +240,7 @@ public class ProcedureRunner {
     }
 
     @SuppressWarnings("finally")
-    public ClientResponseImpl call(Object... paramListIn) {
+    public ClientResponseImpl call(ParameterSet paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
@@ -258,7 +258,7 @@ public class ProcedureRunner {
         m_site.setProcedureName(m_procedureName);
 
         // use local var to avoid warnings about reassigning method argument
-        Object[] paramList = paramListIn;
+        Object[] paramList = paramListIn.toArray();
 
         ClientResponseImpl retval = null;
         // assert no sql is queued

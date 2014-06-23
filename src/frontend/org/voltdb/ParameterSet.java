@@ -42,12 +42,15 @@ public class ParameterSet implements JSONString {
     static final byte ARRAY = -99;
 
     static class OneParamInfo {
+        StoredProcParamType paramType;
         Object value;
         byte[] encodedString;
         byte[][] encodedStringArray;
     }
 
     private final Object m_params[];
+
+    private final StoredProcParamType m_paramTypes[];
 
     /*
      * The same ParameterSet instance could be accessed by multiple threads to
@@ -71,6 +74,7 @@ public class ParameterSet implements JSONString {
     }
 
     public static ParameterSet fromArrayNoCopy(Object... params) {
+        StoredProcParamType[] paramTypes = new StoredProcParamType[params.length];
         byte[][][] encodedStringArrays = new byte[params.length][][];
         byte[][] encodedStrings = new byte[params.length][];
 
@@ -89,6 +93,7 @@ public class ParameterSet implements JSONString {
                 if (obj instanceof byte[]) {
                     final byte[] b = (byte[]) obj;
                     size += 4 + b.length;
+                    paramTypes[ii] = StoredProcParamType.VARBINARY;
                     continue;
                 }
 
@@ -106,15 +111,19 @@ public class ParameterSet implements JSONString {
                 switch (type) {
                     case SMALLINT:
                         size += 2 * ((short[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.SMALLINT_VECTOR;
                         break;
                     case INTEGER:
                         size += 4 * ((int[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.INTEGER_VECTOR;
                         break;
                     case BIGINT:
                         size += 8 * ((long[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.BIGINT_VECTOR;
                         break;
                     case FLOAT:
                         size += 8 * ((double[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.FLOAT_VECTOR;
                         break;
                     case STRING:
                         String strings[] = (String[]) obj;
@@ -128,17 +137,21 @@ public class ParameterSet implements JSONString {
                             }
                         }
                         encodedStringArrays[ii] = arrayEncodedStrings;
+                        paramTypes[ii] = StoredProcParamType.STRING_VECTOR;
                         break;
                     case TIMESTAMP:
                         size += 8 * ((TimestampType[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.VOLTTIMESTAMP_VECTOR;
                         break;
                     case DECIMAL:
                         size += 16 * ((BigDecimal[])obj).length;
+                        paramTypes[ii] = StoredProcParamType.DECIMAL_VECTOR;
                         break;
                     case VOLTTABLE:
                         for (VoltTable vt : (VoltTable[]) obj) {
                             size += vt.getSerializedSize();
                         }
+                        paramTypes[ii] = StoredProcParamType.VOLTTABLE_VECTOR;
                         break;
                     case VARBINARY:
                         for (byte[] buf : (byte[][]) obj) {
@@ -147,6 +160,7 @@ public class ParameterSet implements JSONString {
                                 size += buf.length;
                             }
                         }
+                        paramTypes[ii] = StoredProcParamType.VARBINARY_VECTOR;
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
@@ -157,14 +171,17 @@ public class ParameterSet implements JSONString {
             // Handle NULL mappings not encoded by type.min_value convention
             if (obj == VoltType.NULL_TIMESTAMP) {
                 size += 8;
+                paramTypes[ii] = StoredProcParamType.VOLTTIMESTAMP;
                 continue;
             }
             else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
                 size += 4;
+                paramTypes[ii] = StoredProcParamType.STRING;
                 continue;
             }
             else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
+                paramTypes[ii] = StoredProcParamType.DECIMAL;
                 continue;
             }
 
@@ -172,39 +189,48 @@ public class ParameterSet implements JSONString {
             switch (type) {
                 case TINYINT:
                     size++;
+                    paramTypes[ii] = StoredProcParamType.TINYINT;
                     break;
                 case SMALLINT:
                     size += 2;
+                    paramTypes[ii] = StoredProcParamType.SMALLINT;
                     break;
                 case INTEGER:
                     size += 4;
+                    paramTypes[ii] = StoredProcParamType.INTEGER;
                     break;
                 case BIGINT:
                     size += 8;
+                    paramTypes[ii] = StoredProcParamType.BIGINT;
                     break;
                 case FLOAT:
                     size += 8;
+                    paramTypes[ii] = StoredProcParamType.FLOAT;
                     break;
                 case STRING:
                     byte encodedString[] = ((String)obj).getBytes(Constants.UTF8ENCODING);
                     size += 4 + encodedString.length;
                     encodedStrings[ii] = encodedString;
+                    paramTypes[ii] = StoredProcParamType.STRING;
                     break;
                 case TIMESTAMP:
                     size += 8;
+                    paramTypes[ii] = StoredProcParamType.VOLTTIMESTAMP;
                     break;
                 case DECIMAL:
                     size += 16;
+                    paramTypes[ii] = StoredProcParamType.DECIMAL;
                     break;
                 case VOLTTABLE:
                     size += ((VoltTable) obj).getSerializedSize();
+                    paramTypes[ii] = StoredProcParamType.VOLTTABLE;
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
             }
         }
 
-        return new ParameterSet(params, size, encodedStrings, encodedStringArrays);
+        return new ParameterSet(params, paramTypes, size, encodedStrings, encodedStringArrays);
     }
 
     public static ParameterSet fromJSONString(String json) throws JSONException, IOException {
@@ -225,12 +251,15 @@ public class ParameterSet implements JSONString {
 
         short count = buffer.getShort();
         Object[] params = new Object[count];
+        StoredProcParamType[] paramTypes = new StoredProcParamType[count];
         byte[][] encodedStrings = null;
         byte[][][] encodedStringArrays = null;
 
         for (int i = 0; i < count; ++i) {
             OneParamInfo opi = readOneParameter(buffer);
             params[i] = opi.value;
+            paramTypes[i] = opi.paramType;
+
             if (opi.encodedString != null) {
                 if (encodedStrings == null) {
                     encodedStrings = new byte[count][];
@@ -247,11 +276,13 @@ public class ParameterSet implements JSONString {
 
         int size = buffer.position() - startPos;
 
-        return new ParameterSet(params, size, encodedStrings, encodedStringArrays);
+        return new ParameterSet(params, paramTypes, size, encodedStrings, encodedStringArrays);
     }
 
-    private ParameterSet(Object[] params, int serializedSize, byte[][] encodedStrings, byte[][][] encodedStringArrays) {
+    private ParameterSet(Object[] params, StoredProcParamType[] paramTypes, int serializedSize,
+            byte[][] encodedStrings, byte[][][] encodedStringArrays) {
         m_params = params;
+        m_paramTypes = paramTypes;
         m_serializedSize = serializedSize;
         m_encodedStrings = encodedStrings;
         m_encodedStringArrays = encodedStringArrays;
@@ -268,6 +299,10 @@ public class ParameterSet implements JSONString {
 
     public Object getParam(int index) {
         return m_params[index];
+    }
+
+    public StoredProcParamType getParamType(int index) {
+        return m_paramTypes[index];
     }
 
     /**
@@ -459,6 +494,7 @@ public class ParameterSet implements JSONString {
     static private OneParamInfo readOneParameter(ByteBuffer in)
             throws IOException {
         Object value;
+        StoredProcParamType paramType;
         int len;
         byte[] encodedString = null;
         byte[][] encodedStringArray = null;
@@ -474,6 +510,7 @@ public class ParameterSet implements JSONString {
             }
             if (nextType == null) {
                 value = null;
+                paramType = null;
             }
             else if (nextType == VoltType.STRING) {
                 encodedStringArray = (byte[][]) SerializationHelper.readArray(byte[].class, in);
@@ -487,9 +524,11 @@ public class ParameterSet implements JSONString {
                     }
                 }
                 value = sval;
+                paramType = StoredProcParamType.STRING_VECTOR;
             }
             else {
                 value = SerializationHelper.readArray(nextType.classFromType(), in);
+                paramType = StoredProcParamType.typeFromVoltType(nextType, true);
             }
         }
         else {
@@ -502,21 +541,27 @@ public class ParameterSet implements JSONString {
             switch (nextType) {
                 case NULL:
                     value = null;
+                    paramType = null;
                     break;
                 case TINYINT:
                     value = in.get();
+                    paramType = StoredProcParamType.TINYINT;
                     break;
                 case SMALLINT:
                     value = in.getShort();
+                    paramType = StoredProcParamType.SMALLINT;
                     break;
                 case INTEGER:
                     value = in.getInt();
+                    paramType = StoredProcParamType.INTEGER;
                     break;
                 case BIGINT:
                     value = in.getLong();
+                    paramType = StoredProcParamType.BIGINT;
                     break;
                 case FLOAT:
                     value = in.getDouble();
+                    paramType = StoredProcParamType.FLOAT;
                     break;
                 case STRING:
                     len = in.getInt();
@@ -528,6 +573,7 @@ public class ParameterSet implements JSONString {
                         in.get(encodedString);
                         value = new String(encodedString, Constants.UTF8ENCODING);
                     }
+                    paramType = StoredProcParamType.STRING;
                     break;
                 case VARBINARY:
                     len = in.getInt();
@@ -539,16 +585,19 @@ public class ParameterSet implements JSONString {
                         in.get(encodedString);
                         value = encodedString;
                     }
+                    paramType = StoredProcParamType.VARBINARY;
                     break;
                 case TIMESTAMP:
                     final long micros = in.getLong();
                     value = new TimestampType(micros);
+                    paramType = StoredProcParamType.VOLTTIMESTAMP;
                     break;
                 case VOLTTABLE:
                     final int tableSize = in.getInt();
                     byte[] tableBytes = new byte[tableSize];
                     in.get(tableBytes);
                     value = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(tableBytes), false);
+                    paramType = StoredProcParamType.VOLTTABLE;
                     break;
                 case DECIMAL: {
                     BigDecimal decimal_val = SerializationHelper.getBigDecimal(in);
@@ -558,6 +607,7 @@ public class ParameterSet implements JSONString {
                     else {
                         value = decimal_val;
                     }
+                    paramType = StoredProcParamType.DECIMAL;
                     break;
                 }
                 default:
@@ -567,6 +617,7 @@ public class ParameterSet implements JSONString {
 
         OneParamInfo retval = new OneParamInfo();
         retval.value = value;
+        retval.paramType = paramType;
         retval.encodedString = encodedString;
         retval.encodedStringArray = encodedStringArray;
         return retval;

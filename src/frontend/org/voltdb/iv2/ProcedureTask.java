@@ -27,6 +27,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
+import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
@@ -65,7 +66,7 @@ abstract public class ProcedureTask extends TransactionTask
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
 
         try {
-            Object[] callerParams = null;
+            ParameterSet callerParams = null;
             /*
              * Parameters are lazily deserialized. We may not find out until now
              * that the parameter set is corrupt

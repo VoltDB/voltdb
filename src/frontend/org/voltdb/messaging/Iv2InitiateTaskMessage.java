@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -125,8 +126,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_invocation.getParams().size();
     }
 
-    public Object[] getParameters() {
-        return m_invocation.getParams().toArray();
+    public ParameterSet getParameters() {
+        return m_invocation.getParams();
     }
 
     public long getClientInterfaceHandle() {

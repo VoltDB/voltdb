@@ -422,7 +422,7 @@ public class TestVoltProcedure extends TestCase {
         assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
             runner.setupTransaction(null);
-            runner.call(params.toArray());
+            runner.call(params);
             statsRow = agent.m_source.getStatsRows(false, 0L);
             assertEquals(statsRow[0][6], new Long(ii));
         }
@@ -453,7 +453,8 @@ public class TestVoltProcedure extends TestCase {
                 site.m_context.database.getProcedures().get(procedure.getName()), null);
 
         runner.setupTransaction(null);
-        return runner.call(args);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(args);
+        return runner.call(params);
     }
 
     private class MockExecutionSite extends ExecutionSite {

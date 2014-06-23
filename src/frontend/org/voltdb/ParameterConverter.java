@@ -1052,7 +1052,7 @@ public class ParameterConverter {
         return expectedType.convertToParamType(param, inputClz);
     }
 
-    public static Object ryToMakeCompatible(final Class<?> expectedClz, final Object param)
+    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
             throws VoltTypeException
     {
         // uncomment for debugging

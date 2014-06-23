@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -51,6 +49,9 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 public class MpScheduler extends Scheduler
 {
@@ -328,7 +329,7 @@ public class MpScheduler extends Scheduler
     {
         return msg.getStoredProcedureName().startsWith("@") &&
                 msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
-                (byte) msg.getParameters()[1] != 1; // clearIndex is MP, normal rebalance is NP
+                (byte) msg.getParameters().getParam(1) != 1; // clearIndex is MP, normal rebalance is NP
     }
 
     /**
@@ -337,7 +338,7 @@ public class MpScheduler extends Scheduler
     private Set<Integer> getBalancePartitions(Iv2InitiateTaskMessage msg)
     {
         try {
-            JSONObject jsObj = new JSONObject((String) msg.getParameters()[0]);
+            JSONObject jsObj = new JSONObject((String) msg.getParameters().getParam(0));
             BalancePartitionsRequest request = new BalancePartitionsRequest(jsObj);
 
             return Sets.newHashSet(request.partitionPairs.get(0).srcPartition,
