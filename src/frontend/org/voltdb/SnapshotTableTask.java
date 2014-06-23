@@ -47,10 +47,16 @@ public class SnapshotTableTask
 
     public void setTarget(SnapshotDataTarget target)
     {
+        if (target == null) {
+            VoltDB.crashLocalVoltDB("Attempted to set null target on snapshot table task");
+        }
         m_target = target;
     }
     public SnapshotDataTarget getTarget()
     {
+        if (m_target == null) {
+            VoltDB.crashLocalVoltDB("Attempted to operate on snapshot table task with a null target");
+        }
         return m_target;
     }
 

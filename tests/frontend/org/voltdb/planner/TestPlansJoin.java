@@ -158,8 +158,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        if (p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL) {
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
+        }
         assertNull(((AbstractScanPlanNode)n.getChild(0)).getPredicate());
         assertNull(((AbstractScanPlanNode)n.getChild(1)).getPredicate());
 
@@ -179,8 +184,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        if (ExpressionType.COMPARE_EQUAL == p.getLeft().getExpressionType()) {
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
+        }
         assertNull(((AbstractScanPlanNode)n.getChild(0)).getPredicate());
         assertNull(((AbstractScanPlanNode)n.getChild(1)).getPredicate());
 
@@ -763,7 +773,11 @@ public class TestPlansJoin extends PlannerTestCase {
         nl = (NestLoopPlanNode) n;
         p = nl.getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.CONJUNCTION_OR, p.getLeft().getExpressionType());
+        if (ExpressionType.CONJUNCTION_OR == p.getLeft().getExpressionType()) {
+            assertEquals(ExpressionType.CONJUNCTION_OR, p.getLeft().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.CONJUNCTION_OR, p.getRight().getExpressionType());
+        }
         assertNull(nl.getWherePredicate());
         assertEquals(2, nl.getChildCount());
         c0 = (SeqScanPlanNode) nl.getChild(0);

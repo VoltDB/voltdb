@@ -558,9 +558,19 @@ public class AsyncExportClient
         boolean passed = false;
 
         VoltTable stats = null;
-        System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        try {
+            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        } catch (Exception ex) {
+        }
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            try {
+                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            } catch (Exception ex) {
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");

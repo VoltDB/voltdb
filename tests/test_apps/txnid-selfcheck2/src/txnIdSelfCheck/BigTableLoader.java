@@ -75,6 +75,7 @@ public class BigTableLoader extends Thread {
     }
 
     long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
+        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
         VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
         return t.asScalarLong();
     }
