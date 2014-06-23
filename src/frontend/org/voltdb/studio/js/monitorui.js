@@ -395,7 +395,6 @@ this.RefreshMonitor = function(id, Success)
 	// Update the monitor graphs
 	var lmax = 1;
 	var rmax = 1;
-	var left_opt = right_opt = {};
 	switch(monitor.leftMetric)
 	{
 		case 'lat':
@@ -463,12 +462,18 @@ this.RefreshMonitor = function(id, Success)
 	monitor.siteCount = strData.length;
 
 	if (monitor.leftMetric != 'tb') {
-               left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+               var left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
         }
+	else {
+               var left_opt = {};
+	}
 
         if (monitor.rightMetric != 'tb') {
-               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
+               var right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
         }
+	else {
+               var right_opt = {};
+	}
 
 	try
 	{
