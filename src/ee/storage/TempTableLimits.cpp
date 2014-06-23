@@ -43,15 +43,21 @@ void TempTableLimits::increaseAllocated(int bytes)
                  limit_mb);
         throw SQLException(SQLException::volt_temp_table_memory_overflow, msg);
     }
-    if (!m_logLatch && m_logThreshold > 0 && m_currMemoryInBytes > m_logThreshold) {
-        m_logLatch = true;
-        int thresh_mb = static_cast<int>(m_logThreshold / (1024 * 1024));
-        char msg[1024];
-        snprintf(msg, sizeof(msg), "More than %d MB of temp table memory used while executing SQL."
-                 " This may indicate an operation that should be broken into smaller chunks.",
-                 thresh_mb);
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+
+    if (m_currMemoryInBytes > m_peakMemoryInBytes) {
+        m_peakMemoryInBytes = m_currMemoryInBytes;
     }
+
+    if ( m_logLatch || m_logThreshold <= 0 || m_currMemoryInBytes <= m_logThreshold) {
+        return;
+    }
+
+    m_logLatch = true;
+    int thresh_mb = static_cast<int>(m_logThreshold / (1024 * 1024));
+    char msg[1024];
+    snprintf(msg, sizeof(msg), "More than %d MB of temp table memory used while executing SQL."
+             " This may indicate an operation that should be broken into smaller chunks.", thresh_mb);
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
 }
 
 } // namespace voltdb

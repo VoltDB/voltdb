@@ -30,6 +30,7 @@ class TempTableLimits {
 public:
     TempTableLimits(int64_t memoryLimit = 1024 * 1024 * 100, int64_t logThreshold = -1)
         : m_currMemoryInBytes(0)
+        , m_peakMemoryInBytes(0)
         , m_logThreshold(logThreshold)
         , m_memoryLimit(memoryLimit)
         , m_logLatch(false)
@@ -44,10 +45,15 @@ public:
     void reduceAllocated(int bytes);
 
     int64_t getAllocated() const { return m_currMemoryInBytes; }
+    int64_t getPeakMemoryInBytes() const { return m_peakMemoryInBytes; }
+    void resetPeakMemory() { m_peakMemoryInBytes = m_currMemoryInBytes; }
 
 private:
     /// The current amount of memory used by temp tables for this plan fragment.
     int64_t m_currMemoryInBytes;
+    /// The high water amount of memory used by temp tables
+    /// during the current execution of this plan fragment.
+    int64_t m_peakMemoryInBytes;
     /// The memory allocation at which a log message will be generated.
     /// A negative value disables this behavior.
     const int64_t m_logThreshold;
@@ -60,6 +66,5 @@ private:
 };
 
 } // namespace voltdb
-
 
 #endif // _EE_STORAGE_TEMPTABLELIMITS_H_

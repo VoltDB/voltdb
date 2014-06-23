@@ -97,7 +97,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJ)J");
+    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJJJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_fragmentProgressUpdateMID != 0);
@@ -225,7 +225,9 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
                 std::string planNodeName,
                 std::string targetTableName,
                 int64_t targetTableSize,
-                int64_t tuplesProcessed) {
+                int64_t tuplesProcessed,
+                int64_t currMemoryInBytes,
+                int64_t peakMemoryInBytes) {
         JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
         if (jni_frame.checkResult() < 0) {
                 VOLT_ERROR("Unable to load dependency: jni frame error.");
@@ -244,10 +246,10 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
         }
 
     jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
-                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed);
+                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed,
+                currMemoryInBytes, peakMemoryInBytes);
     return (int64_t)nextStep;
 }
-
 
 std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);

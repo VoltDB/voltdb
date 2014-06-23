@@ -463,9 +463,12 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
         // set this back to -1 for error handling
         m_currentInputDepId = -1;
+        m_currExecutorVec = NULL;
+
         return ENGINE_ERRORCODE_ERROR;
     }
     assert(execsForFrag);
+    m_currExecutorVec = execsForFrag;
 
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
@@ -542,6 +545,10 @@ void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
     }
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
+    m_currExecutorVec = NULL;
+    if (execsForFrag != NULL) {
+        execsForFrag->limits.resetPeakMemory();
+    }
 }
 
 // -------------------------------------------------
@@ -1577,7 +1584,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         PersistentTable * originalTable = currentTable->currentPreTruncateTable();
 
         VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
-                tableStreamTypeToString(streamType));
+                tableStreamTypeToString(streamType).c_str());
 
         remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
@@ -1585,7 +1592,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
             // Reset all the previous table pointers to be NULL.
             currentTable->unsetPreTruncateTable();
             VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
-                    tableStreamTypeToString(streamType));
+                    tableStreamTypeToString(streamType).c_str());
         }
     }
     else {
@@ -1747,6 +1754,9 @@ static std::string dummy_last_accessed_plan_node_name("no plan node in progress"
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
+
+    assert(m_currExecutorVec);
+
     if (m_lastAccessedTable == NULL) {
         tableName = "None";
         tableSize = 0;
@@ -1763,7 +1773,9 @@ void VoltDBEngine::reportProgessToTopend() {
                                         planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
+                                        m_currExecutorVec->limits.getAllocated(),
+                                        m_currExecutorVec->limits.getPeakMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
     if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");

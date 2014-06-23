@@ -527,6 +527,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int32_t m_compactionThreshold;
 
+        /** current ExecutorVector **/
+        ExecutorVector *m_currExecutorVec;
+
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;

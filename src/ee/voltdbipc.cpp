@@ -771,14 +771,18 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string targetTableName,
         int64_t targetTableSize,
-        int64_t tuplesProcessed) {
+        int64_t tuplesProcessed,
+        int64_t currMemoryInBytes,
+        int64_t peakMemoryInBytes) {
     char message[sizeof(int8_t) +
                  sizeof(int16_t) +
                  planNodeName.size() +
                  sizeof(int16_t) +
                  targetTableName.size() +
                  sizeof(targetTableSize) +
-                 sizeof(tuplesProcessed)];
+                 sizeof(tuplesProcessed) +
+                 sizeof(currMemoryInBytes) +
+                 sizeof(peakMemoryInBytes)];
     message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
     size_t offset = 1;
 
@@ -801,6 +805,12 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     offset += sizeof(targetTableSize);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+    offset += sizeof(tuplesProcessed);
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(currMemoryInBytes);
+    offset += sizeof(tuplesProcessed);
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(peakMemoryInBytes);
     offset += sizeof(tuplesProcessed);
 
     int32_t length;

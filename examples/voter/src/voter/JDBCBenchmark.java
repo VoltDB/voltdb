@@ -80,6 +80,7 @@ public class JDBCBenchmark {
     ClientStatsContext fullStatsContext;
 
     // voter benchmark state
+    AtomicLong totalVotes = new AtomicLong(0);
     AtomicLong acceptedVotes = new AtomicLong(0);
     AtomicLong badContestantVotes = new AtomicLong(0);
     AtomicLong badVoteCountVotes = new AtomicLong(0);
@@ -244,12 +245,12 @@ public class JDBCBenchmark {
 
         // 1. Voting Board statistics, Voting results and performance statistics
         String display = "\n" + HORIZONTAL_RULE + " Voting Results\n"
-                + HORIZONTAL_RULE + "\nA total of %d votes were received...\n"
+                + HORIZONTAL_RULE + "\nA total of %d votes were received during the benchmark...\n"
                 + " - %,9d Accepted\n"
                 + " - %,9d Rejected (Invalid Contestant)\n"
                 + " - %,9d Rejected (Maximum Vote Count Reached)\n"
                 + " - %,9d Failed (Transaction Error)\n\n";
-        System.out.printf(display, stats.getInvocationsCompleted(),
+        System.out.printf(display, totalVotes.get(),
                 acceptedVotes.get(), badContestantVotes.get(),
                 badVoteCountVotes.get(), failedVotes.get());
 
@@ -353,6 +354,7 @@ public class JDBCBenchmark {
                     voteCS.setLong(3, config.maxvotes);
 
                     try {
+                        totalVotes.incrementAndGet();
                         voteCS.executeUpdate();
                         acceptedVotes.incrementAndGet();
                     } catch (Exception x) {
