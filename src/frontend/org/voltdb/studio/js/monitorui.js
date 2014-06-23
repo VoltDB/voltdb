@@ -6,6 +6,111 @@ this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
 
+function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
+    this.lowestTrackableValue = lowestTrackableValue;
+    this.highestTrackableValue = highestTrackableValue;
+    this.nSVD = nSVD;
+    this.totalCount = totalCount;
+    this.count = [];
+    this.init();
+}
+
+Histogram.prototype.init = function() {
+    var largestValueWithSingleUnitResolution = 2 * Math.pow(10, this.nSVD);
+    this.unitMagnitude = Math.floor(Math.log(this.lowestTrackableValue)/Math.log(2));
+    var subBucketCountMagnitude = Math.ceil(Math.log(largestValueWithSingleUnitResolution)/Math.log(2));
+    this.subBucketHalfCountMagnitude = ((subBucketCountMagnitude > 1) ? subBucketCountMagnitude : 1) - 1;
+    this.subBucketCount = Math.pow(2, (this.subBucketHalfCountMagnitude + 1));
+    this.subBucketHalfCount = this.subBucketCount / 2;
+    this.subBucketMask = (this.subBucketCount - 1) << this.unitMagnitude;
+    var trackableValue = (this.subBucketCount - 1) << this.unitMagnitude;
+    var bucketsNeeded = 1;
+    while (trackableValue < this.highestTrackableValue) {
+        trackableValue *= 2;
+        bucketsNeeded++;
+    }
+    this.bucketCount = bucketsNeeded;
+
+    this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
+}
+
+Histogram.prototype.diff = function(newer) {
+    var h = new Histogram(newer.lowestTrackableValue, newer.highestTrackableValue, newer.nSVD, newer.totalCount - this.totalCount);
+    for (var i = 0; i < h.countsArrayLength; i++) {
+        h.count[i] = newer.count[i] - this.count[i];
+    }
+    return h;
+}
+
+Histogram.prototype.getCountAt = function(bucketIndex, subBucketIndex) {
+    var bucketBaseIndex = (bucketIndex + 1) << this.subBucketHalfCountMagnitude;
+    var offsetInBucket = subBucketIndex - this.subBucketHalfCount;
+    var countIndex = bucketBaseIndex + offsetInBucket;
+    return this.count[countIndex];
+}
+
+Histogram.prototype.valueFromIndex = function(bucketIndex, subBucketIndex) {
+    return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
+}
+
+Histogram.prototype.getValueAtPercentile = function(percentile) {
+    var totalToCurrentIJ = 0;
+    var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
+    for (var i = 0; i < this.bucketCount; i++) {
+        var j = (i == 0) ? 0 : (this.subBucketCount / 2);
+        for (; j < this.subBucketCount; j++) {
+            totalToCurrentIJ += this.getCountAt(i, j);
+            if (totalToCurrentIJ >= countAtPercentile) {
+                var valueAtIndex = this.valueFromIndex(i, j);
+                return valueAtIndex / 1000.0;
+            }
+        }
+    }
+}
+
+function read32(str) {
+    var s1 = str.substring(0, 2);
+    var s2 = str.substring(2, 4);
+    var s3 = str.substring(4, 6);
+    var s4 = str.substring(6, 8);
+    return s4 + s3 + s2 + s1;
+}
+
+function read64(str) {
+    var s1 = read32(str);
+    var s2 = read32(str.substring(8, 16));
+    return s2 + s1;
+}
+
+function convert2Histogram(str) {
+    // Read lowestTrackableValue
+    var lowestTrackableValue = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    
+    // Read highestTrackableValue
+    var highestTrackableValue = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    
+    // Read numberOfSignificantValueDigits
+    var nSVD = parseInt(read32(str), 16);
+    str = str.substring(8, str.length);
+    
+    // Read totalCount
+    var totalCount = parseInt(read64(str), 16);
+    str = str.substring(16, str.length);
+    
+    var histogram = new Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount);
+    
+    var i = 0;
+    while (str.length >= 16) {
+        var value = parseInt(read64(str), 16);
+        histogram.count[i] = value;
+        str = str.substring(16, str.length);
+        i++;
+    }
+    return histogram;
+}
+
 function InitializeChart(id, chart, metric)
 {
 	$('#'+chart+'chart-'+id).empty();
@@ -84,15 +189,17 @@ this.AddMonitor = function(tab)
     , 'memStatsCallback': function(response) {MonitorUI.Monitors[id].memStatsResponse = response;}
     , 'procStatsCallback': function(response) {MonitorUI.Monitors[id].procStatsResponse = response;}
     , 'starvStatsCallback': function(response) {MonitorUI.Monitors[id].starvStatsResponse = response;}
+    , 'latStatsCallback': function(response) {MonitorUI.Monitors[id].latStatsResponse = response;}
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
+    , 'latStatsResponse': null
     , 'lastTimedTransactionCount': -1
-    , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
+    , 'latHistogram': null
     , 'latData': [data]
     , 'tpsData': [data]
     , 'memData': [data]
@@ -146,7 +253,7 @@ this.SetRefreshSpeed = function()
 			}
 		}
 		if ((speed != 'pau') && (MonitorUI.Interval == null))
-			MonitorUI.Interval = setInterval(function() {MonitorUI.RefreshData();}, (speed == 'hig' ? 1 : (speed == 'nor' ? 2 : 10))*500);
+			MonitorUI.Interval = setInterval(function() {MonitorUI.RefreshData();}, (speed == 'hig' ? 1 : (speed == 'nor' ? 2 : 5))*1000);
 		MonitorUI.Speed = speed;
 	}
 }
@@ -176,6 +283,7 @@ this.RefreshMonitorData = function(id)
                 			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
     			            .BeginExecute('@Statistics', ['PROCEDUREPROFILE', 0], MonitorUI.Monitors[id].procStatsCallback)
     			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
+				    .BeginExecute('@Statistics', ['LATENCY_HISTOGRAM', 0], MonitorUI.Monitors[id].latStatsCallback)
     	                	.End(MonitorUI.RefreshMonitor, id);
     }
 }
@@ -222,8 +330,19 @@ this.RefreshMonitor = function(id, Success)
 		Mem += table[j][3]*1.0/1048576.0;
 	dataMem = dataMem.slice(1);
 	dataMem.push([dataIdx, Mem]);
-	var Lat = 0;
-	var TPS = 0;
+
+	// Compute latency statistics 
+	table = monitor.latStatsResponse.results[0].data;
+	var latStats = convert2Histogram(table[0][5]);
+	var lat = 0;
+	if (monitor.latHistogram == null)
+		lat = latStats.getValueAtPercentile(99);
+	else
+		lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
+	monitor.latHistogram = latStats;
+	dataLat = dataLat.slice(1);
+	dataLat.push([dataIdx, lat]);
+
 	var procStats = {};
     // Compute procedure statistics 
 	table = monitor.procStatsResponse.results[0].data;
@@ -245,46 +364,19 @@ this.RefreshMonitor = function(id, Success)
 			data = [srcData[1], srcData[3], srcData[2], srcData[5], srcData[4], srcData[6]];
 		procStats[srcData[1]] = data;
 	}
-        // Compute latency 
+    // Compute latency 
 	var currentTimedTransactionCount = 0.0;
-    var currentLatencySum = 0.0;
-    var currentLatencyAverage = 0.0;
 	for(var proc in procStats)
 	{
 		currentTimedTransactionCount += procStats[proc][1];
-		currentLatencySum += procStats[proc][1]*procStats[proc][4];
-		currentLatencyAverage += procStats[proc][4];
 		dataTB.push([procStats[proc][0], procStats[proc][2]]);
 	}
-
-	// Compute initial latency averge. We'll compute the delta average next.
-	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
 	if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick)
 	{
 		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
-		dataLat = dataLat.slice(1);
-                if (delta == 0)
-		{
-			if (monitor.noTransactionCount < 5)
-			{
-				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
-				monitor.noTransactionCount++;
-			}
-			else
-			{
-				dataLat.push([dataIdx,0]);
-			}
-		}
-		else
-		{
-			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-			var delta_latency = latency_val / delta;
-			dataLat.push([dataIdx,delta_latency/1000000.0]);
-			monitor.noTransactionCount = 0;
-		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -328,7 +420,6 @@ this.RefreshMonitor = function(id, Success)
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
-	monitor.lastLatencyAverage = currentLatencyAverage;
 	
 	var keys = [];
 	var starvStats = {};
