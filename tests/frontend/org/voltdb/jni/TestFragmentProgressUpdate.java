@@ -225,40 +225,31 @@ public class TestFragmentProgressUpdate extends TestCase {
         long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
         long previousPeakMemory = m_ee.m_peakMemoryInBytes;
 
-        selectProc = procedures.getIgnoreCase("DeleteRows");
-        assertNotNull(selectProc);
-        selectStmt = selectProc.getStatements().getIgnoreCase("warehouse_half");
-        selectBottomFrag = null;
+        Procedure deleteProc = procedures.getIgnoreCase("DeleteRows");
+        assertNotNull(deleteProc);
+        Statement deleteStmt = deleteProc.getStatements().getIgnoreCase("warehouse_half");
+        assertNotNull(deleteStmt);
+        PlanFragment deleteBottomFrag = null;
 
-        i = 0;
+        int j = 0;
         // this kinda assumes the right order
-        for (PlanFragment f : selectStmt.getFragments()) {
-            if (i != 0) selectBottomFrag = f;
-            i++;
+        for (PlanFragment f : deleteStmt.getFragments()) {
+            if (j != 0) deleteBottomFrag = f;
+            j++;
         }
         // populate plan cache
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
-                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                CatalogUtil.getUniqueIdForFragment(deleteBottomFrag),
+                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()));
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
                 1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
                 3, 2, 42, Long.MAX_VALUE);
 
-        selectProc = procedures.getIgnoreCase("SelectAll");
-        selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
-        selectBottomFrag = null;
-
-        i = 0;
-        // this kinda assumes the right order
-        for (PlanFragment f : selectStmt.getFragments()) {
-            if (i != 0) selectBottomFrag = f;
-            i++;
-        }
         // populate plan cache
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
