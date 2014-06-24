@@ -58,11 +58,16 @@ import org.voltdb.VoltTable;
 @ProcInfo (
         singlePartition = false
     )
-public class DeleteRows extends VoltProcedure {
-    public final SQLStmt warehouse_half = new SQLStmt("DELETE FROM WAREHOUSE WHERE W_ID > 5000;");
+public class FragmentUpdateTestProcedure extends VoltProcedure {
+    public final SQLStmt warehouse_select = new SQLStmt("SELECT * FROM WAREHOUSE;");
+    public final SQLStmt warehouse_del_half = new SQLStmt("DELETE FROM WAREHOUSE WHERE W_ID > 5000;");
+    public final SQLStmt warehouse_join = new SQLStmt("SELECT W1.W_TAX + W1.W_YTD FROM WAREHOUSE W1, WAREHOUSE W2"
+            + " WHERE W1.W_ID = W2.W_ID AND W1.W_ID > -1 AND W1.W_TAX > W2.W_TAX ORDER BY W2.W_ID;");
 
     public VoltTable[] run() {
-        voltQueueSQL(warehouse_half);
+        voltQueueSQL(warehouse_select);
+        voltQueueSQL(warehouse_del_half);
+        voltQueueSQL(warehouse_join);
         return voltExecuteSQL();
     }
 }

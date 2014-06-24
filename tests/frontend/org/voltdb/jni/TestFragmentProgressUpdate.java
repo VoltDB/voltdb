@@ -59,6 +59,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         testFragmentProgressUpdate(m_ee);
     }
 
+    // test we reset the statistic when start a new fragment
     public void testJNIFragmentProgressUpdate2() throws Exception {
         m_ee = new ExecutionEngineJNI(
                 CLUSTER_ID,
@@ -72,6 +73,22 @@ public class TestFragmentProgressUpdate extends TestCase {
                                      0,
                                      0));
         testTwoUpdates(m_ee);
+    }
+
+    // test sometimes the peak is larger than the current
+    public void testJNIFragmentProgressUpdate3() throws Exception {
+        m_ee = new ExecutionEngineJNI(
+                CLUSTER_ID,
+                NODE_ID,
+                0,
+                0,
+                "",
+                100,
+                new HashinatorConfig(HashinatorType.LEGACY,
+                                     LegacyHashinator.getConfigureBytes(1),
+                                     0,
+                                     0));
+        testPeakLargerThanCurr(m_ee);
     }
 
     /*public void testIPCFragmentProgressUpdate() throws Exception {
@@ -187,8 +204,8 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         Cluster cluster =  catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
-        Procedure selectProc = procedures.getIgnoreCase("SelectAll");
-        Statement selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
+        Procedure testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
 
         // delete 5000 records
@@ -225,9 +242,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
         long previousPeakMemory = m_ee.m_peakMemoryInBytes;
 
-        Procedure deleteProc = procedures.getIgnoreCase("DeleteRows");
-        assertNotNull(deleteProc);
-        Statement deleteStmt = deleteProc.getStatements().getIgnoreCase("warehouse_half");
+        Statement deleteStmt = testProc.getStatements().getIgnoreCase("warehouse_del_half");
         assertNotNull(deleteStmt);
         PlanFragment deleteBottomFrag = null;
 
@@ -273,6 +288,70 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Although it is true, but I don't think we should compare the memory usage here.
         //assertTrue(m_ee.m_currMemoryInBytes < previousMemoryInBytes);
         assertTrue(m_ee.m_peakMemoryInBytes < previousPeakMemory);
+    }
+
+    void testPeakLargerThanCurr(ExecutionEngine ee) throws Exception {
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        Catalog catalog = builder.createTPCCSchemaCatalog();
+        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
+                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+
+        m_ee.loadCatalog( 0, catalog.serialize());
+
+        int tableSize = 20000;
+        int longOpThreshold = 10000;
+        VoltTable warehousedata = new VoltTable(
+                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
+                );
+        for (int i = 0; i < tableSize; ++i) {
+            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
+        }
+
+        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
+        Procedure testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_join");
+        PlanFragment selectBottomFrag = null;
+
+        // delete 5000 records
+        // I have no idea what's going on here, and just copy code from the above methods
+        int i = 0;
+        // this kinda assumes the right order
+        for (PlanFragment f : selectStmt.getFragments()) {
+            if (i != 0) selectBottomFrag = f;
+            i++;
+        }
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+        ParameterSet params = ParameterSet.emptyParameterSet();
+
+        m_ee.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, 42, Long.MAX_VALUE);
+
+        // If want to see the stats, please uncomment the following line.
+        // It is '8 393216 262144' on my machine.
+        //System.out.println(m_ee.m_callsFromEE +" " + m_ee.m_peakMemoryInBytes + " "+ m_ee.m_currMemoryInBytes);
+        assertEquals(longOpThreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertTrue(m_ee.m_peakMemoryInBytes > m_ee.m_currMemoryInBytes);
     }
 
     private ExecutionEngine m_ee;
