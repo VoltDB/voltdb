@@ -226,9 +226,6 @@ public class ExportGeneration {
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
                     }
-                } else {
-                    //Delete ads that have no data
-                    f.delete();
                 }
             }
         }
