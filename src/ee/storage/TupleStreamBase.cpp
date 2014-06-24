@@ -212,7 +212,7 @@ void TupleStreamBase::rollbackTo(size_t mark)
     }
 
     m_rollbacks++;
-    //std::cout << "Partition " << partitionId() << " rollbacks " << m_rollbacks << std::endl;
+    std::cout << "Partition " << partitionId() << " rollbacks " << m_rollbacks << std::endl;
 
     // back up the universal stream counter
     m_uso = mark;

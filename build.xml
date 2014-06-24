@@ -156,24 +156,13 @@
 
 </patternset>
 
+<patternset id='junit.other.path'>
+ <include name='org/voltdb/TestExportSuite.class'/>
+ </patternset>
+
 <patternset id='junit.regression.h1.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/regressionsuites/TestA*.class' />
-    <include name='org/voltdb/regressionsuites/TestB*.class' />
-    <include name='org/voltdb/regressionsuites/TestC*.class' />
-    <include name='org/voltdb/regressionsuites/TestD*.class' />
-    <include name='org/voltdb/regressionsuites/TestE*.class' />
-    <include name='org/voltdb/regressionsuites/TestF*.class' />
-    <include name='org/voltdb/regressionsuites/TestG*.class' />
-    <include name='org/voltdb/regressionsuites/TestH*.class' />
-    <include name='org/voltdb/regressionsuites/TestI*.class' />
-    <include name='org/voltdb/regressionsuites/TestJ*.class' />
-    <include name='org/voltdb/regressionsuites/TestK*.class' />
-    <include name='org/voltdb/regressionsuites/TestL*.class' />
-    <include name='org/voltdb/regressionsuites/TestM*.class' />
-    <include name='org/voltdb/regressionsuites/TestN*.class' />
-    <include name='org/voltdb/regressionsuites/TestO*.class' />
-    <include name='org/voltdb/regressionsuites/TestP*.class' />
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>
@@ -181,15 +170,6 @@
 <patternset id='junit.regression.h2.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/regressionsuites/TestQ*.class' />
-    <include name='org/voltdb/regressionsuites/TestR*.class' />
-    <include name='org/voltdb/regressionsuites/TestS*.class' />
-    <include name='org/voltdb/regressionsuites/TestT*.class' />
-    <include name='org/voltdb/regressionsuites/TestU*.class' />
-    <include name='org/voltdb/regressionsuites/TestV*.class' />
-    <include name='org/voltdb/regressionsuites/TestW*.class' />
-    <include name='org/voltdb/regressionsuites/TestX*.class' />
-    <include name='org/voltdb/regressionsuites/TestY*.class' />
-    <include name='org/voltdb/regressionsuites/TestZ*.class' />
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>
@@ -1472,8 +1452,7 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.all.path" />
-                <patternset refid="junit.exclude.regression.path" />
+                <patternset refid="junit.other.path" />
             </fileset>
         </tests>
     </run_junit>
