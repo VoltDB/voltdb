@@ -285,16 +285,18 @@ public class ProcedureRunner {
             if (paramList.length + paramListInx != m_paramTypes.length) {
                 m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
-                    " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
+                        " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                 return getErrorResponse(m_statusCode, msg, null);
             }
 
             for (; origParamListInx < paramList.length; paramListInx++, origParamListInx++) {
                 try {
-                    combinedParams[paramListInx] = ParameterConverter.makeCompatible(m_paramTypes[paramListInx], paramList[origParamListInx]);
+                    combinedParams[paramListInx] = ParameterConverter.makeCompatible(m_paramTypes[paramListInx],
+                            paramList[origParamListInx], paramListIn.getParamType(origParamListInx));
                     // check the result type in an assert
-                    assert(ParameterConverter.verifyParameterConversion(combinedParams[paramListInx], m_paramTypes[paramListInx].classFromType()));
+                    assert(ParameterConverter.verifyParameterConversion(combinedParams[paramListInx],
+                            m_paramTypes[paramListInx].classFromType()));
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + paramListInx +

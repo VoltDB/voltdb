@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
+import org.voltdb.StoredProcParamType;
 import org.voltdb.VoltType;
 
 /**
@@ -166,7 +167,7 @@ class ParameterizationInfo {
         }
 
         // leverage existing (rather heavyweight) code to convert param types
-        Object retval = ParameterConverter.makeCompatible(type.getProcParamType(), value);
+        Object retval = ParameterConverter.makeCompatible(type.getProcParamType(), value, StoredProcParamType.STRING);
         // check the result type in an assert
         assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
         return retval;

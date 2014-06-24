@@ -24,6 +24,7 @@ package org.voltdb;
 import java.math.BigDecimal;
 import java.util.HashMap;
 
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -32,7 +33,12 @@ public enum StoredProcParamType {
     INVALID               (VoltType.INVALID, false, null)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
+        {
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramClz)
         {
             throw new VoltTypeException(
                     "AllowedStoredProcParams: The provided value: (" + param.toString() +
@@ -47,9 +53,10 @@ public enum StoredProcParamType {
     TINYINT               (VoltType.TINYINT, false, byte.class)
     {
         public Object getNullValue() { return VoltType.NULL_TINYINT; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val) { return (Byte)val == VoltType.NULL_TINYINT; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
-            return ParameterConverter.convertToByte(param, paramClz);
+            return ParameterConverter.convertToByte(param, paramType);
         }
     },
 
@@ -60,17 +67,23 @@ public enum StoredProcParamType {
     SMALLINT              (VoltType.SMALLINT, false, short.class)
     {
         public Object getNullValue() { return VoltType.NULL_SMALLINT; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val) { return (Short)val == VoltType.NULL_SMALLINT; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
-            return ParameterConverter.convertToShort(param, paramClz);
+            return ParameterConverter.convertToShort(param, paramType);
         }
     },
     SMALLINT_VECTOR       (VoltType.SMALLINT, true, short[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -81,17 +94,23 @@ public enum StoredProcParamType {
     INTEGER               (VoltType.INTEGER, false, int.class)
     {
         public Object getNullValue() { return VoltType.NULL_INTEGER; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val) { return (Integer)val == VoltType.NULL_INTEGER; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
-            return ParameterConverter.convertToInteger(param, paramClz);
+            return ParameterConverter.convertToInteger(param, paramType);
         }
     },
     INTEGER_VECTOR        (VoltType.INTEGER, true, int[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -102,17 +121,23 @@ public enum StoredProcParamType {
     BIGINT                (VoltType.BIGINT, false, long.class)
     {
         public Object getNullValue() { return VoltType.NULL_BIGINT; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val) { return (Long)val == VoltType.NULL_BIGINT; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
-            return ParameterConverter.convertToLong(param, paramClz);
+            return ParameterConverter.convertToLong(param, paramType);
         }
     },
     BIGINT_VECTOR         (VoltType.BIGINT, true, long[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -123,17 +148,23 @@ public enum StoredProcParamType {
     FLOAT                 (VoltType.BIGINT, false, double.class)
     {
         public Object getNullValue() { return VoltType.NULL_FLOAT; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val) { return (Double)val == VoltType.NULL_FLOAT; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
-            return ParameterConverter.convertToFloat(param, paramClz);
+            return ParameterConverter.convertToFloat(param, paramType);
         }
     },
     FLOAT_VECTOR          (VoltType.BIGINT, true, double[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -145,65 +176,105 @@ public enum StoredProcParamType {
     VOLTTIMESTAMP         (VoltType.TIMESTAMP, false, TimestampType.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToVoltTimestamp(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_TIMESTAMP;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToVoltTimestamp(param, paramType);
         }
     },
     JAVADATESTAMP         (VoltType.TIMESTAMP, false, java.util.Date.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToJavaDate(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_TIMESTAMP;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToJavaDate(param, paramType);
         }
     },
     SQLDATESTAMP          (VoltType.TIMESTAMP, false, java.sql.Date.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToSqlDate(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_TIMESTAMP;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToSqlDate(param, paramType);
         }
     },
     SQLTIMESTAMP          (VoltType.TIMESTAMP, false, java.sql.Timestamp.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToSqlTimestamp(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_TIMESTAMP;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToSqlTimestamp(param, paramType);
         }
     },
     VOLTTIMESTAMP_VECTOR  (VoltType.TIMESTAMP, true, TimestampType[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
     JAVADATESTAMP_VECTOR  (VoltType.TIMESTAMP, true, java.util.Date[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
     SQLDATESTAMP_VECTOR   (VoltType.TIMESTAMP, true, java.sql.Date[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
     SQLTIMESTAMP_VECTOR   (VoltType.TIMESTAMP, true, java.sql.Timestamp[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -215,17 +286,27 @@ public enum StoredProcParamType {
     STRING                (VoltType.STRING, false, String.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToString(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_STRING_OR_VARBINARY || ((String) val).trim().equals(Constants.CSV_NULL);
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToString(param, paramType);
         }
     },
     STRING_VECTOR         (VoltType.STRING, true, String[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -235,17 +316,27 @@ public enum StoredProcParamType {
     VOLTTABLE             (VoltType.VOLTTABLE, false, VoltTable.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToVoltTable(param, paramClz);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToVoltTable(param, paramType);
         }
     },
     VOLTTABLE_VECTOR      (VoltType.VOLTTABLE, true, VoltTable[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -255,17 +346,27 @@ public enum StoredProcParamType {
     DECIMAL               (VoltType.DECIMAL, false, BigDecimal.class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToDecimal(param, paramClz);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToDecimal(param, paramType);
         }
     },
     DECIMAL_VECTOR        (VoltType.DECIMAL, true, BigDecimal[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     },
 
@@ -275,32 +376,34 @@ public enum StoredProcParamType {
     VARBINARY             (VoltType.VARBINARY, false, byte[].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToByteArray(param, paramClz);
+            assert(val != null);
+            return val == VoltType.NULL_STRING_OR_VARBINARY;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToByteArray(param, paramType);
         }
 
     },
     VARBINARY_VECTOR      (VoltType.VARBINARY, true, byte[][].class)
     {
         public Object getNullValue() { return null; }
-        public Object convertToParamType(final Object param, Class<?> paramClz)
+        public boolean isNullValue(Object val)
         {
-            return ParameterConverter.convertToArray(param, paramClz, this.m_baseClass);
+            assert(val != null);
+            return false;
+        }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToArray(param, param.getClass(), this.m_baseClass);
         }
     };
 
-//    SYSTEM_PROC_CONTEXT   (VoltType.INVALID, false, SystemProcedureExecutionContext.class)
-//    {
-//        public Object getNullValue() { return null; }
-//        public Object convertToParamType(final Object param, Class<?> paramClz)
-//        {
-//            return ParameterConverter.convertToSystemProcContext(param, paramClz, this.m_baseClass);
-//        }
-//    };
-
     public abstract Object getNullValue();
-    public abstract Object convertToParamType(final Object param, Class<?> paramClz);
+    public abstract boolean isNullValue(Object val);
+    public abstract Object convertToParamType(final Object param, final StoredProcParamType paramType);
 
 
     protected final Class<?> m_baseClass;
