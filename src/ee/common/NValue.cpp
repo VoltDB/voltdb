@@ -468,9 +468,9 @@ inline static void throwTimestampFormatError(const std::string &str)
 int64_t NValue::parseTimestampString(const std::string &str)
 {
     // ISO extended format, the format volt has supported already
-    static const std::string format1 = "%04d-%02d-%02d %02d:%02d:%02d.%06d";
+    static const char* format1 = "%04d-%02d-%02d %02d:%02d:%02d.%06d";
     // the new format we want to support
-    static const std::string format2 = "%04d-%02d-%02d";
+    static const char* format2 = "%04d-%02d-%02d";
     // some format we can support in the future
     // ISO format
     //static const std::string format3 = "%04d-%02d-%02dT%02d:%02d:%02d.%06d";
@@ -485,19 +485,19 @@ int64_t NValue::parseTimestampString(const std::string &str)
     int num_read = 0;
     // date_str
     std::string date_str(str);
-    // This is the std:string API for "ltrim".
+    // This is the std:string API for "ltrim" and "rtrim"
     date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
 
-    // TODO: have not test against the strings not terminated with '\0', or do we have such test cases?
     size_t len = date_str.size();
     if (len == 10) {
-        num_read = sscanf(date_str.c_str(), format2.c_str(), &year, &month, &day);
+        num_read = sscanf(date_str.c_str(), format2, &year, &month, &day);
         if (num_read != 3) {
             throwTimestampFormatError(str);
         }
     }
     else if (len == 26) {
-        num_read = sscanf(date_str.c_str(), format1.c_str(), &year, &month, &day, &hour, &minute, &second, &micro);
+        num_read = sscanf(date_str.c_str(), format1, &year, &month, &day, &hour, &minute, &second, &micro);
         if (num_read != 7) {
             throwTimestampFormatError(str);
         }
@@ -523,6 +523,9 @@ int64_t NValue::parseTimestampString(const std::string &str)
         throwTimestampFormatError(str);
     }
     if (second > 59 || second < 0) {
+        throwTimestampFormatError(str);
+    }
+    if (micro > 999999 || micro < 0) {
         throwTimestampFormatError(str);
     }
 

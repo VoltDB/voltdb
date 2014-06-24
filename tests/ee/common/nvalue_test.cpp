@@ -2816,6 +2816,11 @@ TEST_F(NValueTest, TestTimestampStringParse)
         "2000-01-01 30:01:01.000000",
         "2000-01-01 25:01:01.000000",
         "2000-01-01 01:60:01.000000",
+        "2000-01-01 01:60:01.-00001",
+        "2000-01-01 01:60:01.-12345",
+        "2000-01-01 01:60:01.-123456",
+        "2000-01-01 01:60:01.-9999999",
+        "2000-01-01 01:60:01.9999999",
         };
     size_t ii = sizeof(trials) / sizeof(const char*);
     while (ii--) {
@@ -3046,6 +3051,146 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
                     dateStr2 << endl;
             }
             str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    delete poolHolder;
+    delete testPool;
+}
+
+TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+
+    std::string peekString;
+
+    char dateStr[32] = {0};
+    char dateStr2[27] = {0};
+
+    // test leading space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "  %02d00-11-30", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "  %02d00-11-30 00:00:00.000000", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    // test trailing space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-10-29  ", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-10-29 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-11-30 00:00:00.000000  ", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    // test leading and trailing space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), " %02d00-12-31 ", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), " %02d00-11-30 00:00:00.000000 ", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
