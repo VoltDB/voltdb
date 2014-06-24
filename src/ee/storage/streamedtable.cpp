@@ -115,6 +115,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
                                       tuple,
                                       ExportTupleStream::DELETE);
         m_tupleCount++;
+        std::cout << "Insert tuple partition " << m_wrapper->m_partitionId << " count " << m_tupleCount << std::endl;
         // Infallible delete (schema change with tuple migration & views) is not supported for export tables
         assert(fallible);
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
