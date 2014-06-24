@@ -72,6 +72,8 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
+    virtual int partitionId() { return m_partitionId; }
+
     // cached catalog values
     const CatalogId m_partitionId;
     const int64_t m_siteId;

@@ -1301,7 +1301,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
-    m_drStream.periodicFlush(timeInMillis, lastCommittedSpHandle, m_executorContext->currentSpHandle());
+    m_drStream.periodicFlush(timeInMillis, lastCommittedSpHandle);
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
@@ -1311,7 +1311,7 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
-    m_drStream.periodicFlush(-1L, lastCommittedSpHandle, m_executorContext->currentSpHandle());
+    m_drStream.periodicFlush(-1L, lastCommittedSpHandle);
 }
 
 string VoltDBEngine::debug(void) const {

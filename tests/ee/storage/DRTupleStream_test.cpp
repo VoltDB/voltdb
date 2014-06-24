@@ -236,7 +236,7 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper.periodicFlush(-1, 2, 2);
+    m_wrapper.periodicFlush(-1, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -254,13 +254,13 @@ TEST_F(DRTupleStreamTest, BasicOps)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 9, 10);
+    m_wrapper.periodicFlush(-1, 9);
 
     for (int i = 10; i < 20; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 19, 19);
+    m_wrapper.periodicFlush(-1, 19);
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -286,13 +286,13 @@ TEST_F(DRTupleStreamTest, FarFutureFlush)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 99, 100);
+    m_wrapper.periodicFlush(-1, 99);
 
     for (int i = 100; i < 110; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 130, 131);
+    m_wrapper.periodicFlush(-1, 130);
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -306,6 +306,7 @@ TEST_F(DRTupleStreamTest, FarFutureFlush)
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
+    std::cout << "Offset is " << results->offset() << " expected " << (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) << std::endl;
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
 
@@ -391,7 +392,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
     ASSERT_FALSE(m_topend.receivedDRBuffer);
 
     // Now, flush the buffer with the tick
-    m_wrapper.periodicFlush(-1, 1, 1);
+    m_wrapper.periodicFlush(-1, 1);
 
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -431,7 +432,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     m_wrapper.rollbackTo(mark);
 
     // so flush and make sure we got something sane
-    m_wrapper.periodicFlush(-1, 1, 2);
+    m_wrapper.periodicFlush(-1, 1);
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
@@ -469,7 +470,7 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(2, 3);
-    m_wrapper.periodicFlush(-1, 3, 3);
+    m_wrapper.periodicFlush(-1, 3);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -497,7 +498,7 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
     // add another and roll it back and flush
     size_t mark = appendTuple(10, 11);
     m_wrapper.rollbackTo(mark);
-    m_wrapper.periodicFlush(-1, 11, 12);
+    m_wrapper.periodicFlush(-1, 11);
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
@@ -530,7 +531,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
         }
     }
     m_wrapper.rollbackTo(mark);
-    m_wrapper.periodicFlush(-1, 11, 12);
+    m_wrapper.periodicFlush(-1, 11);
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();

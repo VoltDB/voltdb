@@ -47,7 +47,7 @@ TupleStreamBase::TupleStreamBase()
       // this allows initial ticks to succeed after rejoins
       m_openSpHandle(0),
       m_openTransactionUso(0),
-      m_committedSpHandle(0), m_committedUso(0)
+      m_committedSpHandle(0), m_committedUso(0), m_rollbacks(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -126,7 +126,10 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     // If the current TXN ID has advanced, then we know that:
     // - The old open transaction has been committed
     // - The current transaction is now our open transaction
-    if (m_openSpHandle < currentSpHandle)
+    // If last committed and current sphandle are the same
+    // this isn't a new transaction, the block below handles it better
+    // by ending the current open transaction and not starting a new one
+    if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
             endTransaction(m_openSpHandle);
@@ -207,6 +210,9 @@ void TupleStreamBase::rollbackTo(size_t mark)
     if (mark > m_uso) {
         throwFatalException("Truncating the future.");
     }
+
+    m_rollbacks++;
+    //std::cout << "Partition " << partitionId() << " rollbacks " << m_rollbacks << std::endl;
 
     // back up the universal stream counter
     m_uso = mark;
@@ -289,12 +295,12 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamBase::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedSpHandle,
-                                  int64_t currentSpHandle)
+                                  int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
+        int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
+        if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
         }
 
@@ -305,8 +311,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            commit(lastCommittedSpHandle, currentSpHandle, currentSpHandle, timeInMillis < 0 ? true : false, true);
-        }
+        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, timeInMillis < 0 ? true : false, true);
     }
 }
