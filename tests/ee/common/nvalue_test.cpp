@@ -3029,6 +3029,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3043,7 +3044,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
             int64_t base = NValue::parseTimestampString(dateStr2);
             NValue str = ValueFactory::getStringValue(dateStr);
-            NValue ts = ValueFactory::castAsTimestamp(str);
+            NValue ts = str.castAs(VALUE_TYPE_TIMESTAMP);
             int64_t value = ValuePeeker::peekTimestamp(ts);
             EXPECT_EQ(base, value);
             if (base != value) {
@@ -3089,6 +3090,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3109,6 +3111,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3130,6 +3133,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3150,6 +3154,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3171,6 +3176,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
@@ -3191,6 +3197,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
                     dateStr2 << endl;
             }
+            str.free();
         }
     } catch(SQLException& exc) {
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
