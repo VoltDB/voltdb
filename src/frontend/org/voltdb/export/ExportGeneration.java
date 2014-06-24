@@ -220,12 +220,13 @@ public class ExportGeneration {
                 }
 
                 if (haveDataFiles) {
-                    try {
-                        addDataSource(f, partitions);
-                        hadValidAd = true;
-                    } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
-                    }
+                    exportLog.info("Datasource " + f.getName() + " Has no data must be fully drained we start fresh.");
+                }
+                try {
+                    addDataSource(f, partitions);
+                    hadValidAd = true;
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
                 }
             }
         }
