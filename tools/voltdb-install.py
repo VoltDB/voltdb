@@ -189,7 +189,7 @@ class Metadata:
         self.volt_root   = None
         self.options     = options
         self.args        = args
-        self.re_volt_jar = re.compile('^voltdb-[0-9.]+[.]jar$')
+        self.re_volt_jar = re.compile('^voltdb(client)?-[.0-9]+[.]([\w]+\.)*jar$')
     def initialize(self, version, volt_root, build_root, output_root, clean_up_items):
         self.version         = version
         self.volt_root       = volt_root

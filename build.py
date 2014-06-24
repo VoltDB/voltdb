@@ -249,6 +249,7 @@ CTX.INPUT['executors'] = """
  seqscanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
+ upsertexecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -257,6 +258,7 @@ CTX.INPUT['expressions'] = """
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
+ parametervalueexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -286,6 +288,7 @@ CTX.INPUT['plannodes'] = """
  seqscannode.cpp
  unionnode.cpp
  updatenode.cpp
+ upsertnode.cpp
 """
 
 CTX.INPUT['indexes'] = """

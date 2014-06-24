@@ -73,7 +73,8 @@ public:
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
     int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed);
+            std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
 
     /**
      * Retrieve a plan from Java via the IPC connection for a fragment id.

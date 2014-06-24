@@ -29,6 +29,7 @@ import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
@@ -76,6 +77,26 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         {
             if (((String)table.get(columnName, VoltType.STRING)).
                     equalsIgnoreCase(columnValue.toUpperCase()))
+            {
+                found = true;
+                break;
+            }
+        }
+        return found;
+    }
+
+    boolean moveToMatchingTupleRow(VoltTable table, String column1Name,
+                              String column1Value, String column2Name,
+                              String column2Value)
+    {
+        boolean found = false;
+        table.resetRowPosition();
+        while (table.advanceRow())
+        {
+            if (((String)table.get(column1Name, VoltType.STRING)).
+                    equalsIgnoreCase(column1Value.toUpperCase()) &&
+                    ((String)table.get(column2Name, VoltType.STRING)).
+                    equalsIgnoreCase(column2Value.toUpperCase()))
             {
                 found = true;
                 break;
@@ -377,42 +398,54 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
         assertEquals(7, indexes.getRowCount());
-        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column2"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
-        assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column3"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
-        assertEquals("INDEX1_TREE", indexes.get("INDEX_NAME", VoltType.STRING));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column4"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column4"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
-        assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column5"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column5"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
-        assertEquals("INDEX2_HASH", indexes.get("INDEX_NAME", VoltType.STRING));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column1"));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
-        assertTrue(((String)indexes.get("INDEX_NAME", VoltType.STRING)).contains("PK_TREE"));
+        assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
+        assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
+                     indexes.get("TYPE", VoltType.SMALLINT));
+        assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
+        assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
+        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+                HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
+        assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
+        assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));

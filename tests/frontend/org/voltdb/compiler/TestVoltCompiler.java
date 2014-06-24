@@ -519,10 +519,10 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertTrue(success);
     }
 
@@ -564,11 +564,11 @@ public class TestVoltCompiler extends TestCase {
             "</project>";
 
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
 
         assertFalse(success);
     }
@@ -589,9 +589,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -610,9 +610,9 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        final String path = xmlFile.getPath();
+        final String projectPath = xmlFile.getPath();
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(path, nothing_jar);
+        final boolean success = compiler.compileWithProjectXML(projectPath, nothing_jar);
         assertFalse(success);
     }
 
@@ -1045,7 +1045,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
 
-        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
+        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         assertNotNull(sql);
     }
 
@@ -2078,10 +2078,8 @@ public class TestVoltCompiler extends TestCase {
 
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+                "PARTITION TABLE t0 ON COLUMN name;";
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
-
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
@@ -2525,8 +2523,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
-                "\"CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER\"";
+        expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -2535,8 +2532,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
-                "\"CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER\"";
+        expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -2776,6 +2772,90 @@ public class TestVoltCompiler extends TestCase {
                 );
         proc = db.getProcedures().get("Foo");
         assertNotNull(proc);
+    }
+
+    public void testDropProcedure() throws Exception {
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
+
+        // Make sure we can drop a GROOVY procedure
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;\n" +
+                "DROP PROCEDURE Foo;"
+                );
+        Procedure proc = db.getProcedures().get("Foo");
+        assertNull(proc);
+
+        // Make sure we can drop a non-annotated stored procedure
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
+                "DROP PROCEDURE org.voltdb.compiler.procedures.AddBook;"
+                );
+        proc = db.getProcedures().get("AddBook");
+        assertNull(proc);
+        proc = db.getProcedures().get("NotAnnotatedAddBook");
+        assertNotNull(proc);
+
+        // Make sure we can drop an annotated stored procedure
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook; " +
+                "DROP PROCEDURE NotAnnotatedAddBook;"
+                );
+        proc = db.getProcedures().get("NotAnnotatedAddBook");
+        assertNull(proc);
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+
+        // Make sure we can drop a single-statement procedure
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1;"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
+
+        ArrayList<Feedback> fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
+                "DROP PROCEDURE NotAnnotatedAddBook;");
+        String expectedError =
+                "Dropped Procedure \"NotAnnotatedAddBook\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // Make sure we can't drop a CRUD procedure (full name)
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "DROP PROCEDURE PKEY_INTEGER.insert;"
+                );
+        expectedError =
+                "Dropped Procedure \"PKEY_INTEGER.insert\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // Make sure we can't drop a CRUD procedure (partial name)
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "DROP PROCEDURE insert;"
+                );
+        expectedError =
+                "Dropped Procedure \"insert\" is not defined";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -3205,5 +3285,4 @@ public class TestVoltCompiler extends TestCase {
         }
         return count;
     }
-
 }

@@ -126,6 +126,7 @@ def print_section(name, mismatches, output_dir):
 </tr>
 """ % (name, len(mismatches))
 
+    temp = []
     for i in mismatches:
         safe_print(i["SQL"])
         detail_page = generate_detail(name, i, output_dir)
@@ -135,7 +136,7 @@ def print_section(name, mismatches, output_dir):
         hsqldbStatus = i["hsqldb"]["Status"]
         if hsqldbStatus < 0:
             hsqldbStatus = "Error: " + `hsqldbStatus`
-        result += """
+        temp.append("""
 <tr>
 <td>%s</td>
 <td><a href="%s">%s</a></td>
@@ -145,7 +146,9 @@ def print_section(name, mismatches, output_dir):
             detail_page,
             cgi.escape(i["SQL"]),
             jniStatus,
-            hsqldbStatus)
+            hsqldbStatus))
+
+    result += ''.join(temp)
 
     result += """
 </table>

@@ -514,6 +514,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
+        bool checkTempTableCleanup(ExecutorVector * execsForFrag);
+        void cleanupExecutors(ExecutorVector * execsForFrag);
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
@@ -653,6 +656,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ThreadLocalPool m_tlPool;
 
         int32_t m_compactionThreshold;
+
+        /** current ExecutorVector **/
+        ExecutorVector *m_currExecutorVec;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize) {

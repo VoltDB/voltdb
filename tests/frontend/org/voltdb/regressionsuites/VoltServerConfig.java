@@ -65,6 +65,13 @@ public interface VoltServerConfig {
     public void shutDown() throws InterruptedException;
 
     /**
+     * Get the hostname/ips matching the hostId
+     * @param hostId
+     * @return The single hostname/ips as string
+     */
+    public String getListenerAddress(int hostId);
+
+    /**
      * Get the list of hostnames/ips that are listening
      * for the running VoltDB instance.
      *

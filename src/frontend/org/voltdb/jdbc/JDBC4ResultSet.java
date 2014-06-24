@@ -50,7 +50,7 @@ import org.voltdb.VoltType;
 // TODO: Blob, Bytes, BinaryStream are debatable.  Here as well, I merely grab a varchar field's binary data.  With the internal conversion to UTF-8, this isn't going to work very well... Maybe embed Base64 encoding until binary field support is available?
 public class JDBC4ResultSet implements java.sql.ResultSet
 {
-    private Statement statement;
+    private final Statement statement;
     protected VoltTable table;
     protected int columnCount;
     private int fetchDirection = FETCH_FORWARD;
@@ -737,7 +737,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkClosed();
         try
         {
-            return table.getActiveRowIndex();
+            return table.getActiveRowIndex()+1;
         }
         catch(Exception x)
         {
@@ -1041,6 +1041,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet
         checkClosed();
         try
         {
+            if (table.getRowCount() == 0) {
+                return false;
+            }
             return table.advanceToRow(table.getRowCount()-1);
         }
         catch(Exception x)

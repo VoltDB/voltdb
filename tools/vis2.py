@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
-import numpy
+import numpy as np
 
 STATS_SERVER = 'volt2'
 
@@ -30,7 +30,6 @@ def COLORS(k):
 
 #COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
 COLORS = ['b','g','r','c','m','y','k']
-#print COLORS
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
@@ -85,10 +84,12 @@ class Plot:
         plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
         plt.grid(True)
         self.fig.autofmt_xdate()
+        plt.ylabel(ylabel)
+        plt.xlabel(xlabel)
 
-    def plot(self, x, y, color, marker_shape, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
-                     marker=marker_shape, markerfacecolor=color, markersize=4)
+    def plot(self, x, y, color, marker_shape, legend, linestyle):
+        self.ax.plot(x, y, linestyle, label=legend, color=color,
+                     marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
@@ -99,8 +100,8 @@ class Plot:
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        plt.xlim((self.xmin.toordinal(), self.xmax.toordinal()))
+        plt.ylim((ymin-(ymax-ymin)*0.05, ymax+(ymax-ymin)*0.05))
+        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
@@ -125,13 +126,45 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
         return
 
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
+
+    flag = dict()
     for b,bd in plot_data.items():
         for k,v in bd.items():
+            if k not in flag.keys():
+                flag[k] = []
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
             if b not in mc:
                 mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b)
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
+
+            if len(u[0]) > 10:
+                ma = moving_average(u[1], 10)
+                pl.plot(u[0], ma, mc[b][0], None, None, ":")
+                failed = 0
+                if k.startswith('lat'):
+                    cv = np.nanmin(ma)
+                    if ma[-1] > cv * 1.05:
+                        failed = -1
+                        rp = (u[0][np.nanargmin(ma)], cv)
+                else:
+                    cv = np.nanmax(ma)
+                    if ma[-1] < cv * 0.95:
+                        failed = 1
+                        rp = (u[0][np.nanargmax(ma)], cv)
+
+                if failed != 0:
+                    p = (ma[-1]-rp[1])/rp[1]*100.
+                    flag[k].append((b, p))
+                    pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,10*failed),
+                        textcoords='offset points', ha='center', color='red')
+                    pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
+                        textcoords='offset points', ha='left', color='red')
+                    pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
+                        textcoords='offset points', ha='left', color='red')
+                    for pos in ['top', 'bottom', 'right', 'left']:
+                        pl.ax.spines[pos].set_edgecolor("red")
+
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
@@ -150,6 +183,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                         textcoords='offset points', ha='center', va='top', xytext=(0,-5))
             """
     pl.close()
+    return flag
 
 def generate_index_file(filenames):
     row = """
@@ -184,18 +218,32 @@ def generate_index_file(filenames):
 
     hrow = """
     <tr>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
-        <td><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
+        <td %s><a href=#%s>%s</a></td>
     </tr>
 """
-
-    h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    h = []
+    for x in filenames:
+        tdattr = "<span></span>" #"bgcolor=green"
+        tdnote = ""
+        M = 0.0
+        if len(x) == 6:
+            for v in x[5].values():
+                if len(v) > 0:
+                    M = max(M, abs(v[0][1]))
+        if M > 0.0:
+            tdattr = '<span style="color:yellow">&#9658;</span>'
+            if M > 10.0:
+                tdattr = '<span style="color:red">&#9658;</span>'
+            tdnote = " (by %.2f%%)" % M
+        h.append(("", x[0].replace(' ','%20'), tdattr + x[0] + tdnote))
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
-        h.append(('',''))
+        h.append(('','',''))
         z -= 1
 
     rows = []
@@ -214,6 +262,26 @@ def generate_index_file(filenames):
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
     return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), ''.join(rows))
+
+def moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+
+    type is 'simple' | 'exponential'
+
+    """
+    x = np.asarray(x)
+    if type=='simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+
+    weights /= weights.sum()
+
+    a =  np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n-1] = None
+    return a
+
 
 def usage():
     print "Usage:"
@@ -254,31 +322,34 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
+        app = app.replace('/','')
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
-        resp = proc.call(["select series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
+        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
         conn.close()
 
         app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
 
-        if len(resp.tables[0].tuples) > 0:
-            legend = resp.tables[0].tuples
-        else:
-            legend = [ ('lat95',    "avg latency95",             "Time",     "Latency (ms)"),
-                       ('lat99',    "avg latency99",             "Time",     "latency (ms)"),
-                       ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
-                     ]
+        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
+                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
+                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node")
+                 }
 
-        app_filename = app.replace(' ', '_')
+        for r in resp.tables[0].tuples:
+            legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4])
+
         fns = [app]
-        for r in legend:
-            title = app + " " + r[1]
+        flags = dict()
+        for r in legend.itervalues():
+            title = app + " " + r['heading']
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate)
+            flags.update(f)
 
         fns.append(iorder)
+        fns.append(flags)
         filenames.append(tuple(fns))
 
     filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))

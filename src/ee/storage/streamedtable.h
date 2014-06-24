@@ -54,6 +54,11 @@ class StreamedTable : public Table {
     virtual TableIterator& iterator();
     virtual TableIterator* makeIterator();
 
+    virtual TableIterator& iteratorDeletingAsWeGo() {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "May not iterate a streamed table.");
+    }
+
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------

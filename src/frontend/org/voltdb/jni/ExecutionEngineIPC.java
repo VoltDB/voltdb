@@ -859,7 +859,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String lastAccessedTable = m_connection.readString(size);
                     long lastAccessedTableSize = m_connection.readLong();
                     long tuplesFound = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
+                    long currMemoryInBytes = m_connection.readLong();
+                    long peakMemoryInBytes = m_connection.readLong();
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
+                            currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
                     m_data.putLong(nextStep);
                     m_data.flip();

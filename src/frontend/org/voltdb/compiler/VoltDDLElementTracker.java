@@ -105,6 +105,26 @@ public class VoltDDLElementTracker {
     }
 
     /**
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
+     */
+    void removeProcedure(String procName) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
+    }
+
+    /**
      * Associates the given partition info to the given tracked procedure
      * @param procedureName the short name of the procedure name
      * @param partitionInfo the partition info to associate with the procedure
@@ -131,7 +151,8 @@ public class VoltDDLElementTracker {
                     descriptor.m_authGroups,
                     descriptor.m_class,
                     partitionInfo,
-                    descriptor.m_language);
+                    descriptor.m_language,
+                    descriptor.m_scriptImpl);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -142,6 +163,7 @@ public class VoltDDLElementTracker {
                     partitionInfo,
                     false,
                     descriptor.m_language,
+                    descriptor.m_scriptImpl,
                     descriptor.m_class);
         }
         m_procedureMap.put(procedureName, descriptor);

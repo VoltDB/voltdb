@@ -59,8 +59,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    private final String[] procs = {"R1.insert", "R2.insert", /* "P1.insert", "P2.insert", "P3.insert"*/};
-    private final String [] tbs =  {"R1","R2"/*,"P1","P2","P3"*/};
+    private final String[] procs = {"R1.insert", "R2.insert", "P1.insert", "P2.insert", "P3.insert"};
+    private final String [] tbs =  {"R1","R2","P1","P2","P3"};
 
     /**
      * Simple sub-query
@@ -166,7 +166,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select newid, id  " +
                     "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
                     "WHERE T1.id = T2.dept ORDER BY newid").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{4, 2}, {5, 2}});
 
             vt = client.callProcedure("@AdHoc",
@@ -178,27 +177,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "WHERE R1.wage / T2.dept_count > 10 ORDER BY wage,dept_count").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3, 30, 2}, {4, 40, 2}, {4, 40, 3},{5, 50, 2},{5, 50, 3}});
 
-            if (!isHSQL()) {
-                vt = client.callProcedure("@AdHoc",
-                        "select id, newid  " +
-                        "FROM (SELECT id, wage FROM R1) T1 " +
-                        "   LEFT OUTER JOIN " +
-                        "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
-                        "   ON T1.id = T2.dept " +
-                        "ORDER BY id, newid").getResults()[0];
-                System.out.println(vt.toString());
-                validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
-                        {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
-            }
 
             vt = client.callProcedure("@AdHoc",
-                    "select T2.id " +
-                    "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
-                    "ORDER BY T2.id").getResults()[0];
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
-                    {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
+                    "select id, newid  " +
+                            "FROM (SELECT id, wage FROM R1) T1 " +
+                            "   LEFT OUTER JOIN " +
+                            "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
+                            "   ON T1.id = T2.dept " +
+                    "ORDER BY id, newid").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
+                    {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
         }
+
+        vt = client.callProcedure("@AdHoc",
+                "select T2.id " +
+                "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
+                "ORDER BY T2.id").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
+                {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
     }
 
     public void testSubSelects_from_replicated() throws NoConnectionsException, IOException, ProcCallException
@@ -210,29 +206,129 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
                 "where T1.ID = P1.ID and T1.ID < 4 order by P1.ID;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] { {1,10}, {2, 20}, {3, 30}});
 
         vt = client.callProcedure("@AdHoc",
                 "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
                 "where T1.ID = P1.ID and T1.ID = 3 order by P1.ID;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] { {3, 30}});
 
         vt = client.callProcedure("@AdHoc",
                 "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
                 "where T1.ID = P1.ID and P1.ID = 3 order by P1.ID;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] { {3, 30}});
 
 
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
                 "where T1.ID = P1.WAGE / 10 order by P1.ID;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] { {1, 10}, {2, 20}, {3, 30}, {4, 40}, {5, 50}});
     }
 
+
+    public void testENG6276() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String sqlArray =
+            "INSERT INTO P4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);" +
+            "INSERT INTO P4 VALUES (1, 'EPOJbVcUPlDghTEMs', NULL, 6.95147507397556374542e-01);" +
+            "INSERT INTO P4 VALUES (2, 'EPOJbVcUPlDghTEMs', -27645, 9.49225716086843585018e-01);" +
+            "INSERT INTO P4 VALUES (3, 'EPOJbVcUPlDghTEMs', -27645, 3.41233435850314625881e-01);" +
+            "INSERT INTO P4 VALUES (4, 'baYqQXVHBZHVlDRlu', 8130, 7.10103786492815025611e-01);" +
+            "INSERT INTO P4 VALUES (5, 'baYqQXVHBZHVlDRlu', 8130, 7.24543183451542227580e-01);" +
+            "INSERT INTO P4 VALUES (6, 'baYqQXVHBZHVlDRlu', 23815, 4.49837414257097889525e-01);" +
+            "INSERT INTO P4 VALUES (7, 'baYqQXVHBZHVlDRlu', 23815, 4.91748197919483431839e-01);" +
+
+            "INSERT INTO R4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);" +
+            "INSERT INTO R4 VALUES (1, 'EPOJbVcUPlDghTEMs', NULL, 6.95147507397556374542e-01);" +
+            "INSERT INTO R4 VALUES (2, 'EPOJbVcUPlDghTEMs', -27645, 9.49225716086843585018e-01);" +
+            "INSERT INTO R4 VALUES (3, 'EPOJbVcUPlDghTEMs', -27645, 3.41233435850314625881e-01);" +
+            "INSERT INTO R4 VALUES (4, 'baYqQXVHBZHVlDRlu', 8130, 7.10103786492815025611e-01);" +
+            "INSERT INTO R4 VALUES (5, 'baYqQXVHBZHVlDRlu', 8130, 7.24543183451542227580e-01);" +
+            "INSERT INTO R4 VALUES (6, 'baYqQXVHBZHVlDRlu', 23815, 4.49837414257097889525e-01);" +
+            "INSERT INTO R4 VALUES (7, 'baYqQXVHBZHVlDRlu', 23815, 4.91748197919483431839e-01);" ;
+
+        // Test Default
+        String []sqls = sqlArray.split(";");
+        for (String sql: sqls) {
+            sql = sql.trim();
+            if (!sql.isEmpty()) {
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            }
+        }
+
+        String query =
+            "SELECT -8, A.NUM " +
+            "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
+            "WHERE (A.NUM + 5 ) > 44";
+
+        vt = client.callProcedure("@Explain", query).getResults()[0];
+        System.err.println(vt);
+
+        vt = client.callProcedure("@AdHoc", query).getResults()[0];
+        System.err.println(vt);
+        long[] row = new long[] {-8, 63890};
+        validateTableOfLongs(vt, new long[][] {row, row, row, row,
+                row, row, row, row});
+    }
+
+
+    // Test subqueries on partitioned table cases
+    public void testSubSelects_from_partitioned() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1) T1, P2 " +
+                "where T1.ID = P2.DEPT order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,1}, {1, 1}, {1, 1}, {2, 1}, {2, 1}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, P2 " +
+                "where T1.ID = P2.DEPT order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}});
+
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT " +
+                "FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, " +
+                "       (SELECT DEPT FROM P2 ) T2,  " +
+                "       (SELECT ID FROM P3 ) T3  " +
+                "where T1.ID = T2.DEPT and T2.DEPT = T3.ID order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}});
+
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT " +
+                "FROM (SELECT P1.ID, P1.DEPT FROM P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
+                "where T1.ID = P2.DEPT and P2.DEPT = 2 order by T1.ID;").getResults()[0];
+
+        validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}, {2, 1}, {2, 1}});
+
+
+        // Outer joins
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1) T1 LEFT OUTER JOIN P2 " +
+                "ON T1.ID = P2.DEPT order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,1}, {1, 1}, {1, 1},
+                {2, 1}, {2, 1}, {3, 1}, {4, 2}, {5, 2}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1) T1 LEFT OUTER JOIN P2 " +
+                "ON T1.ID = P2.DEPT WHERE T1.ID = 3 order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3, 1}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID, T1.DEPT, P2.WAGE FROM (SELECT ID, DEPT FROM P1) T1 LEFT OUTER JOIN P2 " +
+                "ON T1.ID = P2.DEPT AND P2.DEPT = 2 order by T1.ID;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
+                {3, 1, Long.MIN_VALUE},{4,2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
+
+    }
 
     static public junit.framework.Test suite()
     {
@@ -271,12 +367,31 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
                 "CREATE TABLE P3 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, WAGE) );" +
-                "PARTITION TABLE P3 ON COLUMN WAGE;"
+                "PARTITION TABLE P3 ON COLUMN ID;"
+
+                +
+
+                "CREATE TABLE R4 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "DESC VARCHAR(200), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE TABLE P4 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "DESC VARCHAR(200), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P4 ON COLUMN ID;" +
+
+                ""
                 ;
         try {
             project.addLiteralSchema(literalSchema);
@@ -285,7 +400,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
         boolean success;
 
-        config = new LocalCluster("subselect-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("subselect-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

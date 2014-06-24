@@ -119,7 +119,7 @@ public class StatsProcProfTable {
         if (denom == 0L) {
             return 100L;
         }
-        return (100L * nom / denom);
+        return Math.round(100.0 * nom / denom);
     }
 
     // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.

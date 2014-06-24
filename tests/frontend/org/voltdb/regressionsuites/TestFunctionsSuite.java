@@ -2828,6 +2828,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "T1 TIMESTAMP DEFAULT NULL, " +
                 "T2 TIMESTAMP DEFAULT NOW, " +
                 "T3 TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "T4 TIMESTAMP DEFAULT '2012-12-12 12:12:12.121212', " +
                 "PRIMARY KEY (ID) ); " +
 
                 "";

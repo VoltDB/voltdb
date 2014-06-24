@@ -1,0 +1,24 @@
+Materialized-View Benchmark application
+====================================
+The purpose of this application is to provide insight on the overhead of materialized views on stored procedures.
+
+Test currently consists of performing an adjustable amount of inserts and deletes into a table with a materialized view and 
+a table without (to configure the amount of transactions to perform, adjust the txn input argument).
+
+
+run.sh actions described
+---------------------
+
+run.sh                       : compile all Java clients and stored procedures, build the catalog, and start the server
+
+run.sh server                : start the server
+
+run.sh client                : start the materialialized view benchmark
+
+run.sh matviewbenchmark      : compile the source code and start the materialized view benchmark
+
+run.sh matviewbenchmark-help : print out the help for running the matviewbenchmark
+
+run.sh catalog               : compile sources and build the catalog
+
+run.sh clean                 : remove compiled files

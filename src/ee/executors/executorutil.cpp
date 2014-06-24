@@ -67,6 +67,7 @@
 #include "executors/seqscanexecutor.h"
 #include "executors/unionexecutor.h"
 #include "executors/updateexecutor.h"
+#include "executors/upsertexecutor.h"
 
 #include <cassert>
 
@@ -99,6 +100,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UPSERT: return new UpsertExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);

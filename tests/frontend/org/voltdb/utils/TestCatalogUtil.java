@@ -86,7 +86,9 @@ public class TestCatalogUtil extends TestCase {
 
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
-            String sql = CatalogUtil.toSchema(catalog_tbl);
+            StringBuilder sb = new StringBuilder();
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false);
+            String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 
             // Columns
@@ -656,4 +658,23 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
     }
+
+    /**
+     * The CRC of an empty catalog should always be the same.
+     */
+    public void testEmptyCatalogCRC() throws Exception {
+        File file1 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        assertNotNull(file1);
+        byte[] bytes1 = MiscUtils.fileToBytes(file1);
+        InMemoryJarfile jar1 = new InMemoryJarfile(bytes1);
+        long crc1 = jar1.getCRC();
+        Thread.sleep(5000);
+        File file2 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        assertNotNull(file2);
+        byte[] bytes2 = MiscUtils.fileToBytes(file2);
+        InMemoryJarfile jar2 = new InMemoryJarfile(bytes2);
+        long crc2 = jar2.getCRC();
+        assertEquals(crc1, crc2);
+    }
+
 }

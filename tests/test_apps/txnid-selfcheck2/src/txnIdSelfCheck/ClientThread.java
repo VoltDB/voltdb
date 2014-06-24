@@ -53,8 +53,7 @@ public class ClientThread extends Thread {
          * across client process lifetimes.
          */
         static Type typeFromId(float mpRatio, boolean allowInProcAdhoc) {
-            Random rn = new Random(31); // sequence must be deterministic
-            if (rn.nextFloat() < mpRatio) {
+            if (rn.nextDouble() < mpRatio) {
                 int r = rn.nextInt(19);
                 if (allowInProcAdhoc && (r < 1)) return ADHOC_MP;  // 0% or ~5% of MP workload
                 if (r < 7) return PARTITIONED_MP;                  // ~33% or 38%
@@ -72,6 +71,7 @@ public class ClientThread extends Thread {
     final TxnId2PayloadProcessor m_processor;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
+    static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
 
@@ -89,6 +89,7 @@ public class ClientThread extends Thread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
+        log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);

@@ -213,10 +213,10 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
+                                            this,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
     return true;
 }
 
@@ -355,6 +355,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 m_currentIndexInBatch == (numFragments - 1)))
         {
             ++failures;
+            break;
         }
 
         // at the end of each frag, rollup and reset counters
@@ -379,7 +380,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 {
     assert(planfragmentId != 0);
 
-    Table *cleanUpTable = NULL;
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
@@ -426,9 +426,12 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
         // set this back to -1 for error handling
         m_currentInputDepId = -1;
+        m_currExecutorVec = NULL;
+
         return ENGINE_ERRORCODE_ERROR;
     }
     assert(execsForFrag);
+    m_currExecutorVec = execsForFrag;
 
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
@@ -440,10 +443,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
 
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
@@ -451,28 +450,23 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set this back to -1 for error handling
-                m_currentInputDepId = -1;
+                cleanupExecutors(execsForFrag);
+
                 return ENGINE_ERRORCODE_ERROR;
             }
         } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+            cleanupExecutors(execsForFrag);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
-            // set this back to -1 for error handling
-            m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
+    // Clean up all the tempTable when each plan finishes and reset current InputDepId
+    cleanupExecutors(execsForFrag);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -498,11 +492,25 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
-    // set this back to -1 for error handling
-    m_currentInputDepId = -1;
-
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
+}
+
+/**
+ * Function that clean up the temp table the executors used and reset other metadata.
+ */
+void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
+    // Clean up all the tempTable when each plan finishes
+    BOOST_FOREACH(AbstractExecutor *executor, execsForFrag->list) {
+        assert (executor);
+        executor->cleanupTempOutputTable();
+    }
+    // set this back to -1 for error handling
+    m_currentInputDepId = -1;
+    m_currExecutorVec = NULL;
+    if (execsForFrag != NULL) {
+        execsForFrag->limits.resetPeakMemory();
+    }
 }
 
 // -------------------------------------------------
@@ -1586,7 +1594,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         PersistentTable * originalTable = currentTable->currentPreTruncateTable();
 
         VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
-                tableStreamTypeToString(streamType));
+                tableStreamTypeToString(streamType).c_str());
 
         remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
@@ -1594,7 +1602,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
             // Reset all the previous table pointers to be NULL.
             currentTable->unsetPreTruncateTable();
             VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
-                    tableStreamTypeToString(streamType));
+                    tableStreamTypeToString(streamType).c_str());
         }
     }
     else {
@@ -1753,6 +1761,9 @@ static std::string dummy_last_accessed_plan_node_name("no plan node in progress"
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
+
+    assert(m_currExecutorVec);
+
     if (m_lastAccessedTable == NULL) {
         tableName = "None";
         tableSize = 0;
@@ -1769,7 +1780,9 @@ void VoltDBEngine::reportProgessToTopend() {
                                         planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
+                                        m_currExecutorVec->limits.getAllocated(),
+                                        m_currExecutorVec->limits.getPeakMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
     if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");

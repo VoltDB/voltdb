@@ -30,10 +30,10 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
@@ -44,7 +44,6 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectWithJoinOrder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
@@ -59,8 +58,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         FeaturesSelectAll.class, UpdateTests.class,
         SelfJoinTest.class, SelectOrderLineByDistInfo.class,
         BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class,
-        TruncateTable.class
+        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
     };
 
     /**
@@ -358,7 +356,10 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     public void testJoinOrder() throws Exception {
-        if (isHSQL() || isValgrind()) return;
+        if (isHSQL() || isValgrind() || VoltCompiler.DEBUG_VERIFY_CATALOG) {
+            // This test is disabled for verifycatalog until join order is supported in the DDL and explain plan
+            return;
+        }
 
         Client client = getClient();
 
@@ -433,183 +434,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
-
-    private void loadTableForTruncateTest(Client client, String[] procs) throws Exception {
-        for (String proc: procs) {
-            client.callProcedure(proc, 1,  1,  1.1, "Luke",  "WOBURN");
-            client.callProcedure(proc, 2,  2,  2.1, "Leia",  "Bedfor");
-            client.callProcedure(proc, 3,  30,  3.1, "Anakin","Concord");
-            client.callProcedure(proc, 4,  20,  4.1, "Padme", "Burlington");
-            client.callProcedure(proc, 5,  10,  2.1, "Obiwan","Lexington");
-            client.callProcedure(proc, 6,  30,  3.1, "Jedi",  "Winchester");
-        }
-    }
-
-    public void testTruncateTable() throws Exception {
-        System.out.println("STARTING TRUNCATE TABLE......");
-        Client client = getClient();
-        VoltTable vt = null;
-
-        String[] procs = {"RTABLE.insert", "PTABLE.insert"};
-        String[] tbs = {"RTABLE", "PTABLE"};
-        // Insert data
-        loadTableForTruncateTest(client, procs);
-
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-        }
-
-        if (isHSQL()) {
-            return;
-        }
-
-        Exception e = null;
-        try {
-            client.callProcedure("TruncateTable");
-        } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-        } finally {
-            assertNotNull(e);
-        }
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-
-            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
-
-            vt = client.callProcedure("@AdHoc", "select count(ID) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {7});
-
-
-            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
-
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {0});
-
-            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
-            vt = client.callProcedure("@AdHoc", "select ID from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {7});
-
-            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
-        }
-
-        // insert the data back
-        loadTableForTruncateTest(client, procs);
-        String nestedLoopIndexJoin = "select count(*) from rtable r join ptable p on r.age = p.age";
-
-        // Test nested loop index join
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-        }
-
-        vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
-        System.err.println(vt);
-        assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
-        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
-        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
-
-        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {8});
-
-        vt = client.callProcedure("@AdHoc", "Truncate table ptable").getResults()[0];
-        vt = client.callProcedure("@AdHoc", "select count(*) from ptable").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-
-        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-    }
-
-    public void testTableLimitAndPercentage() throws Exception {
-        System.out.println("STARTING TABLE LIMIT AND PERCENTAGE FULL TEST......");
-        Client client = getClient();
-        VoltTable vt = null;
-        Exception e = null;
-        if(isHSQL()) {
-            return;
-        }
-
-        // When table limit feature is fully supported, there needs to be more test cases.
-        // generalize this test within a loop, maybe.
-        // Test max row 0
-        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
-        } finally {
-            assertNotNull(e);
-        }
-        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-
-        // Test @Statistics TABLE
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED0", 0, 0);
-
-        // Test max row 2
-        vt = client.callProcedure("CAPPED2.insert", 0, 0, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 50);
-        vt = client.callProcedure("CAPPED2.insert", 1, 1, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
-
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
-        } finally {
-            assertNotNull(e);
-        }
-        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED2").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {2});
-
-        // Test @Statistics TABLE
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
-
-        // Test @Statistics TABLE for normal table
-        vt = client.callProcedure("NOCAPPED.insert", 0, 0, 0).getResults()[0];
-        // Test @Statistics TABLE
-        validStatisticsForTableLimitAndPercentage(client, "NOCAPPED", VoltType.NULL_INTEGER, 0);
-
-
-        // Test percentage with round up
-        vt = client.callProcedure("CAPPED3.insert", 0, 0, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 34);
-        vt = client.callProcedure("CAPPED3.insert", 1, 1, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 67);
-        vt = client.callProcedure("CAPPED3.insert", 2, 2, 2).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-        validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 100);
-
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED3.insert", 3, 3, 3).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED3 exceeds table maximum row count 3"));
-        } finally {
-            assertNotNull(e);
-        }
-        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED3").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {3});
-
-    }
-
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -627,11 +451,14 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("SelectRightOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-        project.addStmtProcedure("SelectWrongOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
+            // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
+            project.addProcedures(PROCEDURES);
+            project.addStmtProcedure("SelectRightOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
+            project.addStmtProcedure("SelectWrongOrder",
+                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
+        }
 
         boolean success;
 

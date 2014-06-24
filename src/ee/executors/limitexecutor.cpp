@@ -98,7 +98,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
     int tuple_ctr = 0;
     int tuples_skipped = 0;

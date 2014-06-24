@@ -393,7 +393,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
 
     if (!tryInsertOnAllIndexes(&target)) {
         throw ConstraintFailureException(this, source, TableTuple(),
-                                         CONSTRAINT_TYPE_UNIQUE);
+                CONSTRAINT_TYPE_UNIQUE);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -405,6 +405,9 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
             char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
     }
@@ -755,17 +758,24 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  *     can be used directly.
  */
 void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
+    TableTuple matchable(tupleData, m_schema);
     TableTuple target(tupleData, m_schema);
+    //* enable for debug */ std::cout << "DEBUG: undoing "
+    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
     if (!skipLookup) {
         // The UndoInsertAction got a pooled copy of the tupleData.
         // Relocate the original tuple actually in the table.
-        target = lookupTuple(target);
+        target = lookupTuple(matchable);
     }
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
                             " tuple does not exist\n%s\n", m_name.c_str(),
-                            target.debugNoHeader().c_str());
+                            matchable.debugNoHeader().c_str());
     }
+    //* enable for debug */ std::cout << "DEBUG: finding " << (void*)target.address()
+    //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+    //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
 
     // Make sure that they are not trying to delete the same tuple twice
     assert(target.isActive());
@@ -782,11 +792,15 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
         /*
          * Do a table scan.
          */
+        size_t tuple_length = m_schema->tupleLength();
         TableTuple tableTuple(m_schema);
         TableIterator ti(this, m_data.begin());
         while (ti.hasNext()) {
             ti.next(tableTuple);
-            if (tableTuple.equalsNoSchemaCheck(tuple)) {
+            // Do an inline tuple byte comparison
+            // to avoid matching duplicate tuples with different pointers to Object storage
+            // -- which would cause erroneous releases of the wrong Object storage copy.
+            if (::memcmp(tableTuple.address(), tuple.address(), tuple_length) == 0) {
                 return tableTuple;
             }
         }

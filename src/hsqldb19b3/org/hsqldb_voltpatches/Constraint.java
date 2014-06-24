@@ -1058,6 +1058,8 @@ public final class Constraint implements SchemaObject {
         }
 
         VoltXMLElement constraint = new VoltXMLElement("constraint");
+        // WARNING: the name attribute setting is tentative, subject to reset in the
+        // calling function, Table.voltGetTableXML.
         constraint.attributes.put("name", getName().name);
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
@@ -1068,6 +1070,8 @@ public final class Constraint implements SchemaObject {
         // Any constraint implemented as an index must have an index name attribute.
         // No other constraint details are currently used by VoltDB.
         if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
+            // WARNING: the index attribute setting is tentative, subject to reset in
+            // the calling function, Table.voltGetTableXML.
             constraint.attributes.put("index", core.mainIndex.getName().name);
         }
         return constraint;

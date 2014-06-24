@@ -91,15 +91,4 @@ public class TableLeafNode extends JoinNode {
                                                       equivalenceSet);
         }
     }
-
-    @Override
-    public boolean isReplicatedInSubselects() {
-        return true;
-    }
-
-    @Override
-    public boolean isReplicatedOutsideSubselects() {
-        return m_tableScan.getIsReplicated();
-    }
-
 }

@@ -118,7 +118,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
     if (preJoinPredicate) {
-        preJoinPredicate->substitute(params);
         VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
                     "NULL" : preJoinPredicate->debug(true).c_str());
     }
@@ -127,7 +126,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *joinPredicate = node->getJoinPredicate();
     if (joinPredicate) {
-        joinPredicate->substitute(params);
         VOLT_TRACE ("Join predicate: %s", joinPredicate == NULL ?
                     "NULL" : joinPredicate->debug(true).c_str());
     }
@@ -136,7 +134,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *wherePredicate = node->getWherePredicate();
     if (wherePredicate) {
-        wherePredicate->substitute(params);
         VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ?
                     "NULL" : wherePredicate->debug(true).c_str());
     }
@@ -159,7 +156,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple &joined = output_table->tempTuple();
     TableTuple null_tuple = m_null_tuple;
 
-    TableIterator iterator0 = outer_table->iterator();
+    TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
@@ -179,6 +176,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         // it can't match any of inner tuples
         if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
+            // By default, the delete as we go flag is false.
             TableIterator iterator1 = inner_table->iterator();
             while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
                 pmp.countdownProgress();
