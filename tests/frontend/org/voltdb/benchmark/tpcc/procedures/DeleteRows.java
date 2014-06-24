@@ -59,11 +59,10 @@ import org.voltdb.VoltTable;
         singlePartition = false
     )
 public class DeleteRows extends VoltProcedure {
-    public final SQLStmt warehouse = new SQLStmt("DELETE FROM WAREHOUSE;");
     public final SQLStmt warehouse_half = new SQLStmt("DELETE FROM WAREHOUSE WHERE W_ID > 5000;");
 
     public VoltTable[] run() {
-        voltQueueSQL(warehouse);
+        voltQueueSQL(warehouse_half);
         return voltExecuteSQL();
     }
 }
