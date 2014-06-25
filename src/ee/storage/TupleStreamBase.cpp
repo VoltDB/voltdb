@@ -47,7 +47,7 @@ TupleStreamBase::TupleStreamBase()
       // this allows initial ticks to succeed after rejoins
       m_openSpHandle(0),
       m_openTransactionUso(0),
-      m_committedSpHandle(0), m_committedUso(0), m_rollbacks(0)
+      m_committedSpHandle(0), m_committedUso(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -210,9 +210,6 @@ void TupleStreamBase::rollbackTo(size_t mark)
     if (mark > m_uso) {
         throwFatalException("Truncating the future.");
     }
-
-    m_rollbacks++;
-    //std::cout << "Partition " << partitionId() << " rollbacks " << m_rollbacks << std::endl;
 
     // back up the universal stream counter
     m_uso = mark;

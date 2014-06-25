@@ -79,9 +79,6 @@ public:
     /** Send committed data to the top end */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);
 
-    virtual int partitionId() { return 0; }
-
-
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
 
@@ -108,8 +105,6 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
-
-    size_t m_rollbacks;
 };
 
 }
