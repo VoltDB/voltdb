@@ -26,6 +26,8 @@
 #include <locale>
 #include <iomanip>
 
+#include <iostream>
+
 namespace voltdb {
 
 /** implement the 1-argument SQL OCTET_LENGTH function */
@@ -540,61 +542,63 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
                                    "0000000000"    //20 digits
                                    "0000000100"    //30 digits
                                    "00000000");    //38 digits
-    static TTInt negative_rounding("-0000000000"   //10 digits
-                                   "0000000000"    //20 digits
-                                   "0000000100"    //30 digits
-                                   "00000000");    //38 digits
 
+    TTInt scaledValue;
     const ValueType type = getValueType();
     out.imbue(newloc);
     switch(type) {
     case VALUE_TYPE_TINYINT:
     case VALUE_TYPE_SMALLINT:
-        out << std::fixed << castAsIntegerAndGetValue() << ".00";
-        break;
     case VALUE_TYPE_INTEGER:
-        out << std::fixed << getInteger() << ".00";
-        break;
     case VALUE_TYPE_BIGINT:
-        out << std::fixed << getBigInt() << ".00";
-        break;
     case VALUE_TYPE_DOUBLE:
-        out << std::fixed << std::setprecision(2) << getDouble();
+        scaledValue = castAsDecimalAndGetValue();
         break;
-    // TODO: how to handle rounding?
+    // round to the nearest even
     case VALUE_TYPE_DECIMAL:
-    {
-        TTInt scaledValue = getDecimal();
-        int64_t fraction = getFractionalPart(scaledValue);
-
-        int64_t third_digit = fraction / (kMaxScaleFactor/1000);
-        third_digit %= 10;
-        if (third_digit > 4) {
-            scaledValue += positive_rounding;
-            fraction = getFractionalPart(scaledValue);
-        }
-        else if (third_digit < -4) {
-            scaledValue += negative_rounding;
-            fraction = getFractionalPart(scaledValue);
-        }
-        else {
-
-        }
-
-        if (fraction < 0) {
-            fraction = -fraction;
-        }
-
-        int64_t whole = narrowDecimalToBigInt(scaledValue);
-        fraction /= kMaxScaleFactor/100;
-
-        out << std::fixed << whole << '.' << std::setfill('0') << std::setw(2) << fraction;
-    }
+        scaledValue = getDecimal();
         break;
     default:
         throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
         break;
     }
+
+    if (scaledValue.IsSign()) {
+        out << '-';
+        scaledValue.ChangeSign();
+    }
+
+    std::cout<<"haha "<<scaledValue.ToString(10)<<std::endl;
+
+    int64_t fraction = getFractionalPart(scaledValue);
+    int64_t second_digit = 0;
+
+    int64_t third_digit = fraction / (kMaxScaleFactor / 1000);
+    third_digit %= 10;
+
+    if (third_digit == 5) {
+        second_digit = fraction / (kMaxScaleFactor / 100);
+        // we don't need mod 10 then mod 2, because mod 2 can give us the second
+        // digit is odd or even
+        //second_digit %= 10;
+        second_digit %= 2;
+        if (second_digit != 0) {
+            scaledValue += positive_rounding;
+            fraction = getFractionalPart(scaledValue);
+        }
+    }
+    else if (third_digit > 5) {
+        scaledValue += positive_rounding;
+        fraction = getFractionalPart(scaledValue);
+    }
+    else {
+        // do nothing here
+    }
+
+    int64_t whole = narrowDecimalToBigInt(scaledValue);
+    fraction /= kMaxScaleFactor/100;
+
+    out << std::fixed << whole << '.' << std::setfill('0') << std::setw(2) << fraction;
 
     // TODO: Although there should be only one copy of newloc (and money_numpunct),
     // we still need to test and make sure no memory leakage in this piece of code.

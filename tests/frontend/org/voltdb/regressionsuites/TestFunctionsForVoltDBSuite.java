@@ -1456,26 +1456,42 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "2013-07-18 02:00:00.123457", "IBM", nbd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         bd = new BigDecimal("1.5");
-        cr = client.callProcedure("R3.insert", 3, 11, 32023, 2147483647, n1, 2147483647999.123,
+        cr = client.callProcedure("R3.insert", 3, 11, 32023, 2147483647, n1, 1.5,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         bd = new BigDecimal("-1.5");
-        cr = client.callProcedure("R3.insert", 4, 11, 32023, 2147483647, n1, 2147483647999.123,
+        cr = client.callProcedure("R3.insert", 4, 11, 32023, 2147483647, n1, -1.5,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         bd = new BigDecimal("12340.596");
-        cr = client.callProcedure("R3.insert", 5, 12, 16000, 1280000011, n1-10, 1.5,
+        cr = client.callProcedure("R3.insert", 5, 12, 16000, 1280000011, n1-10, 1.508,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         bd = new BigDecimal("-12340.596");
-        cr = client.callProcedure("R3.insert", 6, 12, 16000, 1280000011, n1-10, 1.5,
+        cr = client.callProcedure("R3.insert", 6, 12, 16000, 1280000011, n1-10, -1.508,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         bd = new BigDecimal("12399.996");
-        cr = client.callProcedure("R3.insert", 7, 12, 16000, 1280000011, n1-10, 1.5,
+        cr = client.callProcedure("R3.insert", 7, 12, 16000, 1280000011, n1-10, 1.512,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         bd = new BigDecimal("-12399.996");
-        cr = client.callProcedure("R3.insert", 8, 12, 16000, 1280000011, n1-10, 1.5,
+        cr = client.callProcedure("R3.insert", 8, 12, 16000, 1280000011, n1-10, -1.512,
+                "2013-07-18 02:00:00.123457", "IBM", bd);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        bd = new BigDecimal("12399.995");
+        cr = client.callProcedure("R3.insert", 9, 12, 16000, 1280000011, n1-10, 1.515,
+                "2013-07-18 02:00:00.123457", "IBM", bd);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        bd = new BigDecimal("-12399.995");
+        cr = client.callProcedure("R3.insert", 10, 12, 16000, 1280000011, n1-10, -1.515,
+                "2013-07-18 02:00:00.123457", "IBM", bd);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        bd = new BigDecimal("12399.985");
+        cr = client.callProcedure("R3.insert", 11, 12, 16000, 1280000011, n1-10, 1.505,
+                "2013-07-18 02:00:00.123457", "IBM", bd);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        bd = new BigDecimal("-12399.985");
+        cr = client.callProcedure("R3.insert", 12, 12, 16000, 1280000011, n1-10, -1.505,
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
@@ -1614,54 +1630,107 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(pcex.getMessage().contains("out of range"));
         }
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 3");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 3");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
         assertEquals(str, "1.50");
+        str = result.getString(1);
+        assertEquals(str, "1.50");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 4");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 4");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
         assertEquals(str, "-1.50");
+        str = result.getString(1);
+        assertEquals(str, "-1.50");
 
         // rounding
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 5");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 5");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        assertEquals(str, "1.51");
+        str = result.getString(1);
         assertEquals(str, "12,340.60");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 6");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 6");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        assertEquals(str, "-1.51");
+        str = result.getString(1);
         assertEquals(str, "-12,340.60");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 7");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 7");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        assertEquals(str, "1.51");
+        str = result.getString(1);
         assertEquals(str, "12,400.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 8");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 8");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        assertEquals(str, "-1.51");
+        str = result.getString(1);
         assertEquals(str, "-12,400.00");
+
+        // round to nearest even
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 9");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        //assertEquals(str, "1.52");
+        str = result.getString(1);
+        assertEquals(str, "12,400.00");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 10");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        //assertEquals(str, "-1.52");
+        str = result.getString(1);
+        assertEquals(str, "-12,400.00");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 11");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertEquals(str, "1.50");
+        str = result.getString(1);
+        assertEquals(str, "12,399.98");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 12");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertEquals(str, "-1.50");
+        str = result.getString(1);
+        assertEquals(str, "-12,399.98");
 
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY('abc') from R3 where id = 4");
