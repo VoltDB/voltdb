@@ -74,6 +74,21 @@ public class SQLCommand
     private static final Pattern Subquery =
             Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern CreateView =
+        Pattern.compile("(\\s*)(create\\s+view\\s+.*\\s+as\\s+)select",
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern CreateProcedureSelect =
+        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)select",
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern CreateProcedureInsert =
+        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)insert",
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern CreateProcedureUpdate =
+        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)update",
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern CreateProcedureDelete =
+        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)delete",
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -144,12 +159,22 @@ public class SQLCommand
         }
 
         /*
-         * Mark all subsequent set and subquery portions of a query with SQL_PARSER_SAME_SELECT tag
+         * Mark all SQL keywords that are part of another statement so they don't get auto-split
          */
         query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SAME_SELECT");
         query = Subquery.matcher(query).replaceAll("$1$2$3SQL_PARSER_SAME_SELECT");
+        query = CreateView.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEVIEW");
+        query = CreateProcedureSelect.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATESELECT");
+        query = CreateProcedureInsert.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEINSERT");
+        query = CreateProcedureUpdate.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEUPDATE");
+        query = CreateProcedureDelete.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEDELETE");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
+        query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
+        query = query.replaceAll("SQL_PARSER_SAME_CREATESELECT", "select");
+        query = query.replaceAll("SQL_PARSER_SAME_CREATEINSERT", "insert");
+        query = query.replaceAll("SQL_PARSER_SAME_CREATEUPDATE", "update");
+        query = query.replaceAll("SQL_PARSER_SAME_CREATEDELETE", "delete");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
@@ -240,7 +265,7 @@ public class SQLCommand
         "UPDATE",
     };
 
-    private static List<String> getQuery(boolean interactive) throws Exception
+    public static List<String> getQuery(boolean interactive) throws Exception
     {
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
@@ -703,6 +728,12 @@ public class SQLCommand
         {
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@AdHoc", query));
+            // if the query was DDL, reload the stored procedures.
+            if (SQLLexer.extractDDLToken(query) != null) {
+                Procedures.clear();
+                loadSystemProcedures();
+                loadStoredProcedures(Procedures);
+            }
         }
         return;
     }
@@ -1011,6 +1042,11 @@ public class SQLCommand
 
     static public void mockVoltDBForTest(Client testVoltDB) {
         VoltDB = testVoltDB;
+    }
+
+    static public void mockLineReaderForTest(SQLConsoleReader reader)
+    {
+        lineInputReader = reader;
     }
 
     private static InputStream in = null;

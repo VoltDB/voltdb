@@ -84,8 +84,7 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedSpHandle,
-                       int64_t currentSpHandle);
+                       int64_t lastComittedSpHandle);
 
     /** write a tuple to the stream */
     size_t appendTuple(int64_t lastCommittedSpHandle,

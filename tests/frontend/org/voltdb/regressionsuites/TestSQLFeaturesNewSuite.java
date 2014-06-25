@@ -242,10 +242,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"));
-        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
-            // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
-            project.addProcedures(PROCEDURES);
-        }
+        project.addProcedures(PROCEDURES);
 
         boolean success;
 
