@@ -17,14 +17,12 @@
 
 package org.voltdb.iv2;
 
-import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -83,7 +81,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
@@ -107,10 +105,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                         startAction.doesRejoin());
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
 
-        super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions,
-                startAction,
-                agent, memStats, cl, coreBindIds, drGateway);
+        super.configureCommon(backend, catalogContext,
+                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway);
 
         m_tickProducer.start();
 

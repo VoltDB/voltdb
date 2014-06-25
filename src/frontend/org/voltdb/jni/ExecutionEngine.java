@@ -17,6 +17,7 @@
 
 package org.voltdb.jni;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -423,8 +424,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Releases the Engine object. */
     abstract public void release() throws EEException, InterruptedException;
 
+    public static byte[] getStringBytes(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    public void loadCatalog(long timestamp, String serializedCatalog) {
+        loadCatalog(timestamp, getStringBytes(serializedCatalog));
+    }
+
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
+    abstract protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
