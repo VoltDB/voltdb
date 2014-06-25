@@ -13,7 +13,7 @@
 {@agg = "_numagg"}
 --- DESC is a varchar partition column
 {@columnpredicate = "A._variable[#string string] = B.DESC"}
-{@columntype = "int"}
+{@columntype = "numeric"}
 {@comparableconstant = "44"}
 {@comparabletype = "numeric"}
 {@comparablevalue = "_numericvalue"}
@@ -41,15 +41,15 @@ INSERT INTO @dmltable VALUES (_id, 'NewSQL', 10, 500.0)
 INSERT INTO @dmltable VALUES (_id, 'NewSQL', 10, 500.0)
 
 SELECT 1, * FROM @fromtables A WHERE @columnpredicate
-SELECT @optionalfn(A._variable[#picked @columntype]) AS Q5 FROM @fromtables A WHERE @columnpredicate ORDER BY 1 LIMIT _value[int:1,100] OFFSET _value[int:1,100]
+SELECT A._variable[#arg @columntype] AS Q5 FROM @fromtables A WHERE @columnpredicate ORDER BY 1 LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 
 -- additional aggregation fun
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     ))                                              AS Q16 FROM @fromtables A WHERE @columnpredicate
+SELECT     @agg(                                          A._variable[#arg @columntype]     )                                                   AS Q16 FROM @fromtables A WHERE @columnpredicate
 
 -- These test that the fixed issue eng-909 -- combining DISTINCT and non-DISTINCT aggs has not regressed.
-SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
-SELECT 20,                                               A._variable[#GB @columntype]   , @agg(@optionalfn(A._variable[@columntype]))        FROM @fromtables A WHERE @columnpredicate GROUP BY         A.__[#GB]
-SELECT 21,                           A._variable[#GB @columntype] ,                       @agg(            A._variable[@columntype] )        FROM @fromtables A WHERE @columnpredicate GROUP BY         A.__[#GB]
+SELECT     _distinctableagg(DISTINCT                     A._variable[#arg @columntype]      ), @agg(            A._variable[#arg @columntype] ) AS Q18 FROM @fromtables A WHERE @columnpredicate
+SELECT 20,                                               A._variable[#GB @columntype]   ,      @agg(            A._variable[#arg @columntype] )        FROM @fromtables A WHERE @columnpredicate GROUP BY         A.__[#GB]
+SELECT 21,                           A._variable[#GB @columntype] ,                            @agg(            A._variable[#arg @columntype] )        FROM @fromtables A WHERE @columnpredicate GROUP BY         A.__[#GB]   ORDER BY 2       LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q24 FROM @fromtables A WHERE @columnpredicate
+SELECT     @agg(                     A._variable[#arg @columntype]     ), COUNT(*)                                         AS Q24 FROM @fromtables A WHERE @columnpredicate
 
