@@ -87,7 +87,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       source,
                                       ExportTupleStream::INSERT);
         m_tupleCount++;
-        std::cout << "Insert tuple partition " << m_wrapper->m_partitionId << " count " << m_tupleCount << std::endl;
+//        std::cout << "Insert tuple partition " << m_wrapper->m_partitionId << " count " << m_tupleCount << std::endl;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
             // With no active UndoLog, there is no undo support.
