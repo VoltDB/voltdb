@@ -924,7 +924,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
 
-        // (3) Sub-query with group by join with replicated table
+        // (3) Sub-query with replicated table group by
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT A, C FROM R1 GROUP BY A, C) T1, P1 " +
                 "where T1.A = P1.A ");
@@ -983,7 +983,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "SP4");
 
         //
-        // (4) Sub-query with group by join with partitioned table
+        // (4) Sub-query with partitioned table group by
         //
 
         // optimize the group by case to join on distributed node.
@@ -1203,15 +1203,8 @@ public class TestSubQueries extends PlannerTestCase {
                 "                (SELECT A, C FROM R2 LIMIT 5) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
         assertEquals(2, planNodes.size());
-
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
-        // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+        checkPushedDownJoins(planNodes, 3);
 
         // Distinct apply on replicated table only
         planNodes = compileToFragments(
@@ -1223,11 +1216,7 @@ public class TestSubQueries extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertEquals(2, planNodes.size());
-
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
-        // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+        checkPushedDownJoins(planNodes, 3);
 
 
         // table count
@@ -1240,11 +1229,7 @@ public class TestSubQueries extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertEquals(2, planNodes.size());
-
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
-        // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+        checkPushedDownJoins(planNodes, 3);
 
 
         // group by
@@ -1257,13 +1242,7 @@ public class TestSubQueries extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertEquals(2, planNodes.size());
-
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
-        // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
-
-
+        checkPushedDownJoins(planNodes, 3);
 
         //
         planNodes = compileToFragments(
@@ -1275,11 +1254,7 @@ public class TestSubQueries extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertEquals(2, planNodes.size());
-
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
-        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
-        // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+        checkPushedDownJoins(planNodes, 3);
     }
 
     private void checkJoinNode(AbstractPlanNode root, PlanNodeType type, int num) {
@@ -1287,6 +1262,15 @@ public class TestSubQueries extends PlannerTestCase {
         if (num > 0) {
             assertEquals(num, nodes.size());
         }
+    }
+
+    private void checkPushedDownJoins(List<AbstractPlanNode> planNodes, int nestLoopCount) {
+        assertEquals(2, planNodes.size());
+
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
+        checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
+        // Join on distributed node
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
     }
 
     public void testPartitionedLimitOffset() {
@@ -1692,8 +1676,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         // LEFT partition table
-        planNodes = compileToFragments("SELECT T1.CC FROM P1 LEFT JOIN " +
-                "(SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
+        planNodes = compileToFragments("SELECT T1.CC FROM P1 LEFT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
         for (AbstractPlanNode apn: planNodes) {
             System.out.println(apn.toExplainPlanString());
         }
@@ -1747,8 +1730,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
 
         // RIGHT partition table
-        planNodes = compileToFragments("SELECT T1.CC FROM P1 RIGHT JOIN " +
-                "(SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
+        planNodes = compileToFragments("SELECT T1.CC FROM P1 RIGHT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
         for (AbstractPlanNode apn: planNodes) {
             System.out.println(apn.toExplainPlanString());
         }

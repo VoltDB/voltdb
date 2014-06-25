@@ -317,7 +317,7 @@ public class QueryPlanner {
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit
-            m_recentErrorMsg = "This query has too complex joins that are not supported: " + m_sql;
+            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. Consider simplifying its subqueries: " + m_sql;
             return null;
         }
 

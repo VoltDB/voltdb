@@ -606,7 +606,7 @@ public class PlanAssembler {
 
         // Remove the coordinator send/receive pair.
         // It will be added later for the whole plan
-        compiledPlan.rootPlanGraph = subqueryScan.processRevieveNode(compiledPlan.rootPlanGraph);
+        compiledPlan.rootPlanGraph = subqueryScan.processReceiveNode(compiledPlan.rootPlanGraph);
 
         subqueryScan.setBestCostPlan(compiledPlan);
 

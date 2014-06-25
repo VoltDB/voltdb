@@ -295,7 +295,7 @@ public class StmtSubqueryScan extends StmtTableScan {
      * @param root
      * @return
      */
-    public AbstractPlanNode processRevieveNode(AbstractPlanNode root) {
+    public AbstractPlanNode processReceiveNode(AbstractPlanNode root) {
         assert(m_subqueriesPartitioning != null);
         if (! m_subqueriesPartitioning.requiresTwoFragments()) {
             return root;
