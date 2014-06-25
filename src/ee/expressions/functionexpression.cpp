@@ -328,9 +328,6 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
-        case FUNC_VOLT_FORMAT_CURRENCY:
-            ret = new UnaryFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>((*arguments)[0]);
-            break;
         default:
             return NULL;
         }
@@ -382,6 +379,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
         default:
             return NULL;
