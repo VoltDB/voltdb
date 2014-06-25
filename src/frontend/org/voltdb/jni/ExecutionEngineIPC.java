@@ -770,6 +770,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -807,6 +808,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(cmd.m_id);
+        m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
@@ -836,12 +838,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
             final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
 
@@ -910,8 +913,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
+            final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -920,10 +923,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);
+        m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
+        m_data.putInt(shouldDRStream ? 1 : 0);
 
         final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
         if (m_data.remaining() < tableBytes.remaining()) {

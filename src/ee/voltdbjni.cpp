@@ -406,8 +406,8 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
-    jbyteArray serialized_table, jlong spHandle, jlong lastCommittedSpHandle,
-    jboolean returnUniqueViolations, jlong undoToken)
+    jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
+    jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -429,9 +429,9 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            bool success = engine->loadTable(table_id, serialize_in,
+            bool success = engine->loadTable(table_id, serialize_in, txnId,
                                              spHandle, lastCommittedSpHandle,
-                                             returnUniqueViolations);
+                                             returnUniqueViolations, shouldDRStream);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 
@@ -546,6 +546,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jint num_fragments,
         jlongArray plan_fragment_ids,
         jlongArray input_dep_ids,
+        jlong txnId,
         jlong spHandle,
         jlong lastCommittedSpHandle,
         jlong uniqueId,
@@ -581,6 +582,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     fragmentIdsBuffer,
                                                     input_dep_ids ? depIdsBuffer : NULL,
                                                     serialize_in,
+                                                    txnId,
                                                     spHandle,
                                                     lastCommittedSpHandle,
                                                     uniqueId,

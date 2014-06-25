@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -578,27 +579,32 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    /*
-                     * The poll is blocking through the future, shouldn't
-                     * call poll a second time until a response has been given
-                     * which nulls out the field
-                     */
-                    if (m_pollFuture != null) {
-                        fut.setException(new RuntimeException("Should not poll more than once"));
-                        return;
+        try {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        /*
+                         * The poll is blocking through the future, shouldn't
+                         * call poll a second time until a response has been given
+                         * which nulls out the field
+                         */
+                        if (m_pollFuture != null) {
+                            fut.setException(new RuntimeException("Should not poll more than once"));
+                            return;
+                        }
+                        pollImpl(fut);
+                    } catch (Exception e) {
+                        exportLog.error("Exception polling export buffer", e);
+                    } catch (Error e) {
+                        VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
-                    pollImpl(fut);
-                } catch (Exception e) {
-                    exportLog.error("Exception polling export buffer", e);
-                } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                 }
-            }
-        });
+            });
+        } catch (RejectedExecutionException e) {
+            //Don't expect this to happen outside of test, but in test it's harmless
+            exportLog.info("Polling from export data source rejected, this should be harmless");
+        }
         return fut;
     }
 
@@ -677,14 +683,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void discard() {
             checkDoubleFree();
-            m_backingCont.discard();
             try {
-                ack(m_uso);
-            } finally {
-                forwardAckToOtherReplicas(m_uso);
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            m_backingCont.discard();
+                            try {
+                                ackImpl(m_uso);
+                            } finally {
+                                forwardAckToOtherReplicas(m_uso);
+                            }
+                        } catch (Exception e) {
+                            exportLog.error("Error acking export buffer", e);
+                        } catch (Error e) {
+                            VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
+                        }
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                //Don't expect this to happen outside of test, but in test it's harmless
+                exportLog.info("Acking export data task rejected, this should be harmless");
+                //With the executor service stopped, it is safe to discard the backing container
+                m_backingCont.discard();
             }
         }
-
     }
 
     private void forwardAckToOtherReplicas(long uso) {

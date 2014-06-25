@@ -34,7 +34,7 @@ public:
 
     ExportTupleStream(CatalogId partitionId, int64_t siteId);
 
-    ~ExportTupleStream() {
+    virtual ~ExportTupleStream() {
     }
 
     void setSignatureAndGeneration(std::string signature, int64_t generation);
@@ -71,6 +71,12 @@ public:
                        ExportTupleStream::Type type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+
+    virtual int partitionId() { return m_partitionId; }
+
+    // cached catalog values
+    const CatalogId m_partitionId;
+    const int64_t m_siteId;
 
     std::string m_signature;
     int64_t m_generation;

@@ -318,6 +318,7 @@ CTX.INPUT['storage'] = """
  TempTableLimits.cpp
  TupleStreamBase.cpp
  ExportTupleStream.cpp
+ DRTupleStream.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
@@ -349,6 +350,11 @@ CTX.THIRD_PARTY_INPUT['crc'] = """
 CTX.THIRD_PARTY_INPUT['murmur3'] = """
  MurmurHash3.cpp
 """
+
+CTX.THIRD_PARTY_INPUT['sha1'] = """
+ sha1.cpp
+"""
+
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -421,6 +427,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      tabletuple_export_test
      TempTableLimitsTest
      ExportTupleStream_test
+     DRTupleStream_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):

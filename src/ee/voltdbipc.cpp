@@ -73,6 +73,7 @@ struct ipc_command {
  */
 typedef struct {
     struct ipc_command cmd;
+    int64_t txnId;
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
@@ -93,9 +94,12 @@ typedef struct {
 typedef struct {
     struct ipc_command cmd;
     int32_t tableId;
+    int64_t txnId;
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t undoToken;
+    int32_t undo;
+    int32_t shouldDRStream;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -599,6 +603,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                                 fragmentIds,
                                                 inputDepIds,
                                                 serialize_in,
+                                                ntohll(queryCommand->txnId),
                                                 ntohll(queryCommand->spHandle),
                                                 ntohll(queryCommand->lastCommittedSpHandle),
                                                 ntohll(queryCommand->uniqueId),
@@ -644,9 +649,12 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     }
 
     const int32_t tableId = ntohl(loadTableCommand->tableId);
+    const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t spHandle = ntohll(loadTableCommand->spHandle);
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
+    const bool undo = loadTableCommand->undo != 0;
+    const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
@@ -654,7 +662,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInput serialize_in(offset, sz);
         m_engine->setUndoToken(undoToken);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle, false);
+        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, undo, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
         } else {

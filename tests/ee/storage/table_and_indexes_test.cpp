@@ -36,6 +36,7 @@
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 
 using namespace voltdb;
@@ -44,7 +45,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0);
+            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0, &drStream);
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;
@@ -172,7 +173,7 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, 0);
+            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, signature, &drStream, false, 0);
 
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
@@ -192,6 +193,7 @@ class TableAndIndexTest : public Test {
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                       warehouseTupleSchema, warehouseColumnNames,
+                                                                      signature, false,
                                                                       0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
@@ -212,6 +214,7 @@ class TableAndIndexTest : public Test {
 
             customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                      customerTupleSchema, customerColumnNames,
+                                                                     signature, false,
                                                                      0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
@@ -245,6 +248,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        MockDRTupleStream drStream;
 
         TupleSchema      *districtTupleSchema;
         vector<TableIndexScheme> districtIndexes;
@@ -271,6 +275,7 @@ class TableAndIndexTest : public Test {
         TableIndexScheme  customerIndex2Scheme;
         vector<int>       customerIndex3ColumnIndices;
         TableIndexScheme  customerIndex3Scheme;
+        char signature[20];
 };
 
 TEST_F(TableAndIndexTest, BigTest) {

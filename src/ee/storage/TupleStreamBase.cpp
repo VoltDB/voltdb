@@ -39,10 +39,8 @@ using namespace voltdb;
 const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(CatalogId partitionId,
-                                       int64_t siteId)
-    : m_partitionId(partitionId), m_siteId(siteId),
-      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+TupleStreamBase::TupleStreamBase()
+    : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
@@ -94,7 +92,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, bool sync)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, bool sync, bool flush)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -117,20 +115,37 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                     true,
                     false);
         }
+
+        if (flush) {
+            extendBufferChain(0);
+        }
+
         return;
     }
 
     // If the current TXN ID has advanced, then we know that:
     // - The old open transaction has been committed
     // - The current transaction is now our open transaction
-    if (m_openSpHandle < currentSpHandle)
+    // If last committed and current sphandle are the same
+    // this isn't a new transaction, the block below handles it better
+    // by ending the current open transaction and not starting a new one
+    if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
+        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
+            endTransaction(m_openSpHandle);
+        }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
-        //<< currentSpHandle << ")" << std::endl;
+        //<< currentSpHandle << ")" << std::endl;T
         m_committedUso = m_uso;
         // Advance the tip to the new transaction.
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
+
+        if (flush) {
+            extendBufferChain(0);
+        }
+
+        beginTransaction(txnId, currentSpHandle);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -140,10 +155,28 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     {
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
+        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
+            endTransaction(m_openSpHandle);
+        }
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
+
+        if (flush) {
+            extendBufferChain(0);
+        }
     }
 
+    pushPendingBlocks();
+
+    if (sync) {
+        pushExportBuffer(
+                NULL,
+                true,
+                false);
+    }
+}
+
+void TupleStreamBase::pushPendingBlocks() {
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
@@ -167,15 +200,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             break;
         }
     }
-
-    if (sync) {
-        pushExportBuffer(
-                NULL,
-                true,
-                false);
-    }
 }
-
 
 /*
  * Discard all data with a uso gte mark
@@ -211,6 +236,9 @@ void TupleStreamBase::rollbackTo(size_t mark)
                 break;
             }
         }
+        if (m_currBlock == NULL) {
+            extendBufferChain(m_defaultCapacity);
+        }
     }
 }
 
@@ -236,17 +264,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
-            if (m_committedUso >= (m_currBlock->uso() + m_currBlock->offset()))
-            {
-                //The block is handed off to the topend which is responsible for releasing the
-                //memory associated with the block data. The metadata is deleted here.
-                pushExportBuffer(
-                        m_currBlock, false, false);
-                delete m_currBlock;
-            } else {
-                m_pendingBlocks.push_back(m_currBlock);
-                m_currBlock = NULL;
-            }
+            m_pendingBlocks.push_back(m_currBlock);
+            m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -262,6 +281,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+
+    pushPendingBlocks();
 }
 
 /*
@@ -271,12 +292,12 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamBase::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedSpHandle,
-                                  int64_t currentSpHandle)
+                                  int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
+        int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
+        if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
         }
 
@@ -287,9 +308,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            extendBufferChain(0);
-            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
-        }
+        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, timeInMillis < 0 ? true : false, true);
     }
 }

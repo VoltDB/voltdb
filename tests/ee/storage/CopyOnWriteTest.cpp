@@ -41,6 +41,7 @@
 #include "storage/TableStreamerContext.h"
 #include "storage/ElasticScanner.h"
 #include "storage/ElasticContext.h"
+#include "storage/DRTupleStream.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include "jsoncpp/jsoncpp.h"
@@ -231,7 +232,7 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
-                                                         m_columnNames, 0, false, false,
+                                                         m_columnNames, signature, false, 0, false, false,
                                                          tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
@@ -291,7 +292,7 @@ public:
             }
         }
         m_engine->setUndoToken(++m_undoToken);
-        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -1072,7 +1073,7 @@ public:
         else {
             m_engine->releaseUndoToken(m_undoToken);
         }
-        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
         m_undoToken++;
     }
 
@@ -1086,11 +1087,13 @@ public:
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;
+    voltdb::MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
     DefaultTupleSerializer m_serializer;
     char m_serializationBuffer[BUFFER_SIZE];
     char m_predicateBuffer[1024 * 256];
@@ -1241,7 +1244,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
-    m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+    m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -1308,7 +1311,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
-    m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+    m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -1365,7 +1368,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             }
             m_engine->undoUndoToken(m_undoToken);
             m_engine->setUndoToken(++m_undoToken);
-            m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+            m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
         }
 
         checkTuples(0, originalTuples, COWTuples);

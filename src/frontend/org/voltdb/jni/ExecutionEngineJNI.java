@@ -258,6 +258,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle, final long lastCommittedSpHandle,
             long uniqueId, final long undoToken) throws EEException
     {
@@ -313,6 +314,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     numFragmentIds,
                     planFragmentIds,
                     inputDepIds,
+                    txnId,
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
@@ -373,8 +375,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations,
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long spHandle, final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
@@ -387,8 +389,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId, returnUniqueViolations, undoToken);
+        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
+                                              spHandle, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
+                                              undoToken);
         checkErrorCode(errorCode);
 
         try {

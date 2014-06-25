@@ -517,12 +517,12 @@ public class ExportManager
     }
 
     public void shutdown() {
+        for (ExportGeneration generation : m_generations.values()) {
+            generation.close();
+        }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
-        }
-        for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
         }
         m_generations.clear();
         m_loaderClass = null;

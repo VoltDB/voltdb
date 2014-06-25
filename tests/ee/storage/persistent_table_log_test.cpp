@@ -31,6 +31,7 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 #include <vector>
 #include <string>
@@ -108,7 +109,7 @@ public:
                                                               m_tableSchemaColumnSizes,
                                                               m_tableSchemaAllowNull);
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
         if ( ! withPK ) {
             return;
@@ -118,7 +119,8 @@ public:
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
-        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
@@ -127,11 +129,13 @@ public:
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
+    MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
     std::vector<ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
 };
 
 class StackCleaner {

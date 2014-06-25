@@ -215,7 +215,10 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             &m_stringPool,
                                             m_isELEnabled,
                                             hostname,
-                                            hostId);
+                                            hostId,
+                                            &m_drStream);
+
+    m_drStream.configure(partitionId);
 
     return true;
 }
@@ -317,6 +320,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
                                        int64_t intputDependencyIds[],
                                        ReferenceSerializeInput &serialize_in,
+                                       int64_t txnId,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
@@ -348,6 +352,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 intputDependencyIds ? intputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_staticParams,
+                                txnId,
                                 spHandle,
                                 lastCommittedSpHandle,
                                 uniqueId,
@@ -371,6 +376,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
                                       const NValueArray &params,
+                                      int64_t txnId,
                                       int64_t spHandle,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
@@ -407,6 +413,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     // configure the execution context.
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
                                              uniqueId);
@@ -596,7 +603,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
  *
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
- * deleteChildCommand() interface.
+ * deleteChildCommand() intrface.
  *
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
@@ -983,14 +990,16 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t spHandle, int64_t lastCommittedSpHandle,
-                        bool returnUniqueViolations)
+                        int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
+                        bool returnUniqueViolations,
+                        bool shouldDRStream)
 {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
     //for export data and we don't technically support loading into an export table
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
                                              spHandle,
                                              -1,
                                              lastCommittedSpHandle);
@@ -1011,7 +1020,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1292,6 +1301,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
+    m_drStream.periodicFlush(timeInMillis, lastCommittedSpHandle);
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
@@ -1301,6 +1311,7 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
+    m_drStream.periodicFlush(-1L, lastCommittedSpHandle);
 }
 
 string VoltDBEngine::debug(void) const {

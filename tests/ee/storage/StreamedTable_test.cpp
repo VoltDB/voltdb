@@ -87,6 +87,8 @@ class MockTopend : public Topend {
 
     }
 
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {}
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
@@ -103,7 +105,7 @@ public:
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0, NULL);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
@@ -140,7 +142,7 @@ public:
         m_quantum->release();
         m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
+        m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0);
     }
 
     virtual ~StreamedTableTest() {

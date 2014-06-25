@@ -23,6 +23,8 @@
 
 namespace voltdb {
 
+class DRTupleStream;
+
 /*
  * EE site global data required by executors at runtime.
  *
@@ -45,7 +47,8 @@ class ExecutorContext {
                     Pool* tempStringPool,
                     bool exportEnabled,
                     std::string hostname,
-                    CatalogId hostId);
+                    CatalogId hostId,
+                    DRTupleStream *drTupleStream);
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
@@ -62,12 +65,14 @@ class ExecutorContext {
 
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
+                               int64_t txnId,
                                int64_t spHandle,
                                int64_t lastCommittedSpHandle,
                                int64_t uniqueId)
     {
         m_undoQuantum = undoQuantum;
         m_spHandle = spHandle;
+        m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
@@ -77,17 +82,13 @@ class ExecutorContext {
     void setupForTick(int64_t lastCommittedSpHandle)
     {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        if (m_spHandle < lastCommittedSpHandle) {
-            m_spHandle = lastCommittedSpHandle;
-        }
+        m_spHandle = std::max(m_spHandle, lastCommittedSpHandle);
     }
 
     // data available via quiesce()
     void setupForQuiesce(int64_t lastCommittedSpHandle) {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        if (m_spHandle < lastCommittedSpHandle) {
-            m_spHandle = lastCommittedSpHandle;
-        }
+        m_spHandle = std::max(lastCommittedSpHandle, m_spHandle);
     }
 
     // for test (VoltDBEngine::getExecutorContext())
@@ -107,9 +108,14 @@ class ExecutorContext {
         return m_topEnd;
     }
 
-    /** Current or most recently sp handle */
+    /** Current or most recent sp handle */
     int64_t currentSpHandle() {
         return m_spHandle;
+    }
+
+    /** Current or most recent txnid, may go backwards due to multiparts */
+    int64_t currentTxnId() {
+        return m_txnId;
     }
 
     /** Timestamp from unique id for this transaction */
@@ -127,6 +133,10 @@ class ExecutorContext {
         return m_lastCommittedSpHandle;
     }
 
+    DRTupleStream* drStream() {
+        return m_drStream;
+    }
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -140,6 +150,8 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+    DRTupleStream *m_drStream;
+    int64_t m_txnId;
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;

@@ -41,7 +41,8 @@ const int MAX_BUFFER_AGE = 4000;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
-    : TupleStreamBase(partitionId, siteId),
+    : TupleStreamBase(),
+      m_partitionId(partitionId), m_siteId(siteId),
       m_signature(""), m_generation(0)
 {}
 
@@ -106,16 +107,17 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle);
+    commit(lastCommittedSpHandle, spHandle, spHandle, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
+
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
 
-    if ((m_currBlock->rawLength() + tupleMaxLength) > m_defaultCapacity) {
+    if (m_currBlock->remaining() < tupleMaxLength) {
         extendBufferChain(tupleMaxLength);
     }
 
@@ -156,6 +158,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (rowHeaderSz + io.position());
+//    std::cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso() << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
