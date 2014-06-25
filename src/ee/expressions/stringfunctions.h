@@ -26,8 +26,6 @@
 #include <locale>
 #include <iomanip>
 
-#include <iostream>
-
 namespace voltdb {
 
 /** implement the 1-argument SQL OCTET_LENGTH function */
@@ -567,8 +565,6 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_FORMAT_CURRENCY>() const {
         out << '-';
         scaledValue.ChangeSign();
     }
-
-    std::cout<<"haha "<<scaledValue.ToString(10)<<std::endl;
 
     int64_t fraction = getFractionalPart(scaledValue);
     int64_t second_digit = 0;
