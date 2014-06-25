@@ -290,6 +290,10 @@ public:
         return m_schema;
     }
 
+    inline void setSchema(const TupleSchema * schema) {
+        m_schema = schema;
+    }
+
     /** Print out a human readable description of this tuple */
     std::string debug(const std::string& tableName) const;
     std::string debugNoHeader() const;
@@ -318,11 +322,13 @@ public:
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
+
 private:
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
     }
+
     inline void setActiveFalse() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~ACTIVE_MASK);
@@ -385,7 +391,12 @@ private:
  */
 class PoolBackedTupleStorage {
 public:
-    PoolBackedTupleStorage(const TupleSchema* schema, Pool* pool) : m_tuple(schema), m_pool(pool) { }
+    PoolBackedTupleStorage():m_tuple(), m_pool(NULL) {}
+
+    void init(const TupleSchema* schema, Pool* pool) {
+        m_tuple.setSchema(schema);
+        m_pool = pool;
+    }
 
     void allocateActiveTuple()
     {

@@ -669,23 +669,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException {
+    protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
-        try {
-            final byte catalogBytes[] = serializedCatalog.getBytes("UTF-8");
-            if (m_data.capacity() < catalogBytes.length + 100) {
-                m_data = ByteBuffer.allocate(catalogBytes.length + 100);
-            }
-            m_data.putInt(Commands.LoadCatalog.m_id);
-            m_data.putLong(timestamp);
-            m_data.put(catalogBytes);
-            m_data.put((byte)'\0');
-        } catch (final UnsupportedEncodingException ex) {
-            Logger.getLogger(ExecutionEngineIPC.class.getName()).log(
-                    Level.SEVERE, null, ex);
+        if (m_data.capacity() < catalogBytes.length + 100) {
+            m_data = ByteBuffer.allocate(catalogBytes.length + 100);
         }
+        m_data.putInt(Commands.LoadCatalog.m_id);
+        m_data.putLong(timestamp);
+        m_data.put(catalogBytes);
+        m_data.put((byte)'\0');
 
         try {
             m_data.flip();
@@ -868,7 +862,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String lastAccessedTable = m_connection.readString(size);
                     long lastAccessedTableSize = m_connection.readLong();
                     long tuplesFound = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
+                    long currMemoryInBytes = m_connection.readLong();
+                    long peakMemoryInBytes = m_connection.readLong();
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
+                            currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
                     m_data.putLong(nextStep);
                     m_data.flip();

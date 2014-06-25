@@ -63,6 +63,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -165,11 +166,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // initialize EEs in the right thread.
     private static class StartupConfig
     {
-        final String m_serializedCatalog;
+        final Catalog m_serializableCatalog;
         final long m_timestamp;
-        StartupConfig(final String serCatalog, final long timestamp)
+        StartupConfig(final Catalog catalog, final long timestamp)
         {
-            m_serializedCatalog = serCatalog;
+            m_serializableCatalog = catalog;
             m_timestamp = timestamp;
         }
     }
@@ -377,7 +378,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long siteId,
             BackendTarget backend,
             CatalogContext context,
-            String serializedCatalog,
             int partitionId,
             int numPartitions,
             StartAction startAction,
@@ -398,7 +398,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
+        m_startupConfig = new StartupConfig(context.catalog, context.m_uniqueId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
         m_currentTxnId = Long.MIN_VALUE;
@@ -433,7 +433,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     /** Thread specific initialization */
-    void initialize(String serializedCatalog, long timestamp)
+    void initialize()
     {
         if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
@@ -446,7 +446,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else {
             m_hsql = null;
-            m_ee = initializeEE(serializedCatalog, timestamp);
+            m_ee = initializeEE();
         }
 
         m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
@@ -460,7 +460,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     /** Create a native VoltDB execution engine */
-    ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
+    ExecutionEngine initializeEE()
     {
         String hostname = CoreUtils.getHostnameOrAddress();
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
@@ -477,7 +477,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         hashinatorConfig);
-                eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
                 // set up the EE over IPC
@@ -493,8 +492,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig);
-                eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
+            eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
@@ -513,8 +512,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
-        initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
-        m_startupConfig = null; // release the serializedCatalog bytes.
+        initialize();
+        m_startupConfig = null; // release the serializableCatalog.
         //Maintain a minimum ratio of task log (unrestricted) to live (restricted) transactions
         final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {

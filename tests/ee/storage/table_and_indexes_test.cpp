@@ -45,7 +45,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0, &drStream);
+            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, NULL, false, "", 0, &drStream);
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;

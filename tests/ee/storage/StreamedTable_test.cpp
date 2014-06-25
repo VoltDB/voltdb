@@ -75,7 +75,8 @@ class MockTopend : public Topend {
     }
 
     virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
         return 1000000000; // larger means less likely/frequent callbacks to ignore
     }
 
@@ -105,7 +106,7 @@ public:
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0, NULL);
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, true, "", 0, NULL);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

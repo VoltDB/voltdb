@@ -134,6 +134,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
+        assertEquals(524288, m_ee.m_currMemoryInBytes);
+        assertEquals(524288, m_ee.m_peakMemoryInBytes);
     }
 
     private ExecutionEngine m_ee;

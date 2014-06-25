@@ -137,7 +137,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -167,7 +167,7 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -216,7 +216,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -265,7 +265,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -300,7 +300,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 
@@ -328,7 +328,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 

@@ -25,7 +25,6 @@ import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -389,6 +388,9 @@ public class StatsAgent extends OpsAgent
         case LATENCY:
             stats = collectLatencyStats(interval);
             break;
+        case LATENCY_HISTOGRAM:
+            stats = collectLatencyHistogramStats(interval);
+            break;
         case MANAGEMENT:
             stats = collectManagementStats(interval);
             break;
@@ -588,6 +590,19 @@ public class StatsAgent extends OpsAgent
         VoltTable[] stats = null;
 
         VoltTable lStats = getStatsAggregate(StatsSelector.LATENCY, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectLatencyHistogramStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(StatsSelector.LATENCY_HISTOGRAM, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;

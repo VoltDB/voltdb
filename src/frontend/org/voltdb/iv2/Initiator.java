@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -38,7 +37,7 @@ import org.voltdb.StatsAgent;
 public interface Initiator
 {
     /** Configure an Initiator and prepare it for work */
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,

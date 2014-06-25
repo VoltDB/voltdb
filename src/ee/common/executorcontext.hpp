@@ -24,6 +24,7 @@
 namespace voltdb {
 
 class DRTupleStream;
+class VoltDBEngine;
 
 /*
  * EE site global data required by executors at runtime.
@@ -45,6 +46,7 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
+                    VoltDBEngine* engine,
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId,
@@ -100,6 +102,10 @@ class ExecutorContext {
         return m_undoQuantum;
     }
 
+    VoltDBEngine* getEngine() {
+        return m_engine;
+    }
+
     static UndoQuantum *currentUndoQuantum() {
         return getExecutorContext()->m_undoQuantum;
     }
@@ -151,6 +157,7 @@ class ExecutorContext {
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     DRTupleStream *m_drStream;
+    VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;
     int64_t m_uniqueId;

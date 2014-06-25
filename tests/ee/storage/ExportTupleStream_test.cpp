@@ -67,7 +67,8 @@ public:
     }
 
     virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
         return 1000000000; // larger means less likely/frequent callbacks to ignore
     }
 
@@ -110,7 +111,7 @@ public:
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2, NULL)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2, NULL)) {
         srand(0);
 
         // set up the schema used to fill the new buffer

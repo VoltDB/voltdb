@@ -125,7 +125,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
     }
 
     @Override
