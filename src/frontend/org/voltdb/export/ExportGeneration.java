@@ -398,6 +398,26 @@ public class ExportGeneration {
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
+    void initializeMissingPartitionsFromCatalog(
+            final Connector conn,
+            int hostId,
+            HostMessenger messenger,
+            List<Integer> partitions) {
+        /*
+         * Now create datasources based on the catalog
+         */
+        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
+        //Only populate partitions in use if export is actually happening
+        Set<Integer> partitionsInUse = new HashSet<Integer>();
+        while (tableInfoIt.hasNext()) {
+            ConnectorTableInfo next = tableInfoIt.next();
+            Table table = next.getTable();
+            findMissingDataSources(table, partitions, partitionsInUse);
+        }
+
+        initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(partitionsInUse));
+    }
+
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_zk = messenger.getZK();
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
@@ -661,6 +681,20 @@ public class ExportGeneration {
                 VoltDB.crashLocalVoltDB(
                         "Error creating datasources for table " +
                         table.getTypeName() + " host id " + hostId, true, e);
+            }
+        }
+    }
+
+    //Find missing partitions from this generation typicaally called for current generation to fill in missing partitions
+    private void findMissingDataSources(Table table, List<Integer> partitions, Set<Integer> missingPartitions) {
+        for (Integer partition : partitions) {
+            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+            if (dataSourcesForPartition == null) {
+                missingPartitions.add(partition);
+                continue;
+            }
+            if (dataSourcesForPartition.get(table.getSignature()) == null) {
+                missingPartitions.add(partition);
             }
         }
     }
