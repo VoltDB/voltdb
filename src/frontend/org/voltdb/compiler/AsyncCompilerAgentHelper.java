@@ -27,6 +27,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class AsyncCompilerAgentHelper {
     public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
@@ -67,8 +68,10 @@ public class AsyncCompilerAgentHelper {
         // get the diff between catalogs
         try {
             // try to get the new catalog from the params
-            Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes, null);
-            String newCatalogCommands = loadResults.getFirst();
+            Pair<InMemoryJarfile, String> loadResults =
+                CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes);
+            String newCatalogCommands =
+                CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
             if (newCatalogCommands == null) {
                 retval.errorMsg = "Unable to read from catalog bytes";
