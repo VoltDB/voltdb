@@ -403,19 +403,18 @@ public class ExportGeneration {
             int hostId,
             HostMessenger messenger,
             List<Integer> partitions) {
-        /*
-         * Now create datasources based on the catalog
-         */
         Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-        //Only populate partitions in use if export is actually happening
-        Set<Integer> partitionsInUse = new HashSet<Integer>();
+        //Only populate partitions in use if export is actually happening & we have not constructed data sources
+        Set<Integer> missingPartitions = new HashSet<Integer>();
         while (tableInfoIt.hasNext()) {
             ConnectorTableInfo next = tableInfoIt.next();
             Table table = next.getTable();
-            findMissingDataSources(table, partitions, partitionsInUse);
+            findMissingDataSources(table, partitions, missingPartitions);
         }
-
-        initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(partitionsInUse));
+        if (missingPartitions.size() > 0) {
+            exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
+            initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(missingPartitions));
+        }
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
