@@ -1020,7 +1020,9 @@ public class PlanAssembler {
                             " Use separate INSERT and SELECT statements," +
                             " optionally within a stored procedure." );
                 }
+
                 // There is currently no support for unions on partitioned data in this context.
+                // This is also checked for in ParsedInsertStmt::parse
                 if ( ! (subStmt instanceof ParsedSelectStmt)) {
                     throw new PlanningErrorException(
                             "The partitioned table '" + targetTable.getTypeName() +
@@ -1079,7 +1081,7 @@ public class PlanAssembler {
                     if (jj == -1) {
                         //TODO: Here's where we would make proper arrangements for a default value.
                         throw new PlanningErrorException(
-                                "Default values are not supported in 'INSERT ONTO SELECT FROM'." +
+                                "Default values are not supported in 'INSERT INTO SELECT FROM'." +
                                 " Each column in table '" + targetTable.getTypeName() +
                                 "' must be provided an explicit value.");
                     }

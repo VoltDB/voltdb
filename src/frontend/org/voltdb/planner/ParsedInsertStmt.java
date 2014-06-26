@@ -80,6 +80,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 // clause will need to allow joins.
                 m_subselect = parseSubquery(node);
             }
+            else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+                throw new PlanningErrorException(
+                        "The table '" + tableName +
+                        "' must not be updated directly from a UNION or other set operation.");
+            }
+            // else ... assert if there are unexpected child elements of the insert node?
         }
         if (m_subselect != null) {
 
