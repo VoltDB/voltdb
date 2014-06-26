@@ -45,7 +45,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
 
-    private String line = "===================================================\n";
     String catalogJar = "DDLFeature.jar";
     String pathToCatalog = Configuration.getPathToCatalogForTest("DDLFeature.jar");
     String pathToDeployment = Configuration.getPathToCatalogForTest("DDLFeature.xml");
@@ -104,9 +103,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testCreateProcedureAsSQLStmt() throws Exception {
         assertTrue(findTableInSystemCatalogResults("User"));
-
-         ClientResponse resp = m_client.callProcedure("@SystemCatalog", "PROCEDURES");
-         System.out.println(line + resp.getResults()[0] + line);
 
         ClientResponse p1Result, p2Result;
         VoltTable vt1, vt2;
