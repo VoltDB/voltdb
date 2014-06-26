@@ -351,19 +351,21 @@ public class Inits {
                 }
             } while (catalogStuff == null);
 
+            String serializedCatalog = null;
             try {
                 Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
-                m_rvdb.m_serializedCatalog = loadResults.getFirst();
+                serializedCatalog = loadResults.getFirst();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(m_rvdb.m_serializedCatalog);
+            catalog.execute(serializedCatalog);
+            serializedCatalog = null;
 
             // note if this fails it will print an error first
             try {
@@ -380,7 +382,6 @@ public class Inits {
             }
 
             try {
-                m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
