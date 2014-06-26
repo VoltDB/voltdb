@@ -109,26 +109,12 @@ public class TestFragmentProgressUpdate extends TestCase {
     }*/
 
     void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        Catalog catalog = builder.createTPCCSchemaCatalog();
-        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
-                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-
         m_ee.loadCatalog( 0, catalog.serialize());
 
-        int tableSize = 5001;
-        int longOpThreshold = 10000;
-        VoltTable warehousedata = new VoltTable(
-                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
-                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
-                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
-                );
+        tableSize = 5001;
+        longOpThreshold = 10000;
+        warehousedata.clearRowData();
+
         for (int i = 0; i < tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
@@ -137,10 +123,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Cluster cluster =  catalog.getClusters().get("cluster");
-        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
-        Procedure selectProc = procedures.getIgnoreCase("SelectAll");
-        Statement selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
+        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
 
         int i = 0;
@@ -174,26 +157,12 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     void testTwoUpdates(ExecutionEngine ee) throws Exception {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        Catalog catalog = builder.createTPCCSchemaCatalog();
-        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
-                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-
         m_ee.loadCatalog( 0, catalog.serialize());
 
-        int tableSize = 10000;
-        int longOpThreshold = 10000;
-        VoltTable warehousedata = new VoltTable(
-                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
-                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
-                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
-                );
+        tableSize = 10000;
+        longOpThreshold = 10000;
+        warehousedata.clearRowData();
+
         for (int i = 0; i < tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
@@ -202,9 +171,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Cluster cluster =  catalog.getClusters().get("cluster");
-        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
-        Procedure testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
         Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
 
@@ -291,26 +257,12 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     void testPeakLargerThanCurr(ExecutionEngine ee) throws Exception {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        Catalog catalog = builder.createTPCCSchemaCatalog();
-        int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
-                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-
         m_ee.loadCatalog( 0, catalog.serialize());
 
-        int tableSize = 20000;
-        int longOpThreshold = 10000;
-        VoltTable warehousedata = new VoltTable(
-                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
-                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
-                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
-                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
-                );
+        tableSize = 20000;
+        longOpThreshold = 10000;
+        warehousedata.clearRowData();
+
         for (int i = 0; i < tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
@@ -319,8 +271,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Cluster cluster =  catalog.getClusters().get("cluster");
-        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
         Procedure testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
         Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_join");
         PlanFragment selectBottomFrag = null;
@@ -357,11 +307,38 @@ public class TestFragmentProgressUpdate extends TestCase {
     private ExecutionEngine m_ee;
     private static final int CLUSTER_ID = 2;
     private static final long NODE_ID = 1;
+    private int tableSize;
+    private int longOpThreshold;
+    private VoltTable warehousedata;
+    private TPCCProjectBuilder builder;
+    private Catalog catalog;
+    private int WAREHOUSE_TABLEID;
+    private Cluster cluster;
+    private CatalogMap<Procedure> procedures;
+    private Procedure testProc;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
+        warehousedata = new VoltTable(
+                new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
+                new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STREET_2", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_CITY", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_STATE", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_ZIP", VoltType.STRING),
+                new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
+                );
+        builder = new TPCCProjectBuilder();
+        catalog = builder.createTPCCSchemaCatalog();
+        WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
+                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+        cluster =  catalog.getClusters().get("cluster");
+        procedures = cluster.getDatabases().get("database").getProcedures();
+        testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
     }
 
     @Override
