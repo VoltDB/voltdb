@@ -19,6 +19,8 @@ function QueryUI(queryTab) {
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
 
+            // TODO: drop the remaining vars when semi-colon injection is no longer supported
+
             // Normally, statement boundaries are guessed by the parser, which inserts semicolons as needed.
             // The guessing is based on the assumption that the user is smart enough to not use SQL statement
             // keywords as schema names.  To err on the safe side, avoid splitting (require a semicolon) before
@@ -117,8 +119,11 @@ function QueryUI(queryTab) {
             src = src.replace(MatchEndOfLineComments, '');
 
             // Extract quoted strings to keep their content from getting confused with interesting
-            // statement syntax.
+            // statement syntax. This is required for statement splitting even if only at explicit
+            // semi-colon boundaries -- semi-colns might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
+
+            // TODO: drop the following section when semi-colon injection is no longer supported
 
             // Disguise compound keywords temporarily to avoid triggering statement splits.
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
@@ -128,6 +133,8 @@ function QueryUI(queryTab) {
 
             // Restore disguised compound keywords post-statement-split.
             src = src.replace(MatchCompoundKeywordDisguise, '');
+
+            // TODO: drop the preceding section when semi-colon injection is no longer supported
 
             // Finally, get to work -- break the input into separate statements for processing.
             splitStmts = src.split(';');
