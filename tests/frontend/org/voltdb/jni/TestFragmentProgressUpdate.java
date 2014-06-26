@@ -109,21 +109,21 @@ public class TestFragmentProgressUpdate extends TestCase {
     }*/
 
     void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
-        m_ee.loadCatalog( 0, catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.serialize());
 
-        tableSize = 5001;
-        longOpThreshold = 10000;
+        m_tableSize = 5001;
+        m_longOpthreshold = 10000;
         warehousedata.clearRowData();
 
-        for (int i = 0; i < tableSize; ++i) {
+        for (int i = 0; i < m_tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
-        assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_select");
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
 
         int i = 0;
@@ -148,7 +148,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
-        assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
+        assertEquals(m_longOpthreshold, m_ee.m_lastTuplesAccessed);
         assertTrue(450000 < m_ee.m_currMemoryInBytes);
         assertTrue(550000 > m_ee.m_currMemoryInBytes);
         assertTrue(450000 < m_ee.m_peakMemoryInBytes);
@@ -157,21 +157,21 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     void testTwoUpdates(ExecutionEngine ee) throws Exception {
-        m_ee.loadCatalog( 0, catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.serialize());
 
-        tableSize = 10000;
-        longOpThreshold = 10000;
+        m_tableSize = 10000;
+        m_longOpthreshold = 10000;
         warehousedata.clearRowData();
 
-        for (int i = 0; i < tableSize; ++i) {
+        for (int i = 0; i < m_tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
-        assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_select");
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
 
         // delete 5000 records
@@ -199,7 +199,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(2, m_ee.m_callsFromEE);
-        assertEquals(longOpThreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertEquals(m_longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
         assertTrue(900000 < m_ee.m_currMemoryInBytes);
         assertTrue(1100000 > m_ee.m_currMemoryInBytes);
         assertTrue(900000 < m_ee.m_peakMemoryInBytes);
@@ -208,7 +208,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
         long previousPeakMemory = m_ee.m_peakMemoryInBytes;
 
-        Statement deleteStmt = testProc.getStatements().getIgnoreCase("warehouse_del_half");
+        Statement deleteStmt = m_testProc.getStatements().getIgnoreCase("warehouse_del_half");
         assertNotNull(deleteStmt);
         PlanFragment deleteBottomFrag = null;
 
@@ -245,7 +245,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 3, 2, 42, Long.MAX_VALUE);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
-        assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
+        assertEquals(m_longOpthreshold, m_ee.m_lastTuplesAccessed);
         assertTrue(450000 < m_ee.m_currMemoryInBytes);
         assertTrue(550000 > m_ee.m_currMemoryInBytes);
         assertTrue(450000 < m_ee.m_peakMemoryInBytes);
@@ -257,21 +257,21 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     void testPeakLargerThanCurr(ExecutionEngine ee) throws Exception {
-        m_ee.loadCatalog( 0, catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.serialize());
 
-        tableSize = 20000;
-        longOpThreshold = 10000;
+        m_tableSize = 20000;
+        m_longOpthreshold = 10000;
         warehousedata.clearRowData();
 
-        for (int i = 0; i < tableSize; ++i) {
+        for (int i = 0; i < m_tableSize; ++i) {
             warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
-        assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
+        assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Procedure testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        Procedure testProc = m_procedures.getIgnoreCase("FragmentUpdateTestProcedure");
         Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_join");
         PlanFragment selectBottomFrag = null;
 
@@ -300,22 +300,22 @@ public class TestFragmentProgressUpdate extends TestCase {
         // If want to see the stats, please uncomment the following line.
         // It is '8 393216 262144' on my machine.
         //System.out.println(m_ee.m_callsFromEE +" " + m_ee.m_peakMemoryInBytes + " "+ m_ee.m_currMemoryInBytes);
-        assertEquals(longOpThreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertEquals(m_longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
         assertTrue(m_ee.m_peakMemoryInBytes > m_ee.m_currMemoryInBytes);
     }
 
     private ExecutionEngine m_ee;
     private static final int CLUSTER_ID = 2;
     private static final long NODE_ID = 1;
-    private int tableSize;
-    private int longOpThreshold;
+    private int m_tableSize;
+    private int m_longOpthreshold;
     private VoltTable warehousedata;
-    private TPCCProjectBuilder builder;
-    private Catalog catalog;
+    private TPCCProjectBuilder m_builder;
+    private Catalog m_catalog;
     private int WAREHOUSE_TABLEID;
-    private Cluster cluster;
-    private CatalogMap<Procedure> procedures;
-    private Procedure testProc;
+    private Cluster m_cluster;
+    private CatalogMap<Procedure> m_procedures;
+    private Procedure m_testProc;
 
     @Override
     protected void setUp() throws Exception {
@@ -332,13 +332,13 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
                 );
-        builder = new TPCCProjectBuilder();
-        catalog = builder.createTPCCSchemaCatalog();
-        WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
+        m_builder = new TPCCProjectBuilder();
+        m_catalog = m_builder.createTPCCSchemaCatalog();
+        WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
                 get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        cluster =  catalog.getClusters().get("cluster");
-        procedures = cluster.getDatabases().get("database").getProcedures();
-        testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        m_cluster =  m_catalog.getClusters().get("cluster");
+        m_procedures = m_cluster.getDatabases().get("database").getProcedures();
+        m_testProc = m_procedures.getIgnoreCase("FragmentUpdateTestProcedure");
     }
 
     @Override
