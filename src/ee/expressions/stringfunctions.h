@@ -21,12 +21,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <locale>
 #include <iomanip>
-
-#include <iostream>
 
 namespace voltdb {
 
@@ -530,7 +529,6 @@ struct money_numpunct : std::numpunct<char> {
 };
 
 /** implement the Volt SQL Format_Currency function for all numeric values */
-// TODO: Can we do this with boost?
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vector<NValue>& arguments) {
     static std::locale newloc(std::cout.getloc(), new money_numpunct);
     static std::locale nullloc(std::cout.getloc(), new std::numpunct<char>);
@@ -554,15 +552,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     // rounding
     const NValue &arg2 = arguments[1];
     int32_t places = arg2.castAsIntegerAndGetValue();
-    if (places > 12 || places < -37) {
+    if (places >= 12 || places <= -26) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-            "the second parameter should be <= 13 and > -37");
+            "the second parameter should be < 12 and > -26");
     }
-std::cout<<"place is " <<places<<" and num is "<<scaledValue.ToString(10)<<std::endl;
     int64_t fraction = getDigits(scaledValue, places + 1);
     int64_t next_digit = fraction % 10;
-std::cout<<"haha "<<fraction<<std::endl;
-std::cout<<"the digit is "<<next_digit<<std::endl;
     if (next_digit == 5) {
         int64_t curr_digit = fraction / 10;
         // we don't need mod 10 then mod 2, because mod 2 can give us the current
@@ -579,9 +574,8 @@ std::cout<<"the digit is "<<next_digit<<std::endl;
         // do nothing here
     }
 
-std::cout<<"after haha num is "<<scaledValue.ToString(10)<<std::endl;
     if (places <= 0) {
-        scaledValue -= scaledValue % (int64_t)(kMaxScaleFactor / std::pow(10, places));
+        scaledValue -= scaledValue % (int64_t)(kMaxScaleFactor * std::pow(10, -places));
         int64_t whole = narrowDecimalToBigInt(scaledValue);
         out << std::fixed << whole;
     }
@@ -590,10 +584,10 @@ std::cout<<"after haha num is "<<scaledValue.ToString(10)<<std::endl;
         fraction = getFractionalPart(scaledValue);
         fraction /= kMaxScaleFactor / (int64_t)std::pow(10,places);
         out << std::fixed << whole;
+        // fractional part does not need groups
         out.imbue(nullloc);
         out << '.' << std::setfill('0') << std::setw(places) << fraction;
     }
-std::cout<<"here!"<<std::endl;
     // TODO: Although there should be only one copy of newloc (and money_numpunct),
     // we still need to test and make sure no memory leakage in this piece of code.
     std::string rv = out.str();

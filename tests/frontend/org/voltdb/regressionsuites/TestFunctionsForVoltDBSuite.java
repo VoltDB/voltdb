@@ -1495,7 +1495,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "2013-07-18 02:00:00.123457", "IBM", bd);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(120, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1503,7 +1503,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "120.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(123456) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(123456, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1511,7 +1511,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "123,456.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(1234567890.12345) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(1234567890.12345, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1519,7 +1519,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "1,234,567,890.12");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-120) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-120, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1527,7 +1527,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-120.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-123456.789) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-123456.789, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1535,7 +1535,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-123,456.79");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1543,7 +1543,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "11.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny) from R3 where id = 2");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1551,7 +1551,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-11.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1559,7 +1559,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "32,023.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small) from R3 where id = 2");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1567,7 +1567,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-32,023.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1575,7 +1575,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "2,147,483,647.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num) from R3 where id = 2");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1583,7 +1583,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-2,147,483,647.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1591,7 +1591,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertTrue(str.equals("9,223,372,036,854,775,807.00"));
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big) from R3 where id = 2");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1599,7 +1599,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "-9,223,372,036,854,775,807.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio) from R3 where id = 1");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1607,7 +1607,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "2,147,483,647,999.12");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio) from R3 where id = 2");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1616,21 +1616,21 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(str, "-2,147,483,647,999.12");
 
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 1");
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from R3 where id = 1");
             fail("range validity check failed for FORMAT_CURRENCY");
         }
         catch (ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("out of range"));
         }
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec) from R3 where id = 2");
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from R3 where id = 2");
             fail("range validity check failed for FORMAT_CURRENCY");
         }
         catch (ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("out of range"));
         }
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 3");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 3");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1640,7 +1640,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(1);
         assertEquals(str, "1.50");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 4");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 4");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1651,7 +1651,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(str, "-1.50");
 
         // rounding
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 5");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 5");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1661,7 +1661,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(1);
         assertEquals(str, "12,340.60");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 6");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 6");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1671,7 +1671,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(1);
         assertEquals(str, "-12,340.60");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 7");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 7");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1681,7 +1681,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(1);
         assertEquals(str, "12,400.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio), FORMAT_CURRENCY(dec) from R3 where id = 8");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2), FORMAT_CURRENCY(dec, 2) from R3 where id = 8");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1692,27 +1692,29 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(str, "-12,400.00");
 
         // round to nearest even
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 9");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2),FORMAT_CURRENCY(dec, 2) from R3 where id = 9");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        // TODO: wrong here: because converting from double to decimal is not a precise process
         //assertEquals(str, "1.52");
         str = result.getString(1);
         assertEquals(str, "12,400.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 10");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2),FORMAT_CURRENCY(dec, 2) from R3 where id = 10");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        // TODO: wrong here: because converting from double to decimal is not a precise process
         //assertEquals(str, "-1.52");
         str = result.getString(1);
         assertEquals(str, "-12,400.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 11");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2),FORMAT_CURRENCY(dec, 2) from R3 where id = 11");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1722,7 +1724,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(1);
         assertEquals(str, "12,399.98");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio),FORMAT_CURRENCY(dec) from R3 where id = 12");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2),FORMAT_CURRENCY(dec, 2) from R3 where id = 12");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1733,7 +1735,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(str, "-12,399.98");
 
         try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY('abc') from R3 where id = 4");
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY('abc', 2) from R3 where id = 4");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
@@ -1741,7 +1743,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         String[] s = {"1,000,000.00", "100,000.00", "10,000.00", "1,000.00", "100.00", "10.00", "1.00", "0.10", "0.01", "0.00"};
         for (int i = 0; i < 10; i++){
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY("+ Math.pow(10, 6-i) +") from R3 where id = 1");
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY("+ Math.pow(10, 6-i) +", 2) from R3 where id = 1");
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
@@ -1750,7 +1752,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(str, s[i]);
         }
         for (int i = 0; i < 10; i++){
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY("+ -Math.pow(10, 6-i) +") from R3 where id = 1");
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY("+ -Math.pow(10, 6-i) +", 2) from R3 where id = 1");
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
@@ -1759,7 +1761,35 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(str, "-" + s[i]);
         }
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(0) from R3 where id = 4");
+        // TODO: The precision depends on the ability of TTInt, and there may exist some number whose rounding is wrong.
+        String[] s2 = {"1,111,111.11111", "1,111,111.1111", "1,111,111.111", "1,111,111.11", "1,111,111.1", "1,111,111", "1,111,110",
+                "1,111,100", "1,111,000", "1,110,000", "1,100,000", "1,000,000", "0"};
+        for (int i=5; i > -8; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(1111111.11111, "+i+") from R3 where id = 1");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s2[5-i]);
+        }
+
+        // check the validity of the second parameter
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(2, 15) from R3 where id = 4");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("the second parameter"));
+        }
+
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(2, -26) from R3 where id = 4");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("the second parameter"));
+        }
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(0, 2) from R3 where id = 4");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1767,7 +1797,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "0.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(0.0) from R3 where id = 4");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(0.0, 2) from R3 where id = 4");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1775,7 +1805,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(0);
         assertEquals(str, "0.00");
 
-        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-0.0) from R3 where id = 4");
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(-0.0, 2) from R3 where id = 4");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
