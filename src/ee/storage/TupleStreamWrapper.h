@@ -72,6 +72,7 @@ public:
                                 m_generation, m_partitionId, m_signature, sb, false, false);
         delete sb;
         m_uso = count;
+        extendBufferChain(0);
     }
 
     int64_t allocatedByteCount() const {
