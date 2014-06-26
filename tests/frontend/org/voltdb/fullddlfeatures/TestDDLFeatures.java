@@ -347,7 +347,5 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 1l);
-
-        teardownSystem();
     }
 }
