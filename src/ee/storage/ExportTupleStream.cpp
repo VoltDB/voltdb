@@ -37,7 +37,6 @@ using namespace std;
 using namespace voltdb;
 
 const int METADATA_COL_CNT = 6;
-const int MAX_BUFFER_AGE = 4000;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
