@@ -659,12 +659,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // received on the coordinator, it can be treated as replicated data in later
         // joins, which MAY help with later outer joins with replicated data.
 
-
-        boolean needInnerSendReceive = (m_partitioning.requiresTwoFragments()) &&
-                                       (! innerPlan.hasReplicatedResult()) &&
-                                       (outerPlan.hasReplicatedResult()) &&
-                                       (joinNode.getJoinType() != JoinType.INNER)
-                                       ;
+        boolean needInnerSendReceive = m_partitioning.requiresTwoFragments() &&
+                                       ! innerPlan.hasReplicatedResult() &&
+                                       outerPlan.hasReplicatedResult() &&
+                                       joinNode.getJoinType() != JoinType.INNER;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
         // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the

@@ -1846,7 +1846,6 @@ public class TestSubQueries extends PlannerTestCase {
     public void testUnions() {
         AbstractPlanNode pn;
         pn = compile("select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A ");
-        System.out.println(pn.toExplainPlanString());
 
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1863,6 +1862,12 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "R2", "A", "C");
         pn = upn.getChild(2);
         checkSeqScan(pn, "R3", "A", "C");
+
+
+        failToCompile("select * FROM " +
+                "(SELECT A, COUNT(*) FROM P1 GROUP BY A " +
+                "UNION " +
+                "SELECT A, COUNT(*) FROM R2 GROUP BY A) T1 , P2 where T1.A = P2.A ", joinErrorMsg);
     }
 
     public void testParameters() {

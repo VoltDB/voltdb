@@ -289,8 +289,8 @@ public class StmtSubqueryScan extends StmtTableScan {
 
 
     /**
-     * For some subquery, it can only join with partition table after it finishes work
-     * on the coordinator. With 2 fragment plan limit, thoese queries should not be supported.
+     * Some subquery results can only be joined with a partitioned table after it finishes work
+     * on the coordinator. With 2 fragment plan limit, those queries should not be supported.
      * Other than that, planner can get rid of the send/receive pair and push down the join.
      * @param root
      * @return
@@ -301,24 +301,28 @@ public class StmtSubqueryScan extends StmtTableScan {
             return root;
         }
         assert(root.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 1);
-
         assert(m_subqueryStmt != null);
-        assert(m_subqueryStmt instanceof ParsedSelectStmt);
+
+
+        m_hasReceiveNode = true;
         ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
+        if (selectStmt == null) {
+            // Union are just returned
+            assert(m_subqueryStmt instanceof ParsedUnionStmt);
+            return root;
+        }
 
         // If query has ditinct on a replicated table column, we should get rid of the receive node
-        // Work on this optimization in future as DISTICT implementation is really bad
+        // Work on this optimization in future as DISTINCT implementation is really bad
         if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinct()) {
-            m_hasReceiveNode = true;
             return root;
         }
 
         // If the query contains the partition materialized table with the need to Re-aggregate,
         // then we can not get rid of the receive node.
-        // This is also catched in StatementPartitioning when analysing the join criteria,
+        // This is also caught in StatementPartitioning when analysing the join criteria,
         // because it contains a partitioned view that does not have partition column.
         if (selectStmt.m_mvFixInfo.needed()) {
-            m_hasReceiveNode = true;
             return root;
         }
 
@@ -326,7 +330,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (selectStmt.hasAggregateExpression()) {
             if (!selectStmt.isGrouped()) {
                 m_tableAggregateSubquery = true;
-                m_hasReceiveNode = true;
                 return root;
             }
             // For group by queries, there are two cases on group by columns.
@@ -334,14 +337,13 @@ public class StmtSubqueryScan extends StmtTableScan {
             //     level, it will violates the join criteria.
             // Detect case (1) to mark receive node.
             if (! selectStmt.hasPartitionColumnInGroupby()) {
-                m_hasReceiveNode = true;
                 return root;
             }
 
             //
             // (2) Group by columns contain the partition columns:
             //     This is the interesting case that we are going to support.
-            //     At this point, subquery does not contain LIMIT/OFFSET/DISTINCT. If join with
+            //     At this point, subquery does not contain LIMIT/OFFSET. If join with
             //     partition table on outer level, we are able to push the join down by
             //     removing the send/receive plan node pair.
         }
@@ -355,7 +357,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         return root;
     }
 
-    public boolean getHasReciveNode() {
+    public boolean hasReceiveNode() {
         if (m_hasReceiveNode) {
             return true;
         }
@@ -363,7 +365,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
-                if (subScan.getHasReciveNode()) {
+                if (subScan.hasReceiveNode()) {
                     return true;
                 }
             }
@@ -384,37 +386,36 @@ public class StmtSubqueryScan extends StmtTableScan {
      */
     private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
         assert(root != null);
-        return removeCoordinatorSendReceivePairRecurcive(root, root);
+        return removeCoordinatorSendReceivePairRecursive(root, root);
     }
 
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root,
+    private AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
             AbstractPlanNode current) {
         if (current instanceof ReceivePlanNode) {
-            if (current.getChildCount() == 1) {
-                AbstractPlanNode child = current.getChild(0);
-                if (child instanceof SendPlanNode) {
-                    assert(child.getChildCount() == 1);
-                    child = child.getChild(0);
-                    if (child instanceof ProjectionPlanNode) {
-                        assert(child.getChildCount() == 1);
-                        child = child.getChild(0);
-                    }
-                    child.clearParents();
-                    if (current.getParentCount() == 0) {
-                        return child;
-                    } else {
-                        assert(current.getParentCount() == 1);
-                        AbstractPlanNode parent = current.getParent(0);
-                        parent.unlinkChild(current);
-                        parent.addAndLinkChild(child);
-                        return root;
-                    }
-                }
+            assert(current.getChildCount() == 1);
+
+            AbstractPlanNode child = current.getChild(0);
+            assert(child instanceof SendPlanNode);
+
+            assert(child.getChildCount() == 1);
+            child = child.getChild(0);
+            if (child instanceof ProjectionPlanNode) {
+                assert(child.getChildCount() == 1);
+                child = child.getChild(0);
             }
-            return root;
+            child.clearParents();
+            if (current.getParentCount() == 0) {
+                return child;
+            } else {
+                assert(current.getParentCount() == 1);
+                AbstractPlanNode parent = current.getParent(0);
+                parent.unlinkChild(current);
+                parent.addAndLinkChild(child);
+                return root;
+            }
         } else if (current.getChildCount() == 1) {
             // This is still a coordinator node
-            return removeCoordinatorSendReceivePairRecurcive(root, current.getChild(0));
+            return removeCoordinatorSendReceivePairRecursive(root, current.getChild(0));
         } else {
             // We are about to branch and leave the coordinator
             return root;
