@@ -48,6 +48,11 @@ namespace voltdb
                                     const std::vector<std::string> &predicateStrings) = 0;
 
         /**
+         * Perpetuate some kinds of streaming after a TRUNCATE TABLE.
+         */
+        virtual TableStreamerInterface* cloneForTruncatedTable(PersistentTableSurgeon &surgeon) = 0;
+
+        /**
          * Continue streaming.
          */
         virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,

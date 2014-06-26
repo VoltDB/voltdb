@@ -18,6 +18,8 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
@@ -36,11 +38,14 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.TransactionIdManager;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.PosixAdvise;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -59,20 +64,24 @@ public class TableSaveFile
     public class Container extends BBContainer {
         public final int partitionId;
         private final BBContainer m_origin;
-        Container(ByteBuffer b, long pointer, BBContainer origin, int partitionId) {
-            super(b, pointer);
+        private boolean discarded = false;
+        Container(ByteBuffer b, BBContainer origin, int partitionId) {
+            super(b);
             m_origin = origin;
             this.partitionId = partitionId;
         }
 
         @Override
         public void discard() {
+            checkDoubleFree();
+            discarded = true;
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
-                m_buffers.add(this);
+                m_buffers.add(m_origin);
             }
         }
+
     }
 
     /**
@@ -83,19 +92,21 @@ public class TableSaveFile
             org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + (1024 * 256);
 
     public TableSaveFile(
-            FileChannel dataIn,
+            FileInputStream fis,
             int readAheadChunks,
             Integer[] relevantPartitionIds) throws IOException {
-        this(dataIn, readAheadChunks, relevantPartitionIds, false);
+        this(fis, readAheadChunks, relevantPartitionIds, false);
     }
 
     // XXX maybe consider an IOException subclass at some point
     public TableSaveFile(
-            FileChannel dataIn,
+            FileInputStream fis,
             int readAheadChunks,
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
             {
+                m_fd = fis.getFD();
+                FileChannel dataIn = fis.getChannel();
         try {
             EELibraryLoader.loadExecutionEngineLibrary(true);
             if (relevantPartitionIds == null) {
@@ -375,14 +386,21 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
-        if (m_chunkReaderThread != null) {
-            m_chunkReaderThread.interrupt();
+        Thread chunkReader;
+        synchronized (this) {
+            m_hasMoreChunks = false;
+            chunkReader = m_chunkReaderThread;
+        }
+
+        if (chunkReader != null) {
+            chunkReader.interrupt();
             try {
-                m_chunkReaderThread.join();
+                chunkReader.join();
             } catch (InterruptedException e) {
                 throw new IOException(e);
             }
         }
+
         synchronized (this) {
             while (!m_availableChunks.isEmpty()) {
                 m_availableChunks.poll().discard();
@@ -414,7 +432,8 @@ public class TableSaveFile
             throw m_chunkReaderException;
         }
         if (!m_hasMoreChunks) {
-            return m_availableChunks.poll();
+            final Container c = m_availableChunks.poll();
+            return c;
         }
 
         if (m_chunkReader == null) {
@@ -433,12 +452,13 @@ public class TableSaveFile
                     throw new IOException(e);
                 }
             }
-            if (m_chunkReaderException != null) {
-                throw m_chunkReaderException;
-            }
         }
         if (c != null) {
             m_chunkReads.release();
+        } else {
+            if (m_chunkReaderException != null) {
+                throw m_chunkReaderException;
+            }
         }
         return c;
     }
@@ -452,6 +472,7 @@ public class TableSaveFile
     }
 
     private final FileChannel m_saveFile;
+    private final FileDescriptor m_fd;
     private final ByteBuffer m_tableHeader;
     private final boolean m_completed;
     private final int m_versionNum[] = new int[4];
@@ -467,7 +488,7 @@ public class TableSaveFile
     private final long m_txnId;
     private final long m_timestamp;
     private boolean m_hasMoreChunks = true;
-    private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
+    private ConcurrentLinkedQueue<BBContainer> m_buffers = new ConcurrentLinkedQueue<BBContainer>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
     private final ChecksumType m_checksumType;
@@ -510,10 +531,47 @@ public class TableSaveFile
          */
         private void readChunksV2() {
             //For reading the compressed input.
-            ByteBuffer fileInputBuffer =
-                    ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
-
+            final BBContainer fileInputBufferC =
+                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+            final ByteBuffer fileInputBuffer = fileInputBufferC.b();
+            long sinceLastFAdvise = Long.MAX_VALUE;
+            long positionAtLastFAdvise = 0;
             while (m_hasMoreChunks) {
+                if (sinceLastFAdvise > 1024 * 1024 * 48) {
+                    sinceLastFAdvise = 0;
+                    VoltLogger log = new VoltLogger("SNAPSHOT");
+                    try {
+                        final long position = m_saveFile.position();
+                        long retval = PosixAdvise.fadvise(
+                                m_fd,
+                                position,
+                                position + 1024 * 1024 * 64,
+                                PosixAdvise.POSIX_FADV_WILLNEED);
+                        if (retval != 0) {
+                            log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
+                        }
+
+                        //Get aligned start and end position
+                        final long fadviseStart = positionAtLastFAdvise;
+                        //-1 because we don't want to drop the last page because
+                        //We will be reading it soon
+                        positionAtLastFAdvise = ((position / Bits.pageSize()) - 1) * Bits.pageSize();
+                        final long length = positionAtLastFAdvise - fadviseStart;
+                        if (length > 0) {
+                            retval = PosixAdvise.fadvise(
+                                    m_fd,
+                                    fadviseStart,
+                                    length,
+                                    PosixAdvise.POSIX_FADV_DONTNEED);
+                        }
+                        if (retval != 0) {
+                            log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
+                        }
+                        positionAtLastFAdvise = position;
+                    } catch (Throwable t) {
+                        log.info("Exception attempting fadvise", t);
+                    }
+                }
 
                 /*
                  * Limit the number of chunk materialized into memory at one time
@@ -524,6 +582,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -536,6 +595,7 @@ public class TableSaveFile
                         if (read == -1) {
                             throw new EOFException();
                         }
+                        sinceLastFAdvise += read;
                     }
                     int nextChunkLength = chunkLengthB.getInt(0);
                     expectedAnotherChunk = true;
@@ -593,6 +653,7 @@ public class TableSaveFile
                         if (read == -1) {
                             throw new EOFException();
                         }
+                        sinceLastFAdvise += read;
                     }
                     fileInputBuffer.flip();
                     nextChunkLength = CompressionService.uncompressedLength(fileInputBuffer);
@@ -619,7 +680,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -630,22 +691,29 @@ public class TableSaveFile
                      */
                     boolean completedRead = false;
                     try {
+                        final ByteBuffer buf = c.b();
                         /*
                          * Assemble a VoltTable out of the chunk of tuples.
                          * Put in the header that was cached in the constructor,
                          * then copy the tuple data.
                          */
-                        c.b.clear();
-                        c.b.limit(nextChunkLength  + m_tableHeader.capacity());
+                        buf.clear();
+                        buf.limit(nextChunkLength  + m_tableHeader.capacity());
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
+                        buf.put(m_tableHeader);
                         //Doesn't move buffer position, does change the limit
-                        CompressionService.decompressBuffer(fileInputBuffer, c.b);
+                        CompressionService.decompressBuffer(fileInputBuffer, buf);
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
                             for (int partitionId : m_partitionIds) {
                                 m_corruptedPartitions.add(partitionId);
+                            }
+                            if (m_continueOnCorruptedChunk) {
+                                m_chunkReads.release();
+                                continue;
+                            } else {
+                                throw new IOException("Failed decompression of saved table chunk");
                             }
                         }
                     }
@@ -656,7 +724,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -665,10 +732,11 @@ public class TableSaveFile
                     /*
                      * VoltTable wants the buffer at the home position 0
                      */
-                    c.b.position(0);
+                    c.b().position(0);
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -681,6 +749,7 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {
+                    e.printStackTrace();
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks = false;
                         m_chunkReaderException = e;
@@ -704,17 +773,19 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
+            fileInputBufferC.discard();
         }
 
         private void readChunks() {
             //For reading the compressed input.
-            ByteBuffer fileInputBuffer =
-                    ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
-
+            BBContainer fileInputBufferC =
+                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+            ByteBuffer fileInputBuffer = fileInputBufferC.b();
             while (m_hasMoreChunks) {
-
                 /*
                  * Limit the number of chunk materialized into memory at one time
                  */
@@ -724,6 +795,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -815,7 +887,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -836,35 +908,35 @@ public class TableSaveFile
                          * It will have to be moved back to the beginning of the tuple data
                          * after the header once the CRC has been calculated.
                          */
-                        c.b.clear();
+                        c.b().clear();
                         //The length of the chunk already includes space for the 4-byte row count
                         //even though it is at the end, but we need to also leave at the end for the CRC calc
                         if (isCompressed()) {
-                            c.b.limit(nextChunkLength  + m_tableHeader.capacity() + 4);
+                            c.b().limit(nextChunkLength  + m_tableHeader.capacity() + 4);
                         } else {
                             //Before compression the chunk length included the stuff added in the EE
                             //like the 2 CRCs and partition id. It is only -8 because we still need the 4-bytes
                             //of padding to move the row count in when constructing the volt table format.
-                            c.b.limit((nextChunkLength - 8)  + m_tableHeader.capacity());
+                            c.b().limit((nextChunkLength - 8)  + m_tableHeader.capacity());
                         }
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
-                        c.b.position(c.b.position() + 4);//Leave space for row count to be moved into
-                        checksumStartPosition = c.b.position();
+                        c.b().put(m_tableHeader);
+                        c.b().position(c.b().position() + 4);//Leave space for row count to be moved into
+                        checksumStartPosition = c.b().position();
                         if (isCompressed()) {
-                            CompressionService.decompressBuffer(fileInputBuffer, c.b);
-                            c.b.position(c.b.limit());
+                            CompressionService.decompressBuffer(fileInputBuffer, c.b());
+                            c.b().position(c.b().limit());
                         } else {
-                            while (c.b.hasRemaining()) {
-                                final int read = m_saveFile.read(c.b);
+                            while (c.b().hasRemaining()) {
+                                final int read = m_saveFile.read(c.b());
                                 if (read == -1) {
                                     throw new EOFException();
                                 }
                             }
                         }
-                        c.b.position(c.b.position() - 4);
-                        rowCount = c.b.getInt();
-                        c.b.position(checksumStartPosition);
+                        c.b().position(c.b().position() - 4);
+                        rowCount = c.b().getInt();
+                        c.b().position(checksumStartPosition);
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
@@ -880,12 +952,11 @@ public class TableSaveFile
                      */
                     final int calculatedCRC =
                             m_checksumType == ChecksumType.CRC32C  ?
-                                    DBBPool.getCRC32C(c.address, c.b.position(), c.b.remaining()) :
-                                        DBBPool.getCRC32(c.address, c.b.position(), c.b.remaining());
+                                    DBBPool.getCRC32C(c.address(), c.b().position(), c.b().remaining()) :
+                                        DBBPool.getCRC32(c.address(), c.b().position(), c.b().remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         } else {
@@ -899,7 +970,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -915,10 +985,10 @@ public class TableSaveFile
                      */
                     boolean success = false;
                     try {
-                        c.b.limit(c.b.limit() - 4);
-                        c.b.position(checksumStartPosition - 4);
-                        c.b.putInt(rowCount);
-                        c.b.position(0);
+                        c.b().limit(c.b().limit() - 4);
+                        c.b().position(checksumStartPosition - 4);
+                        c.b().putInt(rowCount);
+                        c.b().position(0);
                         success = true;
                     } finally {
                         if (!success) {
@@ -930,6 +1000,7 @@ public class TableSaveFile
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -965,24 +1036,27 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
+            fileInputBufferC.discard();
         }
         private Container getOutputBuffer(final int nextChunkPartitionId) {
-            Container c = m_buffers.poll();
+            BBContainer c = m_buffers.poll();
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
-                final ByteBuffer b = originContainer.b;
-                final long pointer = org.voltcore.utils.DBBPool.getBufferAddress(b);
-                c = new Container(b, pointer, originContainer, nextChunkPartitionId);
+                final ByteBuffer b = originContainer.b();
+                final Container retcont = new Container(b, originContainer, nextChunkPartitionId);
+                return retcont;
             }
             /*
              * Need to reconstruct the container with the partition id of the next
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
-            return c;
+            final Container retcont = new Container(c.b(), c, nextChunkPartitionId);
+            return retcont;
         }
 
         @Override

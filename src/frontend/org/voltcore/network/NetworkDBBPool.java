@@ -27,15 +27,24 @@ public class NetworkDBBPool {
     private final ArrayDeque<BBContainer> m_buffers = new ArrayDeque<BBContainer>();
     private static final int LIMIT = Integer.getInteger("NETWORK_DBB_LIMIT", 512);
 
+    private final int m_numBuffers;
+    public NetworkDBBPool(int numBuffers) {
+        m_numBuffers = numBuffers;
+    }
+
+    public NetworkDBBPool() {
+        m_numBuffers = LIMIT;
+    }
     BBContainer acquire() {
        final BBContainer cont = m_buffers.poll();
        if (cont == null) {
            final BBContainer originContainer = DBBPool.allocateDirect(1024 * 32);
-           return new BBContainer(originContainer.b, 0) {
+           return new BBContainer(originContainer.b()) {
                 @Override
                 public void discard() {
+                    checkDoubleFree();
                     //If we had to allocate over the desired limit, start discarding
-                    if (m_buffers.size() > LIMIT) {
+                    if (m_buffers.size() > m_numBuffers) {
                         originContainer.discard();
                         return;
                     }
@@ -43,9 +52,10 @@ public class NetworkDBBPool {
                 }
            };
        }
-       return new BBContainer(cont.b, 0) {
+       return new BBContainer(cont.b()) {
            @Override
            public void discard() {
+               checkDoubleFree();
                m_buffers.push(cont);
            }
        };

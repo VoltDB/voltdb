@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -85,8 +86,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
     // iteration after it had to initially settle for starting at "greater than a prefix key".
-    protected AbstractExpression m_initialExpression;
+    private AbstractExpression m_initialExpression;
 
+    // The predicate for underflow case using the index
     private AbstractExpression m_skip_null_predicate;
 
     // The overall index lookup operation type
@@ -136,6 +138,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate() {
+        // prepare position of non null key
         int searchKeySize = m_searchkeyExpressions.size();
         if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
             m_skip_null_predicate = null;
@@ -150,7 +153,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             nextKeyIndex = searchKeySize - 1;
         }
 
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        setSkipNullPredicate(nextKeyIndex);
+    }
+
+    public void setSkipNullPredicate(int nextKeyIndex) {
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -158,6 +164,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
@@ -165,27 +172,30 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                         col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
+                tve.setInBytes(col.getInbytes());
                 indexedExprs.add(tve);
             }
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
+                assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
-
         }
-        AbstractExpression expr;
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
         for (int i = 0; i < nextKeyIndex; i++) {
             AbstractExpression idxExpr = indexedExprs.get(i);
-            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+            AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                     idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
             exprs.add(expr);
         }
         AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
         exprs.add(expr);
+
         m_skip_null_predicate = ExpressionUtil.combine(exprs);
         m_skip_null_predicate.finalizeValueTypes();
     }
@@ -693,9 +703,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
-            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
-            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+        if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
+                m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX) ||
+                m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,
@@ -717,13 +727,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction +
-                asIndexed[ii] + " = " + m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+            result += conjunction + asIndexed[ii] + " = " +
+                    m_searchkeyExpressions.get(ii).explain(m_targetTableName);
             conjunction = ") AND (";
         }
         // last element
         result += conjunction +
-            asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
+                asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
                 m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
         return result;
     }

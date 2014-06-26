@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -46,6 +47,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
+    private long clientRoundTripTimeNanos = 0;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_STATUS_KEY = "status";
@@ -167,10 +169,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
             int tableSize = buf.getInt();
-            byte[] bytes = new byte[tableSize];
-            buf.get(bytes);
-            ByteBuffer tempBuf = ByteBuffer.wrap(bytes);
-            results[i] = new VoltTable(tempBuf, false);
+            final int originalLimit = buf.limit();
+            buf.limit(buf.position() + tableSize);
+            final ByteBuffer slice = buf.slice();
+            buf.position(buf.position() + tableSize);
+            buf.limit(originalLimit);
+            results[i] = new VoltTable(slice, false);
         }
         setProperly = true;
     }
@@ -256,8 +260,14 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return clientRoundTripTime;
     }
 
-    public void setClientRoundtrip(int time) {
-        clientRoundTripTime = time;
+    @Override
+    public long getClientRoundtripNanos() {
+        return clientRoundTripTimeNanos;
+    }
+
+    public void setClientRoundtrip(long timeNanos) {
+        clientRoundTripTimeNanos = timeNanos;
+        clientRoundTripTime = (int)TimeUnit.NANOSECONDS.toMillis(timeNanos);
     }
 
     @Override
@@ -336,8 +346,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     public void convertResultsToHashForDeterminism() {
         int hash = m_hash == null ? 0 : m_hash;
 
-        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
         t.addRow(hash);
         results = new VoltTable[] { t };
+    }
+
+    public void dropResultTable() {
+        results = new VoltTable[] {};
     }
 }

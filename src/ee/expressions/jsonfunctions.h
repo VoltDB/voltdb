@@ -27,6 +27,8 @@
 #include <jsoncpp/jsoncpp.h>
 #include <jsoncpp/jsoncpp-forwards.h>
 
+#include "common/NValue.hpp"
+
 namespace voltdb {
 
 /** implement the 2-argument SQL FIELD function */
@@ -40,7 +42,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    int32_t lenDoc = docNVal.getObjectLength();
+    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
 
     const NValue& fieldNVal = arguments[1];
     if (fieldNVal.isNull()) {
@@ -49,10 +51,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     if (fieldNVal.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (fieldNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    int32_t lenField = fieldNVal.getObjectLength();
+    int32_t lenField = fieldNVal.getObjectLength_withoutNull();
 
-    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue());
-    char *fieldChars = reinterpret_cast<char*>(fieldNVal.getObjectValue());
+    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    char *fieldChars = reinterpret_cast<char*>(fieldNVal.getObjectValue_withoutNull());
 
     const std::string doc(docChars, lenDoc);
     const std::string field(fieldChars,lenField);
@@ -113,8 +115,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     if (indexNVal.isNull()) {
         return getNullStringValue();
     }
-    int32_t lenDoc = docNVal.getObjectLength();
-    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue());
+    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
+    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
     const std::string doc(docChars, lenDoc);
 
     int32_t index = indexNVal.castAsIntegerAndGetValue();
@@ -173,8 +175,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
         throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    int32_t lenDoc = getObjectLength();
-    char *docChars = reinterpret_cast<char*>(getObjectValue());
+    int32_t lenDoc = getObjectLength_withoutNull();
+    char *docChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
     const std::string doc(docChars, lenDoc);
 
     Json::Value root;

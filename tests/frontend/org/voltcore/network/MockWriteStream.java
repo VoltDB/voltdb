@@ -31,7 +31,7 @@ import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.utils.DeferredSerialization;
 
 public class MockWriteStream implements WriteStream {
-    public BlockingQueue<ByteBuffer[]> m_messages = new LinkedTransferQueue<ByteBuffer[]>();
+    public BlockingQueue<ByteBuffer> m_messages = new LinkedTransferQueue<ByteBuffer>();
 
     @Override
     public boolean hadBackPressure() {
@@ -39,9 +39,16 @@ public class MockWriteStream implements WriteStream {
     }
 
     @Override
+    public void fastEnqueue(DeferredSerialization ds) {
+        enqueue(ds);
+    }
+
+    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
-            m_messages.offer(ds.serialize());
+            ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
+            ds.serialize(buf);
+            m_messages.offer(buf);
         } catch (IOException e) {
             Throwables.propagate(e);
         }
@@ -49,7 +56,7 @@ public class MockWriteStream implements WriteStream {
 
     @Override
     public void enqueue(ByteBuffer b) {
-        m_messages.offer(new ByteBuffer[] { b });
+        m_messages.offer( b );
     }
 
     @Override
@@ -69,7 +76,9 @@ public class MockWriteStream implements WriteStream {
 
     @Override
     public void enqueue(ByteBuffer[] b) {
-        m_messages.offer(b);
+        for (ByteBuffer buf : b) {
+            m_messages.offer(buf);
+        }
     }
 
 }

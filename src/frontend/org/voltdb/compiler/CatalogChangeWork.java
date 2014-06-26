@@ -24,9 +24,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
 
     final byte[] catalogBytes;
     final String deploymentString;
-    final long originalTxnId;
-    final long originalUniqueId;
-    final ProcedureInvocationType invocationType;
+    final String[] adhocDDLStmts;
 
     public CatalogChangeWork(
             long replySiteId,
@@ -36,13 +34,40 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData,
+              adminConnection, clientData, type, originalTxnId, originalUniqueId,
               completionHandler);
-        this.catalogBytes = catalogBytes.clone();
+        if (catalogBytes != null) {
+            this.catalogBytes = catalogBytes.clone();
+        }
+        else {
+            this.catalogBytes = null;
+        }
         this.deploymentString = deploymentString;
-        this.invocationType = type;
-        this.originalTxnId = originalTxnId;
-        this.originalUniqueId = originalUniqueId;
+        adhocDDLStmts = null;
     }
 
+    /**
+     * To process adhoc DDL, we want to convert the AdHocPlannerWork we received from the
+     * ClientInterface into a CatalogChangeWork object for the AsyncCompilerAgentHelper to
+     * grind on.
+     */
+    public CatalogChangeWork(AdHocPlannerWork adhocDDL)
+    {
+        super(adhocDDL.replySiteId,
+              adhocDDL.shouldShutdown,
+              adhocDDL.clientHandle,
+              adhocDDL.connectionId,
+              adhocDDL.hostname,
+              adhocDDL.adminConnection,
+              adhocDDL.clientData,
+              adhocDDL.invocationType,
+              adhocDDL.originalTxnId,
+              adhocDDL.originalUniqueId,
+              adhocDDL.completionHandler);
+        // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
+        this.catalogBytes = null;
+        // Ditto for deployment string
+        this.deploymentString = null;
+        this.adhocDDLStmts = adhocDDL.sqlStatements;
+    }
 }

@@ -26,6 +26,7 @@
 #include "common/executorcontext.hpp"
 
 #include <cstdio>
+#include <limits>
 #include <iostream>
 #include <cassert>
 #include <ctime>
@@ -43,7 +44,11 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
-      m_openSpHandle(0), m_openTransactionUso(0),
+      // snapshot restores will call load table which in turn
+      // calls appendTupple with LONG_MIN transaction ids
+      // this allows initial ticks to succeed after rejoins
+      m_openSpHandle(0),
+      m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
       m_signature(""), m_generation(0)
 {
@@ -128,7 +133,10 @@ void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSp
 {
     if (currentSpHandle < m_openSpHandle)
     {
-        throwFatalException("Active transactions moving backwards");
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle
+                );
     }
 
     // more data for an ongoing transaction with no new committed data
@@ -312,30 +320,21 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0) {
+        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
             m_lastFlush = timeInMillis;
         }
 
-        // ENG-866
-        //
-        // Due to tryToSneakInASinglePartitionProcedure (and probable
-        // speculative execution in the future), the EE is not
-        // guaranteed to see all transactions in transaction ID order.
-        // periodicFlush is handed whatever the most recent SpHandle
-        // executed is, whether or not that SpHandle is relevant to this
-        // export stream.  commit() is enforcing the invariants that
-        // the TupleStreamWrapper needs to see for relevant
-        // transaction IDs; we choose whichever of currentSpHandle or
-        // m_openSpHandle here will allow commit() to continue
-        // operating correctly.
-        int64_t spHandle = currentSpHandle;
-        if (m_openSpHandle > currentSpHandle)
-        {
-            spHandle = m_openSpHandle;
+        /*
+         * handle cases when the currentSpHandle was set by rejoin
+         * and snapshot restore load table statements that send in
+         * Long.MIN_VALUE as their tx id. ee's tick which results
+         * in calls to this procedure may be called right after
+         * these.
+         */
+        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
+            extendBufferChain(0);
+            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
         }
-
-        extendBufferChain(0);
-        commit(lastCommittedSpHandle, spHandle, timeInMillis < 0 ? true : false);
     }
 }
 
@@ -361,7 +360,10 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle)
     {
-        throwFatalException("Active transactions moving backwards");
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle
+                );
     }
 
     commit(lastCommittedSpHandle, spHandle);

@@ -132,44 +132,45 @@ std::string NValue::debug() const {
     int64_t addr;
     buffer << getTypeName(type) << "::";
     switch (type) {
-      case VALUE_TYPE_BOOLEAN:
+    case VALUE_TYPE_BOOLEAN:
         buffer << (getBoolean() ? "true" : "false");
         break;
-      case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_TINYINT:
         buffer << static_cast<int32_t>(getTinyInt());
         break;
-      case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_SMALLINT:
         buffer << getSmallInt();
         break;
-      case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_INTEGER:
         buffer << getInteger();
         break;
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TIMESTAMP:
         buffer << getBigInt();
         break;
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         buffer << getDouble();
         break;
-      case VALUE_TYPE_VARCHAR:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARCHAR:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
-      case VALUE_TYPE_VARBINARY:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARBINARY:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "-bin[@" << addr << "]";
         break;
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
-      default:
-          buffer << "(no details)";
+    default:
+        buffer << "(no details)";
+        break;
     }
     std::string ret(buffer.str());
     return (ret);
@@ -285,127 +286,6 @@ void NValue::createDecimalFromString(const std::string &txt) {
     getDecimal() = whole;
 }
 
-
-/*
- * Avoid scaling both sides if possible. E.g, don't turn dec * 2 into
- * (dec * 2*kMaxScale*E-12). Then the result of simple multiplication
- * is a*b*E-24 and have to further multiply to get back to the assumed
- * E-12, which can overflow unnecessarily at the middle step.
- */
-NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal multiply");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
-    if ((lhs.getValueType() == VALUE_TYPE_DECIMAL) &&
-        (rhs.getValueType() == VALUE_TYPE_DECIMAL))
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.getDecimal();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-    } else if  (lhs.getValueType() != VALUE_TYPE_DECIMAL)
-    {
-        TTLInt calc;
-        calc.FromInt(rhs.getDecimal());
-        calc *= lhs.castAsDecimalAndGetValue();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-    }
-    else
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.castAsDecimalAndGetValue();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-   }
-}
-
-
-/*
- * Divide two decimals and return a correctly scaled decimal.
- * A little cumbersome. Better algorithms welcome.
- *   (1) calculate the quotient and the remainder.
- *   (2) temporarily scale the remainder to 19 digits
- *   (3) divide out remainder to calculate digits after the radix point.
- *   (4) scale remainder to 12 digits (that's the default scale)
- *   (5) scale the quotient back to 19,12.
- *   (6) sum the scaled quotient and remainder.
- *   (7) construct the final decimal.
- */
-
-NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "No decimal NValue in decimal subtract");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
-    TTLInt calc;
-    calc.FromInt(lhs.getDecimal());
-    calc *= NValue::kMaxScaleFactor;
-    if (calc.Div(rhs.getDecimal())) {
-        char message[4096];
-        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
-                lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           message);
-    }
-    TTInt retval;
-    if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-        char message[4096];
-        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
-                lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                calc.ToString(10).c_str());
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           message);
-    }
-    return getDecimalValue(retval);
-}
-
 struct NValueList {
     static int allocationSizeForLength(size_t length)
     {
@@ -462,7 +342,7 @@ bool NValue::inList(const NValue& rhs) const
     if (rhsType != VALUE_TYPE_ARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
-    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue_withoutNull();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values

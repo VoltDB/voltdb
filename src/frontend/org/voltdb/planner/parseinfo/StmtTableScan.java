@@ -24,7 +24,6 @@ import java.util.Set;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -35,17 +34,15 @@ public abstract class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
 
-    public enum TABLE_SCAN_TYPE {
-        TARGET_TABLE_SCAN,
-        TEMP_TABLE_SCAN
-    }
-
     // table alias
     protected String m_tableAlias = null;
 
     // Store a unique list of scan columns.
     protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
     protected Set<String> m_scanColumnNameSet = new HashSet<>();
+
+    // Partitioning column info
+    protected List<SchemaColumn> m_partitioningColumns = null;
 
     protected StmtTableScan(String tableAlias) {
         m_tableAlias = tableAlias;
@@ -59,21 +56,33 @@ public abstract class StmtTableScan {
         return m_scanColumnsList;
     }
 
-    abstract public TABLE_SCAN_TYPE getScanType();
+    public List<SchemaColumn> getPartitioningColumns() {
+        return m_partitioningColumns;
+    }
 
     abstract public String getTableName();
 
     abstract public boolean getIsReplicated();
 
-    abstract public String getPartitionColumnName();
-
     abstract public List<Index> getIndexes();
-
-    public void setPartitioning(PartitioningForStatement partitioning) {}
 
     abstract public String getColumnName(int m_columnIndex);
 
-    abstract public void resolveTVE(TupleValueExpression expr, String columnName);
+
+    abstract public void processTVE(TupleValueExpression expr, String columnName);
+
+
+    public void resolveTVE(TupleValueExpression expr, String columnName) {
+
+        processTVE(expr, columnName);
+
+        if (!m_scanColumnNameSet.contains(columnName)) {
+            SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
+                    columnName, columnName, (TupleValueExpression) expr.clone());
+            m_scanColumnNameSet.add(columnName);
+            m_scanColumnsList.add(scol);
+        }
+    }
 
     abstract public boolean isPartitionedOnColumnIndex(int columnIndex);
 

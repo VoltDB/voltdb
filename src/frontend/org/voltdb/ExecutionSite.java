@@ -25,6 +25,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,7 +50,6 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -362,104 +362,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     /**
-     * SystemProcedures are "friends" with ExecutionSites and granted
-     * access to internal state via m_systemProcedureContext.
-     */
-    protected class SystemProcedureContext implements SystemProcedureExecutionContext {
-        @Override
-        public Database getDatabase()                           { return m_context.database; }
-        @Override
-        public Cluster getCluster()                             { return m_context.cluster; }
-
-        /*
-         * Pre-iv2 the transaction id and sp handle are absolutely always the same.
-         * This is because there is a global order. In IV2 there is no global order
-         * so there is a per partition order/txn-id called SpHandle which may/may not
-         * be the same as the txn-id for a given transaction. If the transaction
-         * is multi-part then the txnid and SpHandle will not be the same.
-         */
-        @Override
-        public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
-        @Override
-        public long getSiteId()                                 { return m_siteId; }
-        @Override
-        public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
-        @Override
-        public int getHostId()                                  { return SiteTracker.getHostForSite(m_siteId); }
-        @Override
-        public int getPartitionId()                             { return m_tracker.getPartitionForSite(m_siteId); }
-        @Override
-        public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
-        @Override
-        public int getCatalogVersion()                          { return m_context.catalogVersion; }
-        @Override
-        public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
-        @Override
-        public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
-
-        @Override
-        public void setNumberOfPartitions(int partitionCount)
-        {
-            throw new UnsupportedOperationException("Changing partition count in legacy is not " +
-                    "supported");
-        }
-
-        @Override
-        public SiteProcedureConnection getSiteProcedureConnection()
-        {
-            return ExecutionSite.this;
-        }
-        @Override
-        public SiteSnapshotConnection getSiteSnapshotConnection()
-        {
-            return ExecutionSite.this;
-        }
-        @Override
-        public void updateBackendLogLevels()
-        {
-            ExecutionSite.this.updateBackendLogLevels();
-        }
-        @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
-        {
-            return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
-        }
-
-
-        @Override
-        public TheHashinator getCurrentHashinator()
-        {
-            return null;
-        }
-
-        @Override
-        public void updateHashinator(TheHashinator hashinator)
-        {
-        }
-
-        @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
-        {
-            return false;
-        }
-
-        @Override
-        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
-                                                          List<DBBPool.BBContainer> outputBuffers)
-        {
-            return Pair.of(0l, new int[0]);
-        }
-    }
-
-    SystemProcedureContext m_systemProcedureContext;
-
-    /**
      * Dummy ExecutionSite useful to some tests that require Mock/Do-Nothing sites.
      * @param siteId
      */
     ExecutionSite(long siteId) {
         m_siteId = siteId;
-        m_systemProcedureContext = new SystemProcedureContext();
         ee = null;
         hsql = null;
         m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex);
@@ -531,13 +438,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                             configuredNumberOfPartitions);
         }
 
-        m_systemProcedureContext = new SystemProcedureContext();
         m_mailbox = mailbox;
 
         // setup the procedure runner wrappers.
-        if (runnerFactory != null) {
-            runnerFactory.configure(this, m_systemProcedureContext);
-        }
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
@@ -597,25 +500,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     // Before blocking record the starvation
                     VoltMessage message = m_mailbox.recv();
                     if (message == null) {
-                        //Will return null if there is no work, safe to block on the mailbox if there is no work
-                        boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext, false) != null);
-
-                        /*
-                         * Do rejoin work here before it blocks on the mailbox
-                         * so that it can rejoin quickly without interrupting
-                         * load too much.
-                         *
-                         * Rejoin and snapshot should never happen at the same
-                         * time on a rejoining node, so it's fine to assign the
-                         * value to hadWork here.
-                         */
-                        hadWork = doRejoinWork();
-                        if (hadWork) {
-                            continue;
-                        } else {
-                            message = m_mailbox.recvBlocking(5);
-                        }
+                        message = m_mailbox.recvBlocking(5);
                     }
 
                     // do periodic work
@@ -623,8 +508,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message != null) {
                         handleMailboxMessage(message);
                     } else {
-                        //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, false);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -881,9 +764,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             initiateRejoin(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.REQUEST_RESPONSE) {
             m_rejoinSnapshotTxnId = rm.getSnapshotTxnId();
-            if (m_rejoinTaskLog != null) {
-                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
-            }
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
@@ -1000,47 +880,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
-            // first finish any on-going snapshot
-            try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext);
-                if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
-                    for (Exception e : completeSnapshotWork) {
-                        hostLog.error("Error completing in progress snapshot.", e);
-                    }
-                }
-            } catch (InterruptedException e) {
-                hostLog.warn("Interrupted during snapshot completion", e);
-            }
-
             hostLog.info("Executing local snapshot. Creating new snapshot.");
 
             //Flush export data to the disk before the partition detection snapshot
             ee.quiesce(lastCommittedTxnId);
 
             // then initiate the local snapshot
-            ExecutionSiteLocalSnapshotMessage snapshotMsg =
-                    (ExecutionSiteLocalSnapshotMessage) message;
-            String nonce = snapshotMsg.nonce + "_" + snapshotMsg.m_roadblockTransactionId;
-            SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable startSnapshotting = saveAPI.startSnapshotting(snapshotMsg.path,
-                                      nonce,
-                                      SnapshotFormat.NATIVE,
-                                      (byte) 0x1,
-                                      snapshotMsg.m_roadblockTransactionId,
-                                      Long.MIN_VALUE,
-                                      new long[0],//this param not used pre-iv2
-                                      null,
-                                      m_systemProcedureContext,
-                                      CoreUtils.getHostnameOrAddress(),
-                                      null,
-                                      TransactionIdManager
-                                          .getTimestampFromTransactionId(snapshotMsg.m_roadblockTransactionId));
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
-                snapshotMsg.crash) {
-                String msg = "Partition detection snapshot completed. Shutting down. " +
-                        "Result: " + startSnapshotting.toString();
-                VoltDB.crashLocalVoltDB(msg, false, null);
-            }
         } else if (message instanceof LocalObjectMessage) {
               LocalObjectMessage lom = (LocalObjectMessage)message;
               ((Runnable)lom.payload).run();
@@ -1124,22 +969,24 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId,
-                                        exportSequenceNumbers);
     }
 
     /*
-     * Do snapshot work exclusively until there is no more. Also blocks
-     * until the syncing and closing of snapshot data targets has completed.
-     */
+         * Do snapshot work exclusively until there is no more. Also blocks
+         * until the syncing and closing of snapshot data targets has completed.
+         */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext);
+        return null;
     }
 
+    @Override
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets)
+    {
+
+    }
 
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
@@ -1506,5 +1353,5 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void setProcedureName(String procedureName) {}
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce) {}
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {}
 }

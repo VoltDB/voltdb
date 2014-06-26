@@ -16,7 +16,6 @@
  */
 
 #include "storage/ElasticContext.h"
-#include "storage/ElasticIndex.h"
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
@@ -35,6 +34,7 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                const std::vector<std::string> &predicateStrings,
                                size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    m_predicateStrings(predicateStrings), // retained for cloning here, not in TableStreamerContext.
     m_nTuplesPerCall(nTuplesPerCall),
     m_indexActive(false)
 {
@@ -45,6 +45,39 @@ ElasticContext::ElasticContext(PersistentTable &table,
 
 ElasticContext::~ElasticContext()
 {}
+
+TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurgeon &surgeon)
+{
+    if ( ! m_indexActive) {
+        return NULL;
+    }
+    ElasticContext *cloned = new ElasticContext(surgeon.getTable(), surgeon,
+        getPartitionId(), getSerializer(), m_predicateStrings, m_nTuplesPerCall);
+    cloned->handleActivation(TABLE_STREAM_ELASTIC_INDEX);
+
+    TupleOutputStreamProcessor dummyProcessor;
+    std::vector<int> dummyPosition;
+    while (true) {
+        int64_t retCode = cloned->handleStreamMore(dummyProcessor, dummyPosition);
+        if (retCode == 0) {
+            break;
+        } else if (retCode == TABLE_STREAM_SERIALIZATION_ERROR) {
+            break;
+        } else if (retCode == 1) {
+            continue;
+        } else {
+            char errMsg[1024];
+            snprintf(errMsg,
+                     1024,
+                     "Received an unrecognized return value %jd from handleStreamMore()",
+                     (intmax_t)retCode);
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
+            break;
+        }
+    }
+
+    return cloned;
+}
 
 /**
  * Activation handler.
@@ -252,6 +285,7 @@ void ElasticContext::updatePredicates(const std::vector<std::string> &predicateS
             }
         }
     }
+    m_predicateStrings = predicateStrings; // retain for possible clone after TRUNCATE TABLE
     TableStreamerContext::updatePredicates(predicateStrings);
 }
 

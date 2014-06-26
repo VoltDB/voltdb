@@ -66,14 +66,17 @@
 
 package org.hsqldb_voltpatches.index;
 
-import java.util.NoSuchElementException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
@@ -1602,18 +1605,14 @@ public class IndexAVL implements Index {
         return this;
     }
 
-    String getColumnNameList() {
+    List<String> getColumnNameList() {
 
-        String columnNameList = "";
+        List<String> columnNameList = new ArrayList<String>();
         Table t2 = (Table) table;
 
         for (int j = 0; j < colIndex.length; ++j) {
-            columnNameList +=
-                t2.getColumn(colIndex[j]).getName().statementName;
-
-            if (j < colIndex.length - 1) {
-                columnNameList += ",";
-            }
+            columnNameList.add(
+                t2.getColumn(colIndex[j]).getName().statementName);
         }
 
         return columnNameList;
@@ -1628,25 +1627,76 @@ public class IndexAVL implements Index {
      * @throws HSQLParseException
      */
     @Override
-    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session)
+    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session, String tableName)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         org.hsqldb_voltpatches.VoltXMLElement index = new org.hsqldb_voltpatches.VoltXMLElement("index");
 
-        index.attributes.put("name", getName().name);
+        String indexName = getName().name;
+        String autoGenIndexName = null;
+        if (indexName.startsWith("SYS_IDX_")) {
+            if (indexName.startsWith("SYS_PK_", 8)) {
+                autoGenIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + tableName;
+            }
+            else if (indexName.startsWith("SYS_CT_", 8)) {
+                autoGenIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + tableName;
+            }
+            else {
+                if (indexName.length() == 13) {
+                    // Raw SYS_IDX_XXXXX
+                    autoGenIndexName = HSQLInterface.AUTO_GEN_IDX_PREFIX + tableName;
+                }
+                else {
+                    // Explicitly named constraint wrapped by SYS_IDX_
+                    autoGenIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                            indexName.substring(8, indexName.length()-6);
+                    indexName = autoGenIndexName;
+                }
+            }
+        }
+        else {
+            autoGenIndexName = "";
+        }
 
         // Support indexed expressions
+        int exprHash = 0;
         if (exprs != null) {
             org.hsqldb_voltpatches.VoltXMLElement indexedExprs = new org.hsqldb_voltpatches.VoltXMLElement("exprs");
             index.children.add(indexedExprs);
-
+            String hashExprString = new String();
+            String sep = "";
             for (org.hsqldb_voltpatches.Expression expression : exprs) {
                 org.hsqldb_voltpatches.VoltXMLElement xml = expression.voltGetExpressionXML(session, (Table) table);
                 indexedExprs.children.add(xml);
+                hashExprString += sep + expression.getSQL();
+                sep = ",";
+            }
+            if (!autoGenIndexName.equals("")) {
+                byte[] bytes = hashExprString.getBytes();
+                int offset = 0;
+                for (int ii = 0; ii < bytes.length; ii++) {
+                    exprHash = 31 * exprHash + bytes[offset++];
+                }
             }
         }
         index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
 
-        index.attributes.put("columns", getColumnNameList());
+        Object[] columnList = getColumnNameList().toArray();
+        if (columnList.length > 0) {
+            if (!autoGenIndexName.equals("") &&
+                    !autoGenIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
+                autoGenIndexName += "_" + StringUtils.join(columnList, "_");
+                if (exprs != null) {
+                    autoGenIndexName += "_" + java.lang.Math.abs(exprHash % 100000);
+                }
+                indexName = autoGenIndexName;
+            }
+            index.attributes.put("name", indexName);
+            index.attributes.put("columns", StringUtils.join(columnList, ","));
+        }
+        else {
+            index.attributes.put("name", autoGenIndexName.equals("") ? indexName : autoGenIndexName);
+            index.attributes.put("columns", "");
+        }
         index.attributes.put("unique", isUnique() ? "true" : "false");
 
         return index;

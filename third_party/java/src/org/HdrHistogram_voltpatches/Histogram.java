@@ -149,4 +149,14 @@ public class Histogram extends AbstractHistogram {
             throws IOException, ClassNotFoundException {
         o.defaultReadObject();
     }
+
+    public static Histogram diff(Histogram newer, Histogram older) {
+        Histogram h = new Histogram(newer.getLowestTrackableValue(), newer.getHighestTrackableValue(), newer.getNumberOfSignificantValueDigits());
+        h.totalCount = newer.totalCount - older.totalCount;
+        for (int ii = 0; ii < h.countsArrayLength; ii++) {
+            h.counts[ii] = newer.counts[ii] - older.counts[ii];
+        }
+        h.reestablishTotalCount();
+        return h;
+    }
 }

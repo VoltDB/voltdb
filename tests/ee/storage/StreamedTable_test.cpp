@@ -45,11 +45,8 @@
 
 using namespace std;
 using namespace voltdb;
-using namespace boost;
 
 const int COLUMN_COUNT = 5;
-// 5 kilobytes of buffer
-const int BUFFER_SIZE = 1024 * 5;
 
 class MockTopend : public Topend {
   public:
@@ -106,7 +103,7 @@ public:
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, true, "", 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
@@ -118,10 +115,9 @@ public:
             columnAllowNull.push_back(false);
         }
         m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
+          TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
-                                         columnAllowNull,
-                                         true);
+                                         columnAllowNull);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero

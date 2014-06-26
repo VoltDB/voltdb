@@ -32,7 +32,7 @@ namespace voltdb {
 class Topend;
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
-const int EL_BUFFER_SIZE = /* 1024; */ 2 * 1024 * 1024;
+const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA;
 
 class TupleStreamWrapper {
 public:
@@ -75,7 +75,7 @@ public:
     }
 
     int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * m_defaultCapacity) +
+        return (m_pendingBlocks.size() * (m_defaultCapacity- MAGIC_HEADER_SPACE_FOR_JAVA)) +
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
     }
 

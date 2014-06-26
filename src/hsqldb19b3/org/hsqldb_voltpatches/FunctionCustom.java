@@ -378,17 +378,11 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_OVERLAY_CHAR :
                 name      = Tokens.T_OVERLAY;
                 parseList = quadParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_IDENTITY :
@@ -493,13 +487,13 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
             case FUNC_ASCII :
-            case FUNC_CHAR :
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 // $FALL-THROUGH$
                 // End of VoltDB extension
+            case FUNC_CHAR :
             case FUNC_SPACE :
                 parseList = singleParamList;
                 break;
@@ -536,9 +530,6 @@ public class FunctionCustom extends FunctionSQL {
 
             case FUNC_REPLACE :
                 parseList = tripleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             default :

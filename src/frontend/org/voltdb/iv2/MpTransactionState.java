@@ -160,9 +160,7 @@ public class MpTransactionState extends TransactionState
             // Only send the fragment once.
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
-                task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
-                // Set the involved partitions for command logging
-                task.setInvolvedPartitions(m_masterHSIds.keySet());
+                task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
             if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
@@ -223,7 +221,8 @@ public class MpTransactionState extends TransactionState
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
-                m_remoteWork.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+                m_remoteWork.setStateForDurability((Iv2InitiateTaskMessage) getNotice(),
+                        m_masterHSIds.keySet());
             }
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];

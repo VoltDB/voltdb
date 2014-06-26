@@ -500,7 +500,14 @@ final class RangeVariable {
      */
     void addIndexCondition(Expression[] exprList, Index index, int colCount,
                            boolean isJoin) {
-
+// VoltDB extension
+        if (rangeIndex == index && isJoinIndex && (!isJoin) &&
+                (multiColumnCount > 0) && (colCount == 0)) {
+            // This is one particular set of conditions which broke the classification of
+            // ON and WHERE clauses.
+            return;
+        }
+// End of VoltDB extension
         rangeIndex  = index;
         isJoinIndex = isJoin;
 
@@ -1171,27 +1178,24 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY && tableAlias == null) {
-            scan.attributes.put("table", rangeTable.getName().name + rangeTable.getName().hashCode());
-        } else {
-            scan.attributes.put("table", rangeTable.getName().name);
-        }
-
-        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("tablealias", tableAlias.name);
-        }
-
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             if (rangeTable instanceof TableDerived) {
-                if (tableAlias == null || (tableAlias != null && tableAlias.name == null )) {
+                if (tableAlias == null || tableAlias.name == null) {
                     // VoltDB require derived sub select table with user specified alias
                     throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                             "SQL Syntax error: Every derived table must have its own alias.");
                 }
+                scan.attributes.put("table", tableAlias.name.toUpperCase());
 
                 VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
                 scan.children.add(subQuery);
             }
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
+        }
+
+        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
         }
 
         // note if this is an outer join

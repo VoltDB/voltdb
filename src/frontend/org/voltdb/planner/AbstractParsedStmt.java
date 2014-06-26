@@ -186,7 +186,7 @@ public abstract class AbstractParsedStmt {
             if (targetNames != null) {
                 targetNames.add(name);
             }
-            Column col = table.getColumns().getIgnoreCase(name.trim());
+            Column col = table.getColumns().getExact(name.trim());
 
             assert(child.children.size() == 1);
             VoltXMLElement subChild = child.children.get(0);
@@ -227,8 +227,8 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
-        this.m_sql = sql;
-        this.m_joinOrder = joinOrder;
+        m_sql = sql;
+        m_joinOrder = joinOrder;
     }
 
     /**
@@ -708,7 +708,7 @@ public abstract class AbstractParsedStmt {
     }
 
     protected Table getTableFromDB(String tableName) {
-        Table table = m_db.getTables().getIgnoreCase(tableName);
+        Table table = m_db.getTables().getExact(tableName);
         return table;
     }
 
@@ -810,6 +810,13 @@ public abstract class AbstractParsedStmt {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt and ParsedUnionStmt.
         throw new RuntimeException("isOrderDeterministic not supported by DML statements");
+    }
+
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
     }
 
 }

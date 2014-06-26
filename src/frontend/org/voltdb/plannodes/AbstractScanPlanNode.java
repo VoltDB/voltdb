@@ -78,8 +78,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
             Collection<String> indexes)
     {
-        if (m_tableScan != null && m_tableScan instanceof StmtTargetTableScan) {
-            tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+        if (m_tableScan != null) {
+            if (m_tableScan instanceof StmtTargetTableScan) {
+                tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+            } else {
+                assert(m_tableScan instanceof StmtSubqueryScan);
+                StmtSubqueryScan subScan = (StmtSubqueryScan) m_tableScan;
+                List<StmtTargetTableScan> tableScans = subScan.getAllTargetTables();
+                for (StmtTargetTableScan tb: tableScans) {
+                    tablesRead.put(tb.getTableName(), tb);
+                }
+            }
         }
     }
 
@@ -212,6 +221,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Accessor to return the sub-query flag
      * @return m_isSubQuery
      */
+    @Override
     public boolean isSubQuery() {
         return m_isSubQuery;
     }
@@ -230,7 +240,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
             } else {
                 m_tableSchema = new NodeSchema();
-                CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+                CatalogMap<Column> cols = db.getTables().getExact(m_targetTableName).getColumns();
                 // you don't strictly need to sort this, but it makes diff-ing easier
                 for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
                 {
@@ -239,6 +249,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                             m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
                     tve.setValueType(VoltType.get((byte)col.getType()));
                     tve.setValueSize(col.getSize());
+                    tve.setInBytes(col.getInbytes());
                     m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
                                                              m_targetTableAlias,
                                                              col.getTypeName(),
@@ -276,7 +287,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
-
             if (m_tableScanSchema.size() != 0)
             {
                 // Order the scan columns according to the table schema
@@ -310,6 +320,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
+
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+        if (aggNode != null) {
+            m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = true;
+        }
     }
 
     @Override
@@ -342,7 +359,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // if there was an inline projection we will have copied these already
             // otherwise we need to iterate through the output schema TVEs
             // and sort them by table schema index order.
-
             for (SchemaColumn col : m_outputSchema.getColumns())
             {
                 // At this point, they'd better all be TVEs.
@@ -370,6 +386,16 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
 
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
+
+        if (aggNode != null) {
+            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
+            m_outputSchema = aggNode.getOutputSchema().clone();
+            // Aggregate plan node change its output schema, and
+            // EE does not have special code to get output schema from inlined aggregate node.
+            m_hasSignificantOutputSchema = true;
+        }
     }
 
     @Override
@@ -394,7 +420,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
-            m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+            m_isSubQuery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
         }
     }
 

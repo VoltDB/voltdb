@@ -52,6 +52,7 @@ public class RejoinMessage extends VoltMessage {
     // number of sources sending to this site
     private int m_snapshotSourceCount = 1;
     private long m_snapshotSinkHSId = -1;
+    private boolean m_schemaHasNoTables = false;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -74,13 +75,14 @@ public class RejoinMessage extends VoltMessage {
      * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
-                         int sourceCount, FixedDBBPool bufferPool)
-    {
+                         int sourceCount, FixedDBBPool bufferPool,
+                         boolean schemaHasNoTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
         m_snapshotSourceCount = sourceCount;
         m_bufferPool = bufferPool;
+        m_schemaHasNoTables = schemaHasNoTables;
     }
 
     /**
@@ -120,6 +122,10 @@ public class RejoinMessage extends VoltMessage {
         return m_snapshotSourceCount;
     }
 
+    public boolean schemaHasNoTables() {
+        return m_schemaHasNoTables;
+    }
+
     /**
      * Get the only snapshot sink HSID specified in the message. This can only be called if
      * there is only one sink HSID. Rejoin uses one snapshot sink for a single site, elastic
@@ -136,7 +142,8 @@ public class RejoinMessage extends VoltMessage {
         msgsize +=
             8 + // m_sourceHSId
             1 + // m_type
-            8; // m_snapshotTxnId
+            8 + // m_snapshotTxnId
+            1;  // m_schemaHasNoTables
         return msgsize;
     }
 

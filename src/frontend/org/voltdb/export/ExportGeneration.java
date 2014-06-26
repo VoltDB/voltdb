@@ -61,7 +61,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -91,11 +90,15 @@ public class ExportGeneration {
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
-    private final Runnable m_onAllSourcesDrained;
+    private Runnable m_onAllSourcesDrained = null;
 
     private final Runnable m_onSourceDrained = new Runnable() {
         @Override
         public void run() {
+            if (m_onAllSourcesDrained == null) {
+                VoltDB.crashLocalVoltDB("No export generation roller found.", true, null);
+                return;
+            }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
@@ -129,7 +132,7 @@ public class ExportGeneration {
                     }, null);
                     removeLeadership.addListener(
                             m_onAllSourcesDrained,
-                            MoreExecutors.sameThreadExecutor());
+                            CoreUtils.SAMETHREADEXECUTOR);
                 }
 
                 ;
@@ -159,8 +162,7 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, Runnable onAllSourcesDrained, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
+    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!isRejoin) {
@@ -183,10 +185,7 @@ public class ExportGeneration {
      * @param generationTimestamp
      * @throws IOException
      */
-    public ExportGeneration(
-            Runnable onAllSourcesDrained,
-            File generationDirectory) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
+    public ExportGeneration(File generationDirectory) throws IOException {
         m_directory = generationDirectory;
     }
 
@@ -229,7 +228,6 @@ public class ExportGeneration {
             }
         }
         createAndRegisterAckMailboxes(partitions, messenger);
-        exportLog.info("Restoring export generation " + m_timestamp);
         return hadValidAd;
     }
 
@@ -666,8 +664,7 @@ public class ExportGeneration {
         }
     }
 
-    public void pushExportBuffer(int partitionId, String signature, long uso,
-            long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
@@ -679,7 +676,9 @@ public class ExportGeneration {
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
                     + partitionId + " generation " + m_timestamp + " the export data is being discarded");
-            DBBPool.deleteCharArrayMemory(bufferPtr);
+            if (buffer != null) {
+                DBBPool.wrapBB(buffer).discard();
+            }
             return;
         }
 
@@ -688,11 +687,13 @@ public class ExportGeneration {
             exportLog.error("Could not find export data source for partition " + partitionId +
                     " signature " + signature + " generation " +
                     m_timestamp + " the export data is being discarded");
-            DBBPool.deleteCharArrayMemory(bufferPtr);
+            if (buffer != null) {
+                DBBPool.wrapBB(buffer).discard();
+            }
             return;
         }
 
-        source.pushExportBuffer(uso, bufferPtr, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync, endOfStream);
     }
 
     public void closeAndDelete() throws IOException {
@@ -796,4 +797,9 @@ public class ExportGeneration {
     public String toString() {
         return "Export Generation - " + m_timestamp.toString();
     }
+
+    public void setGenerationDrainRunnable(Runnable onGenerationDrained) {
+        m_onAllSourcesDrained = onGenerationDrained;
+    }
+
 }

@@ -555,6 +555,44 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
+    public boolean isSubQuery() {
+        return false;
+    }
+
+    public boolean hasSubquery() {
+        if (isSubQuery()) {
+            return true;
+        }
+        for (AbstractPlanNode n : m_children) {
+            if (n.hasSubquery()) {
+                return true;
+            }
+        }
+        for (AbstractPlanNode inlined : m_inlineNodes.values()) {
+            if (inlined.hasSubquery()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether this plan can be joined locally or not if this plan is part of subquery.
+     * @return false when this plan can join locally, otherwise return true.
+     */
+    public boolean isNonjoinableSubquery() {
+        if (hasSubquery()) {
+            if (this.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
+                this.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
+                this.hasAnyNodeOfType(PlanNodeType.LIMIT))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Refer to the override implementation on NestLoopIndexJoin node.
      * @param tableName
@@ -757,28 +795,32 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.ID.name()).value(m_id);
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
-        stringer.key(Members.INLINE_NODES.name()).array();
 
+        if (m_inlineNodes.size() > 0) {
+            stringer.key(Members.INLINE_NODES.name()).array();
 
-        PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
-        int i = 0;
-        for (PlanNodeType type : m_inlineNodes.keySet()) {
-            types[i++] = type;
+            PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
+            int i = 0;
+            for (PlanNodeType type : m_inlineNodes.keySet()) {
+                types[i++] = type;
+            }
+            Arrays.sort(types);
+            for (PlanNodeType type : types) {
+                AbstractPlanNode node = m_inlineNodes.get(type);
+                assert(node != null);
+                assert(node instanceof JSONString);
+                stringer.value(node);
+            }
+            stringer.endArray();
         }
-        Arrays.sort(types);
-        for (PlanNodeType type : types) {
-            AbstractPlanNode node = m_inlineNodes.get(type);
-            assert(node != null);
-            assert(node instanceof JSONString);
-            stringer.value(node);
-        }
-        stringer.endArray();
 
-        stringer.key(Members.CHILDREN_IDS.name()).array();
-        for (AbstractPlanNode node : m_children) {
-            stringer.value(node.getPlanNodeId().intValue());
+        if (m_children.size() > 0) {
+            stringer.key(Members.CHILDREN_IDS.name()).array();
+            for (AbstractPlanNode node : m_children) {
+                stringer.value(node.getPlanNodeId().intValue());
+            }
+            stringer.endArray();
         }
-        stringer.endArray(); //end inlineNodes
 
         outputSchemaToJSON(stringer);
     }
@@ -788,7 +830,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
             for (SchemaColumn column : m_outputSchema.getColumns()) {
-                column.toJSONString(stringer);
+                column.toJSONString(stringer, true);
             }
             stringer.endArray();
         }
@@ -821,10 +863,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
-        if (getPlanNodeType() == PlanNodeType.PROJECTION) {
-            if (m_verboseExplainForDebugging) {
-                sb.append(indent + "PROJECTION\n");
-            }
+        if (( ! m_verboseExplainForDebugging) && (getPlanNodeType() == PlanNodeType.PROJECTION)) {
             extraIndent = "";
         }
         else {
@@ -834,8 +873,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
             // don't bother with inlined projections
-            if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
+            if (( ! m_verboseExplainForDebugging) &&
+                (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
                 continue;
+            }
             sb.append(indent + "inline ");
             sb.append(inlineNode.explainPlanForNode(indent));
             sb.append("\n");

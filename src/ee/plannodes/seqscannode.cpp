@@ -48,22 +48,18 @@
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
 #include "storage/table.h"
+#include "storage/temptable.h"
 
 namespace voltdb {
 
 /*
  * If the output table needs to be cleared then this SeqScanNode is for an executor that created
  * its own output table rather then forwarding a reference to the persistent table being scanned.
- * It still isn't necessarily safe to delete the output table since an inline projection node/executor
- * may have created the table so check if there is an inline projection node.
- *
- * This is a fragile approach to determining whether or not to delete the output table. Maybe
- * it is safer to have the inline nodes be deleted first and set the output table of the
- * enclosing plannode to NULL so the delete can be safely repeated.
+ * When the output table is a temp table, it is safe to delete it.
  */
 SeqScanPlanNode::~SeqScanPlanNode() {
-    if (needsOutputTableClear())
-    {
+    // this check is the same as when the temp table is created in seqscanexecutor
+    if (getPredicate() != NULL || getInlinePlanNodes().size() > 0) {
         delete getOutputTable();
         setOutputTable(NULL);
     }

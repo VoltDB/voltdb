@@ -20,6 +20,7 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -40,11 +41,8 @@ public class StmtTargetTableScan extends StmtTableScan {
         super(tableAlias);
         assert (table != null);
         m_table = table;
-    }
 
-    @Override
-    public TABLE_SCAN_TYPE getScanType() {
-        return TABLE_SCAN_TYPE.TARGET_TABLE_SCAN;
+        findPartitioningColumns();
     }
 
     @Override
@@ -62,8 +60,11 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_table.getIsreplicated();
     }
 
-    @Override
-    public String getPartitionColumnName() {
+    private List<SchemaColumn> findPartitioningColumns() {
+        if (m_partitioningColumns != null) {
+            return m_partitioningColumns;
+        }
+
         if (getIsReplicated()) {
             return null;
         }
@@ -77,8 +78,20 @@ public class StmtTargetTableScan extends StmtTableScan {
         if (partitionCol == null) {
             return null;
         }
-        String colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
-        return colName;
+
+        String tbName = m_table.getTypeName();
+        String colName = partitionCol.getTypeName();
+
+        TupleValueExpression tve = new TupleValueExpression(
+                tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
+        tve.setValueSize(partitionCol.getSize());
+        tve.setValueType(VoltType.get((byte)partitionCol.getType()));
+        tve.setInBytes(partitionCol.getInbytes());
+
+        SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
+        m_partitioningColumns = new ArrayList<SchemaColumn>();
+        m_partitioningColumns.add(scol);
+        return m_partitioningColumns;
     }
 
     @Override
@@ -101,14 +114,8 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public void resolveTVE(TupleValueExpression expr, String columnName) {
+    public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
-        if (!m_scanColumnNameSet.contains(columnName)) {
-            SchemaColumn scol = new SchemaColumn(m_table.getTypeName(), m_tableAlias,
-                    columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(columnName);
-            m_scanColumnsList.add(scol);
-        }
     }
 
     //This column index is being treated as the index into the table,

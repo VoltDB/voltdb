@@ -194,6 +194,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_UPDATE           = 30,
     PLAN_NODE_TYPE_INSERT           = 31,
     PLAN_NODE_TYPE_DELETE           = 32,
+    PLAN_NODE_TYPE_UPSERT           = 33,
 
     //
     // Communication Nodes
@@ -409,6 +410,10 @@ inline bool tableStreamTypeIsValid(TableStreamType streamType) {
     return streamType != TABLE_STREAM_NONE;
 }
 
+inline bool tableStreamTypeAppliesToPreTruncateTable(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_ELASTIC_INDEX;
+}
+
 // ------------------------------------------------------------------
 // Statistics Selector Types
 // ------------------------------------------------------------------
@@ -455,6 +460,8 @@ enum TaskType {
 // Utility functions.
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);
+std::string tableStreamTypeToString(TableStreamType type);
+
 bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
 

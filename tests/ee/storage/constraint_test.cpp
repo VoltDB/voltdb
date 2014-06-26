@@ -110,7 +110,7 @@ protected:
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables, true);
+        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnNullables);
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }

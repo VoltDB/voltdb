@@ -16,6 +16,9 @@
  */
 package org.voltdb.utils;
 
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.*;
@@ -145,17 +148,22 @@ public class VoltFile extends File {
 
                     FileInputStream fis = new FileInputStream(f);
                     FileOutputStream fos = new FileOutputStream(fInOtherSubroot);
-                    ByteBuffer buf = ByteBuffer.allocateDirect(8192);
                     FileChannel inputChannel = fis.getChannel();
                     FileChannel outputChannel = fos.getChannel();
+                    BBContainer bufC = DBBPool.allocateDirect(8192);
+                    ByteBuffer buf = bufC.b();
 
-                    while (inputChannel.read(buf) != -1) {
-                        buf.flip();
-                        outputChannel.write(buf);
-                        buf.clear();
+                    try {
+                        while (inputChannel.read(buf) != -1) {
+                            buf.flip();
+                            outputChannel.write(buf);
+                            buf.clear();
+                        }
+                        inputChannel.close();
+                        outputChannel.close();
+                    } finally {
+                        bufC.discard();
                     }
-                    inputChannel.close();
-                    outputChannel.close();
                 } else {
                     throw new IOException(fInOtherSubroot + " already exists");
                 }

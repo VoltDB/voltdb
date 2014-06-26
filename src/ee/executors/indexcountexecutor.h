@@ -17,7 +17,7 @@
 
 
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
-#define HSTOREINDEXSCANEXECUTOR_H
+#define HSTOREINDEXCOUNTEXECUTOR_H
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -83,4 +83,4 @@ private:
 
 }
 
-#endif
+#endif // HSTOREINDEXCOUNTEXECUTOR_H

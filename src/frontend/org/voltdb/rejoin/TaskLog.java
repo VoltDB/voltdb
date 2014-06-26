@@ -41,14 +41,6 @@ public interface TaskLog {
     public TransactionInfoBaseMessage getNextMessage() throws IOException;
 
     /**
-     * Sets the earliest transaction ID so that any messages returned later will
-     * have a transaction ID larger than this.
-     *
-     * @param txnId
-     */
-    public void setEarliestTxnId(long txnId);
-
-    /**
      * If the queue is empty
      * @return
      */
@@ -62,6 +54,18 @@ public interface TaskLog {
 
     /**
      * Default policy at startup is to drop invocations until recording is necessary
+     * When used for live rejoin the first SnapshotSave plan fragment triggers the start
+     * of recording of transactions for the live rejoin.
+     *
+     * @param snapshotSpHandle    Note that it is possible that this may be called
+     *                            multiple times with different snapshotSpHandles during
+     *                            live rejoin. There may be multiple snapshot fragments
+     *                            with the same snapshot nonce due to snapshot collisions.
+     *                            At the time this is called, we don't know if the
+     *                            snapshot will succeed or not. If it collides with an
+     *                            snapshot in progress, it will be retried later. The task
+     *                            log implementation should update the snapshotSpHandle
+     *                            with the latest one.
      */
-    public void enableRecording();
+    public void enableRecording(long snapshotSpHandle);
 }

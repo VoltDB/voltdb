@@ -53,6 +53,9 @@ if compiler_name == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
 
+if (compiler_name == 'clang') and (compiler_major == 3 and compiler_minor >= 4):
+    CTX.CPPFLAGS += " -Wno-varargs"
+
 if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
@@ -246,6 +249,7 @@ CTX.INPUT['executors'] = """
  seqscanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
+ upsertexecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -254,6 +258,7 @@ CTX.INPUT['expressions'] = """
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
+ parametervalueexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -283,6 +288,7 @@ CTX.INPUT['plannodes'] = """
  seqscannode.cpp
  unionnode.cpp
  updatenode.cpp
+ upsertnode.cpp
 """
 
 CTX.INPUT['indexes'] = """

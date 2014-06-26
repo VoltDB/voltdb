@@ -37,8 +37,8 @@ import org.voltdb.types.ExpressionType;
 
 public class TestScanPlanNode extends TestCase
 {
-    static final String TABLE1 = "table1";
-    static final String[] COLS = { "col0", "col1", "col2", "col3", "col4" };
+    static final String TABLE1 = "TABLE1";
+    static final String[] COLS = { "COL0", "COL1", "COL2", "COL3", "COL4" };
     static final VoltType[] COLTYPES = { VoltType.INTEGER, VoltType.TINYINT,
                                          VoltType.TIMESTAMP, VoltType.FLOAT,
                                          VoltType.BIGINT };

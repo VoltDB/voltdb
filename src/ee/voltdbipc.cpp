@@ -1068,7 +1068,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // Pass 2 - rescan input stream and generate final buffer data.
         ReferenceSerializeInput in2(inptr, sz);
         // 1 byte status and 4 byte count
-        int offset = 5;
+        size_t offset = 5;
         ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
         out1.writeInt(bufferCount);
         for (size_t i = 0; i < bufferCount; i++) {
@@ -1076,8 +1076,8 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
             int length = in2.readInt();
             out1.writeLong((long)m_tupleBuffer);
             // Allow for the length int written later.
-            offset += 4;
-            out1.writeInt(offset);
+            offset += sizeof(int);
+            out1.writeInt(static_cast<int>(offset));
             out1.writeInt(length);
             offset += length;
         }
@@ -1091,22 +1091,20 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // and remaining tuple count.
         // Inject positions (lengths) into previously skipped int-size gaps.
         m_tupleBuffer[0] = kErrorCode_Success;
+        *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
+        offset = 1 + sizeof(int32_t);
+        *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
+        offset += sizeof(int64_t);
         if (remaining > 0) {
-            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
-            offset = 1 + sizeof(int32_t);
-            *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
-            offset += static_cast<int>(sizeof(int64_t));
             std::vector<int>::const_iterator ipos;
             for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
                 int length = *ipos;
                 *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
-                offset += length + static_cast<int>(sizeof(int32_t));
+                offset += length + sizeof(int32_t);
             }
         } else {
-            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
-            // If we failed or finished just set the count and stop right there.
-            *reinterpret_cast<int64_t*>(&m_tupleBuffer[5]) = htonll(remaining);
-            outputSize = 1 + sizeof(int32_t) + sizeof(int64_t);
+            // If we failed or finished, we've set the count, so stop right there.
+            outputSize = offset;
         }
 
         // Ship it.

@@ -23,6 +23,8 @@
 
 namespace voltdb {
 
+class VoltDBEngine;
+
 /*
  * EE site global data required by executors at runtime.
  *
@@ -43,6 +45,7 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
+                    VoltDBEngine* engine,
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId);
@@ -77,11 +80,17 @@ class ExecutorContext {
     void setupForTick(int64_t lastCommittedSpHandle)
     {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
+        if (m_spHandle < lastCommittedSpHandle) {
+            m_spHandle = lastCommittedSpHandle;
+        }
     }
 
     // data available via quiesce()
     void setupForQuiesce(int64_t lastCommittedSpHandle) {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
+        if (m_spHandle < lastCommittedSpHandle) {
+            m_spHandle = lastCommittedSpHandle;
+        }
     }
 
     // for test (VoltDBEngine::getExecutorContext())
@@ -91,6 +100,10 @@ class ExecutorContext {
 
     UndoQuantum *getCurrentUndoQuantum() {
         return m_undoQuantum;
+    }
+
+    VoltDBEngine* getEngine() {
+        return m_engine;
     }
 
     static UndoQuantum *currentUndoQuantum() {
@@ -134,6 +147,7 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+    VoltDBEngine *m_engine;
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;

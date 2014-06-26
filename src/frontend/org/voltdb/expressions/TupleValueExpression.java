@@ -184,6 +184,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_tableAlias;
     }
 
+    public void setTableAlias(String alias) {
+        m_tableAlias = alias;
+    }
+
     public int getTableIndex() {
         return m_tableIdx;
     }
@@ -270,12 +274,13 @@ public class TupleValueExpression extends AbstractValueExpression {
         // table name is not specified (and not missed?).
         // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
         // -- not bothering for now.
-        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        Column column = table.getColumns().getExact(m_columnName);
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
+        setInBytes(column.getInbytes());
     }
 
     /**
@@ -290,6 +295,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
             setValueType(inputColumn.getType());
             setValueSize(inputColumn.getSize());
+            setInBytes(inputColumn.getExpression().getInBytes());
         }
         return index;
     }

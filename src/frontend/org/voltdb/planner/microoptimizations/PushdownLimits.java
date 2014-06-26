@@ -18,10 +18,7 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.List;
 
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -31,18 +28,8 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 public class PushdownLimits extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph);
-        plan.rootPlanGraph = planGraph;
-
-        retval.add(plan);
-        return retval;
-    }
-
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    {
         assert(plan != null);
 
         // depth first:

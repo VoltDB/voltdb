@@ -19,6 +19,7 @@ package org.voltcore.logging;
 
 import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ShutdownHooks;
 
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
@@ -40,7 +41,7 @@ public class VoltLogger {
     private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
 
     static {
-        Runtime.getRuntime().addShutdownHook(new Thread("Async logger final sync") {
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOGGER, true, new Runnable() {
             @Override
             public void run() {
                 try {

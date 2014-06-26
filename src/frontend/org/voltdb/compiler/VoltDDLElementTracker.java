@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -41,7 +42,7 @@ public class VoltDDLElementTracker {
             new HashMap<String, ProcedureDescriptor>();
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
-    String[] m_extraClassses = new String[0];
+    final Set<String> m_extraClassses = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -77,8 +78,8 @@ public class VoltDDLElementTracker {
     /**
      * Add additional non-procedure classes for the jar.
      */
-    void addExtraClasses(String[] classNames) {
-        m_extraClassses = classNames;
+    void addExtraClasses(Set<String> classNames) {
+        m_extraClassses.addAll(classNames);
     }
 
     /**
@@ -101,6 +102,26 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+    }
+
+    /**
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
+     */
+    void removeProcedure(String procName) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
     }
 
     /**
@@ -130,7 +151,8 @@ public class VoltDDLElementTracker {
                     descriptor.m_authGroups,
                     descriptor.m_class,
                     partitionInfo,
-                    descriptor.m_language);
+                    descriptor.m_language,
+                    descriptor.m_scriptImpl);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -141,6 +163,7 @@ public class VoltDDLElementTracker {
                     partitionInfo,
                     false,
                     descriptor.m_language,
+                    descriptor.m_scriptImpl,
                     descriptor.m_class);
         }
         m_procedureMap.put(procedureName, descriptor);

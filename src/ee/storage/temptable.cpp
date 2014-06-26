@@ -52,9 +52,11 @@ namespace voltdb {
 
 TempTable::TempTable()
   : Table(TABLE_BLOCKSIZE),
-    m_iter(this, m_data.begin()),
+    m_iter(this),
     m_limits(NULL)
 {
+    // this happens here because m_data might not be initialized above
+    m_iter.reset(m_data.begin());
 }
 
 TempTable::~TempTable() {}

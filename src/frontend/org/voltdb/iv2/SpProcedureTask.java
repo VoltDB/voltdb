@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.LatencyWatchdog;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
@@ -40,6 +41,15 @@ public class SpProcedureTask extends ProcedureTask
 {
     final private PartitionDRGateway m_drGateway;
 
+    private static final boolean EXEC_TRACE_ENABLED;
+    private static final boolean HOST_DEBUG_ENABLED;
+    private static final boolean HOST_TRACE_ENABLED;
+    static {
+        EXEC_TRACE_ENABLED = execLog.isTraceEnabled();
+        HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
+        HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
+    }
+
     SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
@@ -52,8 +62,10 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        LatencyWatchdog.pet();
+
         waitOnDurabilityBackpressureFuture();
-        if (hostLog.isDebugEnabled()) {
+        if (HOST_DEBUG_ENABLED) {
             hostLog.debug("STARTING: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -69,8 +81,10 @@ public class SpProcedureTask extends ProcedureTask
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (hostLog.isDebugEnabled()) {
+        if (EXEC_TRACE_ENABLED) {
+            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        }
+        if (HOST_DEBUG_ENABLED) {
             hostLog.debug("COMPLETE: " + this);
         }
 
@@ -81,6 +95,8 @@ public class SpProcedureTask extends ProcedureTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
+        LatencyWatchdog.pet();
+
         if (!m_txnState.isReadOnly()) {
             taskLog.logTask(m_txnState.getNotice());
         }
@@ -106,7 +122,9 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        if (hostLog.isTraceEnabled()) {
+        LatencyWatchdog.pet();
+
+        if (HOST_TRACE_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -137,8 +155,10 @@ public class SpProcedureTask extends ProcedureTask
                     m_txnState.getUndoLog());
         }
         m_txnState.setDone();
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        if (hostLog.isTraceEnabled()) {
+        if (EXEC_TRACE_ENABLED) {
+            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        }
+        if (HOST_TRACE_ENABLED) {
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 

@@ -403,18 +403,4 @@ public class BranchNode extends JoinNode {
         }
         return false;
     }
-
-    @Override
-    public boolean containSubSelects() {
-        boolean result = false;
-        if (m_leftNode != null) {
-            result = result || m_leftNode.containSubSelects();
-        }
-        if (result) return result;
-        if (m_rightNode != null) {
-            result = result || m_rightNode.containSubSelects();
-        }
-
-        return result;
-    }
 }

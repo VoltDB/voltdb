@@ -108,8 +108,6 @@
 using namespace std;
 namespace voltdb {
 
-const int64_t AD_HOC_FRAG_ID = -1;
-
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(0),
       m_allTuplesScanned(0),
@@ -215,10 +213,10 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
+                                            this,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
     return true;
 }
 
@@ -357,6 +355,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 m_currentIndexInBatch == (numFragments - 1)))
         {
             ++failures;
+            break;
         }
 
         // at the end of each frag, rollup and reset counters
@@ -381,7 +380,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 {
     assert(planfragmentId != 0);
 
-    Table *cleanUpTable = NULL;
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
@@ -442,10 +440,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
 
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
@@ -453,28 +447,23 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set this back to -1 for error handling
-                m_currentInputDepId = -1;
+                cleanupExecutors(execsForFrag);
+
                 return ENGINE_ERRORCODE_ERROR;
             }
         } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+            cleanupExecutors(execsForFrag);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
-            // set this back to -1 for error handling
-            m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
+    // Clean up all the tempTable when each plan finishes and reset current InputDepId
+    cleanupExecutors(execsForFrag);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -500,11 +489,21 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
-    // set this back to -1 for error handling
-    m_currentInputDepId = -1;
-
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
+}
+
+/**
+ * Function that clean up the temp table the executors used and reset other metadata.
+ */
+void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
+    // Clean up all the tempTable when each plan finishes
+    BOOST_FOREACH(AbstractExecutor *executor, execsForFrag->list) {
+        assert (executor);
+        executor->cleanupTempOutputTable();
+    }
+    // set this back to -1 for error handling
+    m_currentInputDepId = -1;
 }
 
 // -------------------------------------------------
@@ -657,22 +656,29 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         int32_t type = outerIter->second->type();
         std::string name = outerIter->second->name();
         bool nullable = outerIter->second->nullable();
+        bool inBytes = outerIter->second->inbytes();
 
         if (t2->columnName(index).compare(name)) {
             return false;
         }
 
-        if (t2->schema()->columnAllowNull(index) != nullable) {
+        const TupleSchema::ColumnInfo *columnInfo = t2->schema()->getColumnInfo(index);
+
+        if (columnInfo->allowNull != nullable) {
             return false;
         }
 
-        if (t2->schema()->columnType(index) != type) {
+        if (columnInfo->getVoltType() != type) {
             return false;
         }
 
         // check the size of types where size matters
         if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+            if (columnInfo->length != size) {
+                return false;
+            }
+            if (columnInfo->inBytes != inBytes) {
+                assert(type == VALUE_TYPE_VARCHAR);
                 return false;
             }
         }
@@ -1535,6 +1541,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 "Expected at least one output stream in tableStreamSerializeMore(), received %d",
                 nBuffers);
     }
+
+    if (!tableStreamTypeIsValid(streamType)) {
+        // Failure
+        return -1;
+    }
+
     TupleOutputStreamProcessor outputStreams(nBuffers);
     for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
@@ -1550,32 +1562,47 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
     PersistentTable *table = NULL;
+
     if (tableStreamTypeIsSnapshot(streamType)) {
         // If a completed table is polled, return 0 bytes serialized. The
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
+
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
+        }
     }
-    else if (tableStreamTypeIsValid(streamType)) {
+    else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
-        if (found) {
-            table = dynamic_cast<PersistentTable*>(found);
+        if (!found) {
+            return -1;
+        }
+        PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
+        assert(currentTable != NULL);
+        // The ongoing TABLE STREAM needs the original table from the first table truncate.
+        PersistentTable * originalTable = currentTable->currentPreTruncateTable();
+
+        VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
+                tableStreamTypeToString(streamType));
+
+        remaining = originalTable->streamMore(outputStreams, streamType, retPositions);
+        if (remaining <= 0) {
+            // The on going TABLE STREAM of the original table before the first table truncate has finished.
+            // Reset all the previous table pointers to be NULL.
+            currentTable->unsetPreTruncateTable();
+            VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
+                    tableStreamTypeToString(streamType));
         }
     }
     else {
-        // Failure.
-        return -1;
-    }
-
-    // Perform the streaming.
-    if (table != NULL) {
-        remaining = table->streamMore(outputStreams, streamType, retPositions);
-
-        // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {
-            m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+        Table* found = getTable(tableId);
+        if (found) {
+            table = dynamic_cast<PersistentTable*>(found);
+            remaining = table->streamMore(outputStreams, streamType, retPositions);
         }
     }
 

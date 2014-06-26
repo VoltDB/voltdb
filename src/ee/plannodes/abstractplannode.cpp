@@ -275,6 +275,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
     vector<bool> columnAllowNull(schema_size, allowNulls);
+    vector<bool> columnInBytes;
 
     for (int i = 0; i < schema_size; i++)
     {
@@ -283,13 +284,15 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
         // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
         // Someone should put that class out of our misery.
         SchemaColumn* col = outputSchema[i];
-        columnTypes.push_back(col->getExpression()->getValueType());
-        columnSizes.push_back(col->getExpression()->getValueSize());
+        AbstractExpression * expr = col->getExpression();
+        columnTypes.push_back(expr->getValueType());
+        columnSizes.push_back(expr->getValueSize());
+        columnInBytes.push_back(expr->getInBytes());
     }
 
     TupleSchema* schema =
         TupleSchema::createTupleSchema(columnTypes, columnSizes,
-                                       columnAllowNull, true);
+                                       columnAllowNull, columnInBytes);
     return schema;
 }
 
@@ -301,7 +304,9 @@ AbstractPlanNode::generateDMLCountTupleSchema()
     vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
-    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    vector<bool> columnInBytes(1, false);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes,
+            columnAllowNull, columnInBytes);
     return schema;
 }
 
@@ -327,21 +332,25 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     node->m_planNodeId = obj.valueForKey("ID").asInt();
 
-    PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
-    for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
-        PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
-        AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
+    if (obj.hasKey("INLINE_NODES")) {
+        PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
+        for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
+            PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
+            AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
-        // todo: if this throws, new Node can be leaked.
-        // As long as newNode is not NULL, this will not throw.
-        assert(newNode);
-        node->addInlinePlanNode(newNode);
+            // todo: if this throws, new Node can be leaked.
+            // As long as newNode is not NULL, this will not throw.
+            assert(newNode);
+            node->addInlinePlanNode(newNode);
+        }
     }
 
-    PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
-    for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
-        int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
-        node->m_childIds.push_back(childNodeId);
+    if (obj.hasKey("CHILDREN_IDS")) {
+        PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
+        for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
+            int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
+            node->m_childIds.push_back(childNodeId);
+        }
     }
 
     // Output schema are optional -- when they can be determined by a child's copy.
@@ -349,7 +358,7 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
             node->m_outputSchema.push_back(outputColumn);
         }
         node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());

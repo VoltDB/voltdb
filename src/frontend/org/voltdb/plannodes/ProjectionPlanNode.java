@@ -68,6 +68,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
     }
 
+    public void setOutputSchemaWithoutClone(NodeSchema schema)
+    {
+        m_outputSchema = schema;
+        m_hasSignificantOutputSchema = true;
+    }
+
     @Override
     public void resolveColumnIndexes()
     {
