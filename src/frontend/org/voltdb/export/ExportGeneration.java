@@ -220,13 +220,15 @@ public class ExportGeneration {
                 }
 
                 if (haveDataFiles) {
-                    exportLog.info("Datasource " + f.getName() + " Has no data must be fully drained we start fresh.");
-                }
-                try {
-                    addDataSource(f, partitions);
-                    hadValidAd = true;
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
+                    try {
+                        addDataSource(f, partitions);
+                        hadValidAd = true;
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
+                    }
+                } else {
+                    //Delete ads that have no data
+                    f.delete();
                 }
             }
         }
@@ -403,14 +405,8 @@ public class ExportGeneration {
             int hostId,
             HostMessenger messenger,
             List<Integer> partitions) {
-        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-        //Only populate partitions in use if export is actually happening & we have not constructed data sources
         Set<Integer> missingPartitions = new HashSet<Integer>();
-        while (tableInfoIt.hasNext()) {
-            ConnectorTableInfo next = tableInfoIt.next();
-            Table table = next.getTable();
-            findMissingDataSources(table, partitions, missingPartitions);
-        }
+        findMissingDataSources(partitions, missingPartitions);
         if (missingPartitions.size() > 0) {
             exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
             initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(missingPartitions));
@@ -685,14 +681,10 @@ public class ExportGeneration {
     }
 
     //Find missing partitions from this generation typicaally called for current generation to fill in missing partitions
-    private void findMissingDataSources(Table table, List<Integer> partitions, Set<Integer> missingPartitions) {
+    private void findMissingDataSources(List<Integer> partitions, Set<Integer> missingPartitions) {
         for (Integer partition : partitions) {
             Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
             if (dataSourcesForPartition == null) {
-                missingPartitions.add(partition);
-                continue;
-            }
-            if (dataSourcesForPartition.get(table.getSignature()) == null) {
                 missingPartitions.add(partition);
             }
         }
