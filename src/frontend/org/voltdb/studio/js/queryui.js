@@ -42,7 +42,7 @@ function QueryUI(queryTab) {
 
             // There are some easily recognizable patterns that contain statement keywords mid-statement.
             // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
-            // always ignored by the statement splitter -- the user must eparate them from the prior
+            // always ignored by the statement splitter -- the user must separate them from the prior
             // statement with a semicolon.
             // For these other keywords, the usual statement splitting can be easily disabled in special
             // cases:
@@ -109,7 +109,7 @@ function QueryUI(queryTab) {
         }
 
         // break down a multi-statement string into a statement array.
-        function parseMethod(src) {
+        function parseUserInputMethod(src) {
             var splitStmts, stmt, ii, len,
                 stringBank = [],
                 statementBank = [];
@@ -139,9 +139,9 @@ function QueryUI(queryTab) {
                     // Clean up by restoring the replaced quoted strings.
                     stmt = undisguiseQuotedStrings(stmt, stringBank);
 
-                    // Prepare double-quotes (?for whose benefit?) by \-escaping them.
+                    // Prepare double-quotes for HTTP request formatting by \-escaping them.
                     // NOTE: This is NOT a clean up of any mangling done inside this function.
-                    // It apparently just needs doing at some point, so why not here?
+                    // It just needs doing at some point, so why not here?
                     stmt = stmt.replace(MatchDoubleQuotes, EscapedDoubleQuoteLiteral);
 
                     statementBank.push(stmt);
@@ -179,7 +179,7 @@ function QueryUI(queryTab) {
         }
 
         this.parseProcedureCallParameters = parseProcedureCallParametersMethod
-        this.parse = parseMethod;
+        this.parseUserInput = parseUserInputMethod;
     }
 
     CommandParser = new ICommandParser();
@@ -238,7 +238,7 @@ function executeMethod()
         target.html('<div class="wrapper"><textarea></textarea></div>');
         target = target.find('textarea');
     }
-    var statements = CommandParser.parse(source);
+    var statements = CommandParser.parseUserInput(source);
     var start = (new Date()).getTime();
     var connectionQueue = connection.getQueue();
     connectionQueue.Start();
