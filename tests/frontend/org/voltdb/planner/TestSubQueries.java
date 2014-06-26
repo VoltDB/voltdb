@@ -1864,10 +1864,11 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "R3", "A", "C");
 
 
+        String message = "This join of multiple partitioned tables is too complex";
         failToCompile("select * FROM " +
                 "(SELECT A, COUNT(*) FROM P1 GROUP BY A " +
                 "UNION " +
-                "SELECT A, COUNT(*) FROM R2 GROUP BY A) T1 , P2 where T1.A = P2.A ", joinErrorMsg);
+                "SELECT A, COUNT(*) FROM R2 GROUP BY A) T1 , P2 where T1.A = P2.A ", message);
     }
 
     public void testParameters() {
