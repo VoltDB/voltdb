@@ -306,7 +306,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         cluster.startUp();
 
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", cluster.port(0));
+        client.createConnection("localhost");
 
         String classpath = "org/voltdb_testprocs/fullddlfeatures/NoMeaningClass.class";
         Process p = Runtime.getRuntime().exec("jar tf " + pathToCatalog);
