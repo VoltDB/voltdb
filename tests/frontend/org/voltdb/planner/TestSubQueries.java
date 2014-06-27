@@ -1739,7 +1739,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        // Using index scan for group by only: use serial aggregate instead hash aggregate
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
 
         // Right outer join
@@ -1765,7 +1766,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        // Using index scan for group by only: use serial aggregate instead hash aggregate
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         // RIGHT partition table
         planNodes = compileToFragments("SELECT T1.CC FROM P1 RIGHT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
@@ -1793,7 +1795,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        // Using index scan for group by only: use serial aggregate instead hash aggregate
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         // Join locally: inner join case for subselects
         planNodes = compileToFragments("SELECT A, C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
