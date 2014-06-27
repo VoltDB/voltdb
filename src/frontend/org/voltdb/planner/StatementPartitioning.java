@@ -322,6 +322,10 @@ public class StatementPartitioning implements Cloneable{
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
+        // reset this flag to forget the last result of the multiple partition access path.
+        // AdHoc with parameters will call this function at least two times
+        // By default this flag should be true.
+        m_joinValid = true;
         boolean subqueryHasReceiveNode = false;
         boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
