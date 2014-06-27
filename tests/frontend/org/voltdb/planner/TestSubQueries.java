@@ -45,6 +45,7 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
@@ -880,6 +881,64 @@ public class TestSubQueries extends PlannerTestCase {
                 "FROM (SELECT A A1, D D1 FROM P1 WHERE A=2) T1, " +
                 "(SELECT A A2, D D2 FROM P2 ORDER BY D LIMIT 3) T2 where T2.A2=2",
                 joinErrorMsg);
+    }
+
+    public void testPartitionedGroupByWithoutAggregate() {
+        AbstractPlanNode pn;
+        List<AbstractPlanNode> planNodes;
+
+        // group by non-partition column, no pushed down
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT C FROM P1 GROUP BY C) T1");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        checkSeqScan(pn, "T1");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+
+        pn = planNodes.get(1).getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+
+        // count(*), no pushed down
+        planNodes = compileToFragments(
+                "SELECT count(*) FROM (SELECT c FROM P1 GROUP BY c) T1");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof TableCountPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+
+        pn = planNodes.get(1).getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+
+
+        // group by partition column, pushed down
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A FROM P1 GROUP BY A) T1");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1).getChild(0);
+        checkSeqScan(pn, "T1");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+
+        planNodes = compileToFragments(
+                "SELECT count(*) FROM (SELECT A FROM P1 GROUP BY A) T1");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1).getChild(0);
+        assertTrue(pn instanceof TableCountPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
     }
 
     public void testPartitionedGroupBy() {

@@ -1379,14 +1379,13 @@ public class PlanAssembler {
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
-        boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
         boolean indexScanForGroupingOnly = false;
-        if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
+        if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
@@ -1625,7 +1624,7 @@ public class PlanAssembler {
             }
         }
         // DISTINCT is redundant on a single-row result. Return early.
-        else if (containsAggregateExpression) {
+        else if (m_parsedSelect.hasAggregateExpression()) {
             return root;
         }
 

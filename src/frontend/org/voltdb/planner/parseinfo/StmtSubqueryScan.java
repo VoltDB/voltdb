@@ -327,7 +327,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         // Table aggregate cases should not get rid of the receive node
-        if (selectStmt.hasAggregateExpression()) {
+        if (selectStmt.hasAggregateOrGroupby()) {
             if (!selectStmt.isGrouped()) {
                 m_tableAggregateSubquery = true;
                 return root;

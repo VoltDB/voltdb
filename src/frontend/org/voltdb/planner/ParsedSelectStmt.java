@@ -964,6 +964,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_hasAggregateExpression;
     }
 
+    public boolean hasAggregateOrGroupby() {
+        return m_hasAggregateExpression || isGrouped();
+    }
+
     public NodeSchema getFinalProjectionSchema () {
         return m_projectSchema;
     }
