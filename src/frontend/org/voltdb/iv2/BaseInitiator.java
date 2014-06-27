@@ -115,7 +115,7 @@ public abstract class BaseInitiator implements Initiator
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
-    protected void configureCommon(BackendTarget backend, String serializedCatalog,
+    protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
@@ -146,7 +146,6 @@ public abstract class BaseInitiator implements Initiator
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
-                                       serializedCatalog,
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,

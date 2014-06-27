@@ -191,7 +191,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
-    String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
@@ -713,7 +712,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
                             getBackendTargetType(),
-                            m_serializedCatalog,
                             m_catalogContext,
                             m_deployment.getCluster().getKfactor(),
                             csp,
