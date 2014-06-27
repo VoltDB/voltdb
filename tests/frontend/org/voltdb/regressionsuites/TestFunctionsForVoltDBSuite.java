@@ -1581,42 +1581,43 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(id, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
         }
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1");
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
+            // TODO: I have no idea why the exception is different
             assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
         }
         try {

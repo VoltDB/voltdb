@@ -561,17 +561,19 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
             "the second parameter should be < 12 and > -26");
     }
+    int64_t denominator = (places <= 0) ? (int64_t)(kMaxScaleFactor * std::pow((double)10, -(double)places)):
+                                          (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
     TTInt fractional(scaledValue);
-    fractional %= (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
-    TTInt barrier = five * (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)(places + 1)));
+    fractional %= denominator;
+    TTInt barrier = five * (denominator / 10);
 
     if (fractional > barrier) {
-        scaledValue += one * (int64_t)(kMaxScaleFactor / std::pow(10, places));
+        scaledValue += one * denominator;
     }
     else if (fractional == barrier) {
-        TTInt prev = scaledValue / (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
+        TTInt prev = scaledValue / denominator;
         if (prev % 2 == one) {
-            scaledValue += one * (int64_t)(kMaxScaleFactor / std::pow(10, places));
+            scaledValue += one * denominator;
         }
     }
     else {
@@ -579,14 +581,15 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     }
 
     if (places <= 0) {
-        scaledValue -= scaledValue % (int64_t)(kMaxScaleFactor * std::pow(10, -places));
+        //scaledValue -= scaledValue % (int64_t)(kMaxScaleFactor * std::pow(10, -places));
+        scaledValue -= scaledValue % denominator;
         int64_t whole = narrowDecimalToBigInt(scaledValue);
         out << std::fixed << whole;
     }
     else {
         int64_t whole = narrowDecimalToBigInt(scaledValue);
         int64_t fraction = getFractionalPart(scaledValue);
-        fraction /= kMaxScaleFactor / (int64_t)std::pow(10,places);
+        fraction /= denominator;
         out << std::fixed << whole;
         // fractional part does not need groups
         out.imbue(nullloc);
