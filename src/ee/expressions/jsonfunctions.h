@@ -76,7 +76,7 @@ public:
                     arrayIndex = arraySize > 0 ? arraySize - 1 : 0;
                 }
                 node = &((*node)[arrayIndex]);
-                if (node == &Json::Value::null) {
+                if (node->isNull()) {
                     return false;
                 }
             } else {
@@ -85,7 +85,7 @@ public:
                     return false;
                 }
                 node = &((*node)[pathNode.m_field]);
-                if (node == &Json::Value::null) {
+                if (node->isNull()) {
                     return false;
                 }
             }
@@ -173,11 +173,11 @@ private:
                 if (c == '-') {
                     neg = true;
                     if (!readChar(c)) {
-                        throwInvalidPathError("Unexpected termination of JSON path");
+                        throwInvalidPathError("Unexpected termination (unterminated array access)");
                     }
                 }
                 if (c < '0' || c > '9') {
-                    throwInvalidPathError("Unexpected character in JSON path array index");
+                    throwInvalidPathError("Unexpected character in array index");
                 }
                 // atoi while advancing our pointer
                 int32_t arrayIndex = c - '0';
@@ -187,14 +187,14 @@ private:
                         success = true;
                         break;
                     } else if (c < '0' || c > '9') {
-                        throwInvalidPathError("Unexpected character in JSON path array index");
+                        throwInvalidPathError("Unexpected character in array index");
                     }
                     arrayIndex = 10 * arrayIndex + (c - '0');
                 }
                 if (neg) {
                     // other than the special '-1' case, negative indices aren't allowed
                     if (arrayIndex != 1) {
-                        throwInvalidPathError("Invalid array index in JSON path");
+                        throwInvalidPathError("Invalid array index");
                     }
                     arrayIndex = ARRAY_TAIL;
                 }
@@ -220,12 +220,8 @@ private:
                 int32_t i = 0;
                 do {
                     if (c == '\\') {
-                        if (!readChar(c)) {
-                            throwInvalidPathError("Unexpected termination of JSON path (empty escape sequence)");
-                        } else if (c != '[' && c != ']' && c != '.') {
-                            // other than our special escaping cases, we should forward any escapes to
-                            // the actual JSON text
-                            strField[i++] = '\\';
+                        if (!readChar(c) || (c != '[' && c != ']' && c != '.' && c != '\\')) {
+                            throwInvalidPathError("Unescaped backslash (double escaping required for path)");
                         }
                     } else if (c == '.') {
                         expectField = true;
@@ -243,7 +239,7 @@ private:
         }
         // trailing '['
         if (expectArrayIndex) {
-            throwInvalidPathError("Unexpected termination of JSON path");
+            throwInvalidPathError("Unexpected termination (unterminated array access)");
         }
         // if we're either empty or ended on a trailing '.', add an empty field name
         if (expectField || first) {
