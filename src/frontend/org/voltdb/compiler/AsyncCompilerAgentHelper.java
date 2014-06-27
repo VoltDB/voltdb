@@ -88,8 +88,10 @@ public class AsyncCompilerAgentHelper
         // get the diff between catalogs
         try {
             // try to get the new catalog from the params
-            Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes, null);
-            String newCatalogCommands = loadResults.getFirst();
+            Pair<InMemoryJarfile, String> loadResults =
+                CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes);
+            String newCatalogCommands =
+                CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
             if (newCatalogCommands == null) {
                 retval.errorMsg = "Unable to read from catalog bytes";
