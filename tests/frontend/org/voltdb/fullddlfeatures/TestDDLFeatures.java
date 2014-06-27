@@ -23,24 +23,18 @@
 
 package org.voltdb.fullddlfeatures;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLDecoder;
 
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
@@ -292,41 +286,41 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(getTableType("T25"), "EXPORT");
     }
 
-    @Test
-    public void testImportClass() throws Exception
-    {
-        LocalCluster cluster = new LocalCluster(catalogJar, 2, 1, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
-
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        cluster.startUp();
-
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost");
-
-        String classpath = "org/voltdb_testprocs/fullddlfeatures/NoMeaningClass.class";
-        Process p = Runtime.getRuntime().exec("jar tf " + pathToCatalog);
-
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String file = null;
-        boolean exist = false;
-        while ((file = in.readLine()) != null)
-        {
-            if(file.equals(classpath))
-            {
-                exist = true;
-                break;
-            }
-        }
-        assertTrue(exist);
-
-        client.close();
-        cluster.shutDown();
-    }
+//    @Test
+//    public void testImportClass() throws Exception
+//    {
+//        LocalCluster cluster = new LocalCluster(catalogJar, 2, 1, 1, BackendTarget.NATIVE_EE_JNI);
+//        cluster.setHasLocalServer(false);
+//
+//        boolean success = cluster.compile(builder);
+//        assertTrue(success);
+//
+//        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+//
+//        cluster.startUp();
+//
+//        Client client = ClientFactory.createClient();
+//        client.createConnection("localhost");
+//
+//        String classpath = "org/voltdb_testprocs/fullddlfeatures/NoMeaningClass.class";
+//        Process p = Runtime.getRuntime().exec("jar tf " + pathToCatalog);
+//
+//        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//        String file = null;
+//        boolean exist = false;
+//        while ((file = in.readLine()) != null)
+//        {
+//            if(file.equals(classpath))
+//            {
+//                exist = true;
+//                break;
+//            }
+//        }
+//        assertTrue(exist);
+//
+//        client.close();
+//        cluster.shutDown();
+//    }
 
     @Test
     public void testPartitionProcedure() throws Exception
