@@ -1451,7 +1451,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
         String[] decimal_strs = {"123456.64565", "-123456.64565", "1123456785.555", "-1123456785.555", "0.0", "-0.0", "0", "-0",
-                                 "99999999999999999999999999.999999999999", "-99999999999999999999999999.99999999999"};
+                                 "99999999999999999999999999.999999999999", "-99999999999999999999999999.99999999999", "1500", "2500",
+                                 "8223372036854775807.123456789125", "8223372036854775807.123456789175"};
         for(int i = 0; i < decimal_strs.length; i++) {
             BigDecimal bd = new BigDecimal(decimal_strs[i]);
             cr = client.callProcedure("D1.insert", i, bd);
@@ -1561,6 +1562,32 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(7);
         assertEquals(str, "-1,123,457,000");
 
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -3) from D1 where id = 10");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertEquals(str, "2,000");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -3) from D1 where id = 11");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        assertEquals(str, "2,000");
+
+        for (int i = 4; i < 8; i++) {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 2) from D1 where id = "+i);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, "0.00");
+        }
+
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
             fail("range validity check failed for FORMAT_CURRENCY");
@@ -1648,16 +1675,74 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // TODO: The precision depends on the ability of TTInt, and there may exist some number whose rounding is wrong.
-        String[] s2 = {"1,111,111.11111", "1,111,111.1111", "1,111,111.111", "1,111,111.11", "1,111,111.1", "1,111,111", "1,111,110",
-                "1,111,100", "1,111,000", "1,110,000", "1,100,000", "1,000,000", "0"};
-        for (int i=5; i > -8; i--){
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(CAST(1111111.11111 as DECIMAL), "+i+") from D1 where id = 1");
+        // test places from 11 to -25
+        String[] s2 = {"8,223,372,036,854,775,807.12345678912","8,223,372,036,854,775,807.1234567891","8,223,372,036,854,775,807.123456789",
+                  "8,223,372,036,854,775,807.12345679","8,223,372,036,854,775,807.1234568","8,223,372,036,854,775,807.123457",
+                  "8,223,372,036,854,775,807.12346","8,223,372,036,854,775,807.1235","8,223,372,036,854,775,807.123","8,223,372,036,854,775,807.12",
+                  "8,223,372,036,854,775,807.1","8,223,372,036,854,775,807","8,223,372,036,854,775,810","8,223,372,036,854,775,800",
+                  "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
+                  "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
+                  "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
+                  "8,200,000,000,000,000,000","8,000,000,000,000,000,000","null","0","0","0","0","0","0"};
+        for (int i=11; i > -19; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             str = result.getString(0);
-            assertEquals(str, s2[5-i]);
+            assertEquals(str, s2[11-i]);
+        }
+        // it will go out of the range of int64_t
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        // now it is zero
+        for (int i=-20; i >= -25; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s2[11-i]);
+        }
+        String s3[] ={"8,223,372,036,854,775,807.12345678918","8,223,372,036,854,775,807.1234567892","8,223,372,036,854,775,807.123456789",
+                "8,223,372,036,854,775,807.12345679","8,223,372,036,854,775,807.1234568","8,223,372,036,854,775,807.123457",
+                "8,223,372,036,854,775,807.12346","8,223,372,036,854,775,807.1235","8,223,372,036,854,775,807.123","8,223,372,036,854,775,807.12",
+                "8,223,372,036,854,775,807.1","8,223,372,036,854,775,807","8,223,372,036,854,775,810","8,223,372,036,854,775,800",
+                "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
+                "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
+                "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
+                "8,200,000,000,000,000,000","8,000,000,000,000,000,000","null","0","0","0","0","0","0"};
+        for (int i=11; i > -19; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s3[11-i]);
+        }
+        // it will go out of the range of int64_t
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 13");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        // now it is zero
+        for (int i=-20; i >= -25; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s3[11-i]);
         }
 
         // check the validity of the second parameter
@@ -1673,16 +1758,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             fail("type validity check failed for FORMAT_CURRENCY");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
-
-        for (int i = 4; i < 8; i++) {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 2) from D1 where id = "+i);
-            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-            result = cr.getResults()[0];
-            assertEquals(1, result.getRowCount());
-            assertTrue(result.advanceRow());
-            str = result.getString(0);
-            assertEquals(str, "0.00");
         }
     }
 

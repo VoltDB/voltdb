@@ -561,8 +561,16 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
             "the second parameter should be < 12 and > -26");
     }
-    int64_t denominator = (places <= 0) ? (int64_t)(kMaxScaleFactor * std::pow((double)10, -(double)places)):
-                                          (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
+
+    TTInt ten(10);
+    if (places <= 0) {
+        ten.Pow(-places);
+    }
+    else {
+        ten.Pow(places);
+    }
+    TTInt denominator = (places <= 0) ? (TTInt(kMaxScaleFactor) * ten):
+                                        (TTInt(kMaxScaleFactor) / ten);
     TTInt fractional(scaledValue);
     fractional %= denominator;
     TTInt barrier = five * (denominator / 10);
@@ -581,15 +589,15 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     }
 
     if (places <= 0) {
-        //scaledValue -= scaledValue % (int64_t)(kMaxScaleFactor * std::pow(10, -places));
-        scaledValue -= scaledValue % denominator;
+        scaledValue -= fractional;
         int64_t whole = narrowDecimalToBigInt(scaledValue);
         out << std::fixed << whole;
     }
     else {
         int64_t whole = narrowDecimalToBigInt(scaledValue);
         int64_t fraction = getFractionalPart(scaledValue);
-        fraction /= denominator;
+        // here denominator is guarateed to be able to converted to int64_t
+        fraction /= denominator.ToInt();
         out << std::fixed << whole;
         // fractional part does not need groups
         out.imbue(nullloc);
