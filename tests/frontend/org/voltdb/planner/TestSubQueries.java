@@ -1710,7 +1710,8 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        // Using index scan for group by only: use serial aggregate instead hash aggregate
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         // LEFT partition table
         planNodes = compileToFragments("SELECT T1.CC FROM P1 LEFT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
