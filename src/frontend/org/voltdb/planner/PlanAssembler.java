@@ -1394,6 +1394,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
+        boolean indexScanForGroupingOnly = false;
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
@@ -1408,6 +1409,7 @@ public class PlanAssembler {
                         candidate.clearParents();
                         root.getChild(0).clearChildren();
                         root.getChild(0).addAndLinkChild(candidate);
+                        indexScanForGroupingOnly = true;
                     }
                 }
             }
@@ -1467,8 +1469,16 @@ public class PlanAssembler {
                 }
             }
             if (needHashAgg) {
-                aggNode = new HashAggregatePlanNode();
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                if ( m_parsedSelect.m_mvFixInfo.needed() ) {
+                    aggNode = new HashAggregatePlanNode();
+                } else {
+                    if (indexScanForGroupingOnly) {
+                        assert(root instanceof ReceivePlanNode);
+                        aggNode = new AggregatePlanNode();
+                    } else {
+                        aggNode = new HashAggregatePlanNode();
+                    }
+
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
