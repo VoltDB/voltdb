@@ -1862,8 +1862,11 @@ public class PlanAssembler {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
                     AbstractExpression rootExpr = col.expression;
                     // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-                    if (rootExpr instanceof TupleValueExpression) {
-                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                    // However, if group by partition key, limit can still push down if ordered by aggregate values.
+                    ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+                    for (AbstractExpression tve: tves) {
+                        if  (((TupleValueExpression) tve).hasAggregate() &&
+                                !m_parsedSelect.hasPartitionColumnInGroupby()) {
                             return null;
                         }
                     }
