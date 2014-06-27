@@ -89,7 +89,7 @@ public class AsyncCompilerAgentHelper
         try {
             // try to get the new catalog from the params
             Pair<InMemoryJarfile, String> loadResults =
-                CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes, null);
+                CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes);
             String newCatalogCommands =
                 CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();

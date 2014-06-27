@@ -354,7 +354,7 @@ public class Inits {
             byte[] catalogJarBytes = catalogStuff.bytes;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes);
                 m_rvdb.m_serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();
