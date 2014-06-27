@@ -312,8 +312,8 @@ public class StmtSubqueryScan extends StmtTableScan {
             return root;
         }
 
-        // If query has ditinct on a replicated table column, we should get rid of the receive node
-        // Work on this optimization in future as DISTINCT implementation is really bad
+        // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
+        // we should get rid of the receive node.
         if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinct()) {
             return root;
         }
@@ -343,9 +343,14 @@ public class StmtSubqueryScan extends StmtTableScan {
             //
             // (2) Group by columns contain the partition columns:
             //     This is the interesting case that we are going to support.
-            //     At this point, subquery does not contain LIMIT/OFFSET. If join with
-            //     partition table on outer level, we are able to push the join down by
-            //     removing the send/receive plan node pair.
+            //     At this point, subquery does not contain LIMIT/OFFSET.
+            //     But if the aggregate has distinct, we have to compute on coordinator.
+            if ( selectStmt.hasAggregateDistinct() ) {
+                return root;
+            }
+
+            //     Now. If this sub-query joins with partition table on outer level,
+            //     we are able to push the join down by removing the send/receive plan node pair.
         }
 
         //

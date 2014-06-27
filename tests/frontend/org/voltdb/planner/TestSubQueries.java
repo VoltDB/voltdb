@@ -1454,9 +1454,6 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5 OFFSET 1) T1, P2 " +
                 "where T1.A = P2.A", joinErrorMsg);
 
-        failToCompile("SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
-                "where T1.A = P2.A", joinErrorMsg);
-
         // Without GROUP BY.
         failToCompile("SELECT * FROM (SELECT COUNT(*) FROM P1) T1, P2 ", joinErrorMsg);
         failToCompile("SELECT * FROM (SELECT MAX(C) FROM P1) T1, P2 ", joinErrorMsg);
@@ -1465,27 +1462,15 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("SELECT * FROM (SELECT A, C FROM P1 LIMIT 5) T1, P2 " +
                 "where T1.A = P2.A", joinErrorMsg);
 
-        failToCompile("SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 " +
-                "where T1.A = P2.A", joinErrorMsg);
 
-        // Nested LIMIT/OFFSET/DISTINCT
+
+        // Nested LIMIT/OFFSET
         failToCompile("SELECT * FROM (SELECT A, R1.C FROM R1, " +
                 "                     (SELECT A, C FROM P1 LIMIT 5) T0 where R1.A = T0.A ) T1, P2 " +
                 "where T1.A = P2.A", joinErrorMsg);
 
-        failToCompile(
-                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
-                "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
-                "              P2 " +
-                "where T1.A = P2.A");
 
-        // Invalid DISTINCT/LIMIT/OFFSET on parent subquery with partitoned nested subquery
-        failToCompile(
-                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
-                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
-                "              P2 " +
-                "where T1.A = P2.A");
-
+        // Invalid LIMIT/OFFSET on parent subquery with partitoned nested subquery
         failToCompile(
                 "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                 (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 " +
@@ -1505,7 +1490,59 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
                 "                    (SELECT A, C FROM R2) T2, P3 " +
                 "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
-        }
+
+        // Invalid aggregate distinct
+        failToCompile(
+                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, P1 " +
+                "where T1.A = P1.A ", joinErrorMsg);
+    }
+
+    /**
+     * The next DISTINCT are possible to do. The reason that we do not support them is
+     * DISTINCT has to be applied again on coordinator after joins locally.
+     * TODO: make the planner smarter to plan these kind of sub-queries.
+     */
+    public void testDistinct() {
+        AbstractPlanNode pn;
+        List<AbstractPlanNode> planNodes;
+
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, R1 " +
+                "where T1.A = R1.A ");
+        assertEquals(2, planNodes.size());
+        assertTrue(planNodes.get(0).toExplainPlanString().contains("DISTINCT"));
+        assertTrue(planNodes.get(0).toExplainPlanString().contains("LOOP INNER JOIN"));
+
+        pn = planNodes.get(1).getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P2");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+
+        // T
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A",
+                joinErrorMsg);
+
+
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
+
+        failToCompile(
+                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
+    }
 
     public void testEdgeCases() {
         AbstractPlanNode pn;

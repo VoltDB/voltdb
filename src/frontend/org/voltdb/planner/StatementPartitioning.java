@@ -139,7 +139,7 @@ public class StatementPartitioning implements Cloneable{
      */
     private String m_fullColumnName;
 
-    private boolean m_JoinValid = true;
+    private boolean m_joinValid = true;
 
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
@@ -322,7 +322,6 @@ public class StatementPartitioning implements Cloneable{
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
-        boolean isThisJoinValid = true;
         boolean subqueryHasReceiveNode = false;
         boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
@@ -348,7 +347,7 @@ public class StatementPartitioning implements Cloneable{
                     if (subqueryHasReceiveNode) {
                         // Has found another subquery with receive node on the same level
                         // Not going to support this kind of subquery join with 2 fragment plan.
-                        isThisJoinValid = false;
+                        m_joinValid = false;
 
                         // Still needs to count the independent partition tables
                         break;
@@ -395,13 +394,13 @@ public class StatementPartitioning implements Cloneable{
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {
-            isThisJoinValid = false;
+            m_joinValid = false;
         }
 
         // This is the case that subquery with receive node join with another partition table
         // on outer level. Not going to support this kind of join.
         if (subqueryHasReceiveNode && hasPartitionedTableJoin) {
-            isThisJoinValid = false;
+            m_joinValid = false;
         }
 
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
@@ -418,12 +417,10 @@ public class StatementPartitioning implements Cloneable{
                 }
             }
         }
-
-        m_JoinValid = isThisJoinValid;
     }
 
     public boolean isJoinValid() {
-        return m_JoinValid;
+        return m_joinValid;
     }
 
     private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,
