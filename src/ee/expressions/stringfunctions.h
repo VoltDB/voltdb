@@ -532,12 +532,17 @@ struct money_numpunct : std::numpunct<char> {
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vector<NValue>& arguments) {
     static std::locale newloc(std::cout.getloc(), new money_numpunct);
     static std::locale nullloc(std::cout.getloc(), new std::numpunct<char>);
-    static TTInt positive_rounding("1");
+    static TTInt one("1");
+    static TTInt five("5");
 
     assert(arguments.size() == 2);
     const NValue &arg1 = arguments[0];
     if (arg1.isNull()) {
         return getNullStringValue();
+    }
+    const ValueType type = arg1.getValueType();
+    if (type != VALUE_TYPE_DECIMAL) {
+        throwCastSQLException (type, VALUE_TYPE_DECIMAL);
     }
 
     std::ostringstream out;
@@ -556,19 +561,18 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
             "the second parameter should be < 12 and > -26");
     }
-    int64_t fraction = getDigits(scaledValue, places + 1);
-    int64_t next_digit = fraction % 10;
-    if (next_digit == 5) {
-        int64_t curr_digit = fraction / 10;
-        // we don't need mod 10 then mod 2, because mod 2 can give us the current
-        // digit is odd or even
-        curr_digit %= 2;
-        if (curr_digit != 0) {
-            scaledValue += positive_rounding * (int64_t)(kMaxScaleFactor / std::pow(10, places));
-        }
+    TTInt fractional(scaledValue);
+    fractional %= (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
+    TTInt barrier = five * (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)(places + 1)));
+
+    if (fractional > barrier) {
+        scaledValue += one * (int64_t)(kMaxScaleFactor / std::pow(10, places));
     }
-    else if (next_digit > 5) {
-        scaledValue += positive_rounding * (int64_t)(kMaxScaleFactor / std::pow(10, places));
+    else if (fractional == barrier) {
+        TTInt prev = scaledValue / (int64_t)(kMaxScaleFactor / std::pow((double)10, (double)places));
+        if (prev % 2 == one) {
+            scaledValue += one * (int64_t)(kMaxScaleFactor / std::pow(10, places));
+        }
     }
     else {
         // do nothing here
@@ -581,7 +585,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     }
     else {
         int64_t whole = narrowDecimalToBigInt(scaledValue);
-        fraction = getFractionalPart(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
         fraction /= kMaxScaleFactor / (int64_t)std::pow(10,places);
         out << std::fixed << whole;
         // fractional part does not need groups

@@ -175,7 +175,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
-                    new Type[] { Type.SQL_NUMERIC, Type.SQL_INTEGER},
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
             		Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };

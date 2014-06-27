@@ -942,15 +942,6 @@ class NValue {
         return fractional.ToInt();
     }
 
-    static inline int64_t getDigits(TTInt& scaledValue, int32_t places) {
-        TTInt fractional(scaledValue);
-        fractional /= (int64_t) (kMaxScaleFactor / std::pow(10, places));
-        if (fractional > NValue::s_maxInt64AsDecimal || fractional < NValue::s_minInt64AsDecimal) {
-            throwCastSQLValueOutOfRangeException<TTInt>(fractional, VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
-        }
-        return fractional.ToInt();
-    }
-
     int64_t castAsBigIntAndGetValue() const {
         assert(isNull() == false);
 
