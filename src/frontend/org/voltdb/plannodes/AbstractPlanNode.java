@@ -578,22 +578,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Whether this plan can be joined locally or not if this plan is part of subquery.
-     * @return false when this plan can join locally, otherwise return true.
-     */
-    public boolean isNonjoinableSubquery() {
-        if (hasSubquery()) {
-            if (this.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                this.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                this.hasAnyNodeOfType(PlanNodeType.LIMIT))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Refer to the override implementation on NestLoopIndexJoin node.
      * @param tableName
      * @return whether this node has an inlined index scan node or not.
