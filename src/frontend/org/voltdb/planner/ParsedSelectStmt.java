@@ -978,12 +978,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     protected static void simplifyExistsExpression(ParsedSelectStmt selectStmt) {
         // Replace the display columns with a single dummy column "1"
-        boolean hasComplexDisplayColumns = selectStmt.displayColumns.size() > 1;
-        if (selectStmt.displayColumns.size() == 1) {
+        boolean canSimplifyDisplaySchema = !selectStmt.hasAggregateExpression;
+        if (canSimplifyDisplaySchema && selectStmt.displayColumns.size() == 1) {
             ParsedColInfo col = selectStmt.displayColumns.get(0);
-            hasComplexDisplayColumns = !(col.expression instanceof ConstantValueExpression);
+            canSimplifyDisplaySchema = !(col.expression instanceof ConstantValueExpression);
         }
-        if (hasComplexDisplayColumns) {
+        if (canSimplifyDisplaySchema) {
             // add a single dummy output column
             ParsedColInfo col = new ParsedColInfo();
             ConstantValueExpression colExpr = new ConstantValueExpression();
@@ -997,7 +997,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = "$$_EXISTS_$$";
             col.alias = "$$_EXISTS_$$";
             col.index = 0;
+            selectStmt.displayColumns.clear();
+            selectStmt.projectSchema = null;
             selectStmt.displayColumns.add(col);
+            selectStmt.placeTVEsinColumns();
         }
 
         // Drop DISTINCT expression
@@ -1006,28 +1009,33 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Add LIMIT 1
         selectStmt.limit = 1;
 
-        // Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
-        if (selectStmt.having == null) {
-            selectStmt.hasComplexAgg = false;
-            selectStmt.hasComplexGroupby = false;
-            selectStmt.hasAggregateExpression = false;
-            selectStmt.hasAverage = false;
-            selectStmt.aggResultColumns.clear();
-            selectStmt.orderColumns.clear();
-            selectStmt.groupByColumns.clear();
+//        // Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+//        if (selectStmt.having == null) {
+//            selectStmt.hasComplexAgg = false;
+//            selectStmt.hasComplexGroupby = false;
+//            selectStmt.hasAggregateExpression = false;
+//            selectStmt.hasAverage = false;
+//            if (selectStmt.aggResultColumns != selectStmt.displayColumns) {
+//                // Clear out aggregate columns if they differes from the display ones
+//                // We don't want to clear the display columns
+//                selectStmt.aggResultColumns.clear();
+//            }
+//            selectStmt.orderColumns.clear();
+//            selectStmt.groupByColumns.clear();
+//
+//            selectStmt.groupByExpressions = null;
+//
+//            selectStmt.avgPushdownDisplayColumns = null;
+//            selectStmt.avgPushdownAggResultColumns = null;
+//            selectStmt.avgPushdownOrderColumns = null;
+//            selectStmt.avgPushdownHaving = null;
+//            selectStmt.avgPushdownNewAggSchema = null;
+//
+//            selectStmt.aggResultColumns = selectStmt.displayColumns;
+//        }
+//        selectStmt.placeTVEsinColumns();
 
-            selectStmt.groupByExpressions = null;
-
-            selectStmt.avgPushdownDisplayColumns = null;
-            selectStmt.avgPushdownAggResultColumns = null;
-            selectStmt.avgPushdownOrderColumns = null;
-            selectStmt.avgPushdownHaving = null;
-            selectStmt.avgPushdownNewAggSchema = null;
-
-            selectStmt.aggResultColumns = selectStmt.displayColumns;
-            selectStmt.placeTVEsinColumns();
-        }
-}
+    }
 
     /**
      * Helper method to replace all TVEs and aggregated expressions with the corresponding PVEs.

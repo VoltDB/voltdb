@@ -133,7 +133,7 @@ public enum ExpressionType {
     // -----------------------------
     // Subquery
     // -----------------------------
-    SUBQUERY    (SubqueryExpression.class, 400, "<subquery>"),
+    SUBQUERY                    (SubqueryExpression.class, 400, "<subquery>"),
 ;
 
     private final int m_value;

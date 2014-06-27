@@ -43,7 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
 #include "seqscanexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -177,6 +176,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
+        bool hasNullTuple = false;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
@@ -187,36 +187,19 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                        (int)input_table->activeTupleCount());
             pmp.countdownProgress();
 
-if (m_isSemiScan) {
-std::cout << "SeqScan Tuple " << tuple.debug(output_table->name()) << '\n';
-}
             //
             // For each tuple we need to evaluate it against our predicate
             //
-            bool passPredicate = false;
+            bool passedPredicate = false;
             if (predicate != NULL) {
                 NValue retval = predicate->eval(&tuple, NULL);
-if (m_isSemiScan) {
-std::cout << "Subquery Pred eval " << retval.debug() << ", isTrue=" << retval.isTrue() << 
-", isNull= " << retval.isNull() << '\n';
-} else {
-std::cout << "Main Pred eval " << retval.debug() << ", isTrue=" << retval.isTrue() << 
-", isNull= " << retval.isNull() << '\n';
-
-}
                 if (retval.isTrue()) {
-                    passPredicate = true;
+                    passedPredicate = true;
                 } else if (m_isSemiScan && retval.isNull()) {
-                // Then outer_expr IN (SELECT ...) evaluates to NULL
-                // Insert the tuple into our output table and exit
-                //
-                    tuple.setAllNulls();
-                    output_temp_table->insertTupleNonVirtual(tuple);
-std::cout << "Inserted NULL\n";
-                    break;
+                    hasNullTuple = true;
                 }
             }
-            if (predicate == NULL || passPredicate == true)
+            if (predicate == NULL || passedPredicate == true)
             {
                 // Check if we have to skip this tuple because of offset
                 if (tuple_skipped < offset) {
@@ -254,6 +237,16 @@ std::cout << "Inserted NULL\n";
                     break;
                 }
             }
+        }
+        // if this scan node is used as a filter for the IN subquery expression we need
+        // to differentiate between the empty result set (the input table is not empty but
+        // non of the tuples pass the predicate, and all of them are not NULL) and
+        // the NULL tuple result set (the input table is not empty, non of the tuples pass
+        // the predicate, and there are NULL tuples
+        if (m_isSemiScan && output_temp_table->activeTupleCount() == 0 &&
+            input_table->activeTupleCount() != 0 && hasNullTuple) {
+            tuple.setAllNulls();
+            output_temp_table->insertTupleNonVirtual(tuple);
         }
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<

@@ -61,19 +61,15 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
         bool paramsChanged = !hasPriorResult;
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
         // Substitute parameters.
-        bool hasNullParam = false;
         if (m_tveParams.get() != NULL) {
             size_t paramsCnt = m_tveParams->size();
             for (size_t i = 0; i < paramsCnt; ++i) {
                 AbstractExpression* tveParam = (*m_tveParams)[i];
                 NValue param = tveParam->eval(tuple1, tuple2);
-                if (param.isNull()) {
-                    hasNullParam = true;
-                }
                 // compare the new param value with the previous one. Since this parameter is set
                 // by this subquery, no other subquery can change it value. So, we don't need to
                 // save its value on a side for future comparisons.
-                    NValue& prevParam = (*m_parameterContainer)[m_paramIdxs[i]];
+                NValue& prevParam = (*m_parameterContainer)[m_paramIdxs[i]];
                 if (hasPriorResult) {
                     if (param.compare(prevParam) != 0) {
                         prevParam = NValue::copyNValue(param);
@@ -114,35 +110,27 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
             snprintf(message, 256, "Failed to execute the subquery '%d'", m_subqueryId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
-        Table* outputTable = executionStack->back()->getPlanNode()->getOutputTable();
-        assert(table != NULL);
+
         NValue retval = NValue::getFalse();
 
-        if (hasNullParam) {
-            size_t size = executionStack->size();
-            assert(size > 1);
-            Table* outputTable = (*executionStack)[size - 2]->getPlanNode()->getOutputTable();
-            if (outputTable->activeTupleCount() != 0) {
+        Table* outputTable = executionStack->back()->getPlanNode()->getOutputTable();
+        assert(outputTable != NULL);
+        // Check the first tuple if it's NULL tuple or not
+        TableIterator& it = outputTable->iterator();
+        TableTuple tuple(outputTable->schema());
+        if (it.next(tuple)) {
+            // If this subquery is part of the IN expression, its top plan node will be a
+            // special purpose seqscan node which inserts a tuple with all columns set to NULL
+            // if one of the tuples from the IN list is NULL, so we can try any (the first one) index.
+            // If this subquery is part of the EXISTS expression, the EXISTS expression
+            // only cares whether the tuple exists or not, and potential false positives
+            // (The EXISTS output schema may have NULL columns) still will be evaluated
+            // to TRUE by the parent ExistsSubquery expression.
+            if (tuple.isNull(0)) {
                 retval.setNull();
+            } else {
+                retval = NValue::getTrue();
             }
-        } else {
-            // Check the first tuple if it's NULL tuple or not
-             TableIterator& it = outputTable->iterator();
-             TableTuple tuple(outputTable->schema());
-             if (it.next(tuple)) {
-std::cout << "SubExpr schema: " <<  outputTable->schema()->debug() << '\n';
-                // can get any idx
-std::cout << "SubExpr: " << tuple.debug(outputTable->name()) << ", isNull=" << tuple.isNull(0) << '\n';
-                if (!tuple.isNull(0)) {
-                    retval = NValue::getTrue();
-                } else {
-std::cout << "SubExpr retval is NULL\n ";
-                    retval.setNull();
-                }
-             } else {
-std::cout << "SubExpr is empty\n";
-                retval = NValue::getFalse();
-             }
         }
 
         if (hasPriorResult) {

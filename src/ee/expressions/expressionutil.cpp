@@ -207,7 +207,7 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
     } else if (r_subquery != NULL) { // IN (SELECT ...)
-        return rc;
+        return new InSubqueryExpression(lc, rc);
     }
 
     //okay, still getTypedValue is beneficial.
@@ -248,7 +248,7 @@ operatorFactory(ExpressionType et,
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_EXISTS):
-         ret = lc;
+         ret = new ExistsSubqueryExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):

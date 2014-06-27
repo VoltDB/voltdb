@@ -66,7 +66,7 @@ struct SubqueryContext {
 
   private:
     // Subquery ID
-    int64_t m_stmtId;
+    int m_stmtId;
     // The result (TRUE/FALSE) of the previous IN/EXISTS subquery invocation
     NValue m_lastResult;
     // The parameter values that weere used to obtain the last result in the accesinding

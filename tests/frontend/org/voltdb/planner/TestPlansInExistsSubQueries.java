@@ -229,6 +229,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
     }
 
+    public void testSendReceiveInSubquery() {
+        failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
+                "Subqueries on partitioned data are only supported in single partition stored procedures.");
+      }
 
     // HSQL failed to parse  these statement
     // commented out for now
@@ -247,7 +251,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 //                " having exists (select c from r2 where r2.c = max(r1.a))");
 //        }
 //    }
-
 
     // Disabled for now
 //    public void testDeleteWhereIn() {
@@ -275,11 +278,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 //      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
 //    }
 
-    public void testSendReceiveInSubquery() {
-      failToCompile("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1",
-              "Subqueries on partitioned data are only supported in single partition stored procedures.");
-    }
-
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();
         List<SchemaColumn> scs = ns.getColumns();
@@ -293,44 +291,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
    }
 
-    //    public void testUpdateWhereIn() {
-////        compileToFragments(" select  c from R1 \n" +
-////                " where exists (select  c from r2 );");
-//
-////        compileToFragments(" select c from R1 \n" +
-////                "    where c in (select c from r2 where "
-////                + "  exists (select 1 from r3 where r3.c = r2.c));");
-//
-//        compileToFragments(" select c from R1 \n" +
-//                "    where c in (select c from r2 where "
-//                + "  a in (select a from r3 where r3.c = r1.c) limit 1 offset 1);");
-//
-////        compileToFragments(" select c from R1 \n" +
-////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
-////                + " and c in (select c from r3 where r3.a = r1.a )"
-////                + " );");
-//
-////        compileToFragments(" select c from R1 \n" +
-////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
-////                + " and c in (select c from r3 where r3.a = r1.a limit 1 offset 2)"
-////                + " limit 1 offset 2);");
-//
-////        compileToFragments(" select c from R1 \n" +
-////                "    where c=? and a in (select a from r2 where r2.c = r1.c "
-////                + " and exists (select c from r3 where r2.c=r3.c and r3.a = r1.a )"
-////                + " limit 1 offset 2);");
-//
-////        compileToFragments(" select c from R1 \n" +
-////                "    where c=? and exists (select a from r2 where r2.a = r1.a and r2.c = r1.c "
-////                + " and exists (select c from r3 where r2.c=r3.c and r3.a = r1.a ));");
-//// check the IN variant params seems don't work
-//        //                "    where c=? and a in (select a from r2 where r2.c = r1.c "
-////                + " and c in (select c from r3 where r3.a = r1.a ));");
-////    "    group by c having max(a) in (select a from r2);");
-////    "    where exists (select 1 from r2 where r2.c = r1.c);");
-////                "                having max(a+c) > 2;");
-//
-//    }
 
     @Override
     protected void setUp() throws Exception {

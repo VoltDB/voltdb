@@ -60,6 +60,7 @@
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/hashrangeexpression.h"
 #include "expressions/subqueryexpression.h"
-
+#include "expressions/existssubqueryexpression.h"
+#include "expressions/insubqueryexpression.h"
 
 #endif
