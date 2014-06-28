@@ -308,18 +308,21 @@ public class QueryPlanner {
         bestPlan.resetPlanNodeIds();
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        fragmentize(bestPlan);
+        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+        if (receives.size() > 1) {
+            // Have too many receive node for two fragment plan limit
+            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. Consider simplifying its subqueries: " + m_sql;
+            return null;
+        }
+
+        if (receives.size() == 1) {
+            ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+            fragmentize(bestPlan, recvNode);
+        }
         return bestPlan;
     }
 
-    private static void fragmentize(CompiledPlan plan) {
-        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
-
-        if (receives.isEmpty()) return;
-
-        assert (receives.size() == 1);
-
-        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+    private static void fragmentize(CompiledPlan plan, ReceivePlanNode recvNode) {
         assert(recvNode.getChildCount() == 1);
         AbstractPlanNode childNode = recvNode.getChild(0);
         assert(childNode instanceof SendPlanNode);
@@ -330,7 +333,6 @@ public class QueryPlanner {
         recvNode.clearChildren();
 
         plan.subPlanGraph = sendNode;
-
         return;
     }
 }

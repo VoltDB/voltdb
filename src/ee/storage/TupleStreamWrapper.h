@@ -72,6 +72,9 @@ public:
                                 m_generation, m_partitionId, m_signature, sb, false, false);
         delete sb;
         m_uso = count;
+        //Extend the buffer chain to replace any existing stream blocks with a new one
+        //with the correct USO
+        extendBufferChain(0);
     }
 
     int64_t allocatedByteCount() const {
@@ -84,8 +87,7 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedSpHandle,
-                       int64_t currentSpHandle);
+                       int64_t lastComittedSpHandle);
 
     /** write a tuple to the stream */
     size_t appendTuple(int64_t lastCommittedSpHandle,
