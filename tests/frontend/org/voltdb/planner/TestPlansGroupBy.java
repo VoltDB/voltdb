@@ -195,10 +195,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 aggNode = (AggregatePlanNode)p;
                 assertNotNull(aggNode.getPostPredicate());
             }
-        } else {
-            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
         }
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+        assertTrue(p instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
         // inline aggregate

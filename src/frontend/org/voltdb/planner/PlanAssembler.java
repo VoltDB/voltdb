@@ -783,8 +783,15 @@ public class PlanAssembler {
         if (m_parsedSelect.hasComplexGroupby()) {
             return false;
         }
-        // TODO(XIN): Maybe we can remove this projection node for more cases
-        // as optimization in the future.
+
+        if (root.getPlanNodeType() == PlanNodeType.RECEIVE &&
+                m_parsedSelect.hasPartitionColumnInGroupby()) {
+            // Top aggregate has been removed, its schema is exactly the same to
+            // its local aggregate node.
+            return false;
+        }
+
+        // TODO: Maybe we can remove this projection node for more cases as optimization in the future.
         return true;
     }
 
