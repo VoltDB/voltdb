@@ -317,9 +317,7 @@ public abstract class AbstractParsedStmt {
         }
 
         VectorValueExpression vve = new VectorValueExpression();
-        // The columns may have different types, so the best we can do
-        // is to set it to INVALID
-        vve.setValueType(VoltType.INVALID);
+        vve.setValueType(VoltType.VOLTTABLE);
         vve.setArgs(args);
         return vve;
     }
