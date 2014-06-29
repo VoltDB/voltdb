@@ -393,7 +393,7 @@ string planNodeToString(PlanNodeType type)
         return "UNION";
     }
     case PLAN_NODE_TYPE_ORDERBY: {
-        return "RECEIVE";
+        return "ORDERBY";
     }
     case PLAN_NODE_TYPE_PROJECTION: {
         return "PROJECTION";
