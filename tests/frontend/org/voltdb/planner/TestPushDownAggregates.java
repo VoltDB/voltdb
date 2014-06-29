@@ -270,6 +270,17 @@ public class TestPushDownAggregates extends PlannerTestCase {
         pn = compileToFragments("select A1, count(*) as tag from R1 group by A1 order by tag limit 1");
         assertEquals(1, pn.size());
         assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+
+        //
+        // Partition table join, limit push down
+        //
+        pn = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pn, true);
+
+        pn = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag+1 desc limit 10");
+        checkLimitPushedDown(pn, true);
     }
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {

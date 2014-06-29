@@ -923,8 +923,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = planNodes.get(1).getChild(0);
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
 
         planNodes = compileToFragments(
@@ -935,8 +933,6 @@ public class TestSubQueries extends PlannerTestCase {
 
         pn = planNodes.get(1).getChild(0);
         assertTrue(pn instanceof TableCountPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
     }
@@ -958,9 +954,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         // Because it group by the partition column, we can drop the group by column on coordinator
 
-        pn = pn.getChild(0);
-        // Projection node for the aggregate, this may not be needed
-        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
@@ -1069,9 +1062,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
-        // ProjectionNode for the top Aggregate, this may not be needed if without complex aggregates
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
@@ -1150,8 +1140,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
@@ -1175,8 +1163,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
@@ -1765,8 +1751,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScan(pn, "T1", "C");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         // Using index scan for group by only: use serial aggregate instead hash aggregate
@@ -1794,8 +1778,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         // Using index scan for group by only: use serial aggregate instead hash aggregate
@@ -1820,8 +1802,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "R1", "A", "C");
         pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1", "C");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
@@ -1849,8 +1829,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P1");
         pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
