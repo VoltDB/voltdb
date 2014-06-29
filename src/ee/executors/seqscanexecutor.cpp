@@ -276,5 +276,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 
+    // input table can be sub-query temp table
+    cleanupInputTempTable(input_table);
+
     return true;
 }
