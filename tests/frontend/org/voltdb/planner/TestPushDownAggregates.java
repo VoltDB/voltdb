@@ -285,11 +285,12 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {
         assertEquals(2, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        // inline limit with order by node
+        assertTrue(pn.get(0).toExplainPlanString().contains("inline LIMIT"));
         if (pushdown) {
-            assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
+            assertTrue(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
         } else {
-            assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+            assertFalse(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
         }
     }
 
