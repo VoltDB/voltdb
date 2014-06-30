@@ -55,8 +55,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
 class NValue;
 class TableTuple;
 

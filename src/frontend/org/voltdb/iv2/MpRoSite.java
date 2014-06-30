@@ -516,4 +516,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         // TODO Auto-generated method stub
 
     }
+
+    @Override
+    public void applyBinaryLog(byte log[]) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
 }

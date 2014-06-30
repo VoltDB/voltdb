@@ -58,7 +58,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t txnId,
                                   int64_t spHandle,
                                   TableTuple &tuple,
-                                  DRTupleStream::Type type)
+                                  DRRecordType type)
 {
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
@@ -167,7 +167,7 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
-     io.writeByte(static_cast<int8_t>(BEGIN_TXN));
+     io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(txnId);
      io.writeLong(spHandle);
      uint32_t crc = vdbcrc::crc32cInit();
@@ -190,7 +190,7 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
-     io.writeByte(static_cast<int8_t>(END_TXN));
+     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
      io.writeLong(spHandle);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);

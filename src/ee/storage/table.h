@@ -54,6 +54,7 @@
 #include <list>
 #include <cassert>
 
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -65,25 +66,6 @@
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
-
-class TableIndex;
-class TableColumn;
-class TableTuple;
-class TableFactory;
-class TableIterator;
-class CopyOnWriteIterator;
-class CopyOnWriteContext;
-class UndoLog;
-class ReadWriteSet;
-class SerializeInput;
-class SerializeOutput;
-class TableStats;
-class StatsSource;
-class StreamBlock;
-class Topend;
-class TupleBlock;
-class PersistentTableUndoDeleteAction;
-class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -275,7 +257,7 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInput &serialize_in,
+    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
                                 Pool *stringPool = NULL,
                                 ReferenceSerializeOutput *uniqueViolationOutput = NULL,
                                 bool shouldDRStreamRows = false);
@@ -284,7 +266,7 @@ class Table {
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInput &serialize_in,
+    void loadTuplesFrom(SerializeInputBE &serialize_in,
                         Pool *stringPool = NULL,
                         ReferenceSerializeOutput *uniqueViolationOutput = NULL,
                         bool shouldDRStreamRows = false);

@@ -272,8 +272,12 @@ class NValue {
        provided. This function will perform memory allocations for
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
+    template <TupleSerializationFormat F, Endianess E>
     static void deserializeFrom(
-        SerializeInput &input, Pool *dataPool, char *storage,
+        SerializeInput<E> &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
+    static void deserializeFrom(
+        SerializeInputBE &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
@@ -282,8 +286,8 @@ class NValue {
     /* Read a ValueType from the SerializeInput stream and deserialize
        a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
-    void deserializeFromAllocateForStorage(ValueType vt, SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE &input, Pool *dataPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
@@ -627,7 +631,7 @@ class NValue {
 
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool);
     void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
@@ -2738,7 +2742,12 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char *storage,
+inline void NValue::deserializeFrom(SerializeInputBE &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
+    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, dataPool, storage, type, isInlined, maxLength, isInBytes);
+}
+
+template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(SerializeInput<E> &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
 
     switch (type) {
@@ -2792,6 +2801,16 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
         break;
     }
     case VALUE_TYPE_DECIMAL: {
+        if (F == TUPLE_SERIALIZATION_DR) {
+            const int scale = input.readByte();
+            const int precisionBytes = input.readByte();
+            if (scale != kMaxDecScale) {
+                throwFatalException("Unexpected scale %d", scale);
+            }
+            if (precisionBytes != 16) {
+                throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
+            }
+        }
         int64_t *longStorage = reinterpret_cast<int64_t*>(storage);
         //Reverse order for Java BigDecimal BigEndian
         longStorage[1] = input.readLong();
@@ -2812,13 +2831,13 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool)
 {
     const ValueType type = static_cast<ValueType>(input.readByte());
     deserializeFromAllocateForStorage(type, input, dataPool);
 }
 
-inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInputBE &input, Pool *dataPool)
 {
     setValueType(type);
     // Parameter array NValue elements are reused from one executor call to the next,

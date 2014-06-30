@@ -42,44 +42,55 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#ifndef DECLARATIONS_H
+#define DECLARATIONS_H
+#include "common/types.h"
 
-#ifndef HSTORECONSTANTVALUEEXPRESSION_H
-#define HSTORECONSTANTVALUEEXPRESSION_H
-
-#include "expressions/abstractexpression.h"
-
-#include "common/valuevector.h"
-
-#include <string>
-
+/*
+ * Forward declarations of things that are too tricky to forward declare in each
+ * file because they are templated.
+ */
 namespace voltdb {
 
-class ConstantValueExpression : public AbstractExpression {
-    public:
-    ConstantValueExpression(const NValue &value)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_CONSTANT) {
-        this->value = value;
-    }
+class CopyOnWriteContext;
+class CopyOnWriteIterator;
+class DRTupleStream;
+class MaterializedViewMetadata;
+class PersistentTable;
+class PersistentTableUndoDeleteAction;
+class PersistentTableUndoTruncateTableAction;
+class ReadWriteSet;
+class RecoveryProtoMsg;
+class SerializeOutput;
+class StatsSource;
+class StreamBlock;
+class TableCatalogDelegate;
+class TableColumn;
+class TableFactory;
+class TableIndex;
+class TableIterator;
+class TableStats;
+class TableTuple;
+class Topend;
+class TupleBlock;
+class TupleOutputStreamProcessor;
+class TupleSerializer;
+class UndoLog;
 
-    virtual ~ConstantValueExpression() {
-        value.free();
-    }
+#ifndef SERIALIZE_IO_DECLARATIONS
+#define SERIALIZE_IO_DECLARATIONS
+template <Endianess E> class SerializeInput;
+typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
+typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
 
-    voltdb::NValue
-    eval(const TableTuple *tuple1, const TableTuple *tuple2) const
-    {
-        VOLT_TRACE ("returning constant value as NValue:%s type:%d",
-                     value.debug().c_str(), (int) this->m_type);
-        return this->value;
-    }
+template <Endianess E> class ReferenceSerializeInput;
+typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
+typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
 
-    std::string debugInfo(const std::string &spacer) const {
-        return spacer + "OptimizedConstantValueExpression:" +
-          value.debug() + "\n";
-    }
+template <Endianess E> class CopySerializeInput;
+typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
+typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
+#endif
 
-  protected:
-    voltdb::NValue value;
-};
-}
+ }
 #endif

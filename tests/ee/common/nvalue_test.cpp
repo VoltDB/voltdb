@@ -2277,7 +2277,7 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
     char serial_buffer[1024];
     // This requires intimate knowledge of ARRAY wire protocol
     ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
-    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInputBE input(serial_buffer, sizeof(serial_buffer));
     setup.writeByte(VALUE_TYPE_ARRAY);
     setup.writeByte(vt);
     setup.writeShort((short)length); // number of list elements

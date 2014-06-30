@@ -386,7 +386,7 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
+void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
                                    Pool *stringPool,
                                    ReferenceSerializeOutput *uniqueViolationOutput,
                                    bool shouldDRStreamRow) {
@@ -429,7 +429,7 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
     }
 }
 
-void Table::loadTuplesFrom(SerializeInput &serialize_io,
+void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                            Pool *stringPool,
                            ReferenceSerializeOutput *uniqueViolationOutput,
                            bool shouldDRStreamRow) {

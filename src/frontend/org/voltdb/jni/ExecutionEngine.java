@@ -55,7 +55,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     static VoltLogger log = new VoltLogger("HOST");
 
     public static enum TaskType {
-        VALIDATE_PARTITIONING(0);
+        VALIDATE_PARTITIONING(0),
+        APPLY_BINARY_LOG(1);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -601,7 +602,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, byte task[]);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+
+    public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to

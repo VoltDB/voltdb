@@ -1191,7 +1191,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        ByteBuffer paramBuffer = ByteBuffer.allocate(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
         paramBuffer.putInt(tableIds.length);
         for (long tableId : tableIds) {
             paramBuffer.putLong(tableId);
@@ -1199,7 +1199,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
-        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer.array()));
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer));
         long mispartitionedRows[] = new long[tableIds.length];
         for (int ii = 0; ii < tableIds.length; ii++) {
             mispartitionedRows[ii] = resultBuffer.getLong();
@@ -1220,5 +1220,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         m_initiatorMailbox.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    @Override
+    public void applyBinaryLog(byte log[]) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
+        paramBuffer.putInt(log.length);
+        paramBuffer.put(log);
+        m_ee.executeTask( TaskType.APPLY_BINARY_LOG, paramBuffer);
     }
 }

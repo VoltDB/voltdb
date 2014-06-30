@@ -358,7 +358,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
 int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
                                        int64_t inputDependencyIds[],
-                                       ReferenceSerializeInput &serialize_in,
+                                       ReferenceSerializeInputBE &serialize_in,
                                        int64_t txnId,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
@@ -1022,7 +1022,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
 bool
 VoltDBEngine::loadTable(int32_t tableId,
-                        ReferenceSerializeInput &serializeIn,
+                        ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         bool returnUniqueViolations,
                         bool shouldDRStream)
@@ -1071,6 +1071,7 @@ void VoltDBEngine::rebuildTableCollections()
     // 3. Clear everything else.
     m_tables.clear();
     m_tablesByName.clear();
+    m_tablesBySignatureHash.clear();
 
     // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
@@ -1083,6 +1084,9 @@ void VoltDBEngine::rebuildTableCollections()
             catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
             m_tables[catTable->relativeIndex()] = tcd->getTable();
             m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
+            if (!tcd->exportEnabled() && !tcd->materialized()) {
+                m_tablesBySignatureHash[*reinterpret_cast<const int64_t*>(tcd->signatureHash())] = tcd->getPersistentTable();
+            }
 
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                   catTable->relativeIndex(),
@@ -1455,7 +1459,7 @@ bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
         int64_t undoToken,
-        ReferenceSerializeInput &serializeIn) {
+        ReferenceSerializeInputBE &serializeIn) {
     Table* found = getTable(tableId);
     if (! found) {
         return false;
@@ -1496,7 +1500,7 @@ bool VoltDBEngine::activateTableStream(
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                                                const TableStreamType streamType,
-                                               ReferenceSerializeInput &serialize_in)
+                                               ReferenceSerializeInputBE &serialize_in)
 {
     int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     try {
@@ -1538,7 +1542,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
 int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
         const TableStreamType streamType,
-        ReferenceSerializeInput &serializeIn,
+        ReferenceSerializeInputBE &serializeIn,
         std::vector<int> &retPositions)
 {
     // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
@@ -1707,7 +1711,7 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int
 }
 
 void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
-    ReferenceSerializeInput taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+    ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
     std::vector<CatalogId> tableIds;
     const int32_t numTables = taskInfo.readInt();
     for (int ii = 0; ii < numTables; ii++) {
@@ -1753,6 +1757,9 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
         dispatchValidatePartitioningTask(taskParams);
+        break;
+    case TASK_TYPE_APPLY_BINARY_LOG:
+        m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool);
         break;
     default:
         throwFatalException("Unknown task type %d", taskType);

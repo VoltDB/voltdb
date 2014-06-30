@@ -18,15 +18,15 @@
 #ifndef DRTUPLESTREAM_H_
 #define DRTUPLESTREAM_H_
 
-#include "StreamBlock.h"
-
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
 #include <cassert>
+
 namespace voltdb {
+class StreamBlock;
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -37,7 +37,6 @@ public:
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
     static const uint8_t DR_VERSION = 0;
-    enum Type { INSERT = 0, DELETE = 1, UPDATE = 2, BEGIN_TXN = 3, END_TXN = 4 };
 
     DRTupleStream();
 
@@ -56,15 +55,15 @@ public:
                        int64_t txnId,
                        int64_t spHandle,
                        TableTuple &tuple,
-                       DRTupleStream::Type type);
+                       DRRecordType type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
     void beginTransaction(int64_t txnId, int64_t spHandle);
     void endTransaction(int64_t spHandle);
 
-private:
     bool m_enabled;
+private:
     CatalogId m_partitionId;
 };
 
@@ -76,7 +75,7 @@ public:
                            int64_t txnId,
                            int64_t spHandle,
                            TableTuple &tuple,
-                           DRTupleStream::Type type) {
+                           DRRecordType type) {
         return 0;
     }
 

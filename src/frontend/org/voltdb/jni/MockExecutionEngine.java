@@ -225,7 +225,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         throw new UnsupportedOperationException();
     }
 }
