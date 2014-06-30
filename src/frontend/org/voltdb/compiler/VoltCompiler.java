@@ -575,10 +575,22 @@ public class VoltCompiler {
             return null;
         }
 
-        // Build DDL from Catalog Data
-        String binDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
+        // generate the catalog report and write it to disk
+        try {
+            // Build DDL from Catalog Data
+            String autoGenDDL = CatalogSchemaTools.toSchema(m_catalog, m_addedClasses);
+            jarOutput.put(AUTOGEN_DDL_FILE_NAME, autoGenDDL.getBytes(Constants.UTF8ENCODING));
+            m_report = ReportMaker.report(m_catalog, m_warnings, autoGenDDL);
+            File file = new File("catalog-report.html");
+            FileWriter fw = new FileWriter(file);
+            fw.write(m_report);
+            fw.close();
+            m_reportPath = file.getAbsolutePath();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
 
-        jarOutput.put(AUTOGEN_DDL_FILE_NAME, binDDL.getBytes(Constants.UTF8ENCODING));
         if (DEBUG_VERIFY_CATALOG) {
             debugVerifyCatalog(new VoltCompilerJarFileReader(jarOutput, AUTOGEN_DDL_FILE_NAME), catalog);
         }
@@ -796,20 +808,6 @@ public class VoltCompiler {
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
-
-        // generate the catalog report and write it to disk
-        try {
-            String autoGenDDL = CatalogSchemaTools.toSchema(m_catalog, m_addedClasses);
-            m_report = ReportMaker.report(m_catalog, m_warnings, autoGenDDL);
-            File file = new File("catalog-report.html");
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
 
         return m_catalog;
     }
