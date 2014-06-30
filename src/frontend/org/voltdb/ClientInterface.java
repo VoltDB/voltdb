@@ -53,6 +53,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -115,7 +116,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1457,11 +1457,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn, boolean isExplain) {
         ParameterSet params = task.getParams();
-        Object[] paramArray = params.toArray();
+        Object[] paramArray = params.getParams();
         String sql = (String) paramArray[0];
-        Object[] userParams = null;
+        ParameterSet userParams = null;
         if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
+            // Brute force it for now but fix up ParameterSet subtract params later
+            Object[] frontTruncatedParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
+            userParams = ParameterSet.fromArrayNoCopy(frontTruncatedParams);
         }
         dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null);
         return null;
@@ -1471,15 +1473,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn, boolean isExplain) {
         ParameterSet params = task.getParams();
         assert(params.size() > 1);
-        Object[] paramArray = params.toArray();
+        Object[] paramArray = params.getParams();
         String sql = (String) paramArray[0];
         // get the partition param which must exist
         Object[] userPartitionKey = Arrays.copyOfRange(paramArray, 1, 2);
-        Object[] userParams = null;
+        ParameterSet userParams = null;
         // There's no reason (any more) that AdHocSP's can't have '?' parameters, but
         // note that the explicit partition key argument is not considered one of them.
         if (params.size() > 2) {
-            userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
+            // Brute force it for now but fix up ParameterSet subtract params later
+            Object[] frontTruncatedParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
+            userParams = ParameterSet.fromArrayNoCopy(frontTruncatedParams);
         }
         dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey);
         return null;
@@ -1487,7 +1491,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn, boolean isExplain,
-            String sql, Object[] userParams, Object[] userPartitionKey) {
+            String sql, ParameterSet userParams, Object[] userPartitionKey) {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 

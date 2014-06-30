@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
+import org.voltdb.StoredProcParamType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -62,7 +63,7 @@ public class PerPartitionTable {
     //Column information
     final VoltTable.ColumnInfo m_columnInfo[];
     //Column types
-    final VoltType[] m_columnTypes;
+    final StoredProcParamType[] m_columnTypes;
     //The number of rows in m_partitionProcessorQueue.
     final AtomicLong m_partitionQueuedRowCnt = new AtomicLong(0);
     //Size of the batches this table submits (minimum of all values provided by VoltBulkLoaders)
@@ -309,9 +310,8 @@ public class PerPartitionTable {
             row_args = new Object[currRow.m_rowData.length];
             try {
                 for (int i = 0; i < row_args.length; i++) {
-                    final VoltType type = m_columnTypes[i];
-                    row_args[i] = ParameterConverter.makeCompatible(type.getProcParamType(),
-                            currRow.m_rowData[i]);
+                    row_args[i] = ParameterConverter.makeCompatible(m_columnTypes[i],
+                            currRow.m_rowData[i], loader.m_rowInsertTypes[i]);
                 }
             } catch (VoltTypeException e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());

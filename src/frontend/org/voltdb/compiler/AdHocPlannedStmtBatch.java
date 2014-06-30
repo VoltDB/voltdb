@@ -121,7 +121,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         // Mock up a dummy work request.
         AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(replySiteId,
                                                                                 sql,
-                                                                                userParams,
+                                                                                ParameterSet.fromArrayNoCopy(userParams),
                                                                                 false, // mock inferred partitioning
                                                                                 null, dummyHandler);
         // Mock up dummy results from the work request.
@@ -246,7 +246,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         if (work.userParamSet == null) {
             userParamCache = ParameterSet.emptyParameterSet();
         } else {
-            Object[] typedUserParams = new Object[work.userParamSet.length];
+            Object[] typedUserParams = new Object[work.userParamSet.size()];
             int ii = 0;
             for (AdHocPlannedStatement cs : plannedStatements) {
                 for (VoltType paramType : cs.core.parameterTypes) {
@@ -259,7 +259,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                     }
                     typedUserParams[ii] =
                             ParameterConverter.makeCompatible(paramType.getProcParamType(),
-                                                              work.userParamSet[ii]);
+                                                              work.userParamSet.getParam(ii),
+                                                              work.userParamSet.getParamType(ii));
                     // System.out.println("DEBUG typed parameter: " + work.userParamSet[ii] +
                     //         "using type: " + paramType + "as: " + typedUserParams[ii]);
                     ii++;
@@ -333,12 +334,13 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             return work.userPartitionKey[0];
         }
         if (partitionParamIndex > -1 && work.userParamSet != null &&
-                work.userParamSet.length > partitionParamIndex) {
-            Object userParamValue = work.userParamSet[partitionParamIndex];
+                work.userParamSet.size() > partitionParamIndex) {
+            Object userParamValue = work.userParamSet.getParam(partitionParamIndex);
             if (partitionParamType == null) {
                 return userParamValue;
             } else {
-                return ParameterConverter.makeCompatible(partitionParamType.getProcParamType(), userParamValue);
+                return ParameterConverter.makeCompatible(partitionParamType.getProcParamType(),
+                        userParamValue, work.userParamSet.getParamType(partitionParamIndex));
             }
         }
         return partitionParamValue;

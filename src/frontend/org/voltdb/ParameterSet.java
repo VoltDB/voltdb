@@ -301,6 +301,11 @@ public class ParameterSet implements JSONString {
         return m_params[index];
     }
 
+    // Warning: Use toArray if a copy is required (which it usually is)
+    public Object[] getParams() {
+        return m_params;
+    }
+
     public StoredProcParamType getParamType(int index) {
         return m_paramTypes[index];
     }

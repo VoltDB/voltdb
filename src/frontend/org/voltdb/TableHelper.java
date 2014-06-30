@@ -850,11 +850,15 @@ public class TableHelper {
             Object[] row = new Object[dest.getColumnCount()];
             // get the values from the source table or defaults
             for (int i = 0; i < dest.getColumnCount(); i++) {
+                VoltType srcColType;
                 if (indexMap.containsKey(i)) {
                     int sourcePos = indexMap.get(i);
-                    row[i] = source.get(sourcePos, source.getColumnType(sourcePos));
+                    srcColType = source.getColumnType(sourcePos);
+                    row[i] = source.get(sourcePos, srcColType);
                 }
                 else {
+                    // makeCompatible will only accept Null for this Input Object Type;
+                    srcColType = VoltType.NULL;
                     row[i] = dest.getColumnDefaultValue(i);
                     // handle no default specified
                     if (row[i] == TableShorthand.ColMeta.NO_DEFAULT_VALUE) {
@@ -870,7 +874,8 @@ public class TableHelper {
                 }
                 // make the values the core types of the target table
                 VoltType destColType = dest.getColumnType(i);
-                row[i] = ParameterConverter.makeCompatible(destColType.getProcParamType(), row[i]);
+                row[i] = ParameterConverter.makeCompatible(destColType.getProcParamType(),
+                        row[i], srcColType.getProcParamType());
                 // check the result type in an assert
                 assert(ParameterConverter.verifyParameterConversion(row[i], destColType.classFromType()));
             }

@@ -50,7 +50,8 @@ public class CatalogSpecificPlanner {
                 retval.set((AdHocPlannedStmtBatch)result);
             }
         };
-        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql, userParams,
+        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql,
+                ParameterSet.fromArrayNoCopy(userParams),
                 singlePartition, m_catalogContext, completionHandler);
         m_agent.compileAdHocPlanForProcedure(work);
         return retval;

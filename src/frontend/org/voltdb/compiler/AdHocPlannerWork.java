@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import org.voltcore.network.Connection;
 import org.voltdb.CatalogContext;
+import org.voltdb.ParameterSet;
 import org.voltdb.client.ProcedureInvocationType;
 
 
@@ -27,7 +28,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
 
     final String sqlBatchText;
     final String[] sqlStatements;
-    final Object[] userParamSet;
+    final ParameterSet userParamSet;
     final CatalogContext catalogContext;
     final boolean inferPartitioning;
     // The user partition key is usually null
@@ -42,7 +43,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     public AdHocPlannerWork(long replySiteId, long clientHandle, long connectionId,
             boolean adminConnection, Connection clientConnection,
             String sqlBatchText, String[] sqlStatements,
-            Object[] userParamSet, CatalogContext context, boolean isExplain,
+            ParameterSet userParamSet, CatalogContext context, boolean isExplain,
             boolean inferPartitioning, Object[] userPartitionKey,
             ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
@@ -92,7 +93,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
      * test related parts of the system.
      */
     public static AdHocPlannerWork makeStoredProcAdHocPlannerWork(long replySiteId,
-            String sql, Object[] userParams, boolean singlePartition, CatalogContext context,
+            String sql, ParameterSet userParams, boolean singlePartition, CatalogContext context,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         return new AdHocPlannerWork(replySiteId, 0, 0, false, null,
@@ -102,7 +103,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             // denote that the partitioning has already been done so something like the planner
             // code path for @AdHocSpForTest is called for.
             // The plan is required to be single-partition regardless of its internal logic
-            // -- EXCEPT that writes to replicated tables are strictly forbdden -- and there
+            // -- EXCEPT that writes to replicated tables are strictly forbidden -- and there
             // should be no correlation inferred or assumed between the partitioning and the
             // statement's constants or parameters.
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
@@ -112,11 +113,11 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     @Override
     public String toString() {
         String retval = super.toString();
-        if (userParamSet == null || (userParamSet.length == 0)) {
+        if (userParamSet == null || (userParamSet.size() == 0)) {
             retval += "\n  user params: empty";
         } else {
-            int i = 0;
-            for (Object param : userParamSet) {
+            for (int i=0; i<userParamSet.size();) {
+                Object param = userParamSet.getParam(i);
                 i++;
                 retval += String.format("\n  user param[%d]: %s",
                                         i, (param == null ? "null" : param.toString()));

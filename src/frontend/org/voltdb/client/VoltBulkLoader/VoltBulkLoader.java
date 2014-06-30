@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
+import org.voltdb.StoredProcParamType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -87,10 +88,11 @@ public class VoltBulkLoader {
     //Column information
     VoltTable.ColumnInfo m_colInfo[];
     //Column types
-    //Map<Integer, VoltType> m_columnTypes;
-    TreeMap<Integer, VoltType> m_mappedColumnTypes;
-    //In array form
-    final VoltType[] m_columnTypes;
+    TreeMap<Integer, StoredProcParamType> m_mappedColumnTypes;
+    //Type of each column in table (more fine grained than VoltTypes)
+    final StoredProcParamType[] m_columnTypes;
+    //Type of each insert row object
+    StoredProcParamType[] m_rowInsertTypes = null;
     //Index of partitioned column in table
     int m_partitionedColumnIndex = -1;
     //Column Names
@@ -198,9 +200,9 @@ public class VoltBulkLoader {
                         try {
                             Object row_args[] = new Object[currRow.m_rowData.length];
                             for (int i = 0; i < row_args.length; i++) {
-                                final VoltType type = m_columnTypes[i];
-                                row_args[i] = ParameterConverter.makeCompatible(type.getProcParamType(),
-                                        currRow.m_rowData[i]);
+                                final StoredProcParamType type = m_columnTypes[i];
+                                row_args[i] = ParameterConverter.makeCompatible(type,
+                                        currRow.m_rowData[i], m_rowInsertTypes[i]);
                             }
                             table.addRow(row_args);
                         } catch (VoltTypeException ex) {
@@ -253,7 +255,7 @@ public class VoltBulkLoader {
         VoltTable procInfo = m_clientImpl.callProcedure("@SystemCatalog",
                 "COLUMNS").getResults()[0];
 
-        m_mappedColumnTypes = new TreeMap<Integer, VoltType>();
+        m_mappedColumnTypes = new TreeMap<Integer, StoredProcParamType>();
         m_colNames = new TreeMap<Integer, String>();
         m_partitionedColumnIndex = -1;
         m_partitionColumnType = VoltType.NULL;
@@ -273,13 +275,13 @@ public class VoltBulkLoader {
         }
 
         while (procInfo.advanceRow()) {
-            String table = procInfo.getString("TABLE_NAME");
+            final String table = procInfo.getString("TABLE_NAME");
             if (tableName.equalsIgnoreCase(table)) {
                 VoltType vtype = VoltType.typeFromString(procInfo.getString("TYPE_NAME"));
                 int idx = (int) procInfo.getLong("ORDINAL_POSITION") - 1;
-                m_mappedColumnTypes.put(idx, vtype);
+                m_mappedColumnTypes.put(idx, vtype.getProcParamType());
                 m_colNames.put(idx, procInfo.getString("COLUMN_NAME"));
-                String remarks = procInfo.getString("REMARKS");
+                final String remarks = procInfo.getString("REMARKS");
                 if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
                     m_partitionColumnType = vtype;
                     m_partitionedColumnIndex = idx;
@@ -292,13 +294,13 @@ public class VoltBulkLoader {
             //VoltBulkLoader will exit.
             throw new IllegalArgumentException("Table Name parameter does not match any known table.");
         }
-        m_columnTypes = getColumnTypes();
+        m_columnTypes = getProcParamFromColumnTypes();
 
         //Build column info so we can build VoltTable
         m_colInfo = new VoltTable.ColumnInfo[m_columnCnt];
         for (int i = 0; i < m_columnCnt; i++) {
-            VoltType type = m_columnTypes[i];
-            String cname = m_colNames.get(i);
+            final VoltType type = m_columnTypes[i].getVoltType();
+            final String cname = m_colNames.get(i);
             VoltTable.ColumnInfo ci = new VoltTable.ColumnInfo(cname, type);
             m_colInfo[i] = ci;
         }
@@ -462,6 +464,12 @@ public class VoltBulkLoader {
                         " found, " + m_columnCnt + " expected for row: " + rowHandle.toString();
             generateError(rowHandle, fieldList, errMsg);
             return;
+        }
+        if (m_rowInsertTypes == null) {
+            m_rowInsertTypes = new StoredProcParamType[m_columnCnt];
+            for (int i=0; i<m_columnCnt; i++) {
+                m_rowInsertTypes[i] = StoredProcParamType.typeFromClass(fieldList[i].getClass());
+            }
         }
         VoltBulkLoaderRow newRow = new VoltBulkLoaderRow(this, rowHandle, fieldList);
         if (m_isMP) {
@@ -641,8 +649,15 @@ public class VoltBulkLoader {
         return m_loaderCompletedCnt.get();
     }
 
-    public VoltType[] getColumnTypes() {
-        return (VoltType[])m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
+    private StoredProcParamType[] getProcParamFromColumnTypes() {
+        return (StoredProcParamType[])m_mappedColumnTypes.values().toArray(new StoredProcParamType[m_mappedColumnTypes.size()]);
     }
 
+    public VoltType[] getColumnTypes() {
+        VoltType[] columnTypes = new VoltType[m_columnCnt];
+        for (int i = 0; i < m_columnCnt; i++) {
+            columnTypes[i] = m_columnTypes[i].getVoltType();
+        }
+        return columnTypes;
+    }
 }
