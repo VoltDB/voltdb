@@ -372,7 +372,7 @@ string planNodeToString(PlanNodeType type)
         return "UPDATE";
     }
     case PLAN_NODE_TYPE_INSERT: {
-        return "DELETE";
+        return "INSERT";
     }
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
