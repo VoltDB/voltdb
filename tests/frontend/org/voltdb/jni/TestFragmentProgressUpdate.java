@@ -113,13 +113,13 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         m_tableSize = 5001;
         m_longOpthreshold = 10000;
-        warehousedata.clearRowData();
+        m_warehousedata.clearRowData();
 
         for (int i = 0; i < m_tableSize; ++i) {
-            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
+            m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -161,13 +161,13 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         m_tableSize = 10000;
         m_longOpthreshold = 10000;
-        warehousedata.clearRowData();
+        m_warehousedata.clearRowData();
 
         for (int i = 0; i < m_tableSize; ++i) {
-            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
+            m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -261,18 +261,17 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         m_tableSize = 20000;
         m_longOpthreshold = 10000;
-        warehousedata.clearRowData();
+        m_warehousedata.clearRowData();
 
         for (int i = 0; i < m_tableSize; ++i) {
-            warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
+            m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
-        Procedure testProc = m_procedures.getIgnoreCase("FragmentUpdateTestProcedure");
-        Statement selectStmt = testProc.getStatements().getIgnoreCase("warehouse_join");
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_join");
         PlanFragment selectBottomFrag = null;
 
         // delete 5000 records
@@ -309,7 +308,7 @@ public class TestFragmentProgressUpdate extends TestCase {
     private static final long NODE_ID = 1;
     private int m_tableSize;
     private int m_longOpthreshold;
-    private VoltTable warehousedata;
+    private VoltTable m_warehousedata;
     private TPCCProjectBuilder m_builder;
     private Catalog m_catalog;
     private int WAREHOUSE_TABLEID;
@@ -321,7 +320,7 @@ public class TestFragmentProgressUpdate extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        warehousedata = new VoltTable(
+        m_warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
                 new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
                 new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
