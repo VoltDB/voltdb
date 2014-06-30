@@ -736,7 +736,8 @@ public abstract class CatalogUtil {
         // Create catalog Systemsettings
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
-        int maxtemptablesize = 100;
+        // The memory size limit of max temp table
+        int maxtemptablesize = Integer.getInteger("MAX_TEMPTABLE_SIZE", 100);
         int snapshotpriority = 6;
         int elasticPauseTime = 50;
         int elasticThroughput = 2;
