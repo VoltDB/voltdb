@@ -796,7 +796,8 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings);
+            String autoGenDDL = CatalogSchemaTools.toSchema(m_catalog, m_addedClasses);
+            m_report = ReportMaker.report(m_catalog, m_warnings, autoGenDDL);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
