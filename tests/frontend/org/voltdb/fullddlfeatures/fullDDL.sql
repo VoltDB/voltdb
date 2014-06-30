@@ -143,7 +143,7 @@ CREATE PROCEDURE
 ALLOW 
     admin 
 FROM CLASS 
-    org.voltdb_testprocs.fullddlfeatures.NotAnnotatedEmptyProcedure
+    org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
 
