@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -40,6 +38,8 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
+
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * This class was a crude initial effort to tease apart the code in
@@ -172,7 +172,7 @@ public abstract class SnapshotWritePlan
         for (Deque<SnapshotTableTask> tasksForSite : m_taskListsForHSIds.values()) {
             for (SnapshotTableTask task : tasksForSite) {
                 // Close any created targets and replace them with DevNull, go web-scale
-                if (task.getTarget() != null) {
+                if (task.getTarget(true) != null) {
                     try {
                         task.getTarget().close();
                     } catch (Exception e) {

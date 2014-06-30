@@ -587,7 +587,7 @@ public class PlanAssembler {
     }
 
     private ParsedResultAccumulator planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
-        AbstractParsedStmt subQuery = subqueryScan.getSubquery();
+        AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = planId;
@@ -602,21 +602,12 @@ public class PlanAssembler {
             }
             return null;
         }
+        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
 
         // Remove the coordinator send/receive pair.
         // It will be added later for the whole plan
-        AbstractPlanNode root = compiledPlan.rootPlanGraph;
+        compiledPlan.rootPlanGraph = subqueryScan.processReceiveNode(compiledPlan.rootPlanGraph);
 
-        // There should be more cases for Joins have to be done on coordinator
-        // This case should also not be pushed down
-        boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
-                !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
-        if (subScanCanPushdown) {
-            compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
-        }
-        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
 
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
@@ -1388,13 +1379,13 @@ public class PlanAssembler {
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
-        boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
+        boolean indexScanForGroupingOnly = false;
+        if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
@@ -1408,6 +1399,7 @@ public class PlanAssembler {
                         candidate.clearParents();
                         root.getChild(0).clearChildren();
                         root.getChild(0).addAndLinkChild(candidate);
+                        indexScanForGroupingOnly = true;
                     }
                 }
             }
@@ -1467,8 +1459,16 @@ public class PlanAssembler {
                 }
             }
             if (needHashAgg) {
-                aggNode = new HashAggregatePlanNode();
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                if ( m_parsedSelect.m_mvFixInfo.needed() ) {
+                    aggNode = new HashAggregatePlanNode();
+                } else {
+                    if (indexScanForGroupingOnly) {
+                        assert(root instanceof ReceivePlanNode);
+                        aggNode = new AggregatePlanNode();
+                    } else {
+                        aggNode = new HashAggregatePlanNode();
+                    }
+
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
@@ -1624,7 +1624,7 @@ public class PlanAssembler {
             }
         }
         // DISTINCT is redundant on a single-row result. Return early.
-        else if (containsAggregateExpression) {
+        else if (m_parsedSelect.hasAggregateExpression()) {
             return root;
         }
 
@@ -1862,8 +1862,11 @@ public class PlanAssembler {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
                     AbstractExpression rootExpr = col.expression;
                     // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-                    if (rootExpr instanceof TupleValueExpression) {
-                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                    // However, if group by partition key, limit can still push down if ordered by aggregate values.
+                    ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+                    for (AbstractExpression tve: tves) {
+                        if  (((TupleValueExpression) tve).hasAggregate() &&
+                                !m_parsedSelect.hasPartitionColumnInGroupby()) {
                             return null;
                         }
                     }
@@ -1997,52 +2000,6 @@ public class PlanAssembler {
 
     public String getErrorMessage() {
         return m_recentErrorMsg;
-    }
-
-
-
-    /**
-     * Remove the coordinator send/receive pair if any from the graph.
-     *
-     * @param root the complete plan node.
-     * @return the plan without the send/receive pair.
-     */
-    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
-        assert(root != null);
-        return removeCoordinatorSendReceivePairRecurcive(root, root);
-    }
-
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root, AbstractPlanNode current) {
-        if (current instanceof ReceivePlanNode) {
-            if (current.getChildCount() == 1) {
-                AbstractPlanNode child = current.getChild(0);
-                if (child instanceof SendPlanNode) {
-                    assert(child.getChildCount() == 1);
-                    child = child.getChild(0);
-                    if (child instanceof ProjectionPlanNode) {
-                        assert(child.getChildCount() == 1);
-                        child = child.getChild(0);
-                    }
-                    child.clearParents();
-                    if (current.getParentCount() == 0) {
-                        return child;
-                    } else {
-                        assert(current.getParentCount() == 1);
-                        AbstractPlanNode parent = current.getParent(0);
-                        parent.unlinkChild(current);
-                        parent.addAndLinkChild(child);
-                        return root;
-                    }
-                }
-            }
-            return root;
-        } else if (current.getChildCount() == 1) {
-            // This is still a coordinator node
-            return removeCoordinatorSendReceivePairRecurcive(root, current.getChild(0));
-        } else {
-            // We are about to branch and leave the coordinator
-            return root;
-        }
     }
 
     /**
