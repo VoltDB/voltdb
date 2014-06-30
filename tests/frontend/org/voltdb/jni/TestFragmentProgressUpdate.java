@@ -309,11 +309,8 @@ public class TestFragmentProgressUpdate extends TestCase {
     private int m_tableSize;
     private int m_longOpthreshold;
     private VoltTable m_warehousedata;
-    private TPCCProjectBuilder m_builder;
     private Catalog m_catalog;
     private int WAREHOUSE_TABLEID;
-    private Cluster m_cluster;
-    private CatalogMap<Procedure> m_procedures;
     private Procedure m_testProc;
 
     @Override
@@ -331,13 +328,13 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
                 );
-        m_builder = new TPCCProjectBuilder();
-        m_catalog = m_builder.createTPCCSchemaCatalog();
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        m_catalog = builder.createTPCCSchemaCatalog();
+        Cluster cluster = m_catalog.getClusters().get("cluster");
         WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
                 get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        m_cluster =  m_catalog.getClusters().get("cluster");
-        m_procedures = m_cluster.getDatabases().get("database").getProcedures();
-        m_testProc = m_procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
+        m_testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
     }
 
     @Override
