@@ -268,4 +268,22 @@ public class TestVoltType extends TestCase {
         fail();
     }
 
+    public void testTimestampStringRoundTrip() {
+        String[] date_str = {"1900-01-01",
+                             "2000-02-03",
+                             "2100-04-05",
+                             "2012-12-31",
+                             "2001-10-25",
+        };
+        for (int ii=0; ii<date_str.length; ++ii) {
+            try{
+                String str = new TimestampType(date_str[ii]).toString();
+                assertEquals(date_str[ii]+" 00:00:00.000000", str);
+            } catch (Exception e){
+                e.printStackTrace();
+                fail();
+            }
+        }
+    }
+
 }
