@@ -154,6 +154,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
+    assert(offset >= 0);
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
@@ -170,9 +171,10 @@ OrderByExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                input_table->debug().c_str());
 
-    if (limit >= 0 && xs.begin() + limit < xs.end()) {
+
+    if (limit >= 0 && xs.begin() + limit + offset < xs.end()) {
         // partial sort
-        partial_sort(xs.begin(), xs.begin() + limit, xs.end(),
+        partial_sort(xs.begin(), xs.begin() + limit + offset, xs.end(),
                 TupleComparer(node->getSortExpressions(), node->getSortDirections()));
     } else {
         // full sort
