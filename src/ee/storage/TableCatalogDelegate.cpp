@@ -29,6 +29,7 @@
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
+#include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -37,8 +38,11 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
+#include <string>
 #include <vector>
 #include <map>
 
@@ -637,5 +641,57 @@ void TableCatalogDelegate::deleteCommand()
     }
 }
 
+namespace {
+    bool isDefaultNow(const std::string& defaultValue) {
+        std::vector<std::string> tokens;
+        boost::split(tokens, defaultValue, boost::is_any_of(":"));
+        if (tokens.size() != 2) {
+            return false; 
+        }
+
+        int funcId = boost::lexical_cast<int>(tokens[1]);
+        if (funcId == FUNC_CURRENT_TIMESTAMP) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+void TableCatalogDelegate::initTemplateTuple(catalog::Table const &catalogTable, TableTuple& tbTuple) {
+    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
+    for (colIter = catalogTable.columns().begin();
+         colIter != catalogTable.columns().end();
+         colIter++) {
+
+        // TODO an optimization: can skip over the fields which will be
+        // overwritten by values from child node.
+
+        catalog::Column *col = colIter->second;
+        ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
+
+        switch (defaultColType) {
+        case VALUE_TYPE_INVALID:
+            tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
+            break;
+
+        default:
+            {
+                // apparently default value type may be different from the
+                // column type. Do we need to create a cast and evaluate
+                // it here if they are different?
+                
+                std::string defaultValueStr = col->defaultvalue();
+                if (defaultColType == VALUE_TYPE_TIMESTAMP && isDefaultNow(defaultValueStr)) {
+                    tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+                } else {
+                    NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValueStr);
+                    tbTuple.setNValue(col->index(), defaultValue);
+                }
+            }
+            break;
+        }        
+    }
+}
 
 }

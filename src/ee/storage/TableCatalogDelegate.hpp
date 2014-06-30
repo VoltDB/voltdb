@@ -83,6 +83,12 @@ class TableCatalogDelegate : public CatalogDelegate {
     static std::string getIndexIdString(const catalog::Index &catalogIndex);
     static std::string getIndexIdString(const TableIndexScheme &indexScheme);
 
+    /**
+     * Sets each field in the tuple to the default value for the table.
+     * Assumes that the tuple's schema is the same as the table's.
+     */
+    void initTemplateTuple(catalog::Table const &catalogTable, TableTuple& tbTuple);
+
     // ADXXX: should be const
     Table *getTable() {
         return m_table;

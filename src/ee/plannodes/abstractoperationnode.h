@@ -61,6 +61,9 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
         virtual ~AbstractOperationPlanNode();
         Table* getTargetTable() const;
         void setTargetTableDelegate(TableCatalogDelegate * tcd);
+        TableCatalogDelegate* getTargetTableDelegate() {
+            return m_tcd;
+        }
 
         std::string getTargetTableName() const;
         void setTargetTableName(std::string name);

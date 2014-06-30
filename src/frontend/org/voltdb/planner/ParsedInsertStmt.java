@@ -17,7 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -32,7 +32,7 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
-    public HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
+    public LinkedHashMap<Column, AbstractExpression> columns = new LinkedHashMap<Column, AbstractExpression>();
 
     /**
     * Class constructor
