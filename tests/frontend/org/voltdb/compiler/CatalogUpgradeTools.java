@@ -66,6 +66,16 @@ public class CatalogUpgradeTools
         memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
     }
 
+    public static void dorkDowngradeVersion(String srcJar, String dstJar, String buildstring)
+        throws Exception
+    {
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadFromPath(srcJar);
+        String[] bi = getBuildInfoLines(memCatalog);
+        bi[0] = buildstring;
+        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+        memCatalog.writeToFile(new File(dstJar));
+    }
+
     /**
      * Inject DDL statement.
      * @param memCatalog

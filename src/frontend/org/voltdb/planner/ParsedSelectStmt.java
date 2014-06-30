@@ -128,6 +128,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private AbstractExpression m_avgPushdownHaving = null;
     private NodeSchema m_avgPushdownNewAggSchema;
     private boolean m_hasPartitionColumnInGroupby = false;
+    private boolean m_hasAggregateDistinct = false;
 
     // Limit plan node information.
     private LimitPlanNode m_limitNodeTop = null;
@@ -661,6 +662,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             insertAggExpressionsToAggResultColumns(m_aggregationList, col);
             if (m_aggregationList.size() >= 1) {
                 m_hasAggregateExpression = true;
+
+                for (AbstractExpression agg: m_aggregationList) {
+                    assert(agg instanceof AggregateExpression);
+                    if (! m_hasAggregateDistinct &&
+                            ((AggregateExpression)agg).isDistinct() ) {
+                        m_hasAggregateDistinct = true;
+                        break;
+                    }
+                }
             }
 
             m_displayColumns.add(col);
@@ -954,6 +964,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_hasAggregateExpression;
     }
 
+    public boolean hasAggregateOrGroupby() {
+        return m_hasAggregateExpression || isGrouped();
+    }
+
     public NodeSchema getFinalProjectionSchema () {
         return m_projectSchema;
     }
@@ -980,6 +994,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean hasDistinct() {
         return m_distinct;
+    }
+
+    public boolean hasAggregateDistinct() {
+        return m_hasAggregateDistinct;
     }
 
     public List<ParsedColInfo> displayColumns() {
