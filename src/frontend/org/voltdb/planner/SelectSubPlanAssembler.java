@@ -348,10 +348,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // should propagate an error message identifying partitioning as the problem.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
-                int countOfIndependentlyPartitionedTables =
-                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
+                m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
                                                                       valueEquivalence);
-                if (countOfIndependentlyPartitionedTables > 1) {
+                if ( ! m_partitioning.isJoinValid() ) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.
                     // Don't throw a planning error here, in case the problem is just with this
@@ -359,7 +358,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // the failure is unanimous -- a common case.
                     m_recentErrorMsg =
                         "Join of multiple partitioned tables has insufficient join criteria.";
-                    //System.out.println("DEBUG: bad partitioning for: " + joinTree);
                     // This join order, at least, is not worth trying to plan.
                     continue;
                 }
@@ -661,12 +659,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // received on the coordinator, it can be treated as replicated data in later
         // joins, which MAY help with later outer joins with replicated data.
 
-
-        boolean needInnerSendReceive = (m_partitioning.requiresTwoFragments()) &&
-                                       (! innerPlan.hasReplicatedResult()) &&
-                                       (outerPlan.hasReplicatedResult()) &&
-                                       (joinNode.getJoinType() != JoinType.INNER || innerPlan.isNonjoinableSubquery())
-                                       ;
+        boolean needInnerSendReceive = m_partitioning.requiresTwoFragments() &&
+                                       ! innerPlan.hasReplicatedResult() &&
+                                       outerPlan.hasReplicatedResult() &&
+                                       joinNode.getJoinType() != JoinType.INNER;
 
         // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
         // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the

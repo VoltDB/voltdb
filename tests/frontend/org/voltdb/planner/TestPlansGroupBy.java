@@ -195,18 +195,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 aggNode = (AggregatePlanNode)p;
                 assertNotNull(aggNode.getPostPredicate());
             }
-        } else {
-            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
         }
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+        assertTrue(p instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
         // inline aggregate
         assertTrue(p instanceof AbstractScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        PlanNodeType aggType = PlanNodeType.HASHAGGREGATE;
+        if (p instanceof IndexScanPlanNode &&
+                ((IndexScanPlanNode)p).isForGroupingOnly() ) {
+            aggType = PlanNodeType.AGGREGATE;
+        }
+        assertNotNull(p.getInlinePlanNode(aggType));
 
         if (having && !topAgg) {
-            aggNode = (AggregatePlanNode)p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            aggNode = (AggregatePlanNode)p.getInlinePlanNode(aggType);
             assertNotNull(aggNode.getPostPredicate());
         }
     }
@@ -320,24 +325,25 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Partitioned Table
         pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
-        checkGroupByOnlyPlan(true, true, true);
+        // index scan for group by only, no need using hash aggregate
+        checkGroupByOnlyPlan(true, false, true);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
         //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
         //*/ debug */ System.out.println("DEBUG: " + pns.get(1).toExplainPlanString());
-        checkGroupByOnlyPlan(true, true, true);
+        checkGroupByOnlyPlan(true, false, true);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(true, true, true);
+        checkGroupByOnlyPlan(true, false, true);
 
         pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(true, true, true);
+        checkGroupByOnlyPlan(true, false, true);
 
         pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(true, true, true);
+        checkGroupByOnlyPlan(true, false, true);
 
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(true, true, true);
+        checkGroupByOnlyPlan(true, false, true);
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.

@@ -23,12 +23,12 @@
 
 package org.voltdb;
 
+import junit.framework.TestCase;
+
 import org.json_voltpatches.JSONObject;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
-
-import junit.framework.TestCase;
 
 public class AdhocDDLTestBase extends TestCase {
 
@@ -225,5 +225,37 @@ public class AdhocDDLTestBase extends TestCase {
             }
         }
         return partitioncol;
+    }
+
+    protected int indexedColumnCount(String table) throws Exception
+    {
+        VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];
+
+        int count = 0;
+        for(int i = 0; i < indexinfo.m_rowCount; i++)
+        {
+            indexinfo.advanceToRow(i);
+            String name = (String) indexinfo.get(2, VoltType.STRING);
+            if(name.equals(table))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    protected String getTableType(String table) throws Exception
+    {
+        VoltTable tableinfo = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+        for(int i = 0; i < tableinfo.m_rowCount; i++)
+        {
+            tableinfo.advanceToRow(i);
+            String tablename = (String) tableinfo.get(2, VoltType.STRING);
+            if(tablename.equals(table))
+            {
+                return (String) tableinfo.get(3, VoltType.STRING);
+            }
+        }
+        return null;
     }
 }

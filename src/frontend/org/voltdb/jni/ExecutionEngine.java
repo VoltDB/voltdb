@@ -17,6 +17,7 @@
 
 package org.voltdb.jni;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -100,6 +101,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
     public long m_lastTuplesAccessed = 0;
+    public long m_currMemoryInBytes = 0;
+    public long m_peakMemoryInBytes = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -319,14 +322,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     static final long LONG_OP_THRESHOLD = 10000;
+
     public long fragmentProgressUpdate(int batchIndex,
-                                          String planNodeName,
-                                          String lastAccessedTable,
-                                          long lastAccessedTableSize,
-                                          long tuplesProcessed)
+            String planNodeName,
+            String lastAccessedTable,
+            long lastAccessedTableSize,
+            long tuplesProcessed,
+            long currMemoryInBytes,
+            long peakMemoryInBytes)
     {
         ++m_callsFromEE;
         m_lastTuplesAccessed = tuplesProcessed;
+        m_currMemoryInBytes = currMemoryInBytes;
+        m_peakMemoryInBytes = peakMemoryInBytes;
 
         long currentTime = System.currentTimeMillis();
         if (m_startTime == 0) {
@@ -353,17 +361,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
         String msg = String.format(
                 "Procedure %s is taking a long time to execute -- at least " +
-                "%.1f seconds spent accessing " +
-                "%d tuples. Current plan fragment " +
-                "%s in call " +
-                "%d to voltExecuteSQL on site " +
-                "%s.",
-                m_currentProcedureName,
-                (currentTime - m_startTime) / 1000.0,
-                tuplesProcessed,
-                planNodeName,
-                m_currentBatchIndex,
-                CoreUtils.hsIdToString(m_siteId));
+                        "%.1f seconds spent accessing " +
+                        "%d tuples. Current plan fragment " +
+                        "%s in call " +
+                        "%d to voltExecuteSQL on site " +
+                        "%s. Current temp table uses " +
+                        "%d bytes memory, and the peak usage of memory for temp table is " +
+                        "%d bytes.",
+                        m_currentProcedureName,
+                        (currentTime - m_startTime) / 1000.0,
+                        tuplesProcessed,
+                        planNodeName,
+                        m_currentBatchIndex,
+                        CoreUtils.hsIdToString(m_siteId),
+                        currMemoryInBytes,
+                        peakMemoryInBytes);
         log.info(msg);
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
@@ -412,8 +424,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Releases the Engine object. */
     abstract public void release() throws EEException, InterruptedException;
 
+    public static byte[] getStringBytes(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    public void loadCatalog(long timestamp, String serializedCatalog) {
+        loadCatalog(timestamp, getStringBytes(serializedCatalog));
+    }
+
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
+    abstract protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;

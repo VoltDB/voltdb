@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -64,7 +63,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
@@ -81,7 +80,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
-        super.configureCommon(backend, serializedCatalog, catalogContext,
+        super.configureCommon(backend, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;

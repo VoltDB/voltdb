@@ -315,26 +315,16 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedSpHandle,
-                                  int64_t currentSpHandle)
+                                  int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
-        if (timeInMillis > 0 && currentSpHandle != std::numeric_limits<int64_t>::min()) {
+        m_openSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
+        if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
         }
-
-        /*
-         * handle cases when the currentSpHandle was set by rejoin
-         * and snapshot restore load table statements that send in
-         * Long.MIN_VALUE as their tx id. ee's tick which results
-         * in calls to this procedure may be called right after
-         * these.
-         */
-        if (currentSpHandle != std::numeric_limits<int64_t>::min()) {
-            extendBufferChain(0);
-            commit(lastCommittedSpHandle, currentSpHandle, timeInMillis < 0 ? true : false);
-        }
+        extendBufferChain(0);
+        commit(lastCommittedSpHandle, m_openSpHandle, timeInMillis < 0 ? true : false);
     }
 }
 

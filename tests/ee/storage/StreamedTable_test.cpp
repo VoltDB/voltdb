@@ -75,7 +75,8 @@ class MockTopend : public Topend {
     }
 
     virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
         return 1000000000; // larger means less likely/frequent callbacks to ignore
     }
 
