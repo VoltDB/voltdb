@@ -20,22 +20,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 package org.voltdb_testprocs.fullddlfeatures;
 
 import org.voltdb.VoltProcedure;
 
-public class testImportProc extends VoltProcedure {
-
-    static
-    {
-        // test import class here
-        // test missing import class
-    }
-
-    public long run()
-    {
-        NoMeaningClass nmc = new NoMeaningClass();
-        return nmc.returnTen();
+public class NotAnnotatedEmptyProcedure extends VoltProcedure {
+    public long run(long isbn, String title, String author)
+    throws VoltAbortException {
+        return 1;
     }
 }
