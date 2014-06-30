@@ -35,15 +35,7 @@ class ExistsSubqueryExpression : public AbstractExpression {
 };
 
 inline NValue ExistsSubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-    NValue result = m_left->eval(tuple1, tuple2);
-    if (result.isFalse()) {
-        // The subquery result set is empty. The EXISTS expression evaluates to FALSE
-        return result;
-    } else {
-        // The subquery result set contains at least a tuple either NULL or not NULL
-        // The EXISTS expression evaluates to TRUE
-        return NValue::getTrue();
-    }
+    return m_left->eval(tuple1, tuple2);
 }
 
 }

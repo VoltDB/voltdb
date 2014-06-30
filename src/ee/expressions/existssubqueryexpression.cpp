@@ -20,13 +20,16 @@
 #include "existssubqueryexpression.h"
 
 #include "common/debuglog.h"
+#include "expressions/subqueryexpression.h"
 
 namespace voltdb {
 
 ExistsSubqueryExpression::ExistsSubqueryExpression(AbstractExpression* subqueryExpression) :
     AbstractExpression(EXPRESSION_TYPE_OPERATOR_EXISTS, subqueryExpression, NULL) {
     VOLT_TRACE("ExistsSubqueryExpression");
-    assert(subqueryExpression != NULL);
+    SubqueryExpression* se = dynamic_cast<SubqueryExpression*> (subqueryExpression);
+    assert(se != NULL);
+    se->setParentExpressionType(EXPRESSION_TYPE_OPERATOR_EXISTS);
 }
 
 std::string ExistsSubqueryExpression::debugInfo(const std::string &spacer) const {

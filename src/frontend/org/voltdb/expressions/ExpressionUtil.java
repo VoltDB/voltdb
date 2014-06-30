@@ -247,12 +247,6 @@ public abstract class ExpressionUtil {
         } else if (input instanceof TupleValueExpression) {
             tves.add((TupleValueExpression) input);
             return tves;
-        } else if (input instanceof SubqueryExpression) {
-            SubqueryExpression subqueryExpr = (SubqueryExpression) input;
-            for(AbstractExpression arg : subqueryExpr.m_args) {
-                tves.addAll(getTupleValueExpressions(arg));
-            }
-            return tves;
         }
 
         // recursive calls

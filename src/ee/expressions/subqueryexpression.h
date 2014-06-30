@@ -19,7 +19,6 @@
 #define HSTORESUBQUERYEXPRESSION_H
 
 #include <vector>
-#include <sstream>
 
 #include <boost/shared_ptr.hpp>
 
@@ -41,11 +40,9 @@ class SubqueryExpression : public AbstractExpression {
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
 
-    std::string debugInfo(const std::string &spacer) const {
-        std::ostringstream buffer;
-        buffer << spacer << "SubqueryExpression: " << m_subqueryId;
-        return (buffer.str());
-    }
+    void setParentExpressionType(ExpressionType parentType);
+
+    std::string debugInfo(const std::string &spacer) const;
 
   private:
     int m_subqueryId;
@@ -60,7 +57,13 @@ class SubqueryExpression : public AbstractExpression {
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
     // The pointer to the global parameters
     NValueArray* m_parameterContainer;
+    // The parent expression type - either EXISTS or IN
+    ExpressionType m_parentType;
 
 };
+
+inline void SubqueryExpression::setParentExpressionType(ExpressionType parentType) {
+    m_parentType = parentType;
+}
 }
 #endif

@@ -17,13 +17,16 @@
 #include "insubqueryexpression.h"
 
 #include "common/debuglog.h"
+#include "expressions/subqueryexpression.h"
 
 namespace voltdb {
 
 InSubqueryExpression::InSubqueryExpression(AbstractExpression* inVectorExpression, AbstractExpression* subqueryExpression) :
     AbstractExpression(EXPRESSION_TYPE_COMPARE_IN, inVectorExpression, subqueryExpression) {
     VOLT_TRACE("InSubqueryExpression");
-    assert(subqueryExpression != NULL);
+    SubqueryExpression* se = dynamic_cast<SubqueryExpression*> (subqueryExpression);
+    assert(se != NULL);
+    se->setParentExpressionType(EXPRESSION_TYPE_COMPARE_IN);
 }
 
 std::string InSubqueryExpression::debugInfo(const std::string &spacer) const {

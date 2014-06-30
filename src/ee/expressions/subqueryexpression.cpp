@@ -14,6 +14,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <sstream>
+
 #include "subqueryexpression.h"
 
 #include "common/debuglog.h"
@@ -36,7 +39,8 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
             m_paramIdxs(paramIdxs),
             m_otherParamIdxs(otherParamIdxs),
             m_tveParams(tveParams),
-            m_parameterContainer(NULL) {
+            m_parameterContainer(NULL),
+            m_parentType(EXPRESSION_TYPE_INVALID) {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
         m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
         assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
@@ -55,6 +59,7 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
     NValue
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
+        assert(m_parentType == EXPRESSION_TYPE_OPERATOR_EXISTS || m_parentType == EXPRESSION_TYPE_COMPARE_IN);
         // Get the subquery context with the last evaluation result and parameters used to obtain that result
         SubqueryContext* context = ExecutorContext::getExecutorContext()->getSubqueryContext(m_subqueryId);
         bool hasPriorResult = context != NULL;
@@ -119,16 +124,18 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
         TableIterator& it = outputTable->iterator();
         TableTuple tuple(outputTable->schema());
         if (it.next(tuple)) {
-            // If this subquery is part of the IN expression, its top plan node will be a
-            // special purpose seqscan node which inserts a tuple with all columns set to NULL
-            // if one of the tuples from the IN list is NULL, so we can try any (the first one) index.
-            // If this subquery is part of the EXISTS expression, the EXISTS expression
-            // only cares whether the tuple exists or not, and potential false positives
-            // (The EXISTS output schema may have NULL columns) still will be evaluated
-            // to TRUE by the parent ExistsSubquery expression.
-            if (tuple.isNull(0)) {
-                retval.setNull();
+                if (m_parentType == EXPRESSION_TYPE_COMPARE_IN) {
+                // This subquery is part of the IN expression, its top plan node will be a
+                // special purpose seqscan node which inserts a tuple with all columns set to NULL
+                // if one of the tuples from the IN list is NULL, so we can try any (the first one) index.
+                if (tuple.isNull(0)) {
+                    retval.setNull();
+                } else {
+                    retval = NValue::getTrue();
+                }
             } else {
+                // This subquery is part of the EXISTS expression, the EXISTS expression
+                // only cares whether the tuple exists or not.
                 retval = NValue::getTrue();
             }
         }
@@ -149,5 +156,10 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
         return retval;
     }
 
-}
+    std::string SubqueryExpression::debugInfo(const std::string &spacer) const {
+        std::ostringstream buffer;
+        buffer << spacer << "SubqueryExpression: " << m_subqueryId;
+        return (buffer.str());
+    }
 
+}
