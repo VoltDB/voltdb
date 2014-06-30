@@ -528,7 +528,7 @@ struct money_numpunct : std::numpunct<char> {
     std::string do_grouping() const {return "\03";}
 };
 
-/** implement the Volt SQL Format_Currency function for all numeric values */
+/** implement the Volt SQL Format_Currency function for decimal values */
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vector<NValue>& arguments) {
     static std::locale newloc(std::cout.getloc(), new money_numpunct);
     static std::locale nullloc(std::cout.getloc(), new std::numpunct<char>);
@@ -576,12 +576,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     TTInt barrier = five * (denominator / 10);
 
     if (fractional > barrier) {
-        scaledValue += one * denominator;
+        scaledValue += denominator;
     }
     else if (fractional == barrier) {
         TTInt prev = scaledValue / denominator;
         if (prev % 2 == one) {
-            scaledValue += one * denominator;
+            scaledValue += denominator;
         }
     }
     else {

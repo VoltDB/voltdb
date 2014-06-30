@@ -1450,9 +1450,20 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "Delete from R3;");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
-        String[] decimal_strs = {"123456.64565", "-123456.64565", "1123456785.555", "-1123456785.555", "0.0", "-0.0", "0", "-0",
-                                 "99999999999999999999999999.999999999999", "-99999999999999999999999999.99999999999", "1500", "2500",
-                                 "8223372036854775807.123456789125", "8223372036854775807.123456789175"};
+        String[] decimal_strs = {"123456.64565",     // id = 0
+                                 "-123456.64565",    // id = 1
+                                 "1123456785.555",   // id = 2
+                                 "-1123456785.555",  // id = 3
+                                 "0.0",              // id = 4
+                                 "-0.0",             // id = 5
+                                 "0",                // id = 6
+                                 "-0",               // id = 7
+                                 "99999999999999999999999999.999999999999", // id = 8
+                                 "-99999999999999999999999999.99999999999", // id = 9
+                                 "1500",             // id = 10
+                                 "2500",             // id = 11
+                                 "8223372036854775807.123456789125",        // id = 12
+                                 "8223372036854775807.123456789175"};       // id = 13
         for(int i = 0; i < decimal_strs.length; i++) {
             BigDecimal bd = new BigDecimal(decimal_strs[i]);
             cr = client.callProcedure("D1.insert", i, bd);
@@ -1469,22 +1480,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        // rounding to positive places
         str = result.getString(0);
-        assertEquals(str, "123,456.6");
+        assertEquals(str, "123,456.6");    // rounding down
         str = result.getString(1);
-        assertEquals(str, "123,456.65");
+        assertEquals(str, "123,456.65");   // rounding up
         str = result.getString(2);
         assertEquals(str, "123,456.646");
         str = result.getString(3);
-        assertEquals(str, "123,456.6456"); //banker's rounding
+        assertEquals(str, "123,456.6456"); // banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
         str = result.getString(4);
-        assertEquals(str, "123,457");
+        assertEquals(str, "123,457");      // rounding up
         str = result.getString(5);
         assertEquals(str, "123,460");
         str = result.getString(6);
         assertEquals(str, "123,500");
         str = result.getString(7);
-        assertEquals(str, "123,000");
+        assertEquals(str, "123,000");      // rounding down
 
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
@@ -1495,22 +1508,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        // rounding to positive places
         str = result.getString(0);
-        assertEquals(str, "-123,456.6");
+        assertEquals(str, "-123,456.6");    // rounding down
         str = result.getString(1);
-        assertEquals(str, "-123,456.65");
+        assertEquals(str, "-123,456.65");   // rounding up
         str = result.getString(2);
         assertEquals(str, "-123,456.646");
         str = result.getString(3);
-        assertEquals(str, "-123,456.6456"); //banker's rounding
+        assertEquals(str, "-123,456.6456"); //banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
         str = result.getString(4);
-        assertEquals(str, "-123,457");
+        assertEquals(str, "-123,457");      // rounding up
         str = result.getString(5);
         assertEquals(str, "-123,460");
         str = result.getString(6);
         assertEquals(str, "-123,500");
         str = result.getString(7);
-        assertEquals(str, "-123,000");
+        assertEquals(str, "-123,000");      // rounding down
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
                                                  + "FORMAT_CURRENCY(DEC, 3), FORMAT_CURRENCY(DEC, 4),"
@@ -1520,14 +1535,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        // rounding to positive places
         str = result.getString(0);
         assertEquals(str, "1,123,456,785.6");
         str = result.getString(1);
-        assertEquals(str, "1,123,456,785.56"); // banker's rounding
+        assertEquals(str, "1,123,456,785.56"); // banker's rounding: half to nearest even when previous digit is odd
         str = result.getString(2);
         assertEquals(str, "1,123,456,785.555");
         str = result.getString(3);
-        assertEquals(str, "1,123,456,785.5550");
+        assertEquals(str, "1,123,456,785.5550"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
         str = result.getString(4);
         assertEquals(str, "1,123,456,786");
         str = result.getString(5);
@@ -1545,14 +1562,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        // rounding to positive places
         str = result.getString(0);
         assertEquals(str, "-1,123,456,785.6");
         str = result.getString(1);
-        assertEquals(str, "-1,123,456,785.56"); //banker's rounding
+        assertEquals(str, "-1,123,456,785.56"); // banker's rounding: half to nearest even when previous digit is odd
         str = result.getString(2);
         assertEquals(str, "-1,123,456,785.555");
         str = result.getString(3);
-        assertEquals(str, "-1,123,456,785.5550");
+        assertEquals(str, "-1,123,456,785.5550"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
         str = result.getString(4);
         assertEquals(str, "-1,123,456,786");
         str = result.getString(5);
@@ -1568,6 +1587,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is odd
         assertEquals(str, "2,000");
 
         cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -3) from D1 where id = 11");
@@ -1576,8 +1596,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         str = result.getString(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is even
         assertEquals(str, "2,000");
 
+        // zeros with different init input
         for (int i = 4; i < 8; i++) {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 2) from D1 where id = "+i);
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -1588,6 +1610,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(str, "0.00");
         }
 
+        // out of int64_t range
         try {
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
             fail("range validity check failed for FORMAT_CURRENCY");
@@ -1683,7 +1706,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                   "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
                   "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
                   "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
-                  "8,200,000,000,000,000,000","8,000,000,000,000,000,000","null","0","0","0","0","0","0"};
+                  "8,200,000,000,000,000,000","8,000,000,000,000,000,000","not used","0","0","0","0","0","0"};
         for (int i=11; i > -19; i--){
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -1717,7 +1740,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
                 "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
                 "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
-                "8,200,000,000,000,000,000","8,000,000,000,000,000,000","null","0","0","0","0","0","0"};
+                "8,200,000,000,000,000,000","8,000,000,000,000,000,000","not used","0","0","0","0","0","0"};
         for (int i=11; i > -19; i--){
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
             assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
