@@ -143,7 +143,7 @@ CREATE PROCEDURE
 ALLOW 
     admin 
 FROM CLASS 
-    org.voltdb.compiler.procedures.NotAnnotatedEmptyProcedure
+    org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
 
@@ -465,7 +465,7 @@ PARAMETER
     0
 ;
 
-PARTITION PROCEDURE NotAnnotatedEmptyProcedure 
+PARTITION PROCEDURE testCreateProcFromClassProc 
 ON 
 TABLE 
     T26 
