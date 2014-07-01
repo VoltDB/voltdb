@@ -857,11 +857,17 @@ public class TableHelper {
                     row[i] = source.get(sourcePos, srcColType);
                 }
                 else {
-                    // makeCompatible will only accept Null for this Input Object Type;
-                    srcColType = VoltType.NULL;
-                    row[i] = dest.getColumnDefaultValue(i);
+                    // use default target value and type
+                    Object defaultVal = dest.getColumnDefaultValue(i);
+                    if (defaultVal == null) {
+                        srcColType = dest.getColumnType(i);
+                    }
+                    else {
+                        // Since some default values (TIMESTAMP) are represented as Strings
+                        srcColType = VoltType.typeFromClass(defaultVal.getClass());
+                    }
                     // handle no default specified
-                    if (row[i] == TableShorthand.ColMeta.NO_DEFAULT_VALUE) {
+                    if (defaultVal == TableShorthand.ColMeta.NO_DEFAULT_VALUE) {
                         if (dest.getColumnNullable(i)) {
                             row[i] = null;
                         }
@@ -870,6 +876,9 @@ public class TableHelper {
                                     String.format("New column %s needs a default value in migration",
                                             dest.getColumnName(i)));
                         }
+                    }
+                    else {
+                        row[i] = defaultVal;
                     }
                 }
                 // make the values the core types of the target table

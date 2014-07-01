@@ -785,12 +785,40 @@ public class ParameterConverter {
      * @throws Exception with a message describing why the types are incompatible.
      */
     public static Object makeCompatible(final StoredProcParamType expectedType, final Object param, final StoredProcParamType paramType)
-    throws VoltTypeException
+                throws VoltTypeException
     {
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
         // after the basics to check for those.
         if (param == null || paramType.isNullValue(param)) {
+            return expectedType.getNullValue();
+        }
+
+        return expectedType.convertToParamType(param, paramType);
+    }
+    /**
+     * Convert the given value to the type given, if possible.
+     *
+     * This function is in the performance path, so some effort has been made to order
+     * the giant string of branches such that most likely things are first, and that
+     * if the type is already correct, it should move very quickly through the logic.
+     * Some clarity has been sacrificed for performance, but perfect clarity is pretty
+     * elusive with complicated logic like this anyway.
+     *
+     * @throws Exception with a message describing why the types are incompatible.
+     */
+    public static Object makeCompatible(final StoredProcParamType expectedType, final Object param)
+                throws VoltTypeException
+    {
+        // Get blatant null out of the way fast, as it avoids some inline checks
+        // There are some subtle null values that aren't java null coming up, but wait until
+        // after the basics to check for those.
+        if (param == null) {
+            return expectedType.getNullValue();
+        }
+
+        final StoredProcParamType paramType = StoredProcParamType.typeFromClass( param.getClass());
+        if (paramType.isNullValue(param)) {
             return expectedType.getNullValue();
         }
 

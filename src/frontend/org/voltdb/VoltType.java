@@ -392,6 +392,7 @@ public enum VoltType {
             }
         }
         s_classes = b.build();
+        StoredProcParamType.resolveCircularDependencies();
     }
 
     /**

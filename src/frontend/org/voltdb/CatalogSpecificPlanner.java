@@ -51,7 +51,7 @@ public class CatalogSpecificPlanner {
             }
         };
         AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql,
-                ParameterSet.fromArrayNoCopy(userParams),
+                userParams==null?null:ParameterSet.fromArrayNoCopy(userParams),
                 singlePartition, m_catalogContext, completionHandler);
         m_agent.compileAdHocPlanForProcedure(work);
         return retval;

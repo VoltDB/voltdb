@@ -121,7 +121,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         // Mock up a dummy work request.
         AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(replySiteId,
                                                                                 sql,
-                                                                                ParameterSet.fromArrayNoCopy(userParams),
+                                                                                userParams==null?null:ParameterSet.fromArrayNoCopy(userParams),
                                                                                 false, // mock inferred partitioning
                                                                                 null, dummyHandler);
         // Mock up dummy results from the work request.

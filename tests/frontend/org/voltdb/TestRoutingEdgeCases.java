@@ -83,7 +83,7 @@ public class TestRoutingEdgeCases extends TestCase {
                 fail();
             }
             catch (ProcCallException pce) {
-                assertTrue(pce.getMessage().contains("Array / Scalar parameter mismatch"));
+                assertTrue(pce.getMessage().contains("[B is not a match or is out of range for the target parameter type: long"));
             }
 
             // For now, @LoadSinglepartitionTable assumes 8 byte integers, even if type is < 8 bytes

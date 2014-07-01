@@ -468,6 +468,10 @@ public class VoltBulkLoader {
         if (m_rowInsertTypes == null) {
             m_rowInsertTypes = new StoredProcParamType[m_columnCnt];
             for (int i=0; i<m_columnCnt; i++) {
+                if (fieldList[i] == null) {
+                    m_rowInsertTypes = null;
+                    break;
+                }
                 m_rowInsertTypes[i] = StoredProcParamType.typeFromClass(fieldList[i].getClass());
             }
         }

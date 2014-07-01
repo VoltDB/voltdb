@@ -309,9 +309,17 @@ public class PerPartitionTable {
             Object row_args[];
             row_args = new Object[currRow.m_rowData.length];
             try {
-                for (int i = 0; i < row_args.length; i++) {
-                    row_args[i] = ParameterConverter.makeCompatible(m_columnTypes[i],
-                            currRow.m_rowData[i], loader.m_rowInsertTypes[i]);
+                if (loader.m_rowInsertTypes == null) {
+                    for (int i = 0; i < row_args.length; i++) {
+                        row_args[i] = ParameterConverter.makeCompatible(m_columnTypes[i],
+                                currRow.m_rowData[i]);
+                    }
+                }
+                else {
+                    for (int i = 0; i < row_args.length; i++) {
+                        row_args[i] = ParameterConverter.makeCompatible(m_columnTypes[i],
+                                currRow.m_rowData[i], loader.m_rowInsertTypes[i]);
+                    }
                 }
             } catch (VoltTypeException e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
