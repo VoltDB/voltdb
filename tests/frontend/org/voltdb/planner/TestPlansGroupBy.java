@@ -385,10 +385,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(0).getChild(0);
 
         // ENG-5066: now Limit is pushed under Projection
+        // Limit is also inlined with Orderby node
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
         // inline aggregate
@@ -443,15 +444,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Test limit push down
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
-        assertTrue(p instanceof LimitPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-
-        p = p.getChild(0).getChild(0);
+        // inline limit
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        p = p.getChild(0);
         // inline aggregate
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
@@ -479,9 +480,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Test no limit push down
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
