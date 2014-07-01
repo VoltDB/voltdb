@@ -409,6 +409,10 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Expect no rows after the delete propagates
     EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
+
+    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
+        (*i).free();
+    }
 }
 
 TEST_F(TableAndIndexTest, BigTest) {
