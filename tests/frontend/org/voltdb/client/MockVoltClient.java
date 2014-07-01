@@ -59,6 +59,7 @@ import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
@@ -72,7 +73,9 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         super();
     }
 
-    ProcedureCallback m_callback = null;
+    ProcedureCallback m_lastCallback = null;
+    LinkedBlockingQueue<ProcedureCallback> m_callbacks = new LinkedBlockingQueue<ProcedureCallback>();
+    Object m_lock = new Object();
     boolean m_nextReturn = true;
 
     @Override
@@ -258,7 +261,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
-        m_callback = callback;
+        m_lastCallback = callback;
+        synchronized (m_lock) {
+            m_callbacks.add(callback);
+        }
         if (originalTxnId <= lastOrigTxnId)
         {
             origTxnIdOrderCorrect = false;
@@ -271,10 +277,22 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return m_nextReturn;
     }
 
+
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
-        m_callback.clientCallback(clientResponse);
+        m_lastCallback.clientCallback(clientResponse);
+    }
+
+    public void pokeAllPendingCallbacks(final byte status, final String message) throws Exception
+    {
+        synchronized (m_lock) {
+            ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
+            while (!m_callbacks.isEmpty()) {
+                ProcedureCallback callback = m_callbacks.poll();
+                callback.clientCallback(clientResponse);
+            }
+        }
     }
 
     public void setNextReturn(boolean retval)
