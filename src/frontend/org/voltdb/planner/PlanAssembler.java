@@ -247,6 +247,19 @@ public class PlanAssembler {
             }
 
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+
+            // Process the GROUP BY information, decide whether it is group by the partition column
+            for (ParsedColInfo groupbyCol: m_parsedSelect.m_groupByColumns) {
+                StmtTableScan scanTable = m_parsedSelect.m_tableAliasMap.get(groupbyCol.tableAlias);
+                // table alias may be from "VOLT_TEMP_TABLE".
+                if (scanTable != null && scanTable.getPartitioningColumns() != null) {
+                    for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+                        if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
+                            m_parsedSelect.setHasPartitionColumnInGroupby();
+                        }
+                    }
+                }
+            }
             return;
         }
 
