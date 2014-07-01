@@ -109,6 +109,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         m_username = username;
 
+        if (config.m_reconnectOnConnectionLoss) {
+            m_distributer.addClientStatusListener(new ReconnectStatusListener(this,
+                    config.m_initialConnectionRetryIntervalMS, config.m_maxConnectionRetryIntervalMS));
+        }
+
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
         } else {
