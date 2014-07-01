@@ -125,7 +125,7 @@ public class ClientThread extends Thread {
 
     void runOne() throws Exception {
         // 1/10th of txns roll back
-        byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 0 : 0); // XXX PSR 1 : 0);
+        byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
 
         try {
             String procName = null;
