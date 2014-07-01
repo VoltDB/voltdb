@@ -23,7 +23,8 @@
 #include <string>
 #include <queue>
 #include <vector>
-#include <boost/smart_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/shared_array.hpp>
 
 namespace voltdb {
 class Table;
