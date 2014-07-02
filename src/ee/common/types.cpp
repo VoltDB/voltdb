@@ -372,7 +372,7 @@ string planNodeToString(PlanNodeType type)
         return "UPDATE";
     }
     case PLAN_NODE_TYPE_INSERT: {
-        return "DELETE";
+        return "INSERT";
     }
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
@@ -393,7 +393,7 @@ string planNodeToString(PlanNodeType type)
         return "UNION";
     }
     case PLAN_NODE_TYPE_ORDERBY: {
-        return "RECEIVE";
+        return "ORDERBY";
     }
     case PLAN_NODE_TYPE_PROJECTION: {
         return "PROJECTION";
