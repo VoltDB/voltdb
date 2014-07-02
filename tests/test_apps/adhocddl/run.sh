@@ -39,7 +39,9 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
-        src/*.java \
+        src/*.java 
+    java -classpath obj:$CLASSPATH:obj Initializer \
+         --numOfTables=200
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -47,7 +49,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml 
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
