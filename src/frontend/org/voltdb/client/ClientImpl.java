@@ -109,6 +109,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         m_username = username;
 
+        if (config.m_reconnectOnConnectionLoss) {
+            m_reconnectStatusListener = new ReconnectStatusListener(this,
+                    config.m_initialConnectionRetryIntervalMS, config.m_maxConnectionRetryIntervalMS);
+            m_distributer.addClientStatusListener(m_reconnectStatusListener);
+        } else {
+            m_reconnectStatusListener = null;
+        }
+
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
         } else {
@@ -484,6 +492,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         synchronized (m_backpressureLock) {
             m_backpressureLock.notifyAll();
         }
+
+        if (m_reconnectStatusListener != null) {
+            m_distributer.removeClientStatusListener(m_reconnectStatusListener);
+        }
+
         m_distributer.shutdown();
     }
 
@@ -575,6 +588,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private boolean m_backpressure = false;
 
     private boolean m_blockingQueue = true;
+
+    private final ReconnectStatusListener m_reconnectStatusListener;
 
     @Override
     public void configureBlocking(boolean blocking) {
