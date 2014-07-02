@@ -386,6 +386,18 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        String msg = "no exception thrown";
+        try {
+            client.callProcedure("@AdHoc", stmt);
+        }
+        catch (ProcCallException pce) {
+            msg = pce.getMessage();
+        }
+
+        assertTrue(msg.contains(expectedMsg));
+    }
+
 
     // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
