@@ -17,9 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
@@ -83,8 +83,8 @@ public class ReplaySequencer
         FragmentTaskMessage m_firstFragment = null;
         CompleteTransactionMessage m_lastFragment = null;
 
-        private Deque<VoltMessage> m_blockedMessages = new ArrayDeque<VoltMessage>();
-        private Deque<VoltMessage> m_sequencedMessages = new ArrayDeque<VoltMessage>();
+        private Deque<VoltMessage> m_blockedMessages = new LinkedList<VoltMessage>();
+        private Deque<VoltMessage> m_sequencedMessages = new LinkedList<VoltMessage>();
         private boolean m_servedFragment = false;
 
         boolean isReady()
