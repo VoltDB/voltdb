@@ -256,8 +256,12 @@ public class PlanAssembler {
                     for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
                         if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
                             m_parsedSelect.setHasPartitionColumnInGroupby();
+                            break;
                         }
                     }
+                }
+                if (m_parsedSelect.hasPartitionColumnInGroupby()) {
+                    break;
                 }
             }
             return;
