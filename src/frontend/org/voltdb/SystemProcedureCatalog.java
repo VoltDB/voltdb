@@ -156,7 +156,7 @@ public class SystemProcedureCatalog {
         builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@ValidatePartitioning",    new Config("org.voltdb.sysprocs.ValidatePartitioning",     false, false, false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0, VoltType.INVALID,   true,  false, true,  true, false));
-        builder.put("@ApplyBinaryLog",          new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         false, false, false, 0, VoltType.VARBINARY, true,  false, true,  true, true));
+        builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true, false, false, 0, VoltType.VARBINARY, true,  false, true,  true, true));
         listing = builder.build();
     }
 }

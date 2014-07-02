@@ -323,6 +323,7 @@ var IVoltDB = (function(){
                                                   , '@Promote': { '0' : ['Returns bit'] }
                                                   , '@ValidatePartitioning': { '2' : ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                                                   , '@GetPartitionKeys': { '1' : ['VoltType (varchar)', 'Returns Table[]'] }
+                                                  , '@ApplyBinaryLogSP': { '2' : ['Partition (varbinary)', 'log (varbinary)', 'Returns Table[]'] }
                                                   };
 
                 /*

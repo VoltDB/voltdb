@@ -35,6 +35,7 @@
 #include "common/tabletuple.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "storage/tableiterator.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
@@ -347,6 +348,12 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Should have one row from the insert
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+
+    TableIterator iterator = districtTableReplica->iterator();
+    ASSERT_TRUE(iterator.hasNext());
+    TableTuple nextTuple(districtTableReplica->schema());
+    iterator.next(nextTuple);
+    EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
     engine->setupForPlanFragments( NULL, 100, 100, 99, 72);

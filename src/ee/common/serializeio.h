@@ -451,12 +451,6 @@ protected:
     size_t capacity_;
 };
 
-//class SerializeInputBE : public SerializeInput<BYTE_ORDER_BIG_ENDIAN> {};
-//class SerializeInputLE : public SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> {};
-
-//typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
-//typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
-
 /** Implementation of SerializeInput that references an existing buffer. */
 template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
 public:
@@ -467,25 +461,6 @@ public:
     // Destructor does nothing: nothing to clean up!
     virtual ~ReferenceSerializeInput() {}
 };
-
-//class ReferenceSerializeInputBE : public SerializeInputBE {
-//public:
-//    ReferenceSerializeInputBE(const void* data, size_t length) {
-//        this->initialize(data, length);
-//    }
-//    virtual ~ReferenceSerializeInputBE() {}
-//};
-//
-//class ReferenceSerializeInputLE : public SerializeInputLE {
-//public:
-//    ReferenceSerializeInputLE(const void* data, size_t length) {
-//        this->initialize(data, length);
-//    }
-//    virtual ~ReferenceSerializeInputLE() {}
-//};
-
-//typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
-//typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
 
 /** Implementation of SerializeInput that makes a copy of the buffer. */
 template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
@@ -501,34 +476,6 @@ public:
 private:
     ByteArray bytes_;
 };
-
-//class CopySerializeInputBE : public SerializeInputBE {
-//public:
-//    CopySerializeInputBE(const void* data, size_t length) :
-//            bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-//        this->initialize(bytes_.data(), static_cast<int>(length));
-//    }
-//
-//    virtual ~CopySerializeInputBE() {}
-//
-//private:
-//    ByteArray bytes_;
-//};
-//class CopySerializeInputLE : public SerializeInputLE {
-//public:
-//    CopySerializeInputLE(const void* data, size_t length) :
-//            bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-//        this->initialize(bytes_.data(), static_cast<int>(length));
-//    }
-//
-//    virtual ~CopySerializeInputLE() {}
-//
-//private:
-//    ByteArray bytes_;
-//};
-
-//typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
-//typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
 
 #ifndef SERIALIZE_IO_DECLARATIONS
 #define SERIALIZE_IO_DECLARATIONS
