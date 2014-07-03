@@ -256,9 +256,9 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
+     * <p>Experimental: Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
      *
-     * @param on Enable or disable the reconnection feature.
+     * @param on Enable or disable the reconnection feature. Default is off.
      */
     public void setReconnectOnConnectionLoss(boolean on) {
         this.m_reconnectOnConnectionLoss = on;
