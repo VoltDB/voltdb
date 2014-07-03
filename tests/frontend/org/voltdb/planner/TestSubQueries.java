@@ -280,10 +280,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
     }
 
-    public void testTry() {
-
-    }
-
     public void testFunctions() {
         AbstractPlanNode pn;
         String tbName = "T1";
