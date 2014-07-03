@@ -555,7 +555,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
         }
         else {
             std::string defaultValue = column->defaultvalue();
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
+            // this could probably use the temporary string pool instead?
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, ValueFactory::USE_LONG_TERM_STORAGE);
         }
 
         // find a source column in the existing table, if one exists
@@ -641,27 +642,25 @@ void TableCatalogDelegate::deleteCommand()
     }
 }
 
-namespace {
-    bool isDefaultNow(const std::string& defaultValue) {
-        std::vector<std::string> tokens;
-        boost::split(tokens, defaultValue, boost::is_any_of(":"));
-        if (tokens.size() != 2) {
-            return false; 
-        }
-
-        int funcId = boost::lexical_cast<int>(tokens[1]);
-        if (funcId == FUNC_CURRENT_TIMESTAMP) {
-            return true;
-        }
-
+static bool isDefaultNow(const std::string& defaultValue) {
+    std::vector<std::string> tokens;
+    boost::split(tokens, defaultValue, boost::is_any_of(":"));
+    if (tokens.size() != 2) {
         return false;
     }
+    
+    int funcId = boost::lexical_cast<int>(tokens[1]);
+    if (funcId == FUNC_CURRENT_TIMESTAMP) {
+        return true;
+    }
+    
+    return false;
 }
 
-void TableCatalogDelegate::initTemplateTuple(catalog::Table const &catalogTable, TableTuple& tbTuple) {
+void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
-    for (colIter = catalogTable.columns().begin();
-         colIter != catalogTable.columns().end();
+    for (colIter = catalogTable->columns().begin();
+         colIter != catalogTable->columns().end();
          colIter++) {
 
         // TODO an optimization: can skip over the fields which will be
@@ -670,27 +669,33 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const &catalogTable,
         catalog::Column *col = colIter->second;
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
+        std::cerr << "initializing template tuple!\n" << std::endl;
+
+
         switch (defaultColType) {
         case VALUE_TYPE_INVALID:
             tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
             break;
-
-        default:
-            {
-                // apparently default value type may be different from the
-                // column type. Do we need to create a cast and evaluate
-                // it here if they are different?
-                
-                std::string defaultValueStr = col->defaultvalue();
-                if (defaultColType == VALUE_TYPE_TIMESTAMP && isDefaultNow(defaultValueStr)) {
-                    tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
-                } else {
-                    NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValueStr);
-                    tbTuple.setNValue(col->index(), defaultValue);
-                }
+            
+        case VALUE_TYPE_TIMESTAMP:
+            if (isDefaultNow(col->defaultvalue())) {
+                tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+                break;
             }
+            // else, fall through to default case
+        default:
+
+            if (col->defaulttype() != col->type()) {
+                std::cerr << "mismatched default!!\n" << std::endl;
+                throwFatalException("found mismatched type for column %s:\ncolumn: %d\ndefault: %d", col->name().c_str(), col->defaulttype(), col->type());
+            }
+
+            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType, 
+                                                                         col->defaultvalue(), 
+                                                                         ValueFactory::USE_TEMP_STORAGE);
+            tbTuple.setNValue(col->index(), defaultValue);
             break;
-        }        
+        }
     }
 }
 

@@ -112,11 +112,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
     // we need to use the schema of the target table here, not the input table
-    // Use the "temp tuple"... is that ok? xxx 
     TableTuple &templateTuple = targetTable->tempTuple();
-    m_node->getTargetTableDelegate()->initTemplateTuple(*m_engine->getCatalogTable(m_node->getTargetTableName()),
-                                                        templateTuple);
-
+    m_node->initTemplateTuple(m_engine, templateTuple);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 #ifdef DEBUG
@@ -164,6 +161,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
+
+                std::cerr << "site not local, with nvalue " << value.debug() << std::endl;
+
                 if (!m_multiPartition) {
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),

@@ -39,7 +39,9 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -961,12 +963,63 @@ public class PlanAssembler {
             // the tuple that gets the result of the cast can be properly formatted as inline.
             // A too-wide value survives the cast (to generic VARCHAR of any length) but the
             // attempt to cache the result in the inline temp tuple storage will throw an early
-            // runtime error on bahalf of the target table column.
+            // runtime error on be  half of the target table column.
             // The important thing here is to leave the formatting hint in the output schema that
             // drives the temp tuple layout.
             expr.setValueSize(column.getSize());
         }
 
+        return expr;
+    }
+
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, name , id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
         return expr;
     }
 
@@ -986,12 +1039,24 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
+        CatalogMap<Column> targetTableColumns = targetTable.getColumns();
 
-        for (Column col : targetTable.getColumns()) {
+        for (Column col : targetTableColumns) {
             boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
             if (needsValue && !m_parsedInsert.columns.containsKey(col)) {
                 throw new PlanningErrorException("Column " + col.getName()
                         + " has no default and is not nullable.");
+            }
+
+            // hint that this statement can be executed SP.
+            if (col.equals(m_partitioning.getPartitionColForDML())) {
+                AbstractExpression expr = m_parsedInsert.columns.get(col);
+                if (expr == null) {
+                    expr = defaultValueToExpr(col);
+                }
+
+                String fullColumnName = targetTable.getTypeName() + "." + col.getTypeName();
+                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
         }
 
@@ -1009,14 +1074,18 @@ public class PlanAssembler {
         int i = 0;
         for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.columns.entrySet()) {
             Column col = e.getKey();
+
             AbstractExpression valExpr = e.getValue();
             fieldMap[i] = col.getIndex();
+
+            valExpr.setInBytes(col.getInbytes());
 
             // Patch over any mismatched expressions with an explicit cast.
             // Most impossible-to-cast type combinations should have already been caught by the
             // parser, but there are also runtime checks in the casting code
             // -- such as for out of range values.
             valExpr = castExprIfNeeded(valExpr, col);
+
             matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                     "VOLT_TEMP_TABLE",
                     col.getTypeName(),
@@ -1035,8 +1104,8 @@ public class PlanAssembler {
         insertNode.addAndLinkChild(matNode);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-           insertNode.setMultiPartition(false);
-           return insertNode;
+            insertNode.setMultiPartition(false);
+            return insertNode;
         }
 
         insertNode.setMultiPartition(true);

@@ -32,6 +32,12 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
+    /**
+     * A hash of the columns that were provided in the insert stmt,
+     * and the corresponding values that were provided.  It is a
+     * linked hash map so we retain the order in which the user
+     * specified the columns.
+     */
     public LinkedHashMap<Column, AbstractExpression> columns = new LinkedHashMap<Column, AbstractExpression>();
 
     /**

@@ -1,61 +1,45 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2014 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlInsertSuite extends RegressionSuite {
 
-    final long NULL_VALUE = -1;
-
-    private void verifyResult(ClientResponse resp, long... args) {
-
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable vt = resp.getResults()[0];
-
-        assertTrue(vt.advanceRow());
-        for (int i = 0; i < args.length; ++i) {
-            if (args[i] == NULL_VALUE) {
-                vt.getLong(i);
-                assertTrue(vt.wasNull());
-            } else {
-                assertEquals(args[i], vt.getLong(i));
-            }
-        }
-    }
-
-    private void validateInsertStmt(String insertStmt, long... expectedValues) throws IOException, ProcCallException {
-        Client client = getClient();
-        ClientResponse cr;
-
-        cr = client.callProcedure("@AdHoc", insertStmt);
-        verifyResult(cr, 1);
-        cr = client.callProcedure("selectAll");
-        verifyResult(cr, expectedValues);
-        cr = client.callProcedure("deleteAll");
-        verifyResult(cr, 1);
-    }
-
-    private void verifyFails(String stmt, String expectedMsg) throws IOException {
+    private void validateInsertStmt(String insertStmt, long... expectedValues) throws Exception {
         Client client = getClient();
 
-        String msg = "no exception thrown";
-        try {
-            client.callProcedure("@AdHoc", stmt);
-        }
-        catch (ProcCallException pce) {
-            msg = pce.getMessage();
-        }
-
-        assertTrue(msg.contains(expectedMsg));
+        validateTableOfLongs(client, insertStmt, new long[][] {{1}});
+        validateTableOfLongs(client, "select * from p1", new long[][] {expectedValues});
+        validateTableOfLongs(client, "delete from p1;", new long[][] {{1}});
     }
 
-    public void testInsert() throws IOException, ProcCallException
+    public void testInsert() throws Exception
     {
 
         // test with no fields provided (all column values must be provided)
@@ -63,7 +47,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 1, 2, 3, 4, 5, 6);
 
         // not enough values
-        verifyFails("insert into p1 values (1, 2, 3);", "row column count mismatch");
+        verifyStmtFails(getClient(), "insert into p1 values (1, 2, 3);", "row column count mismatch");
 
         // test with all fields specified (in order)
         validateInsertStmt("insert into p1 (ccc, bbb, aaa, zzz, yyy, xxx) values (1, 2, 3, 4, 5, 6);",
@@ -75,7 +59,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
 
         // test with some fields specified (in order)
         validateInsertStmt("insert into p1 (bbb, aaa, zzz) values (1024, 2048, 4096);",
-                10, 1024, 2048, 4096, 14, NULL_VALUE);
+                10, 1024, 2048, 4096, 14, Long.MIN_VALUE);
 
         // test with some fields specified with permuted order
         validateInsertStmt("insert into p1 (zzz, bbb, xxx) values (555, 666, 777);",
@@ -83,10 +67,10 @@ public class TestSqlInsertSuite extends RegressionSuite {
 
         // test with no values provided for NOT NULL columns
         // explicitly set not null field to null.
-        verifyFails("insert into p1 (ccc, zzz) values (null, 7);", "CONSTRAINT VIOLATION");
+        verifyStmtFails(getClient(), "insert into p1 (ccc, zzz) values (null, 7);", "CONSTRAINT VIOLATION");
 
         // try to insert into not null column with no default value
-        verifyFails("insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
+        verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
     }
 
     //
@@ -99,8 +83,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestSqlInsertSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSqlInsertSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE P1 ( " +
@@ -123,6 +106,12 @@ public class TestSqlInsertSuite extends RegressionSuite {
             assertFalse(true);
         }
         boolean success;
+
+//        config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_IPC);
+//        success = config.compile(project);
+//        assert(success);
+//        builder.addServerConfig(config);
+
         config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
