@@ -1,0 +1,40 @@
+<project>
+
+    <target name="clean">
+        <delete includeEmptyDirs="true" dir="build"/>
+        <delete includeEmptyDirs="true" dir="moveme"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="build/classes"/>
+	   <javac includeantruntime="false" srcdir="src" destdir="build/classes">
+          <classpath path="/Users/zz/workspace/voltdb/obj/release/prod/"/>
+	   </javac>
+	</target>
+
+    <target name="jar" depends="clean,compile">
+        <mkdir dir="build/jar"/>
+        <jar destfile="build/jar/MeshMonitor.jar">
+        	<fileset dir="build/classes"/>
+        	<fileset dir="/Users/zz/workspace/voltdb/obj/release/prod"
+            />
+            <manifest>
+                <attribute name="Main-Class" value="MeshMonitor"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="run" depends="jar">
+        <java jar="build/jar/MeshMonitor.jar" fork="true"/>
+        <java jar="build/jar/MeshMonitor.jar" fork="true">
+		<!---arg line="20 10 localhost:12222"/-->
+	</java>
+    </target>
+
+    <target name="movedir" depends="clean,jar">
+        <mkdir dir="moveme"/>
+        <copy file="meshmonitorhelper.sh" tofile="moveme/meshmonitorhelper.sh"/>
+        <copy file="build/jar/MeshMonitor.jar" tofile="moveme/meshmonitor.jar"/>
+        <copy file="README" tofile="moveme/README"/>
+    </target>
+</project>
