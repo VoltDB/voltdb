@@ -40,8 +40,6 @@ function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
         src/*.java 
-    java -classpath obj:$CLASSPATH:obj Initializer \
-         --numOfTables=200
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -49,6 +47,10 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
+    java -classpath obj:$CLASSPATH:obj Initializer \
+         --numOfTables=100 \
+         --numOfCols=50 \
+         --idxPercent=0.1 
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
@@ -65,11 +67,11 @@ function server() {
 # run the client that drives the example
 function client() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj AdhocDDLBenchmark \
+    java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
         --servers=localhost \
-        --duration=180 \
-        --warehouses=256 \
-        --scalefactor=22
+        --numOfTests=20 \
+        --numOfCols=50 \
+        --idxPercent=0.1 
 }
 
 function help() {

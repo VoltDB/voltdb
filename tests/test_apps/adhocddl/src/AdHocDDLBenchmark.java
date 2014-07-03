@@ -78,9 +78,17 @@ public class AdHocDDLBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Median number of Columns in randomly generated tables")
+        int numOfCols = 50;
+
+        @Option(desc = "Percentage of indexed columns in the ramdonly generated table")
+        double idxPercent = 0.1;
+
         @Override
         public void validate() {
-            if (numOfTests <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (numOfTests <= 0) exitWithMessageAndUsage("numOfTests must be > 0");
+            if (numOfCols <= 0) exitWithMessageAndUsage("numOfCols must be > 0");
+            if (idxPercent <= 0) exitWithMessageAndUsage("duration must be > 0");
         }
     }
 
@@ -107,7 +115,7 @@ public class AdHocDDLBenchmark {
      * @throws UnknownHostException
      */
     public AdHocDDLBenchmark(BenchmarkConfig config) throws UnknownHostException, IOException {
-        DDLGen = new DDLGenerator();
+        DDLGen = new DDLGenerator(config.numOfCols, config.idxPercent);
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
@@ -208,20 +216,20 @@ public class AdHocDDLBenchmark {
         connect(config.servers);
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Running Benchmark");
+        System.out.println(" Statistics ");
         System.out.println(HORIZONTAL_RULE);
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
 
-        ClientStats stats = fullStatsContext.fetch().getStats();
-        System.out.println(stats.getInvocationsCompleted());
         // create/start the requested number of threads
         for(int i = 0; i < config.numOfTests; i++)
         {
             runTest(i);
+            ClientStats stats = fullStatsContext.fetch().getStats();
+            System.out.println("Current Average Latency: " + stats.getAverageLatency());
         }
-        stats = fullStatsContext.fetch().getStats();
+        ClientStats stats = fullStatsContext.fetch().getStats();
         System.out.println("Average Latency: " + stats.getAverageLatency());
         System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
 
