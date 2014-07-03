@@ -44,11 +44,11 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
 
-        int64_t __attribute__ ((unused)) tableHandle = 0;
-        int64_t __attribute__ ((unused)) txnId = 0;
-        int64_t __attribute__ ((unused)) spHandle = 0;
-        uint32_t __attribute__ ((unused)) checksum = 0;
-        const char * __attribute__ ((unused)) rowData = NULL;
+        int64_t tableHandle = 0;
+        int64_t  __attribute__ ((unused)) txnId = 0;
+        int64_t  __attribute__ ((unused)) spHandle = 0;
+        uint32_t checksum = 0;
+        const char * rowData = NULL;
         switch (type) {
         case DR_RECORD_DELETE:
         case DR_RECORD_INSERT: {
@@ -65,7 +65,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             PersistentTable *table = tableIter->second;
 
-            TableTuple __attribute__ ((unused)) tempTuple = table->tempTuple();
+            TableTuple tempTuple = table->tempTuple();
 
             ReferenceSerializeInputLE rowInput(rowData,  rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
