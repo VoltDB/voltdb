@@ -465,7 +465,7 @@ PARAMETER
     0
 ;
 
-PARTITION PROCEDURE NotAnnotatedEmptyProcedure 
+PARTITION PROCEDURE testCreateProcFromClassProc 
 ON 
 TABLE 
     T26 

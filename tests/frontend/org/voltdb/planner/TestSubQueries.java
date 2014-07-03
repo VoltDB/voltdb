@@ -35,7 +35,6 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -453,9 +452,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A", "D" );
         checkPredicateComparisonExpression(pn, "R1");
@@ -473,9 +472,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A", "D" );
         checkPredicateComparisonExpression(pn, "R1");
@@ -495,9 +494,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A", "D" );
         checkPredicateComparisonExpression(pn, "R1");
@@ -518,9 +517,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A", "D" );
         checkPredicateComparisonExpression(pn, "R1");
@@ -537,9 +536,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         assertTrue(pn instanceof SeqScanPlanNode);
@@ -557,9 +556,9 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         assertTrue(pn instanceof SeqScanPlanNode);
@@ -1344,28 +1343,24 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         assertTrue(pn instanceof ReceivePlanNode);
 
-        pn = planNodes.get(1);
-        assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        pn = planNodes.get(1).getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "SP4");
-
 
 
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT A, C FROM P1 LIMIT 3) T1 " +
                 "where T1.A = 1 ");
         assertEquals(2, planNodes.size());
-
     }
 
     public void testPartitionedAlias() {

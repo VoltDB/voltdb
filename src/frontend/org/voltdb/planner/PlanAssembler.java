@@ -245,8 +245,24 @@ public class PlanAssembler {
                 // End of the recursion. Nothing to simplify
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
-
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+
+            // Process the GROUP BY information, decide whether it is group by the partition column
+            for (ParsedColInfo groupbyCol: m_parsedSelect.m_groupByColumns) {
+                StmtTableScan scanTable = m_parsedSelect.m_tableAliasMap.get(groupbyCol.tableAlias);
+                // table alias may be from "VOLT_TEMP_TABLE".
+                if (scanTable != null && scanTable.getPartitioningColumns() != null) {
+                    for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+                        if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
+                            m_parsedSelect.setHasPartitionColumnInGroupby();
+                            break;
+                        }
+                    }
+                }
+                if (m_parsedSelect.hasPartitionColumnInGroupby()) {
+                    break;
+                }
+            }
             return;
         }
 
@@ -1294,27 +1310,44 @@ public class PlanAssembler {
             // ensure the order of the data on each partition.
             distributedPlan = handleOrderBy(distributedPlan);
 
-            // Apply the distributed limit.
-            distLimit.addAndLinkChild(distributedPlan);
-
-            // Add the distributed work back to the plan
-            sendNode.addAndLinkChild(distLimit);
+            if (distributedPlan instanceof OrderByPlanNode) {
+                // Inline the distributed limit.
+                distributedPlan.addInlinePlanNode(distLimit);
+                sendNode.addAndLinkChild(distributedPlan);
+            } else {
+                distLimit.addAndLinkChild(distributedPlan);
+                // Add the distributed work back to the plan
+                sendNode.addAndLinkChild(distLimit);
+            }
         }
+
+        // In future, inline LIMIT for aggregate node, join, Receive
+        // Then we do not need to distinguish the order by node.
 
         // Switch if has Complex aggregations
-        AbstractPlanNode projectionNode = root;
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
-            projectionNode.clearChildren();
-            child.clearParents();
-
-            topLimit.addAndLinkChild(child);
-            projectionNode.addAndLinkChild(topLimit);
-            return projectionNode;
+            if (child instanceof OrderByPlanNode) {
+                child.addInlinePlanNode(topLimit);
+            } else {
+                // In future, inline LIMIT for aggregate node
+                root.clearChildren();
+                child.clearParents();
+                topLimit.addAndLinkChild(child);
+                root.addAndLinkChild(topLimit);
+            }
         } else {
-            topLimit.addAndLinkChild(root);
-            return topLimit;
+            if (root instanceof OrderByPlanNode) {
+                root.addInlinePlanNode(topLimit);
+            } else if (root instanceof ProjectionPlanNode &&
+                    root.getChild(0) instanceof OrderByPlanNode) {
+                root.getChild(0).addInlinePlanNode(topLimit);
+            } else {
+                topLimit.addAndLinkChild(root);
+                root = topLimit;
+            }
         }
+        return root;
     }
 
 
