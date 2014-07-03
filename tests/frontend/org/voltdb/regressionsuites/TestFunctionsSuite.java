@@ -836,7 +836,8 @@ public class TestFunctionsSuite extends RegressionSuite {
                 System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() +
                         " rows, where only 2 were expected:");
                 System.out.println(r.toString());
-                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
             }
 
             cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");
