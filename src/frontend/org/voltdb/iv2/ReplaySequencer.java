@@ -83,8 +83,19 @@ public class ReplaySequencer
         FragmentTaskMessage m_firstFragment = null;
         CompleteTransactionMessage m_lastFragment = null;
 
+        /**
+         * Queue up all sp invocations in this queue before the {@link CompleteTransactionMessage} for
+         * this entry's transaction is received
+         */
         private Deque<VoltMessage> m_blockedMessages = new LinkedList<VoltMessage>();
+
+        /**
+         * If required queue up all this transaction MP fragments in this queue. Move all the
+         * blocked SP invocations here once the {@link CompleteTransactionMessage} for this
+         * entry's transaction is received
+         */
         private Deque<VoltMessage> m_sequencedMessages = new LinkedList<VoltMessage>();
+
         private boolean m_servedFragment = false;
 
         boolean isReady()
@@ -97,6 +108,13 @@ public class ReplaySequencer
             return m_sentinalTxnId != null;
         }
 
+        /**
+         * Queue it up in the {@link ReplayEntry#m_blockedMessages} queue
+         * before the {@link CompleteTransactionMessage} for this entry's transaction is received.
+         * Otherwise add it straight to the {@link ReplayEntry#m_sequencedMessages} queue.
+         *
+         * @param m an SP invocation message
+         */
         void addBlockedMessage(VoltMessage m)
         {
             if (m_lastFragment == null)
@@ -109,13 +127,19 @@ public class ReplaySequencer
             }
         }
 
+        /**
+         * If not already done, drain all blocked sps in to the sequenced queue
+         * @param msg a {@link CompleteTransactionMessage}
+         */
         void markLastFragment(CompleteTransactionMessage msg)
         {
-            if (m_lastFragment == null) {
+            if (m_lastFragment == null)
+            {
                 m_lastFragment = msg;
 
                 Iterator<VoltMessage> blocked = m_blockedMessages.iterator();
-                while (blocked.hasNext()) {
+                while (blocked.hasNext())
+                {
                     m_sequencedMessages.addLast(blocked.next());
                     blocked.remove();
                 }
@@ -127,7 +151,7 @@ public class ReplaySequencer
             m_sequencedMessages.addLast(m);
         }
 
-        void addCommpletedMessage(CompleteTransactionMessage msg)
+        void addCompletedMessage(CompleteTransactionMessage msg)
         {
             m_sequencedMessages.addLast(msg);
             markLastFragment(msg);
@@ -382,7 +406,7 @@ public class ReplaySequencer
                 return false;
             }
             if (found != null && found.m_firstFragment != null) {
-                found.addCommpletedMessage(ctm);
+                found.addCompletedMessage(ctm);
             }
             else {
                 // Always expect to see the fragment first, but there are places in the protocol
