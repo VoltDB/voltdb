@@ -1856,7 +1856,7 @@ public class Scanner {
     	if (s.length() == 10) {
     		return newDate(s);
     	}
-		// End of VoltDB extension
+        // End of VoltDB extension
 
         long    zoneSeconds = 0;
         long    seconds;
