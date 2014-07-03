@@ -1,0 +1,90 @@
+Buildfile: /home/yhe/workspace/voltdb/build.xml
+
+junitclass:
+     [exec] tar: Removing leading `/' from member names
+
+junit_onesuite:
+    [junit] Testsuite: org.voltdb.fullddlfeatures.TestDDLFeatures
+    [junit]   Running org.voltdb.fullddlfeatures.TestDDLFeatures
+    [junit] 2014-06-26 18:19:37,212   INFO  [main] COMPILER: Path to catalog /home/yhe/workspace/voltdb/obj/release/test/org/voltdb/fullddlfeatures/fullDDL.sql
+    [junit] 2014-06-26 18:19:37,889   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: AREA on table: T1 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,891   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: ABSVAL on table: T2 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,892   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: ABS_HASH_IDX on table: T3 of type: HASH_TABLE
+    [junit] 2014-06-26 18:19:37,892   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: NOMEANINGHASHWEIRDIDX on table: T3 of type: HASH_TABLE
+    [junit] 2014-06-26 18:19:37,892   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: STRMATCH on table: T3 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,894   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_PK_T4_C1_C9 on table: T4 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,895   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_PK_T9_C1 on table: T9 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,895   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T9_C2 on table: T9 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,895   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_CON on table: T10 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,896   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK1 on table: T11 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,896   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_AU on table: T12 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,896   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK2 on table: T13 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,897   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_UNI1 on table: T14 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,897   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_ASSUMEUNI on table: T15 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,898   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_PK_T17_C on table: T17 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,898   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T18_C on table: T18 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,899   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T19_C on table: T19 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,900   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T21_C6 on table: T21 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,900   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T21_C1_C9 on table: T21 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,901   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T22_C1 on table: T22 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,901   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T22_C6 on table: T22 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,901   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T22_C1_C9 on table: T22 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,903   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_HASH_PK on table: T23 of type: HASH_TABLE
+    [junit] 2014-06-26 18:19:37,903   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_CONSTRAINT_IDX_UNI2 on table: T23 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,903   INFO  [main] COMPILER: [myApp9197203542118784455.tmp]: Created index: VOLTDB_AUTOGEN_IDX_CT_T23_C2 on table: T23 of type: BALANCED_TREE
+    [junit] 2014-06-26 18:19:37,923   INFO  [main] COMPILER: [T1.insert]: Compiling Statement: INSERT INTO T1 VALUES (?, ?, ?);
+    [junit] 2014-06-26 18:19:37,944   INFO  [main] COMPILER: [T10.insert]: Compiling Statement: INSERT INTO T10 VALUES (?);
+    [junit] 2014-06-26 18:19:37,945   INFO  [main] COMPILER: [T11.insert]: Compiling Statement: INSERT INTO T11 VALUES (?);
+    [junit] 2014-06-26 18:19:37,947   INFO  [main] COMPILER: [T11.delete]: Compiling Statement: DELETE FROM T11 WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,954   INFO  [main] COMPILER: [T11.update]: Compiling Statement: UPDATE T11 SET C = ? WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,958   INFO  [main] COMPILER: [T11.upsert]: Compiling Statement: UPSERT INTO T11 VALUES (?);
+    [junit] 2014-06-26 18:19:37,961   INFO  [main] COMPILER: [T12.insert]: Compiling Statement: INSERT INTO T12 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:37,962   INFO  [main] COMPILER: [T13.insert]: Compiling Statement: INSERT INTO T13 VALUES (?);
+    [junit] 2014-06-26 18:19:37,964   INFO  [main] COMPILER: [T13.delete]: Compiling Statement: DELETE FROM T13 WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,967   INFO  [main] COMPILER: [T13.update]: Compiling Statement: UPDATE T13 SET C = ? WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,969   INFO  [main] COMPILER: [T13.upsert]: Compiling Statement: UPSERT INTO T13 VALUES (?);
+    [junit] 2014-06-26 18:19:37,971   INFO  [main] COMPILER: [T14.insert]: Compiling Statement: INSERT INTO T14 VALUES (?);
+    [junit] 2014-06-26 18:19:37,973   INFO  [main] COMPILER: [T15.insert]: Compiling Statement: INSERT INTO T15 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:37,974   INFO  [main] COMPILER: [T16.insert]: Compiling Statement: INSERT INTO T16 VALUES (?);
+    [junit] 2014-06-26 18:19:37,975   INFO  [main] COMPILER: [T17.insert]: Compiling Statement: INSERT INTO T17 VALUES (?);
+    [junit] 2014-06-26 18:19:37,977   INFO  [main] COMPILER: [T17.delete]: Compiling Statement: DELETE FROM T17 WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,979   INFO  [main] COMPILER: [T17.update]: Compiling Statement: UPDATE T17 SET C = ? WHERE (C = ?);
+    [junit] 2014-06-26 18:19:37,982   INFO  [main] COMPILER: [T17.upsert]: Compiling Statement: UPSERT INTO T17 VALUES (?);
+    [junit] 2014-06-26 18:19:37,983   INFO  [main] COMPILER: [T18.insert]: Compiling Statement: INSERT INTO T18 VALUES (?);
+    [junit] 2014-06-26 18:19:37,984   INFO  [main] COMPILER: [T19.insert]: Compiling Statement: INSERT INTO T19 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:37,985   INFO  [main] COMPILER: [T2.insert]: Compiling Statement: INSERT INTO T2 VALUES (?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:37,986   INFO  [main] COMPILER: [T20.insert]: Compiling Statement: INSERT INTO T20 VALUES (?);
+    [junit] 2014-06-26 18:19:37,988   INFO  [main] COMPILER: [T21.insert]: Compiling Statement: INSERT INTO T21 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:37,990   INFO  [main] COMPILER: [T22.insert]: Compiling Statement: INSERT INTO T22 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:37,992   INFO  [main] COMPILER: [T23.insert]: Compiling Statement: INSERT INTO T23 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:37,995   INFO  [main] COMPILER: [T23.delete]: Compiling Statement: DELETE FROM T23 WHERE (C1 = ?) AND (C5 = ?);
+    [junit] 2014-06-26 18:19:37,998   INFO  [main] COMPILER: [T23.update]: Compiling Statement: UPDATE T23 SET C1 = ?, C2 = ?, C3 = ?, C4 = ?, C5 = ?, C6 = ?, C7 = ?, C8 = ?, C9 = ? WHERE (C1 = ?) AND (C5 = ?);
+    [junit] 2014-06-26 18:19:38,003   INFO  [main] COMPILER: [T23.upsert]: Compiling Statement: UPSERT INTO T23 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:38,006   INFO  [main] COMPILER: [T24.insert]: Compiling Statement: INSERT INTO T24 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:38,007   INFO  [main] COMPILER: [T26.insert]: Compiling Statement: INSERT INTO T26 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:38,008   INFO  [main] COMPILER: [T27.insert]: Compiling Statement: INSERT INTO T27 VALUES (?);
+    [junit] 2014-06-26 18:19:38,009   INFO  [main] COMPILER: [T3.insert]: Compiling Statement: INSERT INTO T3 VALUES (?, ?, ?);
+    [junit] 2014-06-26 18:19:38,011   INFO  [main] COMPILER: [T4.insert]: Compiling Statement: INSERT INTO T4 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:38,013   INFO  [main] COMPILER: [T4.delete]: Compiling Statement: DELETE FROM T4 WHERE (C1 = ?) AND (C9 = ?);
+    [junit] 2014-06-26 18:19:38,015   INFO  [main] COMPILER: [T4.update]: Compiling Statement: UPDATE T4 SET C1 = ?, C2 = ?, C3 = ?, C4 = ?, C5 = ?, C6 = ?, C7 = ?, C8 = ?, C9 = ?, C10 = ? WHERE (C1 = ?) AND (C9 = ?);
+    [junit] 2014-06-26 18:19:38,019   INFO  [main] COMPILER: [T4.upsert]: Compiling Statement: UPSERT INTO T4 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    [junit] 2014-06-26 18:19:38,022   INFO  [main] COMPILER: [T5.insert]: Compiling Statement: INSERT INTO T5 VALUES (?);
+    [junit] 2014-06-26 18:19:38,023   INFO  [main] COMPILER: [T6.insert]: Compiling Statement: INSERT INTO T6 VALUES (?);
+    [junit] 2014-06-26 18:19:38,024   INFO  [main] COMPILER: [T7.insert]: Compiling Statement: INSERT INTO T7 VALUES (?);
+    [junit] 2014-06-26 18:19:38,026   INFO  [main] COMPILER: [T8.insert]: Compiling Statement: INSERT INTO T8 VALUES (?);
+    [junit] 2014-06-26 18:19:38,027   INFO  [main] COMPILER: [T9.insert]: Compiling Statement: INSERT INTO T9 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:38,028   INFO  [main] COMPILER: [T9.delete]: Compiling Statement: DELETE FROM T9 WHERE (C1 = ?);
+    [junit] 2014-06-26 18:19:38,031   INFO  [main] COMPILER: [T9.update]: Compiling Statement: UPDATE T9 SET C1 = ?, C2 = ? WHERE (C1 = ?);
+    [junit] 2014-06-26 18:19:38,034   INFO  [main] COMPILER: [T9.upsert]: Compiling Statement: UPSERT INTO T9 VALUES (?, ?);
+    [junit] 2014-06-26 18:19:38,037   INFO  [main] COMPILER: [USER.insert]: Compiling Statement: INSERT INTO USER VALUES (?, ?);
+    [junit] 2014-06-26 18:19:38,052   INFO  [main] org.voltdb.compiler.VoltCompiler: sun.misc.Launcher.AppClassLoader
+    [junit] 2014-06-26 18:19:38,053   INFO  [main] org.voltdb.compiler.VoltCompiler: sun.misc.Launcher.AppClassLoader
+    [junit] 2014-06-26 18:19:38,054   INFO  [main] COMPILER: [p4]: Compiling Statement: SELECT COUNT(*)      FROM T26      WHERE age = ?;
+    [junit] 2014-06-26 18:19:38,231   INFO  [main] COMPILER: [p3.class]: Compiling Statement: SELECT age, name FROM User WHERE age = ?
+    [junit] 2014-06-26 18:19:38,233   WARN  [main] COMPILER: [p3.class]: Procedure p3 has a statement with a non-deterministic result - statement: "SELECT age, name FROM User WHERE age = ?;", reason: the query result does not guarantee a consistent ordering
+    [junit] 2014-06-26 18:19:38,233   INFO  [main] org.voltdb.compiler.VoltCompiler: groovy.lang.GroovyClassLoader.InnerLoader
+    [junit] 2014-06-26 18:19:38,233   INFO  [main] org.voltdb.compiler.VoltCompiler: groovy.lang.GroovyClassLoader.InnerLoader
+    [junit] 2014-06-26 18:19:38,234   INFO  [main] COMPILER: [p2]: Compiling Statement: INSERT INTO User      VALUES (?, ?) ;
+    [junit] 2014-06-26 18:19:38,235   INFO  [main] COMPILER: [p1]: Compiling Statement: SELECT COUNT(*)          , name      FROM User      WHERE age = ?     GROUP BY name ;
+    [junit] 2014-06-26 18:19:38,237   INFO  [main] org.voltdb.compiler.VoltCompiler: sun.misc.Launcher.AppClassLoader
+    [junit] path to deployment is /tmp/myAppDeployment4059525420500259558.tmp

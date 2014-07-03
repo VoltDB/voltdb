@@ -400,6 +400,19 @@ public class ExportGeneration {
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
+    void initializeMissingPartitionsFromCatalog(
+            final Connector conn,
+            int hostId,
+            HostMessenger messenger,
+            List<Integer> partitions) {
+        Set<Integer> missingPartitions = new HashSet<Integer>();
+        findMissingDataSources(partitions, missingPartitions);
+        if (missingPartitions.size() > 0) {
+            exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
+            initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(missingPartitions));
+        }
+    }
+
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_zk = messenger.getZK();
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
@@ -663,6 +676,16 @@ public class ExportGeneration {
                 VoltDB.crashLocalVoltDB(
                         "Error creating datasources for table " +
                         table.getTypeName() + " host id " + hostId, true, e);
+            }
+        }
+    }
+
+    //Find missing partitions from this generation typicaally called for current generation to fill in missing partitions
+    private void findMissingDataSources(List<Integer> partitions, Set<Integer> missingPartitions) {
+        for (Integer partition : partitions) {
+            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+            if (dataSourcesForPartition == null) {
+                missingPartitions.add(partition);
             }
         }
     }

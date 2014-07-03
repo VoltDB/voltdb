@@ -456,6 +456,30 @@ public class TestSqlCmdInterface
         assertThis2(query, expected, 3, ID);
     }
 
+    @Test
+    public void testParseCreateView()
+    {
+        ID = 28;
+        String create = "create view foo (bas, as) as select bar, count(*) from foo group by val";
+        assertThis(create, create, 1, ID);
+    }
+
+    @Test
+    public void testParseCreateStmtProcedure()
+    {
+        ID = 29;
+        String create = "create procedure foo as select * from blat";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as insert into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as update into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as delete into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2";
+        assertThis(create, create, 1, ID);
+    }
+
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {
         // Prepare a Scanner that will "scan" the document
         Scanner opnScanner = new Scanner(QryFileHandle);

@@ -137,8 +137,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedSpHandle,
-                                 m_executorContext->currentSpHandle());
+                                 m_executorContext->m_lastCommittedSpHandle);
     }
 }
 
