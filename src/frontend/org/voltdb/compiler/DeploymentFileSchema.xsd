@@ -274,6 +274,7 @@
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
