@@ -1360,4 +1360,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {}
+
+    @Override
+    public void applyBinaryLog(byte[] logData) {
+        // TODO Auto-generated method stub
+
+    }
 }

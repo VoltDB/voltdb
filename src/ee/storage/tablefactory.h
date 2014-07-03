@@ -60,7 +60,7 @@ namespace voltdb {
 
 class Table;
 class PersistentTable;
-class SerializeInput;
+template <Endianess E> class SerializeInput;
 class TempTable;
 class TempTableLimits;
 class TableColumn;

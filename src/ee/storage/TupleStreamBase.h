@@ -18,18 +18,18 @@
 #ifndef TUPLESTREAMBASE_H_
 #define TUPLESTREAMBASE_H_
 
-#include "StreamBlock.h"
-
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
+#include "common/StreamBlock.h"
 #include "common/Topend.h"
 #include <deque>
 #include <cassert>
 namespace voltdb {
 
 class Topend;
+
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
 //I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care

@@ -426,7 +426,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     jsize length = env->GetArrayLength(serialized_table);
     VOLT_DEBUG("deserializing %d bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
-    ReferenceSerializeInput serialize_in(bytes, length);
+    ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
@@ -455,7 +455,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
 /**
  * Utility used for deserializing ParameterSet passed from Java.
  */
-void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_in,
+void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize_in,
                                    NValueArray &params, Pool *stringPool)
 {
     for (int i = 0; i < cnt; ++i) {
@@ -470,7 +470,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     NValueArray &params, Pool *stringPool) {
     // deserialize parameters as ValueArray.
     // We don't use SerializeIO here because it makes a copy.
-    ReferenceSerializeInput serialize_in(serialized_parameterset, serialized_length);
+    ReferenceSerializeInputBE serialize_in(serialized_parameterset, serialized_length);
 
     // see org.voltdb.ParameterSet.
     // TODO : make it a class. later, later, later...
@@ -576,7 +576,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         }
 
         // all fragments' parameters are in this buffer
-        ReferenceSerializeInput serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+        ReferenceSerializeInputBE serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
 
         int failures = engine->executePlanFragments(num_fragments,
                                                     fragmentIdsBuffer,
@@ -938,7 +938,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     jsize length = env->GetArrayLength(serialized_predicates);
     VOLT_DEBUG("deserializing %d predicate bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_predicates, NULL);
-    ReferenceSerializeInput serialize_in(bytes, length);
+    ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
@@ -1020,7 +1020,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
     jsize length = env->GetArrayLength(serialized_buffers);
     VOLT_DEBUG("nativeTableStreamSerializeMore: deserializing %d buffer bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_buffers, NULL);
-    ReferenceSerializeInput serialize_in(bytes, length);
+    ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
@@ -1150,7 +1150,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
         if (data == NULL) {
             throwFatalException("Failed to get byte array elements of recovery message");
         }
-        ReferenceSerializeInput input(data, remaining);
+        ReferenceSerializeInputBE input(data, remaining);
         RecoveryProtoMsg message(&input);
         return engine->processRecoveryMessage(&message);
     } catch (const FatalException &e) {
@@ -1366,7 +1366,7 @@ JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->resetReusedResultOutputBuffer();
 
-        ReferenceSerializeInput input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+        ReferenceSerializeInputBE input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
         TaskType taskId = static_cast<TaskType>(input.readLong());
         engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const FatalException &e) {

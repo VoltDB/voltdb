@@ -17,9 +17,6 @@
 
 #ifndef EXPORTTUPLESTREAM_H_
 #define EXPORTTUPLESTREAM_H_
-
-#include "StreamBlock.h"
-
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
@@ -27,6 +24,8 @@
 #include <deque>
 #include <cassert>
 namespace voltdb {
+
+class StreamBlock;
 
 class ExportTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -52,6 +51,9 @@ public:
                                 m_generation, m_partitionId, m_signature, sb, false, false);
         delete sb;
         m_uso = count;
+        //Extend the buffer chain to replace any existing stream blocks with a new one
+        //with the correct USO
+        extendBufferChain(0);
     }
 
     int64_t allocatedByteCount() const {

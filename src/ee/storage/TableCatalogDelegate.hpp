@@ -105,15 +105,29 @@ class TableCatalogDelegate : public CatalogDelegate {
         return m_signature;
     }
 
+    const char* signatureHash() {
+        return m_signatureHash;
+    }
+
+    /*
+     * Returns true if this table is a materialized view
+     */
+    bool materialized() {
+        return m_materialized;
+    }
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                             catalog::Table const &catalogTable,
-                                            const int32_t compactionThreshold);
+                                            const int32_t compactionThreshold,
+                                            bool &materialized,
+                                            char *signatureHash);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
+    bool m_materialized;
     std::string m_signature;
     const int32_t m_compactionThreshold;
+    char m_signatureHash[20];
 };
 
 }

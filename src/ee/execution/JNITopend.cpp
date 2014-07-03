@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "common/debuglog.h"
+#include "common/StreamBlock.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -238,7 +239,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // Add the dependency buffer info to the stack object
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
-        ReferenceSerializeInput serialize_in(bytes, length);
+        ReferenceSerializeInputBE serialize_in(bytes, length);
         destination->loadTuplesFrom(serialize_in, stringPool);
         return 1;
     }

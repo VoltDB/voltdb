@@ -127,7 +127,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");

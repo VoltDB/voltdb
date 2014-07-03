@@ -1445,11 +1445,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
         m_data.clear();
         m_data.putInt(Commands.executeTask.m_id);
         m_data.putLong(taskType.taskId);
-        m_data.put(task);
+        m_data.put(task.array());
         try {
             m_data.flip();
             m_connection.write();
@@ -1476,5 +1476,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             Throwables.propagate(e);
         }
         throw new RuntimeException("Failed to executeTask in IPC client");
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+        return ByteBuffer.allocate(requiredCapacity);
     }
 }

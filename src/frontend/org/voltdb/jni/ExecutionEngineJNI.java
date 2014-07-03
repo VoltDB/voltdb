@@ -610,13 +610,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
-        clearPsetAndEnsureCapacity(8 + task.length);
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
 
         byte retval[] = null;
         try {
-            psetBuffer.putLong(taskType.taskId);
-            psetBuffer.put(task);
+            psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();
@@ -626,5 +624,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Throwables.propagate(e);
         }
         return retval;
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+        clearPsetAndEnsureCapacity(8 + requiredCapacity);
+        psetBuffer.position(8);
+        return psetBuffer;
     }
 }

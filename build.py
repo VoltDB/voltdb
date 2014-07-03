@@ -216,6 +216,7 @@ CTX.INPUT['common'] = """
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp
+ Topend.cpp
  TupleOutputStream.cpp
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp
@@ -320,6 +321,7 @@ CTX.INPUT['storage'] = """
  TupleStreamBase.cpp
  ExportTupleStream.cpp
  DRTupleStream.cpp
+ BinaryLogSink.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp

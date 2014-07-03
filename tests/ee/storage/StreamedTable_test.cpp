@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <queue>
 #include <vector>
+#include <deque>
 #include "harness.h"
 
 #include "common/executorcontext.hpp"
@@ -38,8 +39,8 @@
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
+#include "common/StreamBlock.h"
 #include "storage/streamedtable.h"
-#include "storage/StreamBlock.h"
 
 #include "boost/smart_ptr.hpp"
 
@@ -48,61 +49,11 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
 
-class MockTopend : public Topend {
-  public:
-    MockTopend() {
-    }
-
-    void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
-        if (sync) {
-            return;
-        }
-        partitionIds.push(partitionId);
-        signatures.push(signature);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(boost::shared_ptr<char>(block->rawPtr()));
-        receivedExportBuffer = true;
-    }
-
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
-        return 0;
-    }
-
-    virtual int loadNextDependency(
-        int32_t dependencyId, Pool *pool, Table* destination)
-    {
-        return 0;
-    }
-
-    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
-            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
-        return 1000000000; // larger means less likely/frequent callbacks to ignore
-    }
-
-    virtual std::string planForFragmentId(int64_t fragmentId) {
-        return "";
-    }
-
-    virtual void crashVoltDB(FatalException e) {
-
-    }
-
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {}
-
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
-    queue<int32_t> partitionIds;
-    queue<std::string> signatures;
-    vector<boost::shared_ptr<StreamBlock> > blocks;
-    vector<boost::shared_ptr<char> > data;
-    bool receivedExportBuffer;
-};
-
 class StreamedTableTest : public Test {
 public:
     StreamedTableTest() {
         srand(0);
-        m_topend = new MockTopend();
+        m_topend = new DummyTopend();
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
@@ -158,7 +109,7 @@ public:
     }
 
 protected:
-    MockTopend *m_topend;
+    DummyTopend *m_topend;
     Pool *m_pool;
     UndoQuantum *m_quantum;
     ExecutorContext *m_context;
@@ -197,7 +148,7 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    vector<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    deque<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
     int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = (*begin)->offset();

@@ -52,6 +52,7 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/declarations.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -79,21 +80,6 @@ class MaterializedViewInfo;
 }
 
 namespace voltdb {
-
-class TableColumn;
-class TableIndex;
-class TableIterator;
-class TableFactory;
-class TupleSerializer;
-class SerializeInput;
-class Topend;
-class MaterializedViewMetadata;
-class RecoveryProtoMsg;
-class TupleOutputStreamProcessor;
-class ReferenceSerializeInput;
-class PersistentTable;
-class TableCatalogDelegate;
-class DRTupleStream;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -330,7 +316,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         TableStreamType streamType,
                         int32_t partitionId,
                         CatalogId tableId,
-                        ReferenceSerializeInput &serializeIn);
+                        ReferenceSerializeInputBE &serializeIn);
 
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,

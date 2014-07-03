@@ -31,7 +31,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
-#include "storage/StreamBlock.h"
+#include "common/StreamBlock.h"
 #include "storage/DRTupleStream.h"
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
@@ -58,58 +58,6 @@ const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTI
 // 1k buffer
 const int BUFFER_SIZE = 983;
 const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
-
-class DummyTopend : public Topend {
-public:
-    DummyTopend() : receivedDRBuffer(false) {
-
-    }
-
-    int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) {
-        return 0;
-    }
-
-    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
-            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
-        return 1000000000; // larger means less likely/frequent callbacks to ignore
-    }
-
-    std::string planForFragmentId(int64_t fragmentId) {
-        return "";
-    }
-
-    void crashVoltDB(voltdb::FatalException e) {
-    }
-
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
-        int64_t bytes = 0;
-        for (int ii = 0; ii < blocks.size(); ii++) {
-            bytes += blocks[ii]->rawLength();
-        }
-        return bytes;
-    }
-
-    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream) {
-        throw std::exception();
-    }
-
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
-        receivedDRBuffer = true;
-        partitionIds.push(partitionId);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(boost::shared_array<char>(block->rawPtr()));
-    }
-
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
-    queue<int32_t> partitionIds;
-    queue<std::string> signatures;
-    deque<boost::shared_ptr<StreamBlock> > blocks;
-    vector<boost::shared_array<char> > data;
-    bool receivedDRBuffer;
-
-};
 
 class DRTupleStreamTest : public Test {
 public:
@@ -157,7 +105,7 @@ public:
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
                                currentSpHandle, *m_tuple,
-                               DRTupleStream::INSERT);
+                               DR_RECORD_INSERT);
     }
 
     virtual ~DRTupleStreamTest() {

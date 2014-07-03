@@ -196,7 +196,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
 
     initTable();
 
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is
@@ -234,7 +234,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
 
     initTable();
 
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is

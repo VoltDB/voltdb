@@ -77,7 +77,7 @@ class StreamedTable : public Table {
                                                 bool=true);
 
 
-    virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
+    virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
 
