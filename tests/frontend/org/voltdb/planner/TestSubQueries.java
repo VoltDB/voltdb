@@ -255,6 +255,33 @@ public class TestSubQueries extends PlannerTestCase {
                 "     P3 " +
                 "where P3.A = T3.A ");
         assertEquals(1, planNodes.size());
+
+        // LIMIT
+        String sql = "select A_count, count(*) " +
+                    "from (select A, count(*) as A_count " +
+                    "       from (select A, C from P1 ORDER BY A LIMIT 6) T1 group by A) T2 " +
+                    "group by A_count order by A_count";
+        planNodes = compileToFragments(sql);
+        // send node
+        pn = planNodes.get(1).getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
+
+        // LIMIT with GROUP BY, no limit push down
+        sql = "select A_count, count(*) " +
+                "from (select A, count(*) as A_count " +
+                "       from (select C, COUNT(*) A from P1 GROUP BY C ORDER BY A LIMIT 6) T1 group by A) T2 " +
+                "group by A_count order by A_count";
+        planNodes = compileToFragments(sql);
+        printExplainPlan(planNodes);
+        // send node
+        pn = planNodes.get(1).getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
+    }
+
+    public void testTry() {
+
     }
 
     public void testFunctions() {
