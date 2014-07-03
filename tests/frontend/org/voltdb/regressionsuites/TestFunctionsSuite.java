@@ -797,7 +797,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             // test only given date
             strTime = "2014-07-02";
-            cr = client.callProcedure("R2.insert", 5, strTime+" 00:00:00.000000", 15, 1.1, strTime);
+            cr = client.callProcedure("R2.insert", 5, strTime + " 00:00:00.000000", 15, 1.1, strTime);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             strTime = "2014-07-03";
             cr = client.callProcedure("R2.insert", 6, strTime, 16, 1.1, strTime +" 00:00:00.000000");
@@ -833,7 +833,8 @@ public class TestFunctionsSuite extends RegressionSuite {
             // there should be 2 rows wrong, because the cast always return a long format string, but we
             // have two rows containing short format strings
             if (r.getRowCount() != 2) {
-                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() + " rows:");
+                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
                 System.out.println(r.toString());
                 fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
             }
