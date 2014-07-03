@@ -120,7 +120,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
     @Test
     public void testCreateProcedureFromClass() throws Exception {
-        ClientResponse resp = m_client.callProcedure("NotAnnotatedEmptyProcedure", 1l, "Test", "Yuning He");
+        ClientResponse resp = m_client.callProcedure("testCreateProcFromClassProc", 1l, "Test", "Yuning He");
         VoltTable vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.INTEGER), 1);
