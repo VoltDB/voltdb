@@ -21,6 +21,12 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <locale>
+#include <iomanip>
+
 namespace voltdb {
 
 /** implement the 1-argument SQL OCTET_LENGTH function */
@@ -515,6 +521,92 @@ template<> inline NValue NValue::call<FUNC_OVERLAY_CHAR>(const std::vector<NValu
     std::string resultStr = overlay_function(ptrSource, lengthSource, insertStr, start, length);
 
     return getTempStringValue(resultStr.c_str(), resultStr.length());
+}
+
+/** the facet used to group three digits */
+struct money_numpunct : std::numpunct<char> {
+    std::string do_grouping() const {return "\03";}
+};
+
+/** implement the Volt SQL Format_Currency function for decimal values */
+template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vector<NValue>& arguments) {
+    static std::locale newloc(std::cout.getloc(), new money_numpunct);
+    static std::locale nullloc(std::cout.getloc(), new std::numpunct<char>);
+    static TTInt one("1");
+    static TTInt five("5");
+
+    assert(arguments.size() == 2);
+    const NValue &arg1 = arguments[0];
+    if (arg1.isNull()) {
+        return getNullStringValue();
+    }
+    const ValueType type = arg1.getValueType();
+    if (type != VALUE_TYPE_DECIMAL) {
+        throwCastSQLException (type, VALUE_TYPE_DECIMAL);
+    }
+
+    std::ostringstream out;
+    out.imbue(newloc);
+    TTInt scaledValue = arg1.castAsDecimalAndGetValue();
+
+    if (scaledValue.IsSign()) {
+        out << '-';
+        scaledValue.ChangeSign();
+    }
+
+    // rounding
+    const NValue &arg2 = arguments[1];
+    int32_t places = arg2.castAsIntegerAndGetValue();
+    if (places >= 12 || places <= -26) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+            "the second parameter should be < 12 and > -26");
+    }
+
+    TTInt ten(10);
+    if (places <= 0) {
+        ten.Pow(-places);
+    }
+    else {
+        ten.Pow(places);
+    }
+    TTInt denominator = (places <= 0) ? (TTInt(kMaxScaleFactor) * ten):
+                                        (TTInt(kMaxScaleFactor) / ten);
+    TTInt fractional(scaledValue);
+    fractional %= denominator;
+    TTInt barrier = five * (denominator / 10);
+
+    if (fractional > barrier) {
+        scaledValue += denominator;
+    }
+    else if (fractional == barrier) {
+        TTInt prev = scaledValue / denominator;
+        if (prev % 2 == one) {
+            scaledValue += denominator;
+        }
+    }
+    else {
+        // do nothing here
+    }
+
+    if (places <= 0) {
+        scaledValue -= fractional;
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        out << std::fixed << whole;
+    }
+    else {
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
+        // here denominator is guarateed to be able to converted to int64_t
+        fraction /= denominator.ToInt();
+        out << std::fixed << whole;
+        // fractional part does not need groups
+        out.imbue(nullloc);
+        out << '.' << std::setfill('0') << std::setw(places) << fraction;
+    }
+    // TODO: Although there should be only one copy of newloc (and money_numpunct),
+    // we still need to test and make sure no memory leakage in this piece of code.
+    std::string rv = out.str();
+    return getTempStringValue(rv.c_str(), rv.length());
 }
 
 }

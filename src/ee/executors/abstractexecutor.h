@@ -84,6 +84,14 @@ class AbstractExecutor {
         }
     }
 
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;

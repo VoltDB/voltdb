@@ -489,8 +489,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     while (it.next(nextTuple)) {
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
-
     AggregateHashExecutor::p_execute_finish();
+
+    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -591,6 +592,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
+    cleanupInputTempTable(input_table);
     return true;
 }
 
