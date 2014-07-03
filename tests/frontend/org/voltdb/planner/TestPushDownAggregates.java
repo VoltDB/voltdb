@@ -235,52 +235,58 @@ public class TestPushDownAggregates extends PlannerTestCase {
     }
 
     public void testMultiPartLimitPushdown() {
-        List<AbstractPlanNode> pn;
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkLimitPushedDown(pn, true);
+        List<AbstractPlanNode> pns;
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
+        checkLimitPushedDown(pns, true);
 
         // T1 is partitioned on PKEY column
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
+        checkLimitPushedDown(pns, false);
 
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag+1 limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag+1 limit 1");
+        checkLimitPushedDown(pns, false);
 
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by count(*)+1 limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
 
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, count(*)+1 limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
 
-        pn = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, ABS(count(*)+1) limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, ABS(count(*)+1) limit 1");
+        checkLimitPushedDown(pns, false);
 
         //
         // T3 is partitioned on A3 column: group by partition column is another story
         //
-        pn = compileToFragments("select A3, count(*) as tag from T3 group by A3 order by tag limit 1");
-        checkLimitPushedDown(pn, true);
+        pns = compileToFragments("select A3, count(*) as tag from T3 group by A3 order by tag limit 1");
+        checkLimitPushedDown(pns, true);
 
         // function on partition column
-        pn = compileToFragments("select ABS(A3), count(*) as tag from T3 group by ABS(A3) order by tag limit 1");
-        checkLimitPushedDown(pn, false);
+        pns = compileToFragments("select ABS(A3), count(*) as tag from T3 group by ABS(A3) order by tag limit 1");
+        checkLimitPushedDown(pns, false);
 
 
         // Add a replicate table to test
-        pn = compileToFragments("select A1, count(*) as tag from R1 group by A1 order by tag limit 1");
-        assertEquals(1, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        pns = compileToFragments("select A1, count(*) as tag from R1 group by A1 order by tag limit 1");
+        assertEquals(1, pns.size());
+        assertTrue(pns.get(0).toExplainPlanString().contains("LIMIT"));
 
         //
         // Partition table join, limit push down
         //
-        pn = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
                 "group by A3, B4 order by tag desc limit 10");
-        checkLimitPushedDown(pn, true);
+        checkLimitPushedDown(pns, true);
 
-        pn = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
                 "group by A3, B4 order by tag+1 desc limit 10");
-        checkLimitPushedDown(pn, true);
+        checkLimitPushedDown(pns, true);
+
+        // One of the partition table is from sub-query
+        pns = compileToFragments("select A3, B4, count(CT) as tag " +
+                " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pns, true);
     }
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {

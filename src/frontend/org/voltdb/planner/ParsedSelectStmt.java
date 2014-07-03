@@ -706,12 +706,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 org.voltdb.catalog.Column catalogColumn =
                         tb.getColumns().getExact(groupbyCol.columnName);
                 groupbyCol.index = catalogColumn.getIndex();
-
-                Column partitionColumn = tb.getPartitioncolumn();
-                if (partitionColumn != null &&
-                    partitionColumn.getTypeName().equals(groupbyCol.columnName)) {
-                    m_hasPartitionColumnInGroupby = true;
-                }
             }
         }
         else
@@ -986,6 +980,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean hasPartitionColumnInGroupby() {
         return m_hasPartitionColumnInGroupby;
+    }
+
+    public void setHasPartitionColumnInGroupby() {
+        m_hasPartitionColumnInGroupby = true;
     }
 
     public boolean hasOrderByColumns() {
