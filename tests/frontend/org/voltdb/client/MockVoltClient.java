@@ -75,7 +75,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     ProcedureCallback m_lastCallback = null;
     LinkedBlockingQueue<ProcedureCallback> m_callbacks = new LinkedBlockingQueue<ProcedureCallback>();
-    Object m_lock = new Object();
     boolean m_nextReturn = true;
 
     @Override
@@ -262,9 +261,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         calledName = procName;
         calledParameters = parameters;
         m_lastCallback = callback;
-        synchronized (m_lock) {
-            m_callbacks.add(callback);
-        }
+        m_callbacks.add(callback);
         if (originalTxnId <= lastOrigTxnId)
         {
             origTxnIdOrderCorrect = false;
@@ -286,12 +283,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     public void pokeAllPendingCallbacks(final byte status, final String message) throws Exception
     {
-        synchronized (m_lock) {
-            ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
-            while (!m_callbacks.isEmpty()) {
-                ProcedureCallback callback = m_callbacks.poll();
-                callback.clientCallback(clientResponse);
-            }
+        ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
+        ProcedureCallback callback = null;
+        while ((callback = m_callbacks.poll()) != null) {
+            callback.clientCallback(clientResponse);
         }
     }
 
