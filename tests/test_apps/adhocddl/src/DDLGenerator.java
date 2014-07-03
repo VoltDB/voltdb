@@ -43,7 +43,14 @@ public class DDLGenerator
 	public DDLGenerator(int col, double idxPercent)
 	{
 	    numOfCols = col;
-	    idxStep = (int) (1 / idxPercent);
+	    if(idxPercent < 0.01)
+	    {
+	        idxStep = Integer.MAX_VALUE;
+	    }
+	    else
+	    {
+	        idxStep = (int) (1 / idxPercent);
+	    }
 	}
 
 	public String CreateColumn(int colNo)
@@ -79,5 +86,10 @@ public class DDLGenerator
 		sb.append("PRIMARY KEY (C0));");
 
 		return sb.toString();
+	}
+
+	public String DropTable(int tableNo, String prefix)
+	{
+	    return "DROP TABLE " + prefix + tableNo + ";";
 	}
 }

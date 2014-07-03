@@ -48,8 +48,8 @@ function srccompile() {
 function catalog() {
     srccompile
     java -classpath obj:$CLASSPATH:obj Initializer \
-         --numOfTables=100 \
-         --numOfCols=50 \
+         --numOfTables=200 \
+         --numOfCols=10 \
          --idxPercent=0.1 
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
     # stop if compilation fails
@@ -70,7 +70,7 @@ function client() {
     java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
         --servers=localhost \
         --numOfTests=20 \
-        --numOfCols=50 \
+        --numOfCols=10 \
         --idxPercent=0.1 
 }
 

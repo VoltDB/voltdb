@@ -39,7 +39,7 @@ public class Initializer {
         String prefix = "T";
 
         @Option(desc = "Median number of Columns in randomly generated tables")
-        int numOfCols = 50;
+        int numOfCols = 10;
 
         @Option(desc = "Percentage of indexed columns in the ramdonly generated table")
         double idxPercent = 0.1;

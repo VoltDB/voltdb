@@ -70,7 +70,10 @@ public class AdHocDDLBenchmark {
      */
     static class BenchmarkConfig extends CLIConfig {
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 10;
+        int numOfTests = 200;
+
+        @Option(desc = "Table name prefix")
+        String prefix = "T";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -79,7 +82,7 @@ public class AdHocDDLBenchmark {
         String statsfile = "";
 
         @Option(desc = "Median number of Columns in randomly generated tables")
-        int numOfCols = 50;
+        int numOfCols = 10;
 
         @Option(desc = "Percentage of indexed columns in the ramdonly generated table")
         double idxPercent = 0.1;
@@ -88,7 +91,7 @@ public class AdHocDDLBenchmark {
         public void validate() {
             if (numOfTests <= 0) exitWithMessageAndUsage("numOfTests must be > 0");
             if (numOfCols <= 0) exitWithMessageAndUsage("numOfCols must be > 0");
-            if (idxPercent <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (idxPercent <= 0 || idxPercent >= 1) exitWithMessageAndUsage("idxPercent must be > 0 and < 1");
         }
     }
 
@@ -183,15 +186,22 @@ public class AdHocDDLBenchmark {
 
     public void runTest(int tableNo) {
         // Get the next DDL
-        String sqlstmt = DDLGen.CreateTable(tableNo, "TestTable");
+//        String sqlstmt = DDLGen.CreateTable(tableNo, "TestTable");
+        String sqlstmt = DDLGen.DropTable(tableNo, config.prefix);
 
         // synchronously call the "AdHoc" procedure
         try
         {
+            long start = System.currentTimeMillis();
             ClientResponse response = client.callProcedure("@AdHoc", sqlstmt);
             if(response.getStatus() != ClientResponse.SUCCESS)
             {
                 System.out.println("AdHoc call failed");
+            }
+            else
+            {
+                long end = System.currentTimeMillis();
+                System.out.println(end - start);
             }
 
         }
@@ -222,14 +232,19 @@ public class AdHocDDLBenchmark {
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
 
-        // create/start the requested number of threads
+        double sum = 0;
         for(int i = 0; i < config.numOfTests; i++)
         {
             runTest(i);
-            ClientStats stats = fullStatsContext.fetch().getStats();
-            System.out.println("Current Average Latency: " + stats.getAverageLatency());
+//            ClientStats stats = fullStatsContext.fetch().getStats();
+//
+//            double latency = stats.getAverageLatency() * stats.getInvocationsCompleted() - sum;
+//
+//            System.out.println("latency: " + latency);
+//            sum += latency;
         }
         ClientStats stats = fullStatsContext.fetch().getStats();
+        System.out.println();
         System.out.println("Average Latency: " + stats.getAverageLatency());
         System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
 
