@@ -387,15 +387,20 @@ public class RegressionSuite extends TestCase {
     }
 
     static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
-        String msg = "no exception thrown";
         try {
             client.callProcedure("@AdHoc", stmt);
         }
         catch (ProcCallException pce) {
-            msg = pce.getMessage();
+            String msg = pce.getMessage();
+            String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
+                    expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
+            assertTrue(diagnostic, msg.contains(expectedMsg));
+            return;
         }
 
-        assertTrue(msg.contains(expectedMsg));
+        String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
+                expectedMsg + ", but instead it threw nothing.";
+        fail(diagnostic);
     }
 
 
