@@ -21,9 +21,12 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -51,6 +54,8 @@ public class PartitionDRGateway {
             return conversion.get(ordinal);
         }
     }
+
+    public static final Map<Integer, PartitionDRGateway> gateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -83,6 +88,8 @@ public class PartitionDRGateway {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
+        gateways.put(partitionId,  pdrg);
+
         return pdrg;
     }
 
@@ -213,6 +220,19 @@ public class PartitionDRGateway {
                 }
             }
         }
-        DBBPool.wrapBB(buf).discard();
+
+        BBContainer logContainer = DBBPool.wrapBB(buf);
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@ApplySinglePartitionSP");
+        spi.setParams( partitionId, logContainer);
+        final PartitionDRGateway pdrg = gateways.get(partitionId);
+        if (pdrg == null) {
+            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+        }
+        try {
+            pdrg.onSuccessfulProcedureCall( 0, 0,  0, spi, null);
+        } finally {
+            logContainer.discard();
+        }
     }
 }

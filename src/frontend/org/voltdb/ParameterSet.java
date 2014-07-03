@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -599,6 +600,20 @@ public class ParameterSet implements JSONString {
                     buf.put(VoltType.VARBINARY.getValue());
                     buf.putInt(b.length);
                     buf.put(b);
+                    continue;
+                }
+
+                //Same as before, but deal with the fact it is coming in as a unmanaged bytebuffer
+                if (obj instanceof BBContainer) {
+                    final BBContainer cont = (BBContainer) obj;
+                    try {
+                        final ByteBuffer paramBuf = cont.b();
+                        buf.put(VoltType.VARBINARY.getValue());
+                        buf.putInt(paramBuf.remaining());
+                        buf.put(paramBuf);
+                    } finally {
+                        cont.discard();
+                    }
                     continue;
                 }
 
