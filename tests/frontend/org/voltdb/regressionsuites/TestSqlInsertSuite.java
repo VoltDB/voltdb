@@ -95,9 +95,6 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
-
-                "create procedure selectAll as select * from p1;" +
-                "create procedure deleteAll as delete from p1;" +
                 ""
                 ;
         try {
