@@ -1852,6 +1852,12 @@ public class Scanner {
      */
     public TimestampData newTimestamp(String s) {
 
+        // A VoltDB extension -- handle timestamp strings only containing date
+        if (s.length() == 10) {
+            return newDate(s);
+        }
+        // End of VoltDB extension
+
         long    zoneSeconds = 0;
         long    seconds;
         int     fraction = 0;

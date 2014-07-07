@@ -141,12 +141,43 @@ public class AsyncCompilerAgent {
                 w.completionHandler.onCompletion(result);
             }
             else {
+                // We have adhoc DDL.  Is it okay to run it?
+                // Is it forbidden by the replication role and configured schema change method?
+                // master and UAC method chosen:
+                if (!w.onReplica && !w.useAdhocDDL) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "Cluster is configured to use @UpdateApplicationCatalog " +
+                                "to change application schema.  AdHoc DDL is forbidden.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
+                else if (w.onReplica) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL is forbidden on a DR replica cluster. " +
+                                "Apply schema changes to the master and they will propogate to replicas.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
                 final CatalogChangeWork ccw = new CatalogChangeWork(w);
                 dispatchCatalogChangeWork(ccw);
             }
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
+            // We have an @UAC.  Is it okay to run it?
+            // If we weren't provided catalogBytes, it's a deployment-only change and okay to take
+            // master and adhoc DDL method chosen
+            if (w.catalogBytes != null && !w.onReplica && w.useAdhocDDL) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use AdHoc DDL to change application " +
+                            "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
             dispatchCatalogChangeWork(w);
         }
         else {
