@@ -79,7 +79,7 @@ class PBDSegment {
         m_index = index;
         m_file = file;
         if (LOG.isDebugEnabled()) {
-            LOG.info("Creating Segment: " + file.getName() + " At Index: " + m_index);
+            LOG.debug("Creating Segment: " + file.getName() + " At Index: " + m_index);
         }
     }
 
