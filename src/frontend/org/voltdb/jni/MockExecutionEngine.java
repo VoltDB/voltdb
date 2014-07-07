@@ -25,7 +25,12 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.*;
+import org.voltdb.ParameterSet;
+import org.voltdb.StatsSelector;
+import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 
@@ -119,7 +124,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
     }
 
     @Override

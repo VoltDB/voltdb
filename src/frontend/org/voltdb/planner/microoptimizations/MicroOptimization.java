@@ -33,6 +33,12 @@ public abstract class MicroOptimization {
     /// Implementing recursivelyApply to do real work on the plan graph is the more common paradigm.
     void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
     {
+        // seq scan to index scan overrides this function
+        apply(plan, parsedStmt);
+    }
+
+    void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    {
         try {
             m_parsedStmt = parsedStmt;
             AbstractPlanNode planGraph = plan.rootPlanGraph;

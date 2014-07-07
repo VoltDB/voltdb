@@ -160,15 +160,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         output_table->insertTupleNonVirtual(temp_tuple);
 
         VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
-
-        /*if (!output_table->insertTupleNonVirtual(temp_tuple)) {
-            // TODO: DEBUG
-            VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", input_table->name().c_str(), output_table->name().c_str());
-            return (false);
-        }*/
     }
 
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
+    cleanupInputTempTable(input_table);
 
     return (true);
 }

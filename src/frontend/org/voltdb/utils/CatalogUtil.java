@@ -124,14 +124,13 @@ public abstract class CatalogUtil {
      * Load a catalog from the jar bytes.
      *
      * @param catalogBytes
-     * @param log
-     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
+     * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
-            throws IOException
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes)
+        throws IOException
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
@@ -139,9 +138,17 @@ public abstract class CatalogUtil {
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        return new Pair<InMemoryJarfile, String>(jarfile, upgradedFromVersion);
+    }
+
+    /**
+     * Convenience method to extract the catalog commands from an InMemoryJarfile as a string
+     */
+    public static String getSerializedCatalogStringFromJar(InMemoryJarfile jarfile)
+    {
+        byte[] serializedCatalogBytes = jarfile.get(CatalogUtil.CATALOG_FILENAME);
         String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
-        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
+        return serializedCatalog;
     }
 
     /**

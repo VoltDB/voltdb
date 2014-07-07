@@ -15,19 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner.microoptimizations;
+package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
@@ -41,13 +37,12 @@ import org.voltdb.utils.CatalogUtil;
 /// to a database write within the same transaction.
 /// Unlike the other MicroOptimization classes, this is not actually a
 /// performance optimization. It is instead "optimizing for reliability".
-public class SeqScansToUniqueTreeScans extends MicroOptimization {
+public class ScanDeterminizer {
 
     /**
      * Only applies when stronger determinism is needed.
      */
-    @Override
-    void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
+    public static void apply(CompiledPlan plan, DeterminismMode detMode)
     {
         if (detMode == DeterminismMode.FASTER) {
             return;
@@ -59,23 +54,18 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         if (planGraph.isOrderDeterministic()) {
             return;
         }
-        super.apply(plan, detMode, parsedStmt);
+
+        AbstractPlanNode root = plan.rootPlanGraph;
+        root = recursivelyApply(root);
+        plan.rootPlanGraph = root;
     }
 
-    @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    static private AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
-
         // depth first:
         //     Find Sequential Scan node.
         //     Replace with any unique tree index scan if possible.
-
-        // Skip the collector fragment because its result will get aggregated
-        // in a non-deterministic order regardless of the original scan ordering.
-        if (plan instanceof ReceivePlanNode) {
-            return plan;
-        }
 
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
 
