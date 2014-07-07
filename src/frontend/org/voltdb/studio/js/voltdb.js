@@ -110,11 +110,11 @@ var IVoltDB = (function(){
         {
             var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/' 
             var params = this.BuildParamSet(procedure, parameters);
-            if (typeof(uri) == 'string' && typeof(uri) == 'string')
+            if (typeof(params) == 'string')
                 jQuery.postJSON(uri, params, callback);
             else
                 if (callback != null)
-                    callback({"status":-1,"statusstring":"PrepareStatement error: " + uri[0],"results":[]});
+                    callback({"status":-1,"statusstring":"PrepareStatement error: " + params[0],"results":[]});
         }
         var CallbackWrapper = function(userCallback)
         {
