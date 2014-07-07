@@ -129,26 +129,26 @@ public class ClientThread extends Thread {
 
         try {
             String procName = null;
-            int expectedTables = 3;
+            int expectedTables = 4;
             switch (m_type) {
             case PARTITIONED_SP:
                 procName = "UpdatePartitionedSP";
                 break;
             case PARTITIONED_MP:
                 procName = "UpdatePartitionedMP";
-                expectedTables = 4;
+                expectedTables = 5;
                 break;
             case REPLICATED:
                 procName = "UpdateReplicatedMP";
-                expectedTables = 4;
+                expectedTables = 5;
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
-                expectedTables = 4;
+                expectedTables = 5;
                 break;
             case ADHOC_MP:
                 procName = "UpdateReplicatedMPInProcAdHoc";
-                expectedTables = 4;
+                expectedTables = 5;
                 break;
             }
 
@@ -189,7 +189,7 @@ public class ClientThread extends Thread {
                 Benchmark.printJStack();
                 System.exit(-1);
             }
-            VoltTable data = results[2];
+            VoltTable data = results[3];
             try {
                 UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
             }

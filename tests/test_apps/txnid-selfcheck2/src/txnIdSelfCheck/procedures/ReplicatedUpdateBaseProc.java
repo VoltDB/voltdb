@@ -40,6 +40,9 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
     public final SQLStmt r_insert = new SQLStmt(
             "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    public final SQLStmt r_export = new SQLStmt(
+            "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
     // This is for DR. Make sure that the MP transaction gets inserted into the same place in the txn stream
     // at the master and replica.  If they differ, we should get a hash mismatch at the Doctor Agent since we've
     // jammed this into the returned results.
