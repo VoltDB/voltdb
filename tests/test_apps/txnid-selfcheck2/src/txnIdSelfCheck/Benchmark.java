@@ -94,6 +94,8 @@ public class Benchmark {
     public static AtomicLong txnCount = new AtomicLong();
     private long txnCountAtLastCheck;
     private long lastProgressTimestamp = System.currentTimeMillis();
+    private final AtomicLong bigpRowCount = new AtomicLong();
+    private final AtomicLong bigrRowCount = new AtomicLong();
 
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -471,8 +473,10 @@ public class Benchmark {
         txnCountAtLastCheck = txnCountNow;
         long diffInSeconds = (now - lastProgressTimestamp) / 1000;
 
-        log.info(String.format("Executed %d%s", txnCount.get(),
-                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds, last at " +
+        log.info(String.format("Executed %d / loaded bigp: %dMB (%.2f%%) / bigr: %dMB (%.2f%%)", txnCount.get(),
+                        bigpRowCount.get()*config.fillerrowsize/(1024*1024), (float)(bigpRowCount.get()*config.fillerrowsize/(1024*1024))/config.partfillerrowmb * 100,
+                        bigrRowCount.get()*config.fillerrowsize/(1024*1024), (float)(bigrRowCount.get()*config.fillerrowsize/(1024*1024))/config.replfillerrowmb * 100,
+                        madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds, last at " +
                         (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
 
         if (diffInSeconds > config.progresstimeout) {
@@ -535,6 +539,35 @@ public class Benchmark {
     DdlThread ddlt = null;
     List<ClientThread> clientThreads = null;
 
+    private long getRss() throws Exception {
+        ClientResponse cr = client.callProcedure("@Statistics", "MEMORY");
+
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            log.error("Failed to call Statistics proc at startup. Exiting.");
+            log.error(((ClientResponseImpl) cr).toJSONString());
+            printJStack();
+            System.exit(-1);
+        }
+
+        VoltTable t = cr.getResults()[0];
+        long serverCount = t.getRowCount();
+        List<Long> l = new ArrayList();
+        while (t.advanceRow()) {
+            long rss = t.getLong(3);
+            l.add(rss);
+        }
+        assert (l.size() == serverCount);
+        long l0 = l.get(0);
+        assert (l0 > 0);
+        for (long s : l)
+            log.info(s);
+        if (l.size() > 2) {
+            for (long s : l.subList(1, l.size())) {
+                assert ((s-l0/(float)l0) > 0.01);
+            }
+        }
+        return l0;
+    }
 
     /**
      * Core benchmark code.
@@ -571,6 +604,9 @@ public class Benchmark {
             }
             Thread.sleep(10000);
         }
+
+        // get memory size
+        long rss = getRss();
 
         // get stats
         try {

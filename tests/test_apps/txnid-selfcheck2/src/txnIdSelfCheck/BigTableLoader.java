@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
@@ -53,9 +54,12 @@ public class BigTableLoader extends BenchmarkThread {
     long insertsTried = 0;
     long rowsLoaded = 0;
     long nTruncates = 0;
+    AtomicLong rowCount;
 
-    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
+    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount, AtomicLong rowCount) {
         setName("BigTableLoader-"+tableName);
+        setDaemon(true);
+
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -63,6 +67,7 @@ public class BigTableLoader extends BenchmarkThread {
         this.batchSize = batchSize;
         m_permits = permits;
         this.partitionCount = partitionCount;
+        this.rowCount = rowCount;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -85,9 +90,11 @@ public class BigTableLoader extends BenchmarkThread {
     class InsertCallback implements ProcedureCallback {
 
         CountDownLatch latch;
+        AtomicLong rowCount;
 
-        InsertCallback(CountDownLatch latch) {
+        InsertCallback(CountDownLatch latch, AtomicLong rowCount) {
             this.latch = latch;
+            this.rowCount = rowCount;
         }
 
         @Override
@@ -106,6 +113,7 @@ public class BigTableLoader extends BenchmarkThread {
             else {
                 Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
+                rowCount.set(rowsLoaded);
             }
             latch.countDown();
         }
@@ -114,8 +122,9 @@ public class BigTableLoader extends BenchmarkThread {
     @Override
     public void run() {
         byte[] data = new byte[rowSize];
-        long currentRowCount;
-        while (m_shouldContinue.get()) {
+        assert targetCount > 0;
+        long currentRowCount = 0;
+        while (currentRowCount < targetCount && m_shouldContinue.get()) {
             r.nextBytes(data);
 
             try {
@@ -127,7 +136,8 @@ public class BigTableLoader extends BenchmarkThread {
                     for (int i = 0; i < batchSize; i++) {
                         long p = Math.abs((long)(r.nextGaussian() * this.partitionCount));
                         try {
-                            m_permits.acquire();
+                            
+                           m_permits.acquire();
                         } catch (InterruptedException e) {
                             if (!m_shouldContinue.get()) {
                                 return;
@@ -135,7 +145,7 @@ public class BigTableLoader extends BenchmarkThread {
                             log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
                         }
                         insertsTried++;
-                        client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+                        client.callProcedure(new InsertCallback(latch, rowCount), tableName.toUpperCase() + "TableInsert", p, data);
                     }
                     try {
                         latch.await(10, TimeUnit.SECONDS);
@@ -163,7 +173,7 @@ public class BigTableLoader extends BenchmarkThread {
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
-        log.info("BigTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);
+        log.info("BigTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
     }
 
 }
