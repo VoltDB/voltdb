@@ -20,17 +20,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the native VoltDB client
- * library.
- *
- * While synchronous processing can cause performance bottlenecks (each
- * caller waits for a transaction answer before calling another
- * transaction), the VoltDB cluster at large is still able to perform at
- * blazing speeds when many clients are connected to it.
- */
+
+
 
 import java.io.IOException;
 import java.net.UnknownHostException;
@@ -70,16 +61,19 @@ public class AdHocDDLBenchmark {
      */
     static class BenchmarkConfig extends CLIConfig {
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 200;
+        int numOfTests = 20;
 
-        @Option(desc = "Table name prefix")
-        String prefix = "T";
+        @Option(desc = "Table name prefix for test")
+        String prefix = "TEST";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
+
+        @Option(desc = "0: create tables test; 1: drop table test; 2: average latency test")
+        int testMode = 2;
 
         @Option(desc = "Median number of Columns in randomly generated tables")
         int numOfCols = 10;
@@ -184,11 +178,7 @@ public class AdHocDDLBenchmark {
         connections.await();
     }
 
-    public void runTest(int tableNo) {
-        // Get the next DDL
-//        String sqlstmt = DDLGen.CreateTable(tableNo, "TestTable");
-        String sqlstmt = DDLGen.DropTable(tableNo, config.prefix);
-
+    public long runTest(String sqlstmt) {
         // synchronously call the "AdHoc" procedure
         try
         {
@@ -197,11 +187,13 @@ public class AdHocDDLBenchmark {
             if(response.getStatus() != ClientResponse.SUCCESS)
             {
                 System.out.println("AdHoc call failed");
+                return 0;
             }
             else
             {
                 long end = System.currentTimeMillis();
                 System.out.println(end - start);
+                return end - start;
             }
 
         }
@@ -209,6 +201,64 @@ public class AdHocDDLBenchmark {
         {
             e.printStackTrace();
         }
+        return 0;
+    }
+
+    public void createTableTest()
+    {
+        fullStatsContext.fetchAndResetBaseline();
+
+        String sqlstmt;
+        for(int i = 0; i < config.numOfTests; i++)
+        {
+            sqlstmt = DDLGen.CreateTable(i, config.prefix);
+            runTest(sqlstmt);
+        }
+
+        ClientStats stats = fullStatsContext.fetch().getStats();
+        System.out.println();
+        System.out.println("Average Latency: " + stats.getAverageLatency());
+        System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
+    }
+
+    public void dropTableTest()
+    {
+        String sqlstmt;
+        for(int i = 0; i < config.numOfTests; i++)
+        {
+            sqlstmt = DDLGen.CreateTable(i, config.prefix);
+            runTest(sqlstmt);
+        }
+
+        fullStatsContext.fetchAndResetBaseline();
+
+        for(int i = 0; i < config.numOfTests; i++)
+        {
+            sqlstmt = DDLGen.DropTable(i, config.prefix);
+            runTest(sqlstmt);
+        }
+
+        ClientStats stats = fullStatsContext.fetch().getStats();
+        System.out.println();
+        System.out.println("Average Latency: " + stats.getAverageLatency());
+        System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
+    }
+
+    public void averageLatencyTest()
+    {
+        String sqlstmt;
+        long createSum = 0, dropSum = 0;
+        for(int i = 0; i < config.numOfTests; i++)
+        {
+            sqlstmt = DDLGen.CreateTable(i, config.prefix);
+            createSum += runTest(sqlstmt);
+            sqlstmt = DDLGen.DropTable(i, config.prefix);
+            dropSum += runTest(sqlstmt);
+        }
+
+        System.out.println();
+        System.out.println("Average Latency for CREATE: " + (createSum / config.numOfTests));
+        System.out.println("Average Latency for DROP: " + (dropSum / config.numOfTests));
     }
 
     /**
@@ -229,24 +279,22 @@ public class AdHocDDLBenchmark {
         System.out.println(" Statistics ");
         System.out.println(HORIZONTAL_RULE);
 
-        // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-
-        double sum = 0;
-        for(int i = 0; i < config.numOfTests; i++)
+        switch(config.testMode)
         {
-            runTest(i);
-//            ClientStats stats = fullStatsContext.fetch().getStats();
-//
-//            double latency = stats.getAverageLatency() * stats.getInvocationsCompleted() - sum;
-//
-//            System.out.println("latency: " + latency);
-//            sum += latency;
+        case 0:
+            System.out.println("it's create");
+            createTableTest();
+            break;
+        case 1:
+            dropTableTest();
+            break;
+        case 2:
+            averageLatencyTest();
+            break;
+        default:
+            System.out.println("No such test!");
+            break;
         }
-        ClientStats stats = fullStatsContext.fetch().getStats();
-        System.out.println();
-        System.out.println("Average Latency: " + stats.getAverageLatency());
-        System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
 
         // block until all outstanding txns return
         client.drain();

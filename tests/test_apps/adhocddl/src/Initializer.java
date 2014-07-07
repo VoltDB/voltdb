@@ -33,7 +33,7 @@ public class Initializer {
 
     static class InitConfig extends CLIConfig {
         @Option(desc = "Number of tables in server")
-        int numOfTables = 100;
+        int numOfTables = 200;
 
         @Option(desc = "Table name prefix")
         String prefix = "T";

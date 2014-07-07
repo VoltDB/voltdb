@@ -32,7 +32,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot ddl.sql
 }
 
 # compile the source code for procedures and the client
@@ -48,7 +48,7 @@ function srccompile() {
 function catalog() {
     srccompile
     java -classpath obj:$CLASSPATH:obj Initializer \
-         --numOfTables=200 \
+         --numOfTables=100 \
          --numOfCols=10 \
          --idxPercent=0.1 
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
@@ -71,7 +71,8 @@ function client() {
         --servers=localhost \
         --numOfTests=20 \
         --numOfCols=10 \
-        --idxPercent=0.1 
+        --idxPercent=0.1 \
+        --testMode=0 
 }
 
 function help() {
