@@ -151,7 +151,6 @@ class PBDSegment {
                 m_fc.close();
                 m_ras = null;
                 m_fc = null;
-                m_buf.addToTagTrail("discarded in PDBSegment close");
                 m_buf.discard();
                 m_buf = null;
                 m_readBuf = null;
