@@ -513,11 +513,12 @@ public class TestDistributer extends TestCase {
             Thread.yield();
         }
 
+        start = System.currentTimeMillis();
+
         // tell the mock voltdb to stop responding
         volt.handler.sendResponses.set(false);
 
         // Should not timeout unless 2 seconds has passed
-        start = System.currentTimeMillis();
         while (!failed.get()) {
             if ((System.currentTimeMillis() - start) > 2000) {
                 break;
@@ -528,8 +529,10 @@ public class TestDistributer extends TestCase {
 
         // If the actual elapsed time is smaller than the timeout value,
         // but the connection was closed due to a timeout, fail.
-        if ((System.currentTimeMillis() - start) < 2000) {
-            fail("Premature timeout occurred");
+        // Only check if the duration is within a range, because the timer may not be accurate.
+        if ((System.currentTimeMillis() - start) < 1900 &&
+            (System.currentTimeMillis() - start) > 2100) {
+            fail("Premature timeout occurred " + (System.currentTimeMillis() - start));
         }
 
         // clean up
