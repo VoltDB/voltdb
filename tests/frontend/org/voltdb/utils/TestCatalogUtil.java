@@ -677,4 +677,41 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(crc1, crc2);
     }
 
+    public void testClusterSchemaSetting() throws Exception
+    {
+        final String defSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "</deployment>";
+
+        final String catalogSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='catalog'/>" +
+            "</deployment>";
+
+        final String adhocSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "</deployment>";
+
+        final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
+        CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
+        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
+        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getUseadhocschema());
+    }
 }

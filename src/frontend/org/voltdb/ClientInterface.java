@@ -1497,6 +1497,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
                 task.type, task.originalTxnId, task.originalUniqueId,
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
@@ -1533,6 +1535,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
+                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
