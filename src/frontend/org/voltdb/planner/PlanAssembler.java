@@ -1887,15 +1887,10 @@ public class PlanAssembler {
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
-            if (!(receiveNode instanceof AggregatePlanNode) &&
-                !(receiveNode instanceof OrderByPlanNode) &&
+            // Delete the aggregate node case to handle ENG-6485, or say we don't push down meeting aggregate node
+            // TODO: We might want to optimize/push down "limit" for some cases
+            if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                return null;
-            }
-
-            // Limitation: can only push past coordinating aggregation nodes
-            if (receiveNode instanceof AggregatePlanNode &&
-                !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 return null;
             }
 
