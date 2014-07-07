@@ -62,6 +62,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.catalog.Column;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -659,6 +660,7 @@ public class ExportGeneration {
                     dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                     m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                 }
+                Column partColumn = table.getPartitioncolumn();
                 ExportDataSource exportDataSource = new ExportDataSource(
                         m_onSourceDrained,
                         "database",
@@ -667,6 +669,7 @@ public class ExportGeneration {
                         table.getSignature(),
                         m_timestamp,
                         table.getColumns(),
+                        partColumn,
                         m_directory.getPath());
                 m_numSources++;
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +

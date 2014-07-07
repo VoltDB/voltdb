@@ -154,7 +154,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
     {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
-    assert(offset >= 0);
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
