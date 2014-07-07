@@ -163,6 +163,14 @@ public final class DBBPool {
 #endif
         }
 
+        public boolean isTagged() {
+#ifndef NO_MEMCHECK
+            return !m_tags.isEmpty();
+#else
+            return false;
+#endif
+        }
+
 #ifndef NO_MEMCHECK
         @Override
         public void finalize() {
