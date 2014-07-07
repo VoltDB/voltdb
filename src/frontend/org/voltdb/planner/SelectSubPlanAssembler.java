@@ -70,9 +70,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     SelectSubPlanAssembler(Database db, ParsedSelectStmt selectStmt, StatementPartitioning partitioning)
     {
         super(db, selectStmt, partitioning);
-        if (selectStmt.hasJoinOrders()) {
+        if (selectStmt.hasJoinOrder()) {
             // If a join order was provided or large number of tables join
-            m_joinOrders.addAll(selectStmt.getJoinOrders());
+            m_joinOrders.addAll(selectStmt.getJoinOrder());
         } else {
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
             m_joinOrders = queueJoinOrders(m_parsedStmt.m_joinTree, true);

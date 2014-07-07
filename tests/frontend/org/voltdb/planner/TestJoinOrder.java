@@ -331,20 +331,6 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
-    public void testTry() {
-        String sql;
-        AbstractPlanNode pn, n;
-
-        sql = "select * FROM T1, T2, (select T4.D from T3 right outer join T4 on T4.D = T3.C) TM1 LEFT OUTER JOIN T5 on T5.E = TM1.D, T6, T7";
-        pn = compile(sql);
-        n = pn.getChild(0).getChild(0);
-        System.out.println(pn.toExplainPlanString());
-
-        validJoinOrder(pn.toExplainPlanString(), "T1", "T2",  "T4", "T3", "T5", "T6", "T7");
-    }
-
-
-
     private void validJoinOrder(String explainPlan, String... joinOrder) {
         int start = -1;
         for (String tb: joinOrder) {

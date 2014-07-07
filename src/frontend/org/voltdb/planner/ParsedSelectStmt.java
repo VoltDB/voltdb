@@ -152,6 +152,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
 
+    private boolean m_hasLargeNumberOfTableJoins = false;
+    // this list is the join order either from the user or parser if it has large number of table joins.
+    private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
+
     /**
     * Class constructor
     * @param paramValues
@@ -959,13 +963,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return retval;
     }
 
-    public boolean hasJoinOrders() {
-        return m_joinOrder != null || m_largeJoins;
+    public boolean hasJoinOrder() {
+        return m_joinOrder != null || m_hasLargeNumberOfTableJoins;
     }
-    private boolean m_largeJoins = false;
-    private ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
 
-    public ArrayList<JoinNode> getJoinOrders() {
+    public ArrayList<JoinNode> getJoinOrder() {
         return m_joinOrderList;
     }
 
@@ -982,17 +984,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // prepare the join order if needed
         if (m_joinOrder == null &&
                 m_tableAliasList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
-            // When there are large number of table joins, give up the all permutaions.
-            // Be default, try the join order with the sql query table order first.
-            m_largeJoins = true;
+            // When there are large number of table joins, give up the all permutations.
+            // By default, try the join order with the SQL query table order first.
+            m_hasLargeNumberOfTableJoins = true;
 
             StringBuilder sb = new StringBuilder();
+            String separator = "";
             for (int ii = 0; ii < m_tableAliasList.size(); ii++) {
                 String tableAlias = m_tableAliasList.get(ii);
-                sb.append(tableAlias);
-                if (ii != m_tableAliasList.size() - 1) {
-                    sb.append(",");
-                }
+                sb.append(separator).append(tableAlias);
+                separator = ",";
             }
             if (tryAddOneJoinOrder(sb.toString())) {
                 return;
@@ -1025,7 +1026,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             String alias = element.trim().toUpperCase();
             tableAliases.add(alias);
             if (!dupCheck.add(alias)) {
-                if (m_largeJoins) return false;
+                if (m_hasLargeNumberOfTableJoins) return false;
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"").append(joinOrder);
@@ -1038,7 +1039,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
         // that generates a JoinNode tree or throws an exception.
         if (m_tableAliasMap.size() != tableAliases.size()) {
-            if (m_largeJoins) return false;
+            if (m_hasLargeNumberOfTableJoins) return false;
 
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
@@ -1052,7 +1053,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         Set<String> specifiedNames = new HashSet<String>(tableAliases);
         specifiedNames.removeAll(aliasSet);
         if (specifiedNames.isEmpty() == false) {
-            if (m_largeJoins) return false;
+            if (m_hasLargeNumberOfTableJoins) return false;
 
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
@@ -1076,7 +1077,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Now check whether the specified join order is valid or not
         if ( ! isValidJoinOrder(tableAliases)) {
-            if (m_largeJoins) return false;
+            if (m_hasLargeNumberOfTableJoins) return false;
             throw new PlanningErrorException("The specified join order is invalid for the given query");
         }
 

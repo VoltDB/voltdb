@@ -65,11 +65,13 @@ public abstract class AbstractParsedStmt {
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
 
-    //User specified join order, null if none is specified
+    // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
     public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
+    // This list is used to identify the order of the table aliases returned by
+    // the parser for possible use as a default join order.
     protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
 
     protected final String[] m_paramValues;
