@@ -53,11 +53,26 @@ public enum StoredProcParamType {
      * 1-byte signed 2s-compliment byte.
      * Lowest value means NULL in the database.
      */
-    TINYINT               (false, byte.class, new Class[] {Byte.class})
+    TINYINT               (false, byte.class, null)
     {
         protected VoltType resolveCircularDependency() { return VoltType.TINYINT; }
         public Object getNullValue() { return VoltType.NULL_TINYINT; }
-        public boolean isNullValue(Object val) { return (Byte)val == VoltType.NULL_TINYINT; }
+        public boolean isNullValue(Object val) { return (byte)val == VoltType.NULL_TINYINT; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToByte(param, paramType);
+        }
+    },
+
+    /**
+     * 1-byte signed 2s-compliment byte.
+     * null value means NULL in the database.
+     */
+    BOXED_TINYINT         (false, Byte.class, null)
+    {
+        protected VoltType resolveCircularDependency() { return VoltType.TINYINT; }
+        public Object getNullValue() { return null; }
+        public boolean isNullValue(Object val) { return (Byte)val == null; }
         public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
             return ParameterConverter.convertToByte(param, paramType);
@@ -68,16 +83,32 @@ public enum StoredProcParamType {
      * 2-byte signed 2s-compliment short.
      * Lowest value means NULL in the database.
      */
-    SMALLINT              (false, short.class, new Class[] {Short.class})
+    SMALLINT              (false, short.class, null)
     {
         protected VoltType resolveCircularDependency() { return VoltType.SMALLINT; }
         public Object getNullValue() { return VoltType.NULL_SMALLINT; }
-        public boolean isNullValue(Object val) { return (Short)val == VoltType.NULL_SMALLINT; }
+        public boolean isNullValue(Object val) { return (short)val == VoltType.NULL_SMALLINT; }
         public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
             return ParameterConverter.convertToShort(param, paramType);
         }
     },
+
+    /**
+     * 2-byte signed 2s-compliment short.
+     * null means NULL in the database.
+     */
+    BOXED_SMALLINT        (false, Short.class, null)
+    {
+        protected VoltType resolveCircularDependency() { return VoltType.SMALLINT; }
+        public Object getNullValue() { return null; }
+        public boolean isNullValue(Object val) { return (Short)val == null; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToShort(param, paramType);
+        }
+    },
+
     SMALLINT_VECTOR       (true, short[].class, new Class[] {Short[].class})
     {
         protected VoltType resolveCircularDependency() { return VoltType.SMALLINT; }
@@ -97,16 +128,32 @@ public enum StoredProcParamType {
      * 4-byte signed 2s-compliment integer.
      * Lowest value means NULL in the database.
      */
-    INTEGER               (false, int.class, new Class[] {Integer.class, AtomicInteger.class})
+    INTEGER               (false, int.class, null)
     {
         protected VoltType resolveCircularDependency() { return VoltType.INTEGER; }
         public Object getNullValue() { return VoltType.NULL_INTEGER; }
-        public boolean isNullValue(Object val) { return (Integer)val == VoltType.NULL_INTEGER; }
+        public boolean isNullValue(Object val) { return (int)val == VoltType.NULL_INTEGER; }
         public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
             return ParameterConverter.convertToInteger(param, paramType);
         }
     },
+
+    /**
+     * 4-byte signed 2s-compliment integer.
+     * null means NULL in the database.
+     */
+    BOXED_INTEGER         (false, Integer.class, new Class[] {AtomicInteger.class})
+    {
+        protected VoltType resolveCircularDependency() { return VoltType.INTEGER; }
+        public Object getNullValue() { return null; }
+        public boolean isNullValue(Object val) { return (Integer)val == null; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToInteger(param, paramType);
+        }
+    },
+
     INTEGER_VECTOR        (true, int[].class, new Class[] {Integer[].class, AtomicInteger[].class})
     {
         protected VoltType resolveCircularDependency() { return VoltType.INTEGER; }
@@ -126,16 +173,32 @@ public enum StoredProcParamType {
      * 8-byte signed 2s-compliment long.
      * Lowest value means NULL in the database.
      */
-    BIGINT                (false, long.class, new Class[] {Long.class, AtomicLong.class})
+    BIGINT                (false, long.class, null)
     {
         protected VoltType resolveCircularDependency() { return VoltType.BIGINT; }
         public Object getNullValue() { return VoltType.NULL_BIGINT; }
-        public boolean isNullValue(Object val) { return (Long)val == VoltType.NULL_BIGINT; }
+        public boolean isNullValue(Object val) { return (long)val == VoltType.NULL_BIGINT; }
         public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
             return ParameterConverter.convertToLong(param, paramType);
         }
     },
+
+    /**
+     * 8-byte signed 2s-compliment long.
+     * null means NULL in the database.
+     */
+    BOXED_BIGINT          (false, Long.class, new Class[] {AtomicLong.class})
+    {
+        protected VoltType resolveCircularDependency() { return VoltType.BIGINT; }
+        public Object getNullValue() { return null; }
+        public boolean isNullValue(Object val) { return (Long)val == null; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToLong(param, paramType);
+        }
+    },
+
     BIGINT_VECTOR         (true, long[].class, new Class[] {Long[].class, AtomicLong[].class})
     {
         protected VoltType resolveCircularDependency() { return VoltType.BIGINT; }
@@ -155,16 +218,32 @@ public enum StoredProcParamType {
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
-    FLOAT                 (false, double.class, new Class[] {Double.class, float.class, Float.class})
+    FLOAT                 (false, double.class, new Class[] {float.class})
     {
         protected VoltType resolveCircularDependency() { return VoltType.FLOAT; }
         public Object getNullValue() { return VoltType.NULL_FLOAT; }
-        public boolean isNullValue(Object val) { return (Double)val == VoltType.NULL_FLOAT; }
+        public boolean isNullValue(Object val) { return (double)val == VoltType.NULL_FLOAT; }
         public Object convertToParamType(final Object param, final StoredProcParamType paramType)
         {
             return ParameterConverter.convertToFloat(param, paramType);
         }
     },
+
+    /**
+     * 8-bytes in IEEE 754 "double format".
+     * null represent NULL in the database (TBD).
+     */
+    BOXED_FLOAT           (false, Double.class, new Class[] {Float.class})
+    {
+        protected VoltType resolveCircularDependency() { return VoltType.FLOAT; }
+        public Object getNullValue() { return null; }
+        public boolean isNullValue(Object val) { return (Double)val == null; }
+        public Object convertToParamType(final Object param, final StoredProcParamType paramType)
+        {
+            return ParameterConverter.convertToFloat(param, paramType);
+        }
+    },
+
     FLOAT_VECTOR          (true, double[].class, new Class[] {Double[].class, float[].class, Float[].class})
     {
         protected VoltType resolveCircularDependency() { return VoltType.FLOAT; }
