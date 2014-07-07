@@ -581,6 +581,18 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withBuiltinRabbitMQExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='rabbitmq'>"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
                 + "EXPORT TABLE export_data;";
@@ -657,6 +669,19 @@ public class TestCatalogUtil extends TestCase {
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
+        // Check RabbitMQ option
+        final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
+        DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        crc = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("0");
+        assertNotNull(catconn);
+        assertTrue(builtin_rabbitmqdeployment.getExport().isEnabled());
+        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getTarget());
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
     }
 
     /**
