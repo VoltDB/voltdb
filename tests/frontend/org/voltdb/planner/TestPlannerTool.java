@@ -68,7 +68,7 @@ public class TestPlannerTool extends TestCase {
         result = m_pt.planSqlForTest("select * from warehouse;");
         System.out.println(result);
 
-        // try too many tables
+        // try many tables joins
         try {
             result = m_pt.planSqlForTest("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
                 "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
@@ -80,9 +80,11 @@ public class TestPlannerTool extends TestCase {
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
                 "WAREHOUSE.W_ID = 0");
+        }
+        catch (Exception e) {
+            // V4.5 supports multiple table joins
             fail();
         }
-        catch (Exception e) {}
 
         // commented out code put the big stat
         /*int i = 0;

@@ -795,6 +795,28 @@ public class TestFunctionsSuite extends RegressionSuite {
             strTime = "2013-12-31 23:59:59.999999";
             cr = client.callProcedure("R2.insert", 4, strTime, 14, 1.1, strTime);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            // test only given date
+            strTime = "2014-07-02";
+            cr = client.callProcedure("R2.insert", 5, strTime + " 00:00:00.000000", 15, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-03";
+            cr = client.callProcedure("R2.insert", 6, strTime, 16, 1.1, strTime +" 00:00:00.000000");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-04";
+            cr = client.callProcedure("R2.insert", 7, strTime, 17, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+            // test AdHoc cast
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-04 00:00:00.000000' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-04 00:00:00.000000");
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-05' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-05 00:00:00.000000");
 
             cr = client.callProcedure("VERIFY_TIMESTAMP_STRING_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -808,10 +830,14 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("VERIFY_STRING_TIMESTAMP_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            if (r.getRowCount() != 0) {
-                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() + " rows:");
+            // there should be 2 rows wrong, because the cast always return a long format string, but we
+            // have two rows containing short format strings
+            if (r.getRowCount() != 2) {
+                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
                 System.out.println(r.toString());
-                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
             }
 
             cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");

@@ -27,16 +27,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.Assert;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
-
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
-
 import org.junit.Test;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class TestReplaySequencer {
 
@@ -160,6 +158,8 @@ public class TestReplaySequencer {
     {
         TransactionInfoBaseMessage sntl1 = makeSentinel(1L);
         TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl1 = makeCompleteTxn(1L);
+
         TransactionInfoBaseMessage sp1a = makeIv2InitTask(100L);
         TransactionInfoBaseMessage sp1b = makeIv2InitTask(101L);
         TransactionInfoBaseMessage sp1c = makeIv2InitTask(102L);
@@ -167,6 +167,8 @@ public class TestReplaySequencer {
 
         TransactionInfoBaseMessage sntl2 = makeSentinel(2L);
         TransactionInfoBaseMessage frag2 = makeFragment(2L);
+        TransactionInfoBaseMessage cmpl2 = makeCompleteTxn(2L);
+
         TransactionInfoBaseMessage sp2a = makeIv2InitTask(104L);
         TransactionInfoBaseMessage sp2b = makeIv2InitTask(105L);
         TransactionInfoBaseMessage sp2c = makeIv2InitTask(106L);
@@ -193,7 +195,9 @@ public class TestReplaySequencer {
 
         // Offer the first fragment to free up the first half.
         dut.offer(1L, frag1);
+        dut.offer(1L, cmpl1);
         Assert.assertEquals(frag1, dut.poll());
+        Assert.assertEquals(cmpl1, dut.poll());
         Assert.assertEquals(sp1a, dut.poll());
         Assert.assertEquals(sp1b, dut.poll());
         Assert.assertEquals(sp1c, dut.poll());
@@ -203,7 +207,9 @@ public class TestReplaySequencer {
 
         // Offer the second fragment to free up the second half
         dut.offer(2L, frag2);
+        dut.offer(2L, cmpl2);
         Assert.assertEquals(frag2, dut.poll());
+        Assert.assertEquals(cmpl2, dut.poll());
         Assert.assertEquals(sp2a, dut.poll());
         Assert.assertEquals(sp2b, dut.poll());
         Assert.assertEquals(sp2c, dut.poll());
@@ -217,9 +223,12 @@ public class TestReplaySequencer {
     {
         TransactionInfoBaseMessage sntl1 = makeSentinel(1L);
         TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl1 = makeCompleteTxn(1L);
 
         TransactionInfoBaseMessage sntl2 = makeSentinel(2L);
         TransactionInfoBaseMessage frag2 = makeFragment(2L);
+        TransactionInfoBaseMessage cmpl2 = makeCompleteTxn(2L);
+
         TransactionInfoBaseMessage sp2a = makeIv2InitTask(104L);
         TransactionInfoBaseMessage sp2b = makeIv2InitTask(105L);
 
@@ -236,13 +245,20 @@ public class TestReplaySequencer {
 
         // Offer the first fragment to free up the first half.
         dut.offer(1L, frag1);
+        dut.offer(1L, cmpl1);
         Assert.assertEquals(frag1, dut.poll());
+        Assert.assertEquals(cmpl1, dut.poll());
         Assert.assertEquals(null, dut.poll());
         Assert.assertNull(dut.drain());
 
         // Offer the second fragment to free up the second half
         dut.offer(2L, frag2);
         Assert.assertEquals(frag2, dut.poll());
+        Assert.assertEquals(null, dut.poll());
+
+        // Completed the second mp to free up the rests
+        dut.offer(2L, cmpl2);
+
         Assert.assertEquals(sp2a, dut.poll());
         Assert.assertEquals(sp2b, dut.poll());
         Assert.assertEquals(null, dut.poll());
@@ -459,12 +475,10 @@ public class TestReplaySequencer {
         // Offering the fragment and the complete releases init2 and init3
         Assert.assertTrue(dut.offer(1L, frag1));
         Assert.assertEquals(frag1, dut.poll());
+        Assert.assertNull(dut.poll());
+        Assert.assertFalse(dut.offer(1L, complete1));
         Assert.assertEquals(init2, dut.poll());
         Assert.assertEquals(init3, dut.poll());
-        Assert.assertNull(dut.poll());
-        Assert.assertNull(dut.drain());
-
-        Assert.assertFalse(dut.offer(1L, complete1));
         Assert.assertNull(dut.poll());
         Assert.assertNull(dut.drain());
 
@@ -650,9 +664,11 @@ public class TestReplaySequencer {
         Assert.assertNull(dut.poll());
 
         TransactionInfoBaseMessage frag1 = makeFragment(2L);
+        TransactionInfoBaseMessage cmpl1 = makeCompleteTxn(2L);
 
         Assert.assertTrue(dut.offer(2L, frag1));
         Assert.assertEquals(frag1, dut.poll());
+        Assert.assertFalse(dut.offer(2L,cmpl1));
         Assert.assertEquals(init2, dut.poll());
         Assert.assertNull(dut.poll());
 
@@ -680,8 +696,8 @@ public class TestReplaySequencer {
         Assert.assertTrue(dut.offer(1L, frag1));
         Assert.assertTrue(dut.offer(2L, init1));
         Assert.assertEquals(frag1, dut.poll());
-        Assert.assertEquals(init1, dut.poll());
         Assert.assertFalse(dut.offer(1L, cmpl1));
+        Assert.assertEquals(init1, dut.poll());
         Assert.assertNull(dut.poll());
 
         Assert.assertNull(dut.dedupe(1L, sntl1)); // don't care about sentinels
