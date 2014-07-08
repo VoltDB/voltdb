@@ -282,7 +282,6 @@ public class AdHocDDLBenchmark {
         switch(config.testMode)
         {
         case 0:
-            System.out.println("it's create");
             createTableTest();
             break;
         case 1:
