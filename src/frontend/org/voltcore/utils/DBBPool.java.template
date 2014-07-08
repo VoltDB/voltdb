@@ -72,7 +72,7 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
-        private final List<String> m_tags = new ArrayList<String>();
+        private List<String> m_tags = null;
 #endif
 
         public BBContainer(ByteBuffer b) {
@@ -113,6 +113,11 @@ public final class DBBPool {
                 System.err.println("Use was by:");
                 Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                 t.printStackTrace();
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
+                }
                 HOST.fatal("Use after free in DBBPool");
                 HOST.fatal("Free was by:", m_freeThrowable);
                 HOST.fatal("Use was by:", t);
@@ -131,8 +136,10 @@ public final class DBBPool {
                     System.err.println("Current free was by:");
                     Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                     t.printStackTrace();
-                    for (String tag: m_tags) {
-                        System.err.println(tag);
+                    if (isTagged()) {
+                        for (String tag: m_tags) {
+                            System.err.println(tag);
+                        }
                     }
                     HOST.fatal("Double free in DBBPool");
                     HOST.fatal("Original free was by:", m_freeThrowable);
@@ -152,6 +159,9 @@ public final class DBBPool {
             sb.append(tag).append("\n");
             sb.append(CoreUtils.throwableToString(new Throwable()));
             synchronized(this) {
+                if (m_tags == null) {
+                    m_tags = new ArrayList<String>();
+                }
                 m_tags.add(sb.toString());
             }
 #endif
@@ -159,13 +169,13 @@ public final class DBBPool {
 
         public final void addToTagTrail(final String tag) {
 #ifndef NO_MEMCHECK
-            if (!m_tags.isEmpty()) tag(tag);
+            if (isTagged()) tag(tag);
 #endif
         }
 
         public boolean isTagged() {
 #ifndef NO_MEMCHECK
-            return !m_tags.isEmpty();
+            return m_tags != null && !m_tags.isEmpty();
 #else
             return false;
 #endif
@@ -177,8 +187,10 @@ public final class DBBPool {
             if (m_freeThrowable == null) {
                 System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
                 m_allocationThrowable.printStackTrace();
-                for (String tag: m_tags) {
-                    System.err.println(tag);
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
                 }
                 HOST.fatal("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:", m_allocationThrowable);
                 System.exit(-1);
