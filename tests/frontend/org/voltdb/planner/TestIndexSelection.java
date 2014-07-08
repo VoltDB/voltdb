@@ -27,7 +27,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -99,9 +98,10 @@ public class TestIndexSelection extends PlannerTestCase {
         // ENG-5066: now Limit is pushed under Projection
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
+
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));

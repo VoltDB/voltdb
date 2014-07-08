@@ -111,6 +111,9 @@ public class VoltBulkLoader {
     //Queue of batch entries where some rows failed.
     BlockingQueue<VoltBulkLoaderRow> m_failedQueue = null;
 
+    // The max number of failed rows that can be stored in m_failedQueue before blocking insertion
+    private final int FAILED_QUEUE_LIMIT = Integer.getInteger("FAILED_QUEUE_LIMIT", 50);
+
     //Number of rows inserted into the PerPartitionTable queues.
     final AtomicLong m_loaderQueuedRowCnt = new AtomicLong(0);
     //Number of rows removed from PerPartitionTable queue converted to VoltTable and submitted to Client
@@ -179,7 +182,7 @@ public class VoltBulkLoader {
                         assert(m_failedBatchProcessor_cdl == null);
                         BulkLoaderNotification notifier = ((BulkLoaderNotification)currRow.m_rowHandle);
                         m_failedBatchProcessor_cdl = notifier.getLatch();
-                        if (m_failedBatchSentRowCnt.get() == 0) {
+                        if (m_failedBatchProcessor_cdl != null && m_failedBatchSentRowCnt.get() == 0) {
                             m_failedBatchProcessor_cdl.countDown();
                             m_failedBatchProcessor_cdl = null;
                         }
@@ -441,6 +444,10 @@ public class VoltBulkLoader {
      * @throws java.lang.InterruptedException
      */
     public void insertRow(Object rowHandle, Object... fieldList)  throws InterruptedException {
+
+        if (timeToDrainFailedQueue())
+            drainFailQueue();
+
         int partitionId = 0;
         //Find partition to send this row to and put on correct PerPartitionTable.
         if (fieldList == null || fieldList.length <= 0) {
@@ -512,6 +519,21 @@ public class VoltBulkLoader {
         }
     }
 
+    public boolean timeToDrainFailedQueue() {
+        return m_failedQueue.size() > FAILED_QUEUE_LIMIT;
+    }
+
+    public synchronized void drainFailQueue() throws InterruptedException {
+        if (m_failedQueue != null && m_failureProcessor != null) {
+            CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
+            VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
+            drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
+            m_failedQueue.add(drainRow);
+            batchFailureQueueLatch.await();
+            assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
+        }
+    }
+
     /**
      * Called to synchronously force the VoltBulkLoader to submit all the partially full batches
      * in all partitions of the table to the Client for insert. This call will wait until all
@@ -534,14 +556,8 @@ public class VoltBulkLoader {
 
         // Now we know all batches have been processed so wait for all failedQueue messages to complete unless failure
         //processor is dead.
-        if (m_failedQueue != null && m_failureProcessor != null) {
-            CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
-            VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
-            drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
-            m_failedQueue.add(drainRow);
-            batchFailureQueueLatch.await();
-            assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
-        }
+
+        drainFailQueue();
     }
 
     /**

@@ -57,8 +57,9 @@ public class TruncateTableLoader extends Thread {
     long insertsTried = 0;
     long rowsLoaded = 0;
     long nTruncates = 0;
+    float mpRatio;
 
-    TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits) {
+    TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
         setDaemon(true);
 
@@ -68,6 +69,7 @@ public class TruncateTableLoader extends Thread {
         this.rowSize = rowSize;
         this.batchSize = batchSize;
         m_permits = permits;
+        this.mpRatio = mpRatio;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -76,6 +78,7 @@ public class TruncateTableLoader extends Thread {
     }
 
     long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
+        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
         VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
         return t.asScalarLong();
     }
@@ -162,7 +165,7 @@ public class TruncateTableLoader extends Thread {
                 long p = Math.abs(r.nextLong());
                 String tp = this.truncateProcedure;
                 if (tableName == "trup")
-                    tp += r.nextInt(10) == 0 ? "MP" : "SP";
+                    tp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
@@ -213,7 +216,7 @@ public class TruncateTableLoader extends Thread {
                 long p = Math.abs(r.nextLong());
                 String sp = this.scanAggProcedure;
                 if (tableName == "trup")
-                    sp += r.nextInt(10) == 0 ? "MP" : "SP";
+                    sp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||

@@ -581,6 +581,18 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withBuiltinRabbitMQExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='rabbitmq'>"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
                 + "EXPORT TABLE export_data;";
@@ -657,6 +669,19 @@ public class TestCatalogUtil extends TestCase {
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
+        // Check RabbitMQ option
+        final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
+        DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        crc = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("0");
+        assertNotNull(catconn);
+        assertTrue(builtin_rabbitmqdeployment.getExport().isEnabled());
+        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getTarget());
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
     }
 
     /**
@@ -677,4 +702,41 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(crc1, crc2);
     }
 
+    public void testClusterSchemaSetting() throws Exception
+    {
+        final String defSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "</deployment>";
+
+        final String catalogSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='catalog'/>" +
+            "</deployment>";
+
+        final String adhocSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "</deployment>";
+
+        final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
+        CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
+        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
+        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getUseadhocschema());
+    }
 }
