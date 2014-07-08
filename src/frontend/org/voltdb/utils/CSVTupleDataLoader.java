@@ -47,6 +47,11 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     final AtomicLong m_failedCount = new AtomicLong(0);
     final int m_reportEveryNRows = 10000;
 
+    @Override
+    public void setFlushInterval(int delay, int seconds) {
+        //no op
+    }
+
     //Callback for single row procedure invoke called for rows in failed batch.
     private class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
         final CSVLineWithMetaData m_csvLine;
@@ -108,18 +113,18 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException
-    {
+    public boolean insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException    {
         try {
             PartitionSingleExecuteProcedureCallback cbmt =
                     new PartitionSingleExecuteProcedureCallback(metaData);
             if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
                 m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
-                System.exit(1); // Seriously?
+                return false;
             }
         } catch (IOException ex) {
             m_errHandler.handleError(metaData, null, ex.toString());
         }
+        return true;
     }
 
     @Override

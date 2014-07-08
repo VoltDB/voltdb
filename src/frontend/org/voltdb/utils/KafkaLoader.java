@@ -36,9 +36,9 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+import org.voltdb.client.NoConnectionsException;
 
 /**
  * KafkaConsumer loads data from kafka into voltdb
@@ -50,7 +50,7 @@ public class KafkaLoader {
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER");
     private final KafkaConfig m_config;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
-    private VoltBulkLoader m_loader = null;
+    private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private KafkaConsumerConnector m_consumer = null;
     private ExecutorService m_es = null;
@@ -76,18 +76,14 @@ public class KafkaLoader {
     public void close() {
         try {
             closeConsumer();
-            if (m_loader != null) {
-                m_loader.flush();
-                m_loader.cancelQueued();
-                m_loader.drain();
-                m_loader.close();
-                m_loader = null;
-            }
             if (m_client != null) {
                 m_client.close();
                 m_client = null;
             }
+            m_loader.close();
         } catch (InterruptedException ex) {
+        } catch (NoConnectionsException ex) {
+
         }
     }
 
@@ -101,12 +97,20 @@ public class KafkaLoader {
 
         m_client = getClient(c_config, serverlist, m_config.port);
 
-        m_loader = m_client.getNewBulkLoader(m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
+        if (m_config.useSuppliedProcedure) {
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
+        } else {
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, new KafkaBulkLoaderCallback());
+        }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
-        m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.table);
+        m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
         try {
             m_es = getConsumerExecutor(m_consumer, m_loader);
-            m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
+            if (m_config.useSuppliedProcedure) {
+                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for using procedure: " + m_config.procedure);
+            } else {
+                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
+            }
             m_es.awaitTermination(365, TimeUnit.DAYS);
         } catch (Exception ex) {
             m_log.error("Error in Kafka Consumer", ex);
@@ -119,6 +123,12 @@ public class KafkaLoader {
      * Configuration options.
      */
     public static class KafkaConfig extends CLIConfig {
+
+        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
+        String procedure = "";
+
+        // This is set to true when -p option us used.
+        boolean useSuppliedProcedure = false;
 
         @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to")
         String topic = "";
@@ -167,9 +177,6 @@ public class KafkaLoader {
             if (flush <= 0) {
                 exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
             }
-            if (table.length() <= 0) {
-                exitWithMessageAndUsage("Table must be specified.");
-            }
             if (topic.length() <= 0) {
                 exitWithMessageAndUsage("Topic must be specified.");
             }
@@ -178,6 +185,15 @@ public class KafkaLoader {
             }
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
+            }
+            if (procedure.equals("") && table.equals("")) {
+                exitWithMessageAndUsage("procedure name or a table name required");
+            }
+            if (!procedure.equals("") && !table.equals("")) {
+                exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+            }
+            if ((procedure != null) && (procedure.trim().length() > 0)) {
+                useSuppliedProcedure = true;
             }
             //Try and load classes we need and not packaged.
             try {
@@ -200,20 +216,28 @@ public class KafkaLoader {
         }
     }
 
-    class KafkaBulkLoaderCallback implements BulkLoaderFailureCallBack {
+    class KafkaBulkLoaderCallback implements CSVLoaderErrorHandler {
 
         @Override
-        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+        public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
             byte status = response.getStatus();
             if (status != ClientResponse.SUCCESS) {
-                m_log.error("Failed to Insert Row: " + rowHandle);
+                m_log.error("Failed to Insert Row: " + metaData.rawLine);
                 long fc = m_failedCount.incrementAndGet();
                 if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
                         || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
                     m_log.error("Kafkaloader will exit.");
                     closeConsumer();
+                    return true;
                 }
             }
+            return false;
+        }
+
+        @Override
+        public boolean hasReachedErrorLimit() {
+            long fc = m_failedCount.get();
+            return (m_config.maxerrors > 0 && fc > m_config.maxerrors);
         }
     }
 
@@ -222,9 +246,9 @@ public class KafkaLoader {
         final ConsumerConfig m_consumerConfig;
         final ConsumerConnector m_consumer;
 
-        public KafkaConsumerConnector(String zk, String tableName) {
+        public KafkaConsumerConnector(String zk, String groupName) {
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
-            String groupId = "voltdb-" + tableName;
+            String groupId = "voltdb-" + groupName;
             //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
             props.put("zookeeper.connect", zk);
@@ -255,10 +279,10 @@ public class KafkaLoader {
     public static class KafkaConsumer implements Runnable {
 
         private final KafkaStream m_stream;
-        private final VoltBulkLoader m_loader;
+        private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
 
-        public KafkaConsumer(KafkaStream a_stream, VoltBulkLoader loader) {
+        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader) {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
@@ -271,7 +295,9 @@ public class KafkaLoader {
                 byte msg[] = it.next().message();
                 String smsg = new String(msg);
                 try {
-                    m_loader.insertRow(smsg, (Object[]) m_csvParser.parseLine(smsg));
+                    if (!m_loader.insertRow(new CSVLineWithMetaData(smsg, 0), m_csvParser.parseLine(smsg))) {
+                        break;
+                    }
                 } catch (InterruptedException ex) {
                     m_log.error("Consumer stopped", ex);
                 } catch (IOException ex) {
@@ -283,7 +309,7 @@ public class KafkaLoader {
     }
 
     private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer,
-            VoltBulkLoader loader) throws Exception {
+            CSVDataLoader loader) throws Exception {
 
         Map<String, Integer> topicCountMap = new HashMap<>();
         //Get this from config or arg. Use 3 threads default.
