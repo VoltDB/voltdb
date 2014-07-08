@@ -450,6 +450,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
 
                 if (m_aggExec != NULL) {
+                    if (m_aggExec->p_execute_early_returned()) {
+                        // Get enough rows for LIMIT
+                        break;
+                    }
                     m_aggExec->p_execute_tuple(temp_tuple);
                 } else {
                     m_outputTable->insertTupleNonVirtual(temp_tuple);

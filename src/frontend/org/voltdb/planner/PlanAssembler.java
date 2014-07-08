@@ -1310,7 +1310,8 @@ public class PlanAssembler {
             // ensure the order of the data on each partition.
             distributedPlan = handleOrderBy(distributedPlan);
 
-            if (distributedPlan instanceof OrderByPlanNode) {
+            if (distributedPlan instanceof OrderByPlanNode ||
+                    distributedPlan instanceof AggregatePlanNode) {
                 // Inline the distributed limit.
                 distributedPlan.addInlinePlanNode(distLimit);
                 sendNode.addAndLinkChild(distributedPlan);
@@ -1320,14 +1321,14 @@ public class PlanAssembler {
                 sendNode.addAndLinkChild(distLimit);
             }
         }
-
-        // In future, inline LIMIT for aggregate node, join, Receive
+        // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
         // Switch if has Complex aggregations
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
-            if (child instanceof OrderByPlanNode) {
+            if (child instanceof OrderByPlanNode || child instanceof AggregatePlanNode) {
+                // Aggregate apply for serial aggregation only
                 child.addInlinePlanNode(topLimit);
             } else {
                 // In future, inline LIMIT for aggregate node
@@ -1337,10 +1338,11 @@ public class PlanAssembler {
                 root.addAndLinkChild(topLimit);
             }
         } else {
-            if (root instanceof OrderByPlanNode) {
+            if (root instanceof OrderByPlanNode || root instanceof AggregatePlanNode) {
                 root.addInlinePlanNode(topLimit);
-            } else if (root instanceof ProjectionPlanNode &&
-                    root.getChild(0) instanceof OrderByPlanNode) {
+            } else if (root instanceof ProjectionPlanNode
+                    && (root.getChild(0) instanceof OrderByPlanNode ||
+                        root instanceof AggregatePlanNode) ) {
                 root.getChild(0).addInlinePlanNode(topLimit);
             } else {
                 topLimit.addAndLinkChild(root);

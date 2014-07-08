@@ -360,6 +360,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkGroupByOnlyPlan(false, true, true);
     }
 
+    public void testGroupByLimit() {
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1 LIMIT 5");
+        checkGroupByOnlyPlan(false, false, true);
+        printExplainPlan(pns);
+    }
+
     public void testEdgeComplexRelatedCases() {
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
         AbstractPlanNode p = pns.get(0).getChild(0);
