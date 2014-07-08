@@ -100,7 +100,7 @@ public class TestPlansMatView extends PlannerTestCase {
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
         explainedFragment = pns.get(0).toExplainPlanString();
-        assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
+        assertTrue(explainedFragment.contains("using its primary key index"));
 
         pns = compileToFragments("SELECT * FROM VR WHERE V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
@@ -118,7 +118,7 @@ public class TestPlansMatView extends PlannerTestCase {
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
         explainedFragment = pns.get(0).toExplainPlanString();
-        assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
+        assertTrue(explainedFragment.contains("using its primary key index"));
 
         pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");

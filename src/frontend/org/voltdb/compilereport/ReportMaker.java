@@ -851,7 +851,7 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -890,6 +890,8 @@ public class ReportMaker {
         contents = contents.replace("##PLATFORM##", platformData);
 
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
+
+        contents = contents.replace("##DDL##", autoGenDDL);
 
         DateFormat df = new SimpleDateFormat("d MMM yyyy HH:mm:ss z");
         contents = contents.replace("##TIMESTAMP##", df.format(m_timestamp));

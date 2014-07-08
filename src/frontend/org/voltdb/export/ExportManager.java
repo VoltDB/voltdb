@@ -375,6 +375,8 @@ public class ExportManager
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
+                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_uniqueId);
+                    currentGeneration.initializeMissingPartitionsFromCatalog(conn, m_hostId, m_messenger, partitions);
                 }
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();

@@ -4,4 +4,11 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+
+    <export enabled="true" target="file">
+        <configuration>
+            <property name="type">csv</property>
+            <property name="nonce">MyExport</property>
+        </configuration>
+    </export>
 </deployment>

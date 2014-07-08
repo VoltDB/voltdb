@@ -51,6 +51,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
+        builder.setUseAdhocSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

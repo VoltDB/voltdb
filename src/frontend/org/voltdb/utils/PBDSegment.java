@@ -78,7 +78,9 @@ class PBDSegment {
     public PBDSegment(Long index, File file ) {
         m_index = index;
         m_file = file;
-        LOG.info("Creating Segment: " + file.getName() + " At Index: " + m_index);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Creating Segment: " + file.getName() + " At Index: " + m_index);
+        }
     }
 
     int getNumEntries() throws IOException {
@@ -137,7 +139,9 @@ class PBDSegment {
 
     public void closeAndDelete() throws IOException {
         close();
-        LOG.info("Deleting segment at Index " + m_index + " File: " + m_file.getAbsolutePath());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Deleting segment at Index " + m_index + " File: " + m_file.getAbsolutePath());
+        }
         m_file.delete();
     }
 

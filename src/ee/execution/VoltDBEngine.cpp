@@ -1253,20 +1253,25 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
-        PersistentTable *srcTable = dynamic_cast<PersistentTable*>(m_tables[srcCatalogTable->relativeIndex()]);
-        assert(srcTable);
+        Table *srcTable = m_tables[srcCatalogTable->relativeIndex()];
+        PersistentTable *srcPTable = dynamic_cast<PersistentTable*>(srcTable);
+        if ( ! srcPTable) {
+            // Streamed tables don't have views.
+            return;
+        }
         // walk views
         BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
             catalog::MaterializedViewInfo *catalogView = labeledView.second;
             const catalog::Table *destCatalogTable = catalogView->dest();
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
+            assert(destTable);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
                 // This is not a leak -- the materialized view is self-installing into srcTable.
-                new MaterializedViewMetadata(srcTable, destTable, catalogView);
+                new MaterializedViewMetadata(srcPTable, destTable, catalogView);
             } else {
                 // Ensure that the materialized view is using the latest version of the target table.
-                srcTable->updateMaterializedViewTargetTable(destTable, catalogView);
+                srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }

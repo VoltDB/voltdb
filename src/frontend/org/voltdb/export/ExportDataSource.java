@@ -72,6 +72,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final String m_database;
     private final String m_tableName;
+    private String m_partitionColumnName = "";
     private final String m_signature;
     private final byte [] m_signatureBytes;
     private final long m_generation;
@@ -109,6 +110,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String db, String tableName,
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
+            Column partitionColumn,
             String overflowPath
             ) throws IOException
             {
@@ -179,7 +181,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_columnLengths.add(c.getSize());
         }
 
-
+        if (partitionColumn != null) {
+            m_partitionColumnName = partitionColumn.getName();
+        }
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
@@ -253,10 +257,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_columnTypes.add(columnType);
                 m_columnLengths.add(column.getInt("length"));
             }
+
             if (jsObj.has("format")) {
                 m_format = ExportFormat.valueOf(jsObj.getString("format"));
             } else {
                 m_format = ExportFormat.FOURDOTFOUR;
+            }
+
+            try {
+                m_partitionColumnName = jsObj.getString("partitionColumnName");
+            } catch (Exception ex) {
+                //Ignore these if we have a OLD ad file these may not exist.
             }
         } catch (JSONException e) {
             throw new IOException(e);
@@ -326,6 +337,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_partitionId;
     }
 
+    public String getPartitionColumnName() {
+        return m_partitionColumnName;
+    }
+
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
         stringer.key("adVersion").value(0);
         stringer.key("generation").value(m_generation);
@@ -343,6 +358,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         stringer.endArray();
         stringer.key("format").value(ExportFormat.FOURDOTFOUR.toString());
+        stringer.key("partitionColumnName").value(m_partitionColumnName);
     }
 
     /**
