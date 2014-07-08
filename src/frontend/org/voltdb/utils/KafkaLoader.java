@@ -30,6 +30,7 @@ import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
+import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -83,7 +84,6 @@ public class KafkaLoader {
             m_loader.close();
         } catch (InterruptedException ex) {
         } catch (NoConnectionsException ex) {
-
         }
     }
 
@@ -292,10 +292,12 @@ public class KafkaLoader {
         public void run() {
             ConsumerIterator<byte[], byte[]> it = m_stream.iterator();
             while (it.hasNext()) {
-                byte msg[] = it.next().message();
+                MessageAndMetadata<byte[], byte[]> md = it.next();
+                byte msg[] = md.message();
+                long offset = md.offset();
                 String smsg = new String(msg);
                 try {
-                    if (!m_loader.insertRow(new CSVLineWithMetaData(smsg, 0), m_csvParser.parseLine(smsg))) {
+                    if (!m_loader.insertRow(new CSVLineWithMetaData(smsg, offset), m_csvParser.parseLine(smsg))) {
                         break;
                     }
                 } catch (InterruptedException ex) {
