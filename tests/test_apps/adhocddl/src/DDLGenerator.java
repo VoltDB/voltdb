@@ -69,17 +69,15 @@ public class DDLGenerator
 
     public String CreateTable(int tableNo, String prefix)
     {
-        // number of cols range is [numOfCols / 2, numOfCols + numOfCols / 2 - 1]
-        int cols = Math.abs(r.nextInt() % numOfCols) + numOfCols / 2;
         StringBuffer sb = new StringBuffer();
         sb.append("CREATE TABLE " + prefix + tableNo + " (");
 
-        for(int i = 0; i < cols; i++)
+        for(int i = 0; i < numOfCols; i++)
         {
             sb.append(CreateColumn(i) + ", ");
         }
 
-        for(int i = 0; i < cols; i += idxStep)
+        for(int i = 0; i < numOfCols; i += idxStep)
         {
             sb.append("UNIQUE(C" + i + "), ");
         }
@@ -91,5 +89,11 @@ public class DDLGenerator
     public String DropTable(int tableNo, String prefix)
     {
         return "DROP TABLE " + prefix + tableNo + ";";
+    }
+
+    public String CreateProcedure(int procNo, int tableNo, String prefix)
+    {
+        String tableName = prefix + tableNo;
+        return "CREATE PROCEDURE P" + procNo + "on" + tableName + " AS SELECT * FROM " + tableName + ";";
     }
 }

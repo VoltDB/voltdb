@@ -85,7 +85,7 @@ public class AdHocDDLBenchmark {
         public void validate() {
             if (numOfTests <= 0) exitWithMessageAndUsage("numOfTests must be > 0");
             if (numOfCols <= 0) exitWithMessageAndUsage("numOfCols must be > 0");
-            if (idxPercent <= 0 || idxPercent >= 1) exitWithMessageAndUsage("idxPercent must be > 0 and < 1");
+            if (idxPercent < 0 || idxPercent > 1) exitWithMessageAndUsage("idxPercent must be >= 0 and <= 1");
         }
     }
 

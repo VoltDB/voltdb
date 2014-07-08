@@ -35,6 +35,9 @@ public class Initializer {
         @Option(desc = "Number of tables in server")
         int numOfTables = 200;
 
+        @Option(desc = "Number of SPs per table in server")
+        int numOfSPs = 4;
+
         @Option(desc = "Table name prefix")
         String prefix = "T";
 
@@ -55,10 +58,16 @@ public class Initializer {
         DDLGenerator DDLGen = new DDLGenerator(config.numOfCols, config.idxPercent);
         FileOutputStream fos = new FileOutputStream(new File("ddl.sql"));
 
+        String ddl;
         for(int i = 0; i < config.numOfTables; i++)
         {
-            String ddl = DDLGen.CreateTable(i, config.prefix) + "\n\n";
+            ddl = DDLGen.CreateTable(i, config.prefix) + "\n\n";
             fos.write(ddl.getBytes());
+            for(int j = 0; j < config.numOfSPs; j++)
+            {
+                ddl = DDLGen.CreateProcedure(j, i, config.prefix) + "\n\n";
+                fos.write(ddl.getBytes());
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+export VOLTDB_HEAPMAX=4096
 APPNAME="adhocddl"
 
 # find voltdb binaries in either installation or distribution directory.
@@ -48,8 +49,9 @@ function srccompile() {
 function catalog() {
     srccompile
     java -classpath obj:$CLASSPATH:obj Initializer \
-         --numOfTables=0 \
-         --numOfCols=10 \
+         --numOfTables=1000 \
+         --numOfSPs=4 \
+         --numOfCols=50 \
          --idxPercent=0 
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
     # stop if compilation fails
@@ -69,8 +71,8 @@ function client() {
     srccompile
     java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
         --servers=localhost \
-        --numOfTests=50 \
-        --numOfCols=10 \
+        --numOfTests=10 \
+        --numOfCols=50 \
         --idxPercent=0 \
         --testMode=2
 }
