@@ -71,7 +71,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
             long currentCount = m_processedCount.incrementAndGet();
 
             if (currentCount % m_reportEveryNRows == 0) {
-                m_log.info("Inserted " + currentCount + " rows");
+                m_log.info("Inserted " + (currentCount - m_failedCount.get()) + " rows");
             }
         }
     }
