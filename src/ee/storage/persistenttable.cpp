@@ -79,6 +79,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "storage/DRTupleStream.h"
 
 namespace voltdb {
 
@@ -87,7 +88,7 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize, int tupleLimit) :
+PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -96,7 +97,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
-    m_surgeon(*this)
+    m_surgeon(*this),
+    m_isMaterialized(isMaterialized)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -107,6 +109,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     }
 
     m_preTruncateTable = NULL;
+    ::memcpy(&m_signature, signature, 20);
 }
 
 PersistentTable::~PersistentTable()
@@ -362,7 +365,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
 {
     if (fallible) {
         // not null checks at first
@@ -396,6 +399,17 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
                 CONSTRAINT_TYPE_UNIQUE);
     }
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
+    if (!m_isMaterialized && shouldDRStream) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_INSERT);
+    }
+
     // this is skipped for inserts that are never expected to fail,
     // like some (initially, all) cases of tuple migration on schema change
     if (fallible) {
@@ -408,7 +422,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
             //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
             //* enable for debug */           << " { " << target.debugNoHeader() << " } "
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon, drMark));
         }
     }
 
@@ -554,6 +568,18 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
+    if (!m_isMaterialized) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DR_RECORD_INSERT);
+    }
+
     if (uq) {
         /*
          * Create and register an undo action with copies of the "before" and "after" tuple storage
@@ -562,7 +588,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
         uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
                                                                          oldObjects, newObjects,
-                                                                         &m_surgeon, someIndexGotUpdated));
+                                                                         &m_surgeon, someIndexGotUpdated,
+                                                                         drMark));
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
@@ -668,6 +695,16 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         m_views[i]->processTupleDelete(target, fallible);
     }
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
+    if (!m_isMaterialized) {
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_DELETE);
+    }
+
     if (fallible) {
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
@@ -675,7 +712,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             m_tuplesPinnedByUndo++;
             ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon, drMark), this);
             return true;
         }
     }
@@ -1021,9 +1058,10 @@ void PersistentTable::onSetColumns() {
 void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
-                                         size_t &tupleCountPosition) {
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows) {
     try {
-        insertTupleCommon(tuple, tuple, true);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
@@ -1050,7 +1088,7 @@ bool PersistentTable::activateStream(
     TableStreamType streamType,
     int32_t partitionId,
     CatalogId tableId,
-    ReferenceSerializeInput &serializeIn) {
+    ReferenceSerializeInputBE &serializeIn) {
     /*
      * Allow multiple stream types for the same partition by holding onto the
      * TableStreamer object. TableStreamer enforces which multiple stream type
