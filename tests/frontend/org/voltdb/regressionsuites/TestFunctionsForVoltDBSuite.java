@@ -1784,6 +1784,107 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    // col1 is not null while col2 is null
+    private static void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == coalesce(col2, col1)
+        String sql = "SELECT DECODE(COALESCE("+col1+","+ col2+"),COALESCE("+col2+","+col1+"), 0, 1) "
+                + "FROM C_NULL WHERE ID = 1;";
+        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
+        result.advanceRow();
+        long rv = result.getLong(0);
+        assertEquals(rv, 0);
+
+        // coalesce(col1, col2) == col1
+        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
+                + "FROM C_NULL WHERE ID = 1;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        result.advanceRow();
+        rv = result.getLong(0);
+        assertEquals(rv, 0);
+    }
+
+    // TODO: need discuss the logic here
+    private static void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
+        // coalesce(col1, col2) == coalesce(col2, col1)
+        String sql = "SELECT DECODE(COALESCE("+col1+","+ col2+"),COALESCE("+col2+","+col1+"), 0, 1) "
+                + "FROM C_NULL WHERE ID = 0;";
+        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
+        result.advanceRow();
+        long rv = result.getLong(0);
+        assertEquals(rv, 0);
+
+        // coalesce(col1, col2) == col1
+        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
+                + "FROM C_NULL WHERE ID = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        result.advanceRow();
+        rv = result.getLong(0);
+        assertEquals(rv, 0);
+    }
+
+    // Both the columns are not null
+    private static void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col2, col1) == col2
+        String sql = "SELECT DECODE(COALESCE("+col2+","+ col1+")," + col2 + ", 0, 1) "
+                + "FROM C_NULL WHERE ID = 2;";
+        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
+        result.advanceRow();
+        long rv = result.getLong(0);
+        assertEquals(rv, 0);
+
+        // coalesce(col1, col2) == col1
+        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
+                + "FROM C_NULL WHERE ID = 2;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        result.advanceRow();
+        rv = result.getLong(0);
+        assertEquals(rv, 0);
+    }
+
+    public void testCoalesce() throws Exception {
+        System.out.println("STARTING test Case COALESCE function...");
+        Client cl = getClient();
+
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID) values (0);");
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1) values (1,1,1,1,1,'1',100000)");
+        // TODO: below is wrong, because the null timestamp will be regarded as an invalid input by hsql
+        //cl.callProcedure("C_NULL.insert", 1,1,1,1,1,"1",new Timestamp(1000000000000L), null, null, null, null, null);
+        cl.callProcedure("C_NULL.insert", 2,1,1,1,1,"1",new Timestamp(1000000000000L),
+                12,12,12,"12",new Timestamp(1200000000000L));
+
+        doTestCoalescePairBothNull(cl, "I1", "I2");
+        doTestCoalescePairBothNull(cl, "F1", "F2");
+        doTestCoalescePairBothNull(cl, "D1", "D2");
+        doTestCoalescePairBothNull(cl, "V1", "V2");
+        doTestCoalescePairBothNull(cl, "T1", "T2");
+
+        doTestCoalescePairOneNull(cl, "I1", "I2");
+        doTestCoalescePairOneNull(cl, "F1", "F2");
+        doTestCoalescePairOneNull(cl, "D1", "D2");
+        doTestCoalescePairOneNull(cl, "V1", "V2");
+        doTestCoalescePairOneNull(cl, "T1", "T2");
+
+        doTestCoalescePairNotNull(cl, "I1", "I2");
+        doTestCoalescePairNotNull(cl, "F1", "F2");
+        doTestCoalescePairNotNull(cl, "D1", "D2");
+        doTestCoalescePairNotNull(cl, "V1", "V2");
+        doTestCoalescePairNotNull(cl, "T1", "T2");
+
+        // TODO: add more test cases, like adhoc query with all NULL parameters
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1821,6 +1922,22 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+
+                "CREATE TABLE C_NULL ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "S1 SMALLINT DEFAULT NULL, " +
+                "I1 INTEGER DEFAULT NULL, " +
+                "F1 FLOAT DEFAULT NULL, " +
+                "D1 DECIMAL DEFAULT NULL, " +
+                "V1 VARCHAR(10) DEFAULT NULL, " +
+                "T1 TIMESTAMP DEFAULT NULL, " +
+                "I2 INTEGER DEFAULT NULL, " +
+                "F2 FLOAT DEFAULT NULL, " +
+                "D2 DECIMAL DEFAULT NULL, " +
+                "V2 VARCHAR(10) DEFAULT NULL, " +
+                "T2 TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE C_NULL ON COLUMN ID;" +
 
                 "CREATE TABLE R3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
