@@ -167,6 +167,9 @@ public class ParameterSet implements JSONString {
             else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
                 continue;
+            } else if (obj instanceof BBContainer) {
+                size += 4 + ((BBContainer)obj).b().remaining();
+                continue;
             }
 
             VoltType type = VoltType.typeFromClass(cls);
@@ -606,14 +609,10 @@ public class ParameterSet implements JSONString {
                 //Same as before, but deal with the fact it is coming in as a unmanaged bytebuffer
                 if (obj instanceof BBContainer) {
                     final BBContainer cont = (BBContainer) obj;
-                    try {
-                        final ByteBuffer paramBuf = cont.b();
-                        buf.put(VoltType.VARBINARY.getValue());
-                        buf.putInt(paramBuf.remaining());
-                        buf.put(paramBuf);
-                    } finally {
-                        cont.discard();
-                    }
+                    final ByteBuffer paramBuf = cont.b();
+                    buf.put(VoltType.VARBINARY.getValue());
+                    buf.putInt(paramBuf.remaining());
+                    buf.put(paramBuf);
                     continue;
                 }
 
@@ -691,6 +690,13 @@ public class ParameterSet implements JSONString {
             else if (obj == VoltType.NULL_DECIMAL) {
                 buf.put(VoltType.DECIMAL.getValue());
                 VoltDecimalHelper.serializeNull(buf);
+                continue;
+            } else if (obj instanceof BBContainer) {
+                final BBContainer cont = (BBContainer) obj;
+                final ByteBuffer paramBuf = cont.b();
+                buf.put(VoltType.VARBINARY.getValue());
+                buf.putInt(paramBuf.remaining());
+                buf.put(paramBuf);
                 continue;
             }
 

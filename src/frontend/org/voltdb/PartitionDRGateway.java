@@ -223,7 +223,7 @@ public class PartitionDRGateway {
 
         BBContainer logContainer = DBBPool.wrapBB(buf);
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName("@ApplySinglePartitionSP");
+        spi.setProcName("@ApplyBinaryLogSP");
         spi.setParams( partitionId, logContainer);
         final PartitionDRGateway pdrg = gateways.get(partitionId);
         if (pdrg == null) {
