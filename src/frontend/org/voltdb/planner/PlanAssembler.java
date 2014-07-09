@@ -1273,7 +1273,7 @@ public class PlanAssembler {
         // Whether or not we can push the limit node down
         boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
-            sendNode = checkPushDownViability(root);
+            sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
             } else {
@@ -1865,7 +1865,7 @@ public class PlanAssembler {
      * @return If we can push it down, the receive node is returned. Otherwise,
      *         it returns null.
      */
-    protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
+    protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
         // Return a mid-plan send node, if one exists and can host a distributed limit node.

@@ -38,4 +38,3 @@ CREATE PROCEDURE GetTopScores AS
  SELECT user_id, score_value 
  FROM score WHERE score_date > ? AND score_date <= ? 
  ORDER BY score_value DESC, user_id DESC LIMIT ?;
- 

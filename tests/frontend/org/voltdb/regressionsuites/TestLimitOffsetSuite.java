@@ -260,13 +260,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         client.callProcedure(insertProc, 19, 2, "foo");
 
         result = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM C;").getResults()[0];
-        if (result.advanceRow()) {
-            long count = result.getLong(0);
-            assertEquals(18, count);
-        }
-        else {
-            fail("cannot get data from table c");
-        }
+        validateTableOfScalarLongs(result, new long[] {18});
 
         result = client.callProcedure("@AdHoc", "SELECT name, count(id) FROM C GROUP BY name limit 1").getResults()[0];
         if (result.advanceRow()) {
