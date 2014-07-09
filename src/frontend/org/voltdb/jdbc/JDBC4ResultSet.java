@@ -115,22 +115,18 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
             else return false;
         }
 
-        if (cursorPosition == Position.afterLast) {
+        if (cursorPosition == Position.afterLast || cursorPosition == Position.beforeFirst) {
             cursorPosition = Position.middle;
         }
 
         try {
-
             if(table.getActiveRowIndex() > row && row > 0)
                     return table.advanceToRow(row-1);
-
-            if(row < 0 )
+           if(row < 0 )
             {
-                cursorPosition = Position.middle;
                 row += rowCount;
                 row++;
             }
-
             table.resetRowPosition();
             table.advanceToRow(0);
             return table.advanceToRow(row-1);
@@ -1045,8 +1041,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean next() throws SQLException {
         checkClosed();
 
-        if (cursorPosition == Position.afterLast ||
-                table.getActiveRowIndex() == rowCount - 1) {
+        if (cursorPosition == Position.afterLast || table.getActiveRowIndex() == rowCount - 1) {
             cursorPosition = Position.afterLast;
             return false;
         }
@@ -1071,7 +1066,6 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         }
 
         if (cursorPosition == Position.beforeFirst || table.getActiveRowIndex() == -1) {
-            cursorPosition = Position.beforeFirst;
             beforeFirst();
             return false;
         }
@@ -1097,13 +1091,11 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         if (rowCount == 0)
             return false;
 
-        if (table.getActiveRowIndex() + rows > rowCount) {
+        if (table.getActiveRowIndex() + rows >= rowCount) {
             cursorPosition = Position.afterLast;
-            return false;
-        }
-        if (table.getActiveRowIndex() + rows == rowCount) {
-            cursorPosition = Position.afterLast;
-            return true;
+            if (table.getActiveRowIndex() + rows == rowCount)
+                return true;
+             return false;
         }
 
         if (cursorPosition == Position.beforeFirst && rows <= 0) {

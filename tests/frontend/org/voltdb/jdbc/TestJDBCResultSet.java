@@ -169,19 +169,13 @@ public class TestJDBCResultSet {
                     "SELECT * FROM HSQLEMPTY",
                     ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY);
-            hsql3RowStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLTABLE",
-                    ResultSet.TYPE_SCROLL_INSENSITIVE,
-                    ResultSet.CONCUR_READ_ONLY);
+            hsql3RowStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLTABLE", ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
             hsqlEmptyRS = hsqlEmptyStmt.executeQuery();
             hsql3RowRS = hsql3RowStmt.executeQuery();
 
-            voltEmptyStmt = VoltDBConn.createStatement(
-                    ResultSet.TYPE_SCROLL_INSENSITIVE,
-                    ResultSet.CONCUR_READ_ONLY);
-            volt3RowStmt = VoltDBConn.createStatement(
-                    ResultSet.TYPE_SCROLL_INSENSITIVE,
-                    ResultSet.CONCUR_READ_ONLY);
+            voltEmptyStmt = VoltDBConn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            volt3RowStmt = VoltDBConn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
             voltEmptyRS = voltEmptyStmt.executeQuery("SELECT * FROM HSQLEMPTY");
             volt3RowRS = volt3RowStmt.executeQuery("SELECT * FROM HSQLTABLE");
@@ -266,40 +260,9 @@ public class TestJDBCResultSet {
     @Test
     public void testAbsolute() throws Exception {
 
-        hsql3RowRS.last();
-        volt3RowRS.last();
-        hsql3RowRS.next();
-        volt3RowRS.next();
-        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
-
         hsql3RowRS.previous();
         volt3RowRS.previous();
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
-        assertEquals(hsql3RowRS.absolute(1), volt3RowRS.absolute(1));
-        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
-
-        // beforeFirst position
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
-        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
-
-        // going to 2nd position using next and then previous
-        // Check for resetting of the flag in the next method implementation
-        hsql3RowRS.next();
-        volt3RowRS.next();
-        hsql3RowRS.next();
-        volt3RowRS.next();
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
-        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
-
-        // Check for resetting of the flag in the beforeFirst method
-        // implementation
-        hsql3RowRS.beforeFirst();
-        volt3RowRS.beforeFirst();
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
+        assertEquals(hsql3RowRS.absolute(2), volt3RowRS.absolute(2));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         // afterLast position
@@ -321,6 +284,7 @@ public class TestJDBCResultSet {
 
     @Test
     public void testRelative() throws Exception {
+
         hsql3RowRS.next();
         volt3RowRS.next();
         assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
@@ -345,6 +309,12 @@ public class TestJDBCResultSet {
 
     @Test
     public void testNextBoundaryRows() throws SQLException {
+
+        hsql3RowRS.last();
+        volt3RowRS.last();
+        hsql3RowRS.next();
+        volt3RowRS.next();
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         hsql3RowRS.absolute(4);
         volt3RowRS.absolute(4);
