@@ -11,12 +11,13 @@ You can set the testing parameters in run.sh script. The meanings are the follow
 
 In function catalog
 numOfTables: the number of tables that will be generated in the original ddl.sql.
-numOfCols: the average number of columns in each table.
+numOfCols: the number of columns in each table.
+numOfSPs: the number of SPs per table.
 idxPercent: the percentage of UNIQUE INDEX out of the columns that will be built in each table.
 
 In function client
 servers: the comma separate list of server names.
 numOfTests: the number of AdHoc DDLs that will be run in the benchmark
-numOfCols: the average number of columns in each AdHoc DDL.
+numOfCols: the number of columns in each AdHoc DDL.
+numOfSPs: the number of SPs per table.
 idxPercent: the percentage of UNIQUE INDEX out of the columns that will be built in each AdHoc DDL.
-testMode: 0: create tables test; 1: drop table test; 2: average latency test

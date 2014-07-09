@@ -41,7 +41,7 @@ public class Initializer {
         @Option(desc = "Table name prefix")
         String prefix = "T";
 
-        @Option(desc = "Median number of Columns in randomly generated tables")
+        @Option(desc = "Number of Columns in each table")
         int numOfCols = 10;
 
         @Option(desc = "Percentage of indexed columns in the ramdonly generated table")

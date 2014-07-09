@@ -263,7 +263,7 @@ public class AdHocDDLBenchmark {
         float series3 = averageLatencyTest();
 
         ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
-        
+
         if(fw != null)
         {
             fw.append(String.format("%s,%d,-1,%.2f,0,0,%.2f,%.2f\n",
@@ -294,7 +294,7 @@ public class AdHocDDLBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         FileWriter fw = null;
-        if((config.statsfile != null) && (config.statsfile.length() != 0)) 
+        if((config.statsfile != null) && (config.statsfile.length() != 0))
         {
             fw = new FileWriter(config.statsfile);
         }
@@ -304,7 +304,7 @@ public class AdHocDDLBenchmark {
         bunchTest(50, fw, "50 columns table");
         clearServer(0, 1000);
 
-        if((config.statsfile != null) && (config.statsfile.length() != 0)) 
+        if((config.statsfile != null) && (config.statsfile.length() != 0))
         {
             fw.close();
         }
