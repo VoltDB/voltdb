@@ -1310,8 +1310,7 @@ public class PlanAssembler {
             // ensure the order of the data on each partition.
             distributedPlan = handleOrderBy(distributedPlan);
 
-            if (distributedPlan instanceof OrderByPlanNode ||
-                    distributedPlan instanceof AggregatePlanNode) {
+            if (isInlineLimitPlanNodePossible(distributedPlan)) {
                 // Inline the distributed limit.
                 distributedPlan.addInlinePlanNode(distLimit);
                 sendNode.addAndLinkChild(distributedPlan);
@@ -1327,29 +1326,45 @@ public class PlanAssembler {
         // Switch if has Complex aggregations
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
-            if (child instanceof OrderByPlanNode || child instanceof AggregatePlanNode) {
-                // Aggregate apply for serial aggregation only
+            if (isInlineLimitPlanNodePossible(child)) {
                 child.addInlinePlanNode(topLimit);
             } else {
-                // In future, inline LIMIT for aggregate node
                 root.clearChildren();
                 child.clearParents();
                 topLimit.addAndLinkChild(child);
                 root.addAndLinkChild(topLimit);
             }
         } else {
-            if (root instanceof OrderByPlanNode || root instanceof AggregatePlanNode) {
+            if (isInlineLimitPlanNodePossible(root))
+            {
                 root.addInlinePlanNode(topLimit);
-            } else if (root instanceof ProjectionPlanNode
-                    && (root.getChild(0) instanceof OrderByPlanNode ||
-                        root instanceof AggregatePlanNode) ) {
+            } else if (root instanceof ProjectionPlanNode &&
+                    isInlineLimitPlanNodePossible(root.getChild(0)) )
+            {
+                // In future, inlined this projection node for OrderBy and Aggregate
+                // Then we could delete this ELSE IF block.
                 root.getChild(0).addInlinePlanNode(topLimit);
-            } else {
+            } else
+            {
                 topLimit.addAndLinkChild(root);
                 root = topLimit;
             }
         }
         return root;
+    }
+
+    /**
+     * Inline limit plan node can be applied with ORDER BY node and serial aggregation node
+     * @param pn
+     * @return
+     */
+    static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
+        if (pn instanceof OrderByPlanNode ||
+                pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
+        {
+            return true;
+        }
+        return false;
     }
 
 
