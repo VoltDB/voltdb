@@ -96,4 +96,10 @@ public class DDLGenerator
         String tableName = prefix + tableNo;
         return "CREATE PROCEDURE P" + procNo + "on" + tableName + " AS SELECT * FROM " + tableName + ";";
     }
+
+    public String DropProcedure(int procNo, int tableNo, String prefix)
+    {
+        String tableName = prefix + tableNo;
+        return "Drop PROCEDURE P" + procNo + "on" + tableName + ";";
+    }
 }

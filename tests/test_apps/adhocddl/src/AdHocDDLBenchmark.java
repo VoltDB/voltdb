@@ -23,6 +23,7 @@
 
 
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.concurrent.CountDownLatch;
@@ -61,10 +62,16 @@ public class AdHocDDLBenchmark {
      */
     static class BenchmarkConfig extends CLIConfig {
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 20;
+        int numOfTests = 50;
 
-        @Option(desc = "Table name prefix for test")
-        String prefix = "TEST";
+        @Option(desc = "Number of SPs per table in server")
+        int numOfSPs = 4;
+
+        @Option(desc = "Table name prefix")
+        String prefix = "TABLE";
+
+        @Option(desc = "Table name for CREATE and DROP")
+        String table = "TEST";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -72,11 +79,8 @@ public class AdHocDDLBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        @Option(desc = "0: create tables test; 1: drop table test; 2: average latency test")
-        int testMode = 2;
-
-        @Option(desc = "Median number of Columns in randomly generated tables")
-        int numOfCols = 10;
+        @Option(desc = "Number of Columns in each tables")
+        int numOfCols = 5;
 
         @Option(desc = "Percentage of indexed columns in the ramdonly generated table")
         double idxPercent = 0.1;
@@ -112,7 +116,6 @@ public class AdHocDDLBenchmark {
      * @throws UnknownHostException
      */
     public AdHocDDLBenchmark(BenchmarkConfig config) throws UnknownHostException, IOException {
-        DDLGen = new DDLGenerator(config.numOfCols, config.idxPercent);
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
@@ -204,61 +207,68 @@ public class AdHocDDLBenchmark {
         return 0;
     }
 
-    public void createTableTest()
+    public float averageLatencyTest()
     {
-        fullStatsContext.fetchAndResetBaseline();
-
-        String sqlstmt;
+        String createStmt = DDLGen.CreateTable(0, config.table);
+        String dropStmt = DDLGen.DropTable(0, config.table);
+        long sum = 0;
         for(int i = 0; i < config.numOfTests; i++)
         {
-            sqlstmt = DDLGen.CreateTable(i, config.prefix);
-            runTest(sqlstmt);
+            sum += runTest(createStmt);
+            sum += runTest(dropStmt);
         }
 
-        ClientStats stats = fullStatsContext.fetch().getStats();
         System.out.println();
-        System.out.println("Average Latency: " + stats.getAverageLatency());
-        System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
+        System.out.println("Average Latency: " + (sum / config.numOfTests));
+        return sum / config.numOfTests;
     }
 
-    public void dropTableTest()
+    public void updateServer(int startNo, int endNo)
     {
-        String sqlstmt;
-        for(int i = 0; i < config.numOfTests; i++)
+        StringBuffer sqlstmt = new StringBuffer();
+        for(int i = startNo; i < endNo; i++)
         {
-            sqlstmt = DDLGen.CreateTable(i, config.prefix);
-            runTest(sqlstmt);
+            sqlstmt.append(DDLGen.CreateTable(i, config.prefix) + "\n\n");
+            for(int j = 0; j < config.numOfSPs; j++)
+            {
+                sqlstmt.append(DDLGen.CreateProcedure(j, i, config.prefix) + "\n\n");
+            }
         }
-
-        fullStatsContext.fetchAndResetBaseline();
-
-        for(int i = 0; i < config.numOfTests; i++)
-        {
-            sqlstmt = DDLGen.DropTable(i, config.prefix);
-            runTest(sqlstmt);
-        }
-
-        ClientStats stats = fullStatsContext.fetch().getStats();
-        System.out.println();
-        System.out.println("Average Latency: " + stats.getAverageLatency());
-        System.out.println("Average Internal Latency: " + stats.getAverageInternalLatency());
+        runTest(sqlstmt.toString());
     }
 
-    public void averageLatencyTest()
+    public void clearServer(int startNo, int endNo)
     {
-        String sqlstmt;
-        long createSum = 0, dropSum = 0;
-        for(int i = 0; i < config.numOfTests; i++)
+        StringBuffer sqlstmt = new StringBuffer();
+        for(int i = startNo; i < endNo; i++)
         {
-            sqlstmt = DDLGen.CreateTable(i, config.prefix);
-            createSum += runTest(sqlstmt);
-            sqlstmt = DDLGen.DropTable(i, config.prefix);
-            dropSum += runTest(sqlstmt);
+            sqlstmt.append(DDLGen.DropTable(i, config.prefix) + "\n\n");
+            for(int j = 0; j < config.numOfSPs; j++)
+            {
+                sqlstmt.append(DDLGen.DropProcedure(j, i, config.prefix) + "\n\n");
+            }
         }
+        runTest(sqlstmt.toString());
+    }
 
-        System.out.println();
-        System.out.println("Average Latency for CREATE: " + (createSum / config.numOfTests));
-        System.out.println("Average Latency for DROP: " + (dropSum / config.numOfTests));
+    public void bunchTest(int col, FileWriter fw, String label) throws IOException
+    {
+        fullStatsContext.fetchAndResetBaseline();
+        DDLGen = new DDLGenerator(col, config.idxPercent);
+
+        float series1 = averageLatencyTest();
+        updateServer(0, 100);
+        float series2 = averageLatencyTest();
+        updateServer(100, 1000);
+        float series3 = averageLatencyTest();
+
+        ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
+        fw.append(String.format("%s,%d,-1,%.2f,0,0,%.2f,%.2f\n",
+                label,
+                stats.getStartTimestamp(),
+                series3,
+                series1,
+                series2));
     }
 
     /**
@@ -279,21 +289,14 @@ public class AdHocDDLBenchmark {
         System.out.println(" Statistics ");
         System.out.println(HORIZONTAL_RULE);
 
-        switch(config.testMode)
-        {
-        case 0:
-            createTableTest();
-            break;
-        case 1:
-            dropTableTest();
-            break;
-        case 2:
-            averageLatencyTest();
-            break;
-        default:
-            System.out.println("No such test!");
-            break;
-        }
+        FileWriter fw = new FileWriter(config.statsfile);
+
+        bunchTest(5, fw, "5 columns table");
+        clearServer(0, 1000);
+        bunchTest(50, fw, "50 columns table");
+        clearServer(0, 1000);
+
+        fw.close();
 
         // block until all outstanding txns return
         client.drain();
