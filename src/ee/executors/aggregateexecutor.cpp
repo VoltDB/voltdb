@@ -386,7 +386,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 
 inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
 {
-    m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
@@ -541,6 +540,7 @@ void AggregateHashExecutor::p_execute_finish() {
     nextGroupByKeyTuple.move(NULL);
 
     m_hash.clear();
+    m_memoryPool.purge();
 }
 
 inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
@@ -664,6 +664,8 @@ void AggregateSerialExecutor::p_execute_finish()
     delete m_aggregateRow;
     m_nextGroupByValues.clear();
     m_inProgressGroupByValues.clear();
+
+    m_memoryPool.purge();
 }
 
 }
