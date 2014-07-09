@@ -150,8 +150,17 @@ public:
             voltdb::ValueType columnType = columnInfo->getVoltType();
             switch (columnType) {
               case VALUE_TYPE_TINYINT:
+                  bytes += sizeof (int8_t);
+                  break;
+
               case VALUE_TYPE_SMALLINT:
+                  bytes += sizeof (int16_t);
+                  break;
+
               case VALUE_TYPE_INTEGER:
+                  bytes += sizeof (int32_t);
+                  break;
+
               case VALUE_TYPE_BIGINT:
               case VALUE_TYPE_TIMESTAMP:
               case VALUE_TYPE_DOUBLE:
@@ -159,9 +168,8 @@ public:
                 break;
 
               case VALUE_TYPE_DECIMAL:
-                // decimals serialized in ascii as
-                // 32 bits of length + max prec digits + radix pt + sign
-                bytes += sizeof (int32_t) + NValue::kMaxDecPrec + 1 + 1;
+                //1-byte scale, 1-byte precision, 16 bytes all the time right now
+                bytes += 18;
                 break;
 
               case VALUE_TYPE_VARCHAR:
@@ -306,7 +314,8 @@ public:
 
     int compare(const TableTuple &other) const;
 
-    void deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *stringPool);
+    void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
+    void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput &output);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
@@ -659,7 +668,7 @@ inline void TableTuple::copy(const TableTuple &source) {
     ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
 }
 
-inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *dataPool) {
+inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *dataPool) {
     assert(m_schema);
     assert(m_data);
 
@@ -682,6 +691,34 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
         char *dataPtr = getWritableDataPtr(columnInfo);
         NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+    }
+}
+
+inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Pool *dataPool) {
+    assert(m_schema);
+    assert(m_data);
+    const int32_t columnCount  = m_schema->columnCount();
+    int nullMaskLength = ((columnCount + 7) & -8) >> 3;
+    const uint8_t *nullArray = reinterpret_cast<const uint8_t*>(tupleIn.getRawPointer(nullMaskLength));
+
+    for (int j = 0; j < columnCount; j++) {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
+
+        const uint32_t index = j >> 3;
+        const uint32_t bit = j % 8;
+        const uint8_t mask = (uint8_t) (0x80u >> bit);
+        const bool isNull = (nullArray[index] & mask);
+
+        if (isNull) {
+            NValue value = NValue::getNullValue(columnInfo->getVoltType());
+            setNValue(j, value);
+        } else {
+            char *dataPtr = getWritableDataPtr(columnInfo);
+            NValue::deserializeFrom<TUPLE_SERIALIZATION_NATIVE, BYTE_ORDER_LITTLE_ENDIAN>(
+                    tupleIn, dataPool, dataPtr,
+                    columnInfo->getVoltType(), columnInfo->inlined,
+                    static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+        }
     }
 }
 

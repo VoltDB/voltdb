@@ -87,6 +87,13 @@ function server-kafka() {
     $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
+function server-rabbitmq() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
 # run the voltdb server locally with mysql connector
 function server-mysql() {
     # if a catalog doesn't exist, build one
@@ -241,6 +248,11 @@ function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
         genqa.ExportKafkaOnServerVerifier kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
         4 $CLIENTLOG
+}
+
+function export-rabbitmq-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
+        genqa.ExportRabbitMQVerifier kafka1 test test systest
 }
 
 function help() {
