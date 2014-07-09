@@ -1793,7 +1793,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         return sb;
     }
 
-    // haha
+    // concat params with a sql query string, and test the return value
     private static void doTestCoalesceWithoutConst(Client cl, String[] params,
                                                    String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
@@ -1807,6 +1807,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         long rv = result.getLong(0);
         assertEquals(rv, 0);
     }
+
     private static void doTestCoalesceWithConst(Client cl, String[] params,
                                                 String cst ,String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
