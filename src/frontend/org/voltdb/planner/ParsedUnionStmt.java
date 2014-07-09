@@ -67,26 +67,27 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      */
     @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
-
-        assert(stmtNode.children.size() > 1);
         m_tableList.clear();
+        assert(stmtNode.children.size() > 1);
+        AbstractParsedStmt childStmt = null;
+        boolean first = true;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
-                childStmt.parseTablesAndParams(childSQL);
-                m_children.add(childStmt);
-
-                // Add statement's tables to the consolidated list
-                m_tableList.addAll(childStmt.m_tableList);
+                childStmt = new ParsedSelectStmt(m_paramValues, m_db);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
-                childStmt.parseTablesAndParams(childSQL);
-                m_children.add(childStmt);
-                // Add statement's tables to the consolidated list
-                m_tableList.addAll(childStmt.m_tableList);
+                childStmt = new ParsedUnionStmt(m_paramValues,m_db);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
+            childStmt.parseTablesAndParams(childSQL);
+            if (first) {
+                first = false;
+                promoteUnionParametersFromChild(childStmt);
+            }
+            System.out.println("DEBUG: ParsedUnionStmt::parseTablesAndParams # params of " + childSQL.name + " child: " + childStmt.getParameters().length + "'" + childStmt.getParameters().toString() + "'");
+            m_children.add(childStmt);
+            // Add statement's tables to the consolidated list
+            m_tableList.addAll(childStmt.m_tableList);
         }
     }
 

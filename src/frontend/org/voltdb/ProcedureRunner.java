@@ -566,7 +566,7 @@ public class ProcedureRunner {
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
-            throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
+            throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
@@ -637,13 +637,16 @@ public class ProcedureRunner {
             // supporting @AdHocSpForTest with queries that contain '?' parameters.
             if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
-                    throw new ExpectedProcedureException(
+                    throw new IllegalArgumentException(
                             "Number of arguments provided was " + args.length  +
                             " where 0 were expected for statement: " + sql);
                 }
                 argumentParams = plannedStatement.extractedParamArray();
                 if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
-                    String msg = String.format("Wrong number of params for parameterized statement: %s", sql);
+                    String msg = String.format(
+                            "The wrong number of arguments (" + argumentParams.length +
+                            " vs. the " + queuedSQL.stmt.statementParamJavaTypes.length +
+                            " expected) were passed for the parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
             }
@@ -790,9 +793,9 @@ public class ProcedureRunner {
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
         if (inArgs.length != numParamTypes) {
-            throw new ExpectedProcedureException(
-                    "Number of arguments provided was " + inArgs.length  +
-                    " where " + numParamTypes + " was expected for statement " + stmt.getText());
+            throw new VoltAbortException(
+                    "The wrong number of arguments (" + inArgs.length + " vs. he " + numParamTypes +
+                    " expected) were passed for statement: " + stmt.getText());
         }
         for (int ii = 0; ii < numParamTypes; ii++) {
             // this handles non-null values
@@ -821,8 +824,9 @@ public class ProcedureRunner {
             } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
             } else {
-                throw new ExpectedProcedureException("Unknown type " + type +
-                 " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
+                throw new VoltAbortException("Unknown type " + type +
+                        " can not be converted to NULL representation for arg " + ii +
+                        " for SQL stmt: " + stmt.getText());
             }
         }
 
@@ -1026,8 +1030,8 @@ public class ProcedureRunner {
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
            if (isProcedureStackTraceElement(ste)) {
-            matches.add(ste);
-        }
+               matches.add(ste);
+           }
        }
 
        byte status = ClientResponse.UNEXPECTED_FAILURE;
@@ -1054,8 +1058,8 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null) {
-            e = e.getCause();
-        }
+               e = e.getCause();
+           }
        }
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
            status = ClientResponse.TXN_RESTART;
@@ -1064,27 +1068,21 @@ public class ProcedureRunner {
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;
-       }
-
-       // if the error is something we know can happen as part of normal
-       // operation, reduce the verbosity.  Otherwise, generate
-       // more output for debuggability
-       if (expected_failure)
-       {
-           msg.append("  ").append(e.getMessage());
-           for (StackTraceElement ste : matches) {
-               msg.append("\n    at ");
-               msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-               msg.append("(").append(ste.getFileName()).append(":");
-               msg.append(ste.getLineNumber()).append(")");
-           }
-       }
-       else
-       {
+           // For an unexpected condition, generate more output for debuggability.
            Writer result = new StringWriter();
            PrintWriter pw = new PrintWriter(result);
            e.printStackTrace(pw);
            msg.append("  ").append(result.toString());
+       }
+
+       // if the error is something we know can happen as part of normal
+       // operation, reduce the verbosity.
+       msg.append("  ").append(e.getMessage());
+       for (StackTraceElement ste : matches) {
+           msg.append("\n    at ");
+           msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+           msg.append("(").append(ste.getFileName()).append(":");
+           msg.append(ste.getLineNumber()).append(")");
        }
 
        return getErrorResponse(
