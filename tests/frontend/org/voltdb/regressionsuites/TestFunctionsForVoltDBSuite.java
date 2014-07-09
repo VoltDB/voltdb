@@ -1794,10 +1794,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     // haha
-    private static void doTestCoalesceWithoutConst(Client cl, String[] params, String expect, String id) throws Exception {
+    private static void doTestCoalesceWithoutConst(Client cl, String[] params,
+                                                   String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
-        // String sql = "SELECT DECODE(COALESCE(para1, para2, ..., cst),expect,0,1) FROM C_NULL WHERE ID=id";
-        String sql = "SELECT DECODE(COALESCE(" + allPara + ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
+        // sql = "SELECT DECODE(COALESCE(para1, para2, ...),expect,0,1) FROM C_NULL WHERE ID=id";
+        String sql = "SELECT DECODE(COALESCE(" + allPara +
+                ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
         ClientResponse cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         VoltTable result = cr.getResults()[0];
@@ -1805,11 +1807,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         long rv = result.getLong(0);
         assertEquals(rv, 0);
     }
-    private static void doTestCoalesceWithConst(Client cl, String[] params, String cst ,String expect, String id) throws Exception {
+    private static void doTestCoalesceWithConst(Client cl, String[] params,
+                                                String cst ,String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
         allPara += ","+cst;
-        // String sql = "SELECT DECODE(COALESCE(para1, para2, ..., cst),expect,0,1) FROM C_NULL WHERE ID=id";
-        String sql = "SELECT DECODE(COALESCE(" + allPara + ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
+        // sql = "SELECT DECODE(COALESCE(para1, para2, ..., cst),expect,0,1) FROM C_NULL WHERE ID=id";
+        String sql = "SELECT DECODE(COALESCE(" + allPara +
+                ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
         ClientResponse cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         VoltTable result = cr.getResults()[0];
@@ -1841,7 +1845,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     // All the columns are not null
-    private static void doTestCoalesceTriNotNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+    private static void doTestCoalesceTriNotNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
         // coalesce(col1, col3, col2) == col1
@@ -1869,7 +1874,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     // col3 is null
-    private static void doTestCoalesceTriOneNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+    private static void doTestCoalesceTriOneNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
         // coalesce(col1, col3, col2) == col1
@@ -1897,7 +1903,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     // col2 and col3 are null
-    private static void doTestCoalesceTriTwoNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+    private static void doTestCoalesceTriTwoNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
         // coalesce(col1, col3, col2) == col1
@@ -1926,7 +1933,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // all columns are null
     // TODO: need discuss the logic here
-    private static void doTestCoalesceTriAllNull(Client cl, String col1, String col2, String col3, String cst) throws Exception{
+    private static void doTestCoalesceTriAllNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception{
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "0");
         // coalesce(col1, col3, col2) == col1
@@ -1959,7 +1967,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         doTestCoalescePairNotNull(cl, col1, col2);
     }
 
-    private static void doTestThreeColCoalesce(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+    private static void doTestThreeColCoalesce(Client cl, String col1,
+                                               String col2, String col3, String cst) throws Exception {
         doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
         doTestCoalesceTriTwoNull(cl, col1, col2, col3, cst);
         doTestCoalesceTriOneNull(cl, col1, col2, col3, cst);
