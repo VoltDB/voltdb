@@ -1784,105 +1784,237 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    // col1 is not null while col2 is null
-    private static void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
-        // coalesce(col1, col2) == coalesce(col2, col1)
-        String sql = "SELECT DECODE(COALESCE("+col1+","+ col2+"),COALESCE("+col2+","+col1+"), 0, 1) "
-                + "FROM C_NULL WHERE ID = 1;";
+    private static StringBuilder joinStringArray(String[] params, String sep) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : params) {
+            sb.append(s).append(sep);
+        }
+        sb.delete(sb.length()-sep.length(), sb.length());
+        return sb;
+    }
+
+    // haha
+    private static void doTestCoalesceWithoutConst(Client cl, String[] params, String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        // String sql = "SELECT DECODE(COALESCE(para1, para2, ..., cst),expect,0,1) FROM C_NULL WHERE ID=id";
+        String sql = "SELECT DECODE(COALESCE(" + allPara + ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
         ClientResponse cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
         VoltTable result = cr.getResults()[0];
-        result.advanceRow();
+        assertTrue(result.advanceRow());
         long rv = result.getLong(0);
         assertEquals(rv, 0);
-
-        // coalesce(col1, col2) == col1
-        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
-                + "FROM C_NULL WHERE ID = 1;";
-        cr = cl.callProcedure("@AdHoc", sql);
+    }
+    private static void doTestCoalesceWithConst(Client cl, String[] params, String cst ,String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        allPara += ","+cst;
+        // String sql = "SELECT DECODE(COALESCE(para1, para2, ..., cst),expect,0,1) FROM C_NULL WHERE ID=id";
+        String sql = "SELECT DECODE(COALESCE(" + allPara + ")," + expect + ",0,1) FROM C_NULL WHERE ID=" + id;
+        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        result = cr.getResults()[0];
-        result.advanceRow();
-        rv = result.getLong(0);
+        VoltTable result = cr.getResults()[0];
+        assertTrue(result.advanceRow());
+        long rv = result.getLong(0);
         assertEquals(rv, 0);
+    }
+
+    // col1 is not null while col2 is null
+    private static void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == coalesce(col2, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "1");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "1");
     }
 
     // TODO: need discuss the logic here
     private static void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
-        // coalesce(col1, col2) == coalesce(col2, col1)
-        String sql = "SELECT DECODE(COALESCE("+col1+","+ col2+"),COALESCE("+col2+","+col1+"), 0, 1) "
-                + "FROM C_NULL WHERE ID = 0;";
-        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        result.advanceRow();
-        long rv = result.getLong(0);
-        assertEquals(rv, 0);
-
-        // coalesce(col1, col2) == col1
-        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
-                + "FROM C_NULL WHERE ID = 0;";
-        cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        result = cr.getResults()[0];
-        result.advanceRow();
-        rv = result.getLong(0);
-        assertEquals(rv, 0);
+        // coalesce(col1, col2) == coalesce(col2, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "0");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "0");
     }
 
     // Both the columns are not null
     private static void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
-        // coalesce(col2, col1) == col2
-        String sql = "SELECT DECODE(COALESCE("+col2+","+ col1+")," + col2 + ", 0, 1) "
-                + "FROM C_NULL WHERE ID = 2;";
-        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        result.advanceRow();
-        long rv = result.getLong(0);
-        assertEquals(rv, 0);
-
         // coalesce(col1, col2) == col1
-        sql = "SELECT DECODE(COALESCE("+col1+","+ col2+")," + col1 + ", 0, 1) "
-                + "FROM C_NULL WHERE ID = 2;";
-        cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        result = cr.getResults()[0];
-        result.advanceRow();
-        rv = result.getLong(0);
-        assertEquals(rv, 0);
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "2");
+        // coalesce(col2, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col2, "2");
+    }
+
+    // All the columns are not null
+    private static void doTestCoalesceTriNotNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "3");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "3");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "3");
+        // coalesce(col3, col1, col2) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col3, "3");
+        // coalesce(col3, col2, col1) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col3, "3");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "3");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "3");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "3");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "3");
+        // coalesce(col3, col1, col2, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col3, "3");
+        // coalesce(col3, col2, col1, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col3, "3");
+    }
+
+    // col3 is null
+    private static void doTestCoalesceTriOneNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "2");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "2");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "2");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "2");
+        // coalesce(col3, col2, col2) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col2, "2");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "2");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "2");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "2");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "2");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "2");
+        // coalesce(col3, col1, col2, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col2, "2");
+    }
+
+    // col2 and col3 are null
+    private static void doTestCoalesceTriTwoNull(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "1");
+        // coalesce(col2, col1, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col1, "1");
+        // coalesce(col2, col3, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col1, "1");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "1");
+        // coalesce(col3, col2, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col1, "1");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "1");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "1");
+        // coalesce(col2, col1, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col1, "1");
+        // coalesce(col2, col3, col1, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col1, "1");
+    }
+
+    // all columns are null
+    // TODO: need discuss the logic here
+    private static void doTestCoalesceTriAllNull(Client cl, String col1, String col2, String col3, String cst) throws Exception{
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "0");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "0");
+        // coalesce(col2, col1, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col1, "0");
+        // coalesce(col2, col3, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col1, "0");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "0");
+        // coalesce(col3, col2, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col1, "0");
+        // coalesce(col1, col2, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, cst, "0");
+        // coalesce(col1, col3, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, cst, "0");
+        // coalesce(col2, col1, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, cst, "0");
+        // coalesce(col2, col3, col1, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, cst, "0");
+    }
+
+    private static void doTestTwoColCoalesce(Client cl, String col1, String col2) throws Exception {
+        doTestCoalescePairBothNull(cl, col1, col2);
+        doTestCoalescePairOneNull(cl, col1, col2);
+        doTestCoalescePairNotNull(cl, col1, col2);
+    }
+
+    private static void doTestThreeColCoalesce(Client cl, String col1, String col2, String col3, String cst) throws Exception {
+        doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriTwoNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriOneNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
     }
 
     public void testCoalesce() throws Exception {
         System.out.println("STARTING test Case COALESCE function...");
         Client cl = getClient();
 
+        // three set nulls
         cl.callProcedure("@AdHoc", "insert into C_NULL(ID) values (0);");
+        // one set non-null and two sets nulls
         cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1) values (1,1,1,1,1,'1',100000)");
         // TODO: below is wrong, because the null timestamp will be regarded as an invalid input by hsql
         //cl.callProcedure("C_NULL.insert", 1,1,1,1,1,"1",new Timestamp(1000000000000L), null, null, null, null, null);
-        cl.callProcedure("C_NULL.insert", 2,1,1,1,1,"1",new Timestamp(1000000000000L),
-                12,12,12,"12",new Timestamp(1200000000000L));
+        // two sets non-nulls and one set null
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1,I2,F2,D2,V2,T2)"
+                                + " values (2,1,1,1,1,'1',100000,2,2,2,'2',200000)");
+        // three set non-nulls
+        cl.callProcedure("C_NULL.insert", 3,1,1,1,1,"1",new Timestamp(1000000000000L),
+                                              2,2,2,"2",new Timestamp(2000000000000L),
+                                              3,3,3,"3",new Timestamp(3000000000000L));
 
-        doTestCoalescePairBothNull(cl, "I1", "I2");
-        doTestCoalescePairBothNull(cl, "F1", "F2");
-        doTestCoalescePairBothNull(cl, "D1", "D2");
-        doTestCoalescePairBothNull(cl, "V1", "V2");
-        doTestCoalescePairBothNull(cl, "T1", "T2");
+        doTestTwoColCoalesce(cl, "I1", "I2");
+        doTestTwoColCoalesce(cl, "F1", "F2");
+        doTestTwoColCoalesce(cl, "D1", "D2");
+        doTestTwoColCoalesce(cl, "V1", "V2");
+        doTestTwoColCoalesce(cl, "T1", "T2");
 
-        doTestCoalescePairOneNull(cl, "I1", "I2");
-        doTestCoalescePairOneNull(cl, "F1", "F2");
-        doTestCoalescePairOneNull(cl, "D1", "D2");
-        doTestCoalescePairOneNull(cl, "V1", "V2");
-        doTestCoalescePairOneNull(cl, "T1", "T2");
+        doTestThreeColCoalesce(cl, "I1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "F1", "F2", "F3", "100.0");
+        doTestThreeColCoalesce(cl, "D1", "D2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "V1", "V2", "V3", "'hahaha'");
+        doTestThreeColCoalesce(cl, "T1", "T2", "T3", "CAST ('2014-07-09 00:00:00.000000' as TIMESTAMP)");
 
-        doTestCoalescePairNotNull(cl, "I1", "I2");
-        doTestCoalescePairNotNull(cl, "F1", "F2");
-        doTestCoalescePairNotNull(cl, "D1", "D2");
-        doTestCoalescePairNotNull(cl, "V1", "V2");
-        doTestCoalescePairNotNull(cl, "T1", "T2");
+        // test compatiable types
+        doTestThreeColCoalesce(cl, "S1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "S1", "F2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "I1", "F2", "D3", "100.0");
 
-        // TODO: add more test cases, like adhoc query with all NULL parameters
+        // test incompatiable types
+        // TODO: Is the exception throwed by coalesce? Or by decode?
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "T3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
     }
 
     //
@@ -1936,6 +2068,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "D2 DECIMAL DEFAULT NULL, " +
                 "V2 VARCHAR(10) DEFAULT NULL, " +
                 "T2 TIMESTAMP DEFAULT NULL, " +
+                "I3 INTEGER DEFAULT NULL, " +
+                "F3 FLOAT DEFAULT NULL, " +
+                "D3 DECIMAL DEFAULT NULL, " +
+                "V3 VARCHAR(10) DEFAULT NULL, " +
+                "T3 TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE C_NULL ON COLUMN ID;" +
 
