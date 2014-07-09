@@ -17,7 +17,6 @@
 package org.voltdb.utils;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,11 +76,11 @@ public class KafkaLoader {
     public void close() {
         try {
             closeConsumer();
+            m_loader.close();
             if (m_client != null) {
                 m_client.close();
                 m_client = null;
             }
-            m_loader.close();
         } catch (InterruptedException ex) {
         } catch (NoConnectionsException ex) {
         }
@@ -107,7 +106,7 @@ public class KafkaLoader {
         try {
             m_es = getConsumerExecutor(m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
-                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for using procedure: " + m_config.procedure);
+                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
             } else {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
@@ -192,7 +191,7 @@ public class KafkaLoader {
             if (!procedure.equals("") && !table.equals("")) {
                 exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
             }
-            if ((procedure != null) && (procedure.trim().length() > 0)) {
+            if (procedure.trim().length() > 0) {
                 useSuppliedProcedure = true;
             }
             //Try and load classes we need and not packaged.
@@ -220,15 +219,17 @@ public class KafkaLoader {
 
         @Override
         public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
-            byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS) {
-                m_log.error("Failed to Insert Row: " + metaData.rawLine);
-                long fc = m_failedCount.incrementAndGet();
-                if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
-                        || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                    m_log.error("Kafkaloader will exit.");
-                    closeConsumer();
-                    return true;
+            if (response != null) {
+                byte status = response.getStatus();
+                if (status != ClientResponse.SUCCESS) {
+                    m_log.error("Failed to Insert Row: " + metaData.rawLine);
+                    long fc = m_failedCount.incrementAndGet();
+                    if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
+                            || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
+                        m_log.error("Kafkaloader will exit.");
+                        closeConsumer();
+                        return true;
+                    }
                 }
             }
             return false;
@@ -298,12 +299,11 @@ public class KafkaLoader {
                 String smsg = new String(msg);
                 try {
                     if (!m_loader.insertRow(new CSVLineWithMetaData(smsg, offset), m_csvParser.parseLine(smsg))) {
-                        break;
+                        System.exit(1);
                     }
-                } catch (InterruptedException ex) {
+                } catch (Exception ex) {
                     m_log.error("Consumer stopped", ex);
-                } catch (IOException ex) {
-                    m_log.error("Consumer stopped", ex);
+                    System.exit(1);
                 }
             }
         }

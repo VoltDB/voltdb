@@ -123,6 +123,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
             }
         } catch (IOException ex) {
             m_errHandler.handleError(metaData, null, ex.toString());
+            return false;
         }
         return true;
     }
