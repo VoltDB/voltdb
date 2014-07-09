@@ -82,7 +82,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
-                                    toInsert, false);
+                                    toInsert, false, false);
                 // return the number of rows inserted
                 result.addRow(toInsert.getRowCount());
             }

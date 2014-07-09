@@ -230,7 +230,7 @@ public class SnapshotSaveAPI
                                 exportSequenceNumbers);
                     }
 
-                    if (m_deferredSetupFuture != null) {
+                    if (m_deferredSetupFuture != null && taskList != null) {
                         // Add a listener to the deferred setup so that it can kick off the snapshot
                         // task once the setup is done.
                         m_deferredSetupFuture.addListener(new Runnable() {
