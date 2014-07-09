@@ -76,7 +76,7 @@ bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     setDMLCountOutputTable(limits);
 
-    // Target table can be StreamedTable or PersistentTable and must not be NULL
+    // Target table must be persistentTable
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     if ( persistentTarget == NULL ) {
         VOLT_ERROR("Upsert is not supported for Stream table %s", m_node->getTargetTable()->name().c_str());
@@ -100,30 +100,14 @@ bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
 bool UpsertExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("execute Upsert Executor");
 
-    assert(m_node == dynamic_cast<UpsertPlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
-    assert(m_inputTable);
-
-    // Target table can be StreamedTable or PersistentTable and must not be NULL
     // Update target table reference from table delegate
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
+    assert (targetTable->columnCount() == m_inputTable->columnCount());
+    TableTuple targetTuple = TableTuple(targetTable->schema());
 
     TableTuple tbTuple = TableTuple(m_inputTable->schema());
-
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-#ifdef DEBUG
-    //
-    // This should probably just be a warning in the future when we are
-    // running in a distributed cluster
-    //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                m_inputTable->name().c_str());
-        return false;
-    }
-#endif
+    VOLT_DEBUG("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
     assert ( ! m_inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
@@ -132,16 +116,14 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
 
-    assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
     while (iterator.next(tbTuple)) {
-        VOLT_TRACE("Upserting tuple '%s' into target table '%s' with table schema: %s",
+        VOLT_DEBUG("Upserting tuple '%s' into target table '%s' with table schema: %s",
                 tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                 targetTable->schema()->debug().c_str());
 
         // if there is a partition column for the target table
         if (m_partitionColumn != -1) {
-
             // get the value for the partition column
             NValue value = tbTuple.getNValue(m_partitionColumn);
             bool isLocal = m_engine->isLocalSite(value);
@@ -152,9 +134,8 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),
                             tbTuple,
-                            "Mispartitioned tuple in single-partition insert statement.");
+                            "Mispartitioned tuple in single-partition upsert statement.");
                 }
-
                 continue;
             }
         }
@@ -178,9 +159,10 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
             }
         } else {
             // tuple exists already, try to update the tuple instead
-            TableTuple newTuple = TableTuple(targetTable->schema());
-            newTuple.move(tbTuple.address());
-            if (!targetTable->updateTupleWithSpecificIndexes(existsTuple, tbTuple,
+            targetTuple.move(tbTuple.address());
+            TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
+
+            if (!targetTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                     targetTable->allIndexes())) {
                 VOLT_INFO("Failed to update existsTuple from table '%s'",
                         targetTable->name().c_str());

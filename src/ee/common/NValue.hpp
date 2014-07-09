@@ -114,6 +114,28 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
                        msg, internalFlags);
 }
 
+template<>
+inline void throwCastSQLValueOutOfRangeException<TTInt>(
+                                  const TTInt value,
+                                  const ValueType origType,
+                                  const ValueType newType)
+{
+    char msg[1024];
+    snprintf(msg, 1024, "Type %s with value %s can't be cast as %s because the value is "
+            "out of range for the destination type",
+            valueToString(origType).c_str(),
+            value.ToString().c_str(),
+            valueToString(newType).c_str());
+
+    // record underflow or overflow for executors that catch this (indexes, mostly)
+    int internalFlags = 0;
+    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
+    if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
+
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                       msg, internalFlags);
+}
+
 int warn_if(int condition, const char* message);
 
 // This has been demonstrated to be more reliable than std::isinf
@@ -272,8 +294,12 @@ class NValue {
        provided. This function will perform memory allocations for
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
+    template <TupleSerializationFormat F, Endianess E>
     static void deserializeFrom(
-        SerializeInput &input, Pool *dataPool, char *storage,
+        SerializeInput<E> &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
+    static void deserializeFrom(
+        SerializeInputBE &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
@@ -282,8 +308,8 @@ class NValue {
     /* Read a ValueType from the SerializeInput stream and deserialize
        a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
-    void deserializeFromAllocateForStorage(ValueType vt, SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE &input, Pool *dataPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
@@ -627,7 +653,7 @@ class NValue {
 
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool);
     void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
@@ -640,6 +666,9 @@ class NValue {
     // closest but not equal to +/-1E26 within the accuracy of a double.
     static const double s_gtMaxDecimalAsDouble;
     static const double s_ltMinDecimalAsDouble;
+    // These are the bound of converting decimal
+    static TTInt s_maxInt64AsDecimal;
+    static TTInt s_minInt64AsDecimal;
 
     /**
      * 16 bytes of storage for NValue data.
@@ -900,6 +929,23 @@ class NValue {
                            msg);
     }
 
+    /** return the whole part of a TTInt*/
+    static inline int64_t narrowDecimalToBigInt(TTInt &scaledValue) {
+        if (scaledValue > NValue::s_maxInt64AsDecimal || scaledValue < NValue::s_minInt64AsDecimal) {
+            throwCastSQLValueOutOfRangeException<TTInt>(scaledValue, VALUE_TYPE_DECIMAL, VALUE_TYPE_BIGINT);
+        }
+        TTInt whole(scaledValue);
+        whole /= kMaxScaleFactor;
+        return whole.ToInt();
+    }
+
+    /** return the fractional part of a TTInt*/
+    static inline int64_t getFractionalPart(TTInt& scaledValue) {
+        TTInt fractional(scaledValue);
+        fractional %= kMaxScaleFactor;
+        return fractional.ToInt();
+    }
+
     int64_t castAsBigIntAndGetValue() const {
         assert(isNull() == false);
 
@@ -1008,14 +1054,13 @@ class NValue {
             return getDouble();
           case VALUE_TYPE_DECIMAL:
           {
-            double retval;
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            TTInt fractional(scaledValue);
-            whole /= kMaxScaleFactor;
-            fractional %= kMaxScaleFactor;
-            retval = static_cast<double>(whole.ToInt()) +
-                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
+            // we only deal with the decimal number within int64_t range here
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            int64_t fractional = getFractionalPart(scaledValue);
+            double retval;
+            retval = static_cast<double>(whole) +
+                    (static_cast<double>(fractional)/static_cast<double>(kMaxScaleFactor));
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
@@ -1118,9 +1163,7 @@ class NValue {
             retval.getBigInt() = static_cast<int64_t>(getDouble()); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            retval.getBigInt() = whole.ToInt(); break;
+            retval.getBigInt() = narrowDecimalToBigInt(scaledValue); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.getBigInt() = static_cast<int64_t>(getNumberFromString()); break;
@@ -1168,9 +1211,7 @@ class NValue {
             // OR it might be a convenience for some obscure system-generated edge case?
 
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            retval.getTimestamp() = whole.ToInt(); break;
+            retval.getTimestamp() = narrowDecimalToBigInt(scaledValue); break;
         }
         case VALUE_TYPE_VARCHAR: {
             const int32_t length = getObjectLength_withoutNull();
@@ -1213,10 +1254,10 @@ class NValue {
             retval.narrowToInteger(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToInteger(value, type); break;
+            // get the whole part of the decimal
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            // try to convert the whole part, which is a int64_t
+            retval.narrowToInteger(whole, VALUE_TYPE_BIGINT); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToInteger(getNumberFromString(), type); break;
@@ -1256,10 +1297,8 @@ class NValue {
             retval.narrowToSmallInt(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToSmallInt(value, type); break;
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            retval.narrowToSmallInt(whole, VALUE_TYPE_BIGINT); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToSmallInt(getNumberFromString(), type); break;
@@ -1299,10 +1338,8 @@ class NValue {
             retval.narrowToTinyInt(getDouble(), type); break;
         case VALUE_TYPE_DECIMAL: {
             TTInt scaledValue = getDecimal();
-            TTInt whole(scaledValue);
-            whole /= kMaxScaleFactor;
-            int64_t value = whole.ToInt();
-            retval.narrowToTinyInt(value, type); break;
+            int64_t whole = narrowDecimalToBigInt(scaledValue);
+            retval.narrowToTinyInt(whole, type); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.narrowToTinyInt(getNumberFromString(), type); break;
@@ -2738,7 +2775,12 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char *storage,
+inline void NValue::deserializeFrom(SerializeInputBE &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
+    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, dataPool, storage, type, isInlined, maxLength, isInBytes);
+}
+
+template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(SerializeInput<E> &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
 
     switch (type) {
@@ -2792,6 +2834,16 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
         break;
     }
     case VALUE_TYPE_DECIMAL: {
+        if (F == TUPLE_SERIALIZATION_DR) {
+            const int scale = input.readByte();
+            const int precisionBytes = input.readByte();
+            if (scale != kMaxDecScale) {
+                throwFatalException("Unexpected scale %d", scale);
+            }
+            if (precisionBytes != 16) {
+                throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
+            }
+        }
         int64_t *longStorage = reinterpret_cast<int64_t*>(storage);
         //Reverse order for Java BigDecimal BigEndian
         longStorage[1] = input.readLong();
@@ -2812,13 +2864,13 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool)
 {
     const ValueType type = static_cast<ValueType>(input.readByte());
     deserializeFromAllocateForStorage(type, input, dataPool);
 }
 
-inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInputBE &input, Pool *dataPool)
 {
     setValueType(type);
     // Parameter array NValue elements are reused from one executor call to the next,
@@ -2956,48 +3008,56 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
     assert(isNull() == false);
-    switch (getValueType()) {
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
-    {
-        int64_t val = castAsBigIntAndGetValue();
-        io.writeLong(val);
-        return;
-    }
-    case VALUE_TYPE_DOUBLE:
-    {
-        double value = getDouble();
-        io.writeDouble(value);
-        return;
-    }
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    {
-        // requires (and uses) bytecount not character count
-                io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
-                return;
-    }
-    case VALUE_TYPE_DECIMAL:
-    {
-        std::string decstr = createStringFromDecimal();
-        int32_t objectLength = (int32_t)decstr.length();
-        io.writeBinaryString(decstr.data(), objectLength);
-        return;
-    }
-    case VALUE_TYPE_INVALID:
-    case VALUE_TYPE_NULL:
-    case VALUE_TYPE_BOOLEAN:
-    case VALUE_TYPE_ADDRESS:
-    case VALUE_TYPE_ARRAY:
-    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
-        char message[128];
-        snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                message);
-    }
+    const ValueType type = getValueType();
+     switch (type) {
+     case VALUE_TYPE_VARCHAR:
+     case VALUE_TYPE_VARBINARY:
+     {
+         io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
+         return;
+     }
+     case VALUE_TYPE_TINYINT: {
+         io.writeByte(getTinyInt());
+         return;
+     }
+     case VALUE_TYPE_SMALLINT: {
+         io.writeShort(getSmallInt());
+         return;
+     }
+     case VALUE_TYPE_INTEGER: {
+         io.writeInt(getInteger());
+         return;
+     }
+     case VALUE_TYPE_TIMESTAMP: {
+         io.writeLong(getTimestamp());
+         return;
+     }
+     case VALUE_TYPE_BIGINT: {
+         io.writeLong(getBigInt());
+         return;
+     }
+     case VALUE_TYPE_DOUBLE: {
+         io.writeDouble(getDouble());
+         return;
+     }
+     case VALUE_TYPE_DECIMAL: {
+         io.writeByte((int8_t)kMaxDecScale);
+         io.writeByte((int8_t)16);  //number of bytes in decimal
+         io.writeLong(htonll(getDecimal().table[1]));
+         io.writeLong(htonll(getDecimal().table[0]));
+         return;
+     }
+     case VALUE_TYPE_INVALID:
+     case VALUE_TYPE_NULL:
+     case VALUE_TYPE_BOOLEAN:
+     case VALUE_TYPE_ADDRESS:
+     case VALUE_TYPE_ARRAY:
+     case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+         char message[128];
+         snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                 message);
+     }
 
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
             "Invalid type in serializeToExport");

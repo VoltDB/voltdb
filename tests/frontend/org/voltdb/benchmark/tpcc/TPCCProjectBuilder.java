@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.benchmark.tpcc.procedures.FragmentUpdateTestProcedure;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouse;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouseReplicated;
 import org.voltdb.benchmark.tpcc.procedures.ResetWarehouse;
@@ -64,7 +65,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         ostatByCustomerName.class, paymentByCustomerIdC.class,
         paymentByCustomerNameC.class, paymentByCustomerIdW.class,
         paymentByCustomerNameW.class, slev.class, SelectAll.class,
-        ResetWarehouse.class, LoadWarehouse.class,
+        ResetWarehouse.class, LoadWarehouse.class, FragmentUpdateTestProcedure.class,
         LoadWarehouseReplicated.class,
         paymentByCustomerName.class, paymentByCustomerId.class
     };
@@ -180,7 +181,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
 
         // read in the catalog
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assert(serializedCatalog != null);
 
         // create the catalog (that will be passed to the ClientInterface

@@ -24,19 +24,19 @@ public class CatalogChangeWork extends AsyncCompilerWork {
 
     final byte[] catalogBytes;
     final String deploymentString;
-    final long originalTxnId;
-    final long originalUniqueId;
-    final ProcedureInvocationType invocationType;
+    final String[] adhocDDLStmts;
 
     public CatalogChangeWork(
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] catalogBytes, String deploymentString,
             ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
+            boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData,
+              adminConnection, clientData, type, originalTxnId, originalUniqueId,
+              onReplica, useAdhocDDL,
               completionHandler);
         if (catalogBytes != null) {
             this.catalogBytes = catalogBytes.clone();
@@ -45,9 +45,33 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             this.catalogBytes = null;
         }
         this.deploymentString = deploymentString;
-        this.invocationType = type;
-        this.originalTxnId = originalTxnId;
-        this.originalUniqueId = originalUniqueId;
+        adhocDDLStmts = null;
     }
 
+    /**
+     * To process adhoc DDL, we want to convert the AdHocPlannerWork we received from the
+     * ClientInterface into a CatalogChangeWork object for the AsyncCompilerAgentHelper to
+     * grind on.
+     */
+    public CatalogChangeWork(AdHocPlannerWork adhocDDL)
+    {
+        super(adhocDDL.replySiteId,
+              adhocDDL.shouldShutdown,
+              adhocDDL.clientHandle,
+              adhocDDL.connectionId,
+              adhocDDL.hostname,
+              adhocDDL.adminConnection,
+              adhocDDL.clientData,
+              adhocDDL.invocationType,
+              adhocDDL.originalTxnId,
+              adhocDDL.originalUniqueId,
+              adhocDDL.onReplica,
+              adhocDDL.useAdhocDDL,
+              adhocDDL.completionHandler);
+        // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
+        this.catalogBytes = null;
+        // Ditto for deployment string
+        this.deploymentString = null;
+        this.adhocDDLStmts = adhocDDL.sqlStatements;
+    }
 }

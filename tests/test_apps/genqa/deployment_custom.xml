@@ -4,16 +4,9 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true">
-        <onserver exportto="custom" exportconnectorclass="customexport.CustomOnServerExportClient" >
-            <configuration>
-                <property name="type">csv</property>
-                <property name="with-schema">false</property>
-                <property name="batched">false</property>
-                <property name="nonce">zohan</property>
-                <property name="period">1</property>
-                <property name="outdir">exportdata</property>
-            </configuration>
-        </onserver>
+    <export enabled="true" target="custom" exportconnectorclass="customexport.OverflowingServerExportClient" >
+        <configuration>
+            <property name="drain">true</property>
+        </configuration>
     </export>
 </deployment>

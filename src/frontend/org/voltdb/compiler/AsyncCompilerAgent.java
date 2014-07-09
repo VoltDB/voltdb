@@ -34,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -108,26 +109,76 @@ public class AsyncCompilerAgent {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-            final AsyncCompilerResult result = compileAdHocPlan(w);
-            w.completionHandler.onCompletion(result);
+            // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+            // This is not currently robust to comment, multi-line statments,
+            // multiple statements on a line, etc.
+            Boolean hasDDL = null;
+            for (String stmt : w.sqlStatements) {
+                String ddlToken = SQLLexer.extractDDLToken(stmt);
+                if (hasDDL == null) {
+                    hasDDL = (ddlToken != null) ? true : false;
+                }
+                else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null))
+                {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "DDL mixed with DML and queries is unsupported.");
+                    // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // if it's DDL, check to see if it's allowed
+                if (hasDDL && !SQLLexer.isPermitted(stmt)) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+            }
+            if (!hasDDL) {
+                final AsyncCompilerResult result = compileAdHocPlan(w);
+                w.completionHandler.onCompletion(result);
+            }
+            else {
+                // We have adhoc DDL.  Is it okay to run it?
+                // Is it forbidden by the replication role and configured schema change method?
+                // master and UAC method chosen:
+                if (!w.onReplica && !w.useAdhocDDL) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "Cluster is configured to use @UpdateApplicationCatalog " +
+                                "to change application schema.  AdHoc DDL is forbidden.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
+                else if (w.onReplica) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL is forbidden on a DR replica cluster. " +
+                                "Apply schema changes to the master and they will propogate to replicas.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                final CatalogChangeWork ccw = new CatalogChangeWork(w);
+                dispatchCatalogChangeWork(ccw);
+            }
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(w);
-            if (result.errorMsg != null) {
-                hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
+            // We have an @UAC.  Is it okay to run it?
+            // If we weren't provided catalogBytes, it's a deployment-only change and okay to take
+            // master and adhoc DDL method chosen
+            if (w.catalogBytes != null && !w.onReplica && w.useAdhocDDL) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use AdHoc DDL to change application " +
+                            "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
             }
-            // Log something useful about catalog upgrades when they occur.
-            if (result instanceof CatalogChangeResult) {
-                CatalogChangeResult ccr = (CatalogChangeResult)result;
-                if (ccr.upgradedFromVersion != null) {
-                    hostLog.info(String.format(
-                                "In order to update the application catalog it was "
-                                + "automatically upgraded from version %s.",
-                                ccr.upgradedFromVersion));
-                }
-            }
-            w.completionHandler.onCompletion(result);
+            dispatchCatalogChangeWork(w);
         }
         else {
             hostLog.warn("Unexpected message received by AsyncCompilerAgent.  " +
@@ -143,6 +194,25 @@ public class AsyncCompilerAgent {
                 apw.completionHandler.onCompletion(compileAdHocPlan(apw));
             }
         });
+    }
+
+    private void dispatchCatalogChangeWork(CatalogChangeWork work)
+    {
+        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
+        if (result.errorMsg != null) {
+            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+        }
+        // Log something useful about catalog upgrades when they occur.
+        if (result instanceof CatalogChangeResult) {
+            CatalogChangeResult ccr = (CatalogChangeResult)result;
+            if (ccr.upgradedFromVersion != null) {
+                hostLog.info(String.format(
+                            "In order to update the application catalog it was "
+                            + "automatically upgraded from version %s.",
+                            ccr.upgradedFromVersion));
+            }
+        }
+        work.completionHandler.onCompletion(result);
     }
 
     AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {

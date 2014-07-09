@@ -33,7 +33,8 @@ public:
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-                std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed);
+                std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
+                int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
@@ -44,6 +45,9 @@ public:
             StreamBlock *block,
             bool sync,
             bool endOfStream);
+
+    void pushDRBuffer(int32_t partitionId, StreamBlock *block);
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 private:
     JNIEnv *m_jniEnv;
@@ -60,7 +64,9 @@ private:
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
+    jmethodID m_pushDRBufferMID;
     jclass m_exportManagerClass;
+    jclass m_partitionDRGatewayClass;
 };
 
 }

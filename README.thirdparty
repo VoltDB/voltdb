@@ -671,6 +671,36 @@ Netty, code related to replacing the Set in java.nio.channels.Selector
  * under the License.
  */
 ================================================================================
+SHA-1
+
+By Steve Reid <sreid@sea-to-sky.net>
+100% Public Domain
+
+/* public api for steve reid's public domain SHA-1 implementation */
+/* this file is in the public domain */
+/*
+-----------------
+Modified 7/98
+By James H. Brown <jbrown@burgoyne.com>
+Still 100% Public Domain
+
+-----------------
+Modified 8/98
+By Steve Reid <sreid@sea-to-sky.net>
+Still 100% public domain
+
+-----------------
+Modified 4/01
+By Saul Kravitz <Saul.Kravitz@celera.com>
+Still 100% PD
+
+-----------------
+Modified 07/2002
+By Ralph Giles <giles@artofcode.com>
+Still 100% public domain
+
+*/
+================================================================================
 Node.js VoltDB client
 (portions used in VoltDB Node.js client)
 Author Jacob Wright, MIT License (https://github.com/jacwright/voltjs/blob/master/LICENSE)

@@ -64,9 +64,6 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     assert(rowsExpression);
 
-    // substitute params
-    rowsExpression->substitute(params);
-
     // get array nvalue
     NValue arrayNValue = rowsExpression->eval();
 

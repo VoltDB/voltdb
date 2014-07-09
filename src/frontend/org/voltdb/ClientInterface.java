@@ -53,6 +53,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -114,8 +115,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1340,7 +1339,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
                     }
                 }
-            }, MoreExecutors.sameThreadExecutor());
+            }, CoreUtils.SAMETHREADEXECUTOR);
         }
     }
 
@@ -1498,6 +1497,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
                 task.type, task.originalTxnId, task.originalUniqueId,
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
@@ -1534,6 +1535,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
+                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -2108,7 +2111,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.work.type;
+        task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info
@@ -2330,7 +2333,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     c.writeStream().enqueue(buf);
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
 
         //Return the future task for test code
         return ft;
@@ -2451,7 +2454,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);
