@@ -41,6 +41,7 @@
 #include "storage/TableStreamerContext.h"
 #include "storage/ElasticScanner.h"
 #include "storage/ElasticContext.h"
+#include "storage/DRTupleStream.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include "jsoncpp/jsoncpp.h"
@@ -231,7 +232,7 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
-                                                         m_columnNames, 0, false, false,
+                                                         m_columnNames, signature, false, 0, false, false,
                                                          tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
@@ -292,7 +293,7 @@ public:
         }
         m_engine->setUndoToken(++m_undoToken);
         ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
-                                                                     0, 0, 0);
+                                                                     0, 0, 0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -908,15 +909,15 @@ public:
         ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
     }
 
-    boost::shared_ptr<ReferenceSerializeInput> getPredicateSerializeInput(const std::vector<std::string> &predicateStrings) {
+    boost::shared_ptr<ReferenceSerializeInputBE> getPredicateSerializeInput(const std::vector<std::string> &predicateStrings) {
         ReferenceSerializeOutput predicateOutput(m_predicateBuffer, 1024 * 256);
         predicateOutput.writeInt(1);
         for (std::vector<std::string>::const_iterator i = predicateStrings.begin();
              i != predicateStrings.end(); i++) {
             predicateOutput.writeTextString(*i);
         }
-        return boost::shared_ptr<ReferenceSerializeInput>(
-                new ReferenceSerializeInput(m_predicateBuffer, predicateOutput.position()));
+        return boost::shared_ptr<ReferenceSerializeInputBE>(
+                new ReferenceSerializeInputBE(m_predicateBuffer, predicateOutput.position()));
     }
 
     voltdb::ElasticContext *getElasticContext() {
@@ -948,7 +949,7 @@ public:
     }
 
     void streamElasticIndex(std::vector<std::string> &predicateStrings, bool checkCalls) {
-        boost::shared_ptr<ReferenceSerializeInput> predicateInput = getPredicateSerializeInput(predicateStrings);
+        boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getPredicateSerializeInput(predicateStrings);
         bool ok = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
         ASSERT_TRUE(ok);
 
@@ -973,7 +974,7 @@ public:
         char config[4];
         ::memset(config, 0, 4);
         ::memset(config, 0, 4);
-        ReferenceSerializeInput predicateInput(config, 4);
+        ReferenceSerializeInputBE predicateInput(config, 4);
 
         totalInserted = 0;
 
@@ -1017,7 +1018,7 @@ public:
         }
     }
 
-    boost::shared_ptr<ReferenceSerializeInput> getHashRangePredicateInput(const T_HashRange &testRange) {
+    boost::shared_ptr<ReferenceSerializeInputBE> getHashRangePredicateInput(const T_HashRange &testRange) {
         // Set up the hash range predicate.
         ReferenceSerializeOutput hashRangeOutput(m_hashRangeBuffer, 1024 * 256);
         std::ostringstream hashRangeString;
@@ -1025,12 +1026,12 @@ public:
         hashRangeOutput.writeInt(1);
         hashRangeOutput.writeTextString(hashRangeString.str());
 
-        return boost::shared_ptr<ReferenceSerializeInput>(
-                new ReferenceSerializeInput(m_hashRangeBuffer, hashRangeOutput.position()));
+        return boost::shared_ptr<ReferenceSerializeInputBE>(
+                new ReferenceSerializeInputBE(m_hashRangeBuffer, hashRangeOutput.position()));
     }
 
     void materializeIndex(ElasticIndex &index, const T_HashRange &testRange, bool undo, size_t &totalInserted) {
-        boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
+        boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
 
         m_engine->setUndoToken(m_undoToken);
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ,
@@ -1074,12 +1075,12 @@ public:
             m_engine->releaseUndoToken(m_undoToken);
         }
         ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
-                                                                     0, 0, 0);
+                                                                     0, 0, 0, 0);
         m_undoToken++;
     }
 
     void clearIndex(const T_HashRange &testRange, bool expected) {
-        boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
+        boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_CLEAR,
                                                  0, m_tableId, *predicateInput);
         ASSERT_EQ(expected,activated);
@@ -1088,11 +1089,13 @@ public:
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;
+    voltdb::MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
     DefaultTupleSerializer m_serializer;
     char m_serializationBuffer[BUFFER_SIZE];
     char m_predicateBuffer[1024 * 256];
@@ -1194,7 +1197,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
         char config[4];
         ::memset(config, 0, 4);
-        ReferenceSerializeInput input(config, 4);
+        ReferenceSerializeInputBE input(config, 4);
 
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
@@ -1244,7 +1247,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
-                                                                 0, 0, 0);
+                                                                 0, 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -1262,7 +1265,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
         char config[4];
         ::memset(config, 0, 4);
-        ReferenceSerializeInput input(config, 4);
+        ReferenceSerializeInputBE input(config, 4);
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
@@ -1312,7 +1315,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
-                                                                 0, 0, 0);
+                                                                 0, 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -1330,7 +1333,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 
         char config[4];
         ::memset(config, 0, 4);
-        ReferenceSerializeInput input(config, 4);
+        ReferenceSerializeInputBE input(config, 4);
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
@@ -1370,7 +1373,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             m_engine->undoUndoToken(m_undoToken);
             m_engine->setUndoToken(++m_undoToken);
             ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
-                                                                         0, 0, 0);
+                                                                         0, 0, 0, 0);
         }
 
         checkTuples(0, originalTuples, COWTuples);
@@ -1451,7 +1454,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
 
         context("activate");
 
-        ReferenceSerializeInput input(buffer, output.position());
+        ReferenceSerializeInputBE input(buffer, output.position());
         bool success = m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         if (!success) {
             error("COW was previously activated");
@@ -1541,7 +1544,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     char serializationBuffer[bufferSize];
     char config[4];
     ::memset(config, 0, 4);
-    ReferenceSerializeInput input(config, 4);
+    ReferenceSerializeInputBE input(config, 4);
     m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
