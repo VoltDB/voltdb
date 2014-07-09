@@ -263,12 +263,16 @@ public class AdHocDDLBenchmark {
         float series3 = averageLatencyTest();
 
         ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
-        fw.append(String.format("%s,%d,-1,%.2f,0,0,%.2f,%.2f\n",
-                label,
-                stats.getStartTimestamp(),
-                series3,
-                series1,
-                series2));
+        
+        if(fw != null)
+        {
+            fw.append(String.format("%s,%d,-1,%.2f,0,0,%.2f,%.2f\n",
+                    label,
+                    stats.getStartTimestamp(),
+                    series3,
+                    series1,
+                    series2));
+        }
     }
 
     /**
@@ -289,14 +293,21 @@ public class AdHocDDLBenchmark {
         System.out.println(" Statistics ");
         System.out.println(HORIZONTAL_RULE);
 
-        FileWriter fw = new FileWriter(config.statsfile);
+        FileWriter fw = null;
+        if((config.statsfile != null) && (config.statsfile.length() != 0)) 
+        {
+            fw = new FileWriter(config.statsfile);
+        }
 
         bunchTest(5, fw, "5 columns table");
         clearServer(0, 1000);
         bunchTest(50, fw, "50 columns table");
         clearServer(0, 1000);
 
-        fw.close();
+        if((config.statsfile != null) && (config.statsfile.length() != 0)) 
+        {
+            fw.close();
+        }
 
         // block until all outstanding txns return
         client.drain();
