@@ -272,6 +272,10 @@ public class TestJDBCResultSet {
         volt3RowRS.next();
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
+        hsql3RowRS.previous();
+        volt3RowRS.previous();
+        hsql3RowRS.previous();
+        volt3RowRS.previous();
         assertEquals(hsql3RowRS.absolute(1), volt3RowRS.absolute(1));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
@@ -311,7 +315,7 @@ public class TestJDBCResultSet {
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         // negative position
-        assertEquals(volt3RowRS.absolute(-2), hsql3RowRS.absolute(-2));
+        assertEquals(hsql3RowRS.absolute(-3), volt3RowRS.absolute(-3));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
     }
 
@@ -330,13 +334,13 @@ public class TestJDBCResultSet {
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
-        assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         assertEquals(hsql3RowRS.relative(-3), volt3RowRS.relative(-3));
-        assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         assertEquals(hsql3RowRS.relative(-10), volt3RowRS.relative(-10));
-        assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
     }
 
     @Test
