@@ -40,7 +40,7 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
-        src/*.java 
+        src/adhocddl/*.java 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
