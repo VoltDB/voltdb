@@ -28,7 +28,7 @@ CLASSPATH=$({ \
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
 ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar"
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:/home/opt/rabbitmq/rabbitmq.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
