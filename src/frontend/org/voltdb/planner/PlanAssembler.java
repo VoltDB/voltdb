@@ -1295,7 +1295,7 @@ public class PlanAssembler {
         // Whether or not we can push the limit node down
         boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
-            sendNode = checkPushDownViability(root);
+            sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
             } else {
@@ -1887,7 +1887,7 @@ public class PlanAssembler {
      * @return If we can push it down, the receive node is returned. Otherwise,
      *         it returns null.
      */
-    protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
+    protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
         // Return a mid-plan send node, if one exists and can host a distributed limit node.
@@ -1908,15 +1908,10 @@ public class PlanAssembler {
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
-            if (!(receiveNode instanceof AggregatePlanNode) &&
-                !(receiveNode instanceof OrderByPlanNode) &&
+            // Delete the aggregate node case to handle ENG-6485, or say we don't push down meeting aggregate node
+            // TODO: We might want to optimize/push down "limit" for some cases
+            if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                return null;
-            }
-
-            // Limitation: can only push past coordinating aggregation nodes
-            if (receiveNode instanceof AggregatePlanNode &&
-                !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 return null;
             }
 
