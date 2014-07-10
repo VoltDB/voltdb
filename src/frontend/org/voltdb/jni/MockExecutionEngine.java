@@ -49,6 +49,7 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -132,8 +133,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId, boolean returnUniqueViolations, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
+        final long lastCommittedTxnId, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         return null;
@@ -224,7 +225,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         throw new UnsupportedOperationException();
     }
 }

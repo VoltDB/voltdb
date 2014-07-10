@@ -294,8 +294,12 @@ class NValue {
        provided. This function will perform memory allocations for
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
+    template <TupleSerializationFormat F, Endianess E>
     static void deserializeFrom(
-        SerializeInput &input, Pool *dataPool, char *storage,
+        SerializeInput<E> &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
+    static void deserializeFrom(
+        SerializeInputBE &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
@@ -304,8 +308,8 @@ class NValue {
     /* Read a ValueType from the SerializeInput stream and deserialize
        a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
-    void deserializeFromAllocateForStorage(ValueType vt, SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE &input, Pool *dataPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
@@ -649,7 +653,7 @@ class NValue {
 
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool);
     void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
@@ -2771,7 +2775,12 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char *storage,
+inline void NValue::deserializeFrom(SerializeInputBE &input, Pool *dataPool, char *storage,
+        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
+    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, dataPool, storage, type, isInlined, maxLength, isInBytes);
+}
+
+template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(SerializeInput<E> &input, Pool *dataPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
 
     switch (type) {
@@ -2825,6 +2834,16 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
         break;
     }
     case VALUE_TYPE_DECIMAL: {
+        if (F == TUPLE_SERIALIZATION_DR) {
+            const int scale = input.readByte();
+            const int precisionBytes = input.readByte();
+            if (scale != kMaxDecScale) {
+                throwFatalException("Unexpected scale %d", scale);
+            }
+            if (precisionBytes != 16) {
+                throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
+            }
+        }
         int64_t *longStorage = reinterpret_cast<int64_t*>(storage);
         //Reverse order for Java BigDecimal BigEndian
         longStorage[1] = input.readLong();
@@ -2845,13 +2864,13 @@ inline void NValue::deserializeFrom(SerializeInput &input, Pool *dataPool, char 
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool)
 {
     const ValueType type = static_cast<ValueType>(input.readByte());
     deserializeFromAllocateForStorage(type, input, dataPool);
 }
 
-inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInputBE &input, Pool *dataPool)
 {
     setValueType(type);
     // Parameter array NValue elements are reused from one executor call to the next,
@@ -2989,48 +3008,56 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
     assert(isNull() == false);
-    switch (getValueType()) {
-    case VALUE_TYPE_TINYINT:
-    case VALUE_TYPE_SMALLINT:
-    case VALUE_TYPE_INTEGER:
-    case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
-    {
-        int64_t val = castAsBigIntAndGetValue();
-        io.writeLong(val);
-        return;
-    }
-    case VALUE_TYPE_DOUBLE:
-    {
-        double value = getDouble();
-        io.writeDouble(value);
-        return;
-    }
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-    {
-        // requires (and uses) bytecount not character count
-                io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
-                return;
-    }
-    case VALUE_TYPE_DECIMAL:
-    {
-        std::string decstr = createStringFromDecimal();
-        int32_t objectLength = (int32_t)decstr.length();
-        io.writeBinaryString(decstr.data(), objectLength);
-        return;
-    }
-    case VALUE_TYPE_INVALID:
-    case VALUE_TYPE_NULL:
-    case VALUE_TYPE_BOOLEAN:
-    case VALUE_TYPE_ADDRESS:
-    case VALUE_TYPE_ARRAY:
-    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
-        char message[128];
-        snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                message);
-    }
+    const ValueType type = getValueType();
+     switch (type) {
+     case VALUE_TYPE_VARCHAR:
+     case VALUE_TYPE_VARBINARY:
+     {
+         io.writeBinaryString(getObjectValue_withoutNull(), getObjectLength_withoutNull());
+         return;
+     }
+     case VALUE_TYPE_TINYINT: {
+         io.writeByte(getTinyInt());
+         return;
+     }
+     case VALUE_TYPE_SMALLINT: {
+         io.writeShort(getSmallInt());
+         return;
+     }
+     case VALUE_TYPE_INTEGER: {
+         io.writeInt(getInteger());
+         return;
+     }
+     case VALUE_TYPE_TIMESTAMP: {
+         io.writeLong(getTimestamp());
+         return;
+     }
+     case VALUE_TYPE_BIGINT: {
+         io.writeLong(getBigInt());
+         return;
+     }
+     case VALUE_TYPE_DOUBLE: {
+         io.writeDouble(getDouble());
+         return;
+     }
+     case VALUE_TYPE_DECIMAL: {
+         io.writeByte((int8_t)kMaxDecScale);
+         io.writeByte((int8_t)16);  //number of bytes in decimal
+         io.writeLong(htonll(getDecimal().table[1]));
+         io.writeLong(htonll(getDecimal().table[0]));
+         return;
+     }
+     case VALUE_TYPE_INVALID:
+     case VALUE_TYPE_NULL:
+     case VALUE_TYPE_BOOLEAN:
+     case VALUE_TYPE_ADDRESS:
+     case VALUE_TYPE_ARRAY:
+     case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+         char message[128];
+         snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
+         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                 message);
+     }
 
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
             "Invalid type in serializeToExport");

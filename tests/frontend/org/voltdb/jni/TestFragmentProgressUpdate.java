@@ -119,7 +119,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -144,7 +144,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
@@ -167,7 +167,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -194,7 +194,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -229,7 +229,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE);
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -242,7 +242,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
         assertEquals(m_longOpthreshold, m_ee.m_lastTuplesAccessed);
@@ -267,7 +267,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -294,7 +294,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE);
 
         // If want to see the stats, please uncomment the following line.
         // It is '8 393216 262144' on my machine.
