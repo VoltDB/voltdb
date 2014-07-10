@@ -586,6 +586,97 @@ public class CoreUtils {
                                       new SynchronousQueue<Runnable>(), tFactory);
     }
 
+    /**
+     * Create an ExceutorService that places tasks in an existing task queue for execution. Used
+     * to create a bridge for using ListenableFutures in classes already built around a queue.
+     * @param taskQueue : place to enqueue Runnables submitted to the service
+     */
+    public static ExecutorService getQueueingExecutorService(final Queue<Runnable> taskQueue) {
+        return new ExecutorService() {
+            @Override
+            public void execute(Runnable command) {
+                taskQueue.offer(command);
+            }
+
+            @Override
+            public void shutdown() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<Runnable> shutdownNow() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean isShutdown() {
+                return false;
+            }
+
+            @Override
+            public boolean isTerminated() {
+                return false;
+            }
+
+            @Override
+            public boolean awaitTermination(long timeout, TimeUnit unit)
+                    throws InterruptedException {
+                return true;
+            }
+
+            @Override
+            public <T> Future<T> submit(Callable<T> task) {
+                Preconditions.checkNotNull(task);
+                FutureTask<T> retval = new FutureTask<T>(task);
+                retval.run();
+                return retval;
+            }
+
+            @Override
+            public <T> Future<T> submit(Runnable task, T result) {
+                Preconditions.checkNotNull(task);
+                FutureTask<T> retval = new FutureTask<T>(task, result);
+                retval.run();
+                return retval;
+            }
+
+            @Override
+            public Future<?> submit(Runnable task) {
+                Preconditions.checkNotNull(task);
+                ListenableFutureTask<Object> retval = ListenableFutureTask.create(task, null);
+                taskQueue.offer(retval);
+                return retval;
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(
+                    Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(
+                    Collection<? extends Callable<T>> tasks, long timeout,
+                    TimeUnit unit) throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException, ExecutionException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                    long timeout, TimeUnit unit) throws InterruptedException,
+                    ExecutionException, TimeoutException {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
     public static ThreadFactory getThreadFactory(String name) {
         return getThreadFactory(name, SMALL_STACK_SIZE);
     }
