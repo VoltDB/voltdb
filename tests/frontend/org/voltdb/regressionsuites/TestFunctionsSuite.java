@@ -2783,51 +2783,66 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // concat params with a sql query string, and test the return value
-    private static void doTestCoalesceWithoutConst(Client cl, String[] params,
+    private void doTestCoalesceWithoutConst(Client cl, String[] params,
                                                    String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
-        // sql = "SELECT CASE COALESCE(para1, para2, ...) WHEN expect THEN 0 ELSE 1 END FROM C_NULL WHERE ID=id";
-        String sql = "SELECT CASE COALESCE(" + allPara + ") " +
-                "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
-        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        assertTrue(result.advanceRow());
-        long rv = result.getLong(0);
-        assertEquals(rv, 0);
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ...) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ...)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
     }
 
-    private static void doTestCoalesceWithConst(Client cl, String[] params,
+    private void doTestCoalesceWithConst(Client cl, String[] params,
                                                 String cst ,String expect, String id) throws Exception {
         String allPara = joinStringArray(params, ",").toString();
         allPara += ","+cst;
-        // sql = "SELECT CASE COALESCE(para1, para2, ..., cst) WHEN expect THEN 0 ELSE 1 END FROM C_NULL WHERE ID=id";
-        String sql = "SELECT CASE COALESCE(" + allPara + ") " +
-                "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
-        ClientResponse cr = cl.callProcedure("@AdHoc", sql);
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        assertTrue(result.advanceRow());
-        long rv = result.getLong(0);
-        assertEquals(rv, 0);
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ..., cst) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ..., cst)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
     }
 
     // col1 is not null while col2 is null
-    private static void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
+    private void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
         // coalesce(col1, col2) == coalesce(col2, col1) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "1");
         doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "1");
     }
 
-    // TODO: need discuss the logic here
-    private static void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
-        // coalesce(col1, col2) == coalesce(col2, col1) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "0");
-        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "0");
+    private void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
+        // coalesce(col1, col2) == coalesce(col2, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, "NULL", "0");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, "NULL", "0");
     }
 
     // Both the columns are not null
-    private static void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
+    private void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
         // coalesce(col1, col2) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "2");
         // coalesce(col2, col1) == col2
@@ -2835,7 +2850,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // All the columns are not null
-    private static void doTestCoalesceTriNotNull(Client cl, String col1,
+    private void doTestCoalesceTriNotNull(Client cl, String col1,
                                                  String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
@@ -2864,7 +2879,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // col3 is null
-    private static void doTestCoalesceTriOneNull(Client cl, String col1,
+    private void doTestCoalesceTriOneNull(Client cl, String col1,
                                                  String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
@@ -2893,7 +2908,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // col2 and col3 are null
-    private static void doTestCoalesceTriTwoNull(Client cl, String col1,
+    private void doTestCoalesceTriTwoNull(Client cl, String col1,
                                                  String col2, String col3, String cst) throws Exception {
         // coalesce(col1, col2, col3) == col1
         doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
@@ -2922,21 +2937,20 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // all columns are null
-    // TODO: need discuss the logic here
-    private static void doTestCoalesceTriAllNull(Client cl, String col1,
+    private void doTestCoalesceTriAllNull(Client cl, String col1,
                                                  String col2, String col3, String cst) throws Exception{
-        // coalesce(col1, col2, col3) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "0");
-        // coalesce(col1, col3, col2) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "0");
-        // coalesce(col2, col1, col3) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col1, "0");
-        // coalesce(col2, col3, col1) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col1, "0");
-        // coalesce(col3, col1, col2) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "0");
-        // coalesce(col3, col2, col2) == col1
-        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col1, "0");
+        // coalesce(col1, col2, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, "NULL", "0");
+        // coalesce(col1, col3, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, "NULL", "0");
+        // coalesce(col2, col1, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, "NULL", "0");
+        // coalesce(col2, col3, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, "NULL", "0");
+        // coalesce(col3, col1, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, "NULL", "0");
+        // coalesce(col3, col2, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, "NULL", "0");
         // coalesce(col1, col2, col3, cst) == cst
         doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, cst, "0");
         // coalesce(col1, col3, col2, cst) == cst
@@ -2951,15 +2965,15 @@ public class TestFunctionsSuite extends RegressionSuite {
         doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, cst, "0");
     }
 
-    private static void doTestTwoColCoalesce(Client cl, String col1, String col2) throws Exception {
-        //doTestCoalescePairBothNull(cl, col1, col2);
+    private void doTestTwoColCoalesce(Client cl, String col1, String col2) throws Exception {
+        doTestCoalescePairBothNull(cl, col1, col2);
         doTestCoalescePairOneNull(cl, col1, col2);
         doTestCoalescePairNotNull(cl, col1, col2);
     }
 
-    private static void doTestThreeColCoalesce(Client cl, String col1,
-                                               String col2, String col3, String cst) throws Exception {
-        //doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
+    private void doTestThreeColCoalesce(Client cl, String col1,
+                                        String col2, String col3, String cst) throws Exception {
+        doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
         doTestCoalesceTriTwoNull(cl, col1, col2, col3, cst);
         doTestCoalesceTriOneNull(cl, col1, col2, col3, cst);
         doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
