@@ -113,6 +113,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     // we need to use the schema of the target table here, not the input table
     TableTuple &templateTuple = targetTable->tempTuple();
+
+    // initialize the template tuple with default values from the catalog
     m_node->initTemplateTuple(m_engine, templateTuple);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
@@ -161,9 +163,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-
-                std::cerr << "site not local, with nvalue " << value.debug() << std::endl;
-
                 if (!m_multiPartition) {
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),

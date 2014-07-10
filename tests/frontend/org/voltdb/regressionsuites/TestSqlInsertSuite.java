@@ -104,11 +104,6 @@ public class TestSqlInsertSuite extends RegressionSuite {
         }
         boolean success;
 
-//        config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_IPC);
-//        success = config.compile(project);
-//        assert(success);
-//        builder.addServerConfig(config);
-
         config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);

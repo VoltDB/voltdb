@@ -969,7 +969,7 @@ public class PlanAssembler {
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
-    private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {
+    static private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {
 
         if (expr.getValueType().getValue() != column.getType() ||
                 expr.getValueSize() != column.getSize()) {
@@ -1089,6 +1089,10 @@ public class PlanAssembler {
         NodeSchema matSchema = new NodeSchema();
         int[] fieldMap = new int[m_parsedInsert.columns.size()];
         int i = 0;
+
+        // The insert statement's set of columns are contained in a LinkedHashMap,
+        // meaning that we'll iterate over the columns here in the order that the user
+        // specified them in the original SQL.
         for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.columns.entrySet()) {
             Column col = e.getKey();
 

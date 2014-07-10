@@ -60,8 +60,7 @@ public:
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
-    /// Constructs a value copied into long-lived pooled memory (or the heap)
-    /// that will require an explicit NValue::free.
+    /// Constructs a value copied into temporary thread-local storage.
     static inline NValue getTempStringValue(const std::string value) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NValue::getTempStringPool());
     }
@@ -180,7 +179,7 @@ public:
         return value.castAsString();
     }
 
-    enum StorageType { 
+    enum StorageType {
         USE_TEMP_STORAGE,
         USE_LONG_TERM_STORAGE
     };
@@ -215,7 +214,7 @@ public:
             {
                 if (storage == USE_TEMP_STORAGE) {
                     return getTempStringValue(value);
-                } 
+                }
                 else {
                     return getStringValue(value.c_str());
                 }

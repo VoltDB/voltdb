@@ -648,15 +648,19 @@ static bool isDefaultNow(const std::string& defaultValue) {
     if (tokens.size() != 2) {
         return false;
     }
-    
+
     int funcId = boost::lexical_cast<int>(tokens[1]);
     if (funcId == FUNC_CURRENT_TIMESTAMP) {
         return true;
     }
-    
+
     return false;
 }
 
+// This method produces a row containing all the default values for
+// the table.  Note that if there are timestamp columns in the table
+// with a default value of "now", then the column will be populated
+// with whatever time you call this function.
 void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
@@ -669,14 +673,11 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable,
         catalog::Column *col = colIter->second;
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
-        std::cerr << "initializing template tuple!\n" << std::endl;
-
-
         switch (defaultColType) {
         case VALUE_TYPE_INVALID:
             tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
             break;
-            
+
         case VALUE_TYPE_TIMESTAMP:
             if (isDefaultNow(col->defaultvalue())) {
                 tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
@@ -685,13 +686,8 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable,
             // else, fall through to default case
         default:
 
-            if (col->defaulttype() != col->type()) {
-                std::cerr << "mismatched default!!\n" << std::endl;
-                throwFatalException("found mismatched type for column %s:\ncolumn: %d\ndefault: %d", col->name().c_str(), col->defaulttype(), col->type());
-            }
-
-            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType, 
-                                                                         col->defaultvalue(), 
+            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
+                                                                         col->defaultvalue(),
                                                                          ValueFactory::USE_TEMP_STORAGE);
             tbTuple.setNValue(col->index(), defaultValue);
             break;
