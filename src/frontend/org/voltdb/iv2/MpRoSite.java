@@ -336,15 +336,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
+            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public byte[] loadTable(long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -455,7 +456,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
+            Object[] parameterSets, long txnId, long spHandle, long uniqueId, boolean readOnly)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -514,5 +515,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public void applyBinaryLog(byte log[]) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 }

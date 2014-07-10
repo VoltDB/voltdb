@@ -767,7 +767,7 @@ TEST_F(NValueTest, TestCastToString) {
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -1821,66 +1821,66 @@ TEST_F(NValueTest, SerializeToExport)
     // tinyint
     nv = ValueFactory::getTinyIntValue(-50);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-50, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(-50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(0, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(50);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(50, sin.readLong());
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     // smallint
     nv = ValueFactory::getSmallIntValue(-128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-128, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(-128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(0, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     // int
     nv = ValueFactory::getIntegerValue(-4999999);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-4999999, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(-4999999, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(0);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(0, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(128);
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(128, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
@@ -1960,32 +1960,16 @@ TEST_F(NValueTest, SerializeToExport)
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
     nv.serializeToExport_withoutNull(out);
-    EXPECT_EQ(24 + 4, out.position());
-    EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
-    EXPECT_EQ('-', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('7', sin.readChar());
-    EXPECT_EQ('8', sin.readChar());
-    EXPECT_EQ('9', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('.', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
+    EXPECT_EQ(18, out.position());
+    EXPECT_EQ(12, sin.readByte());//12 digit scale
+    EXPECT_EQ(16, sin.readByte());//16 bytes of precision
+    int64_t low = sin.readLong();
+    low = ntohll(low);
+    int64_t high = sin.readLong();
+    high = ntohll(high);
+    TTInt val = ValuePeeker::peekDecimal(nv);
+    EXPECT_EQ(low, val.table[1]);
+    EXPECT_EQ(high, val.table[0]);
     sin.unread(out.position());
     out.position(0);
 }
@@ -2068,7 +2052,7 @@ TEST_F(NValueTest, TestSubstring)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2160,7 +2144,7 @@ TEST_F(NValueTest, TestExtract)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2293,7 +2277,7 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
     char serial_buffer[1024];
     // This requires intimate knowledge of ARRAY wire protocol
     ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
-    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInputBE input(serial_buffer, sizeof(serial_buffer));
     setup.writeByte(VALUE_TYPE_ARRAY);
     setup.writeByte(vt);
     setup.writeShort((short)length); // number of list elements
@@ -2356,7 +2340,7 @@ TEST_F(NValueTest, TestInList)
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
@@ -2564,7 +2548,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2770,7 +2754,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     bool failed = false;
     const char* trials[] = {
@@ -3038,7 +3022,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::string peekString;
 
@@ -3098,7 +3082,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::string peekString;
 

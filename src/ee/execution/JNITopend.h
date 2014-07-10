@@ -45,6 +45,9 @@ public:
             StreamBlock *block,
             bool sync,
             bool endOfStream);
+
+    void pushDRBuffer(int32_t partitionId, StreamBlock *block);
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 private:
     JNIEnv *m_jniEnv;
@@ -61,7 +64,9 @@ private:
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
+    jmethodID m_pushDRBufferMID;
     jclass m_exportManagerClass;
+    jclass m_partitionDRGatewayClass;
 };
 
 }
