@@ -135,18 +135,23 @@ def extract_a_procedure(f):
 
     # java doesn't permit file name has '.'.
     func_name = func_name.replace('.', '_')
-    return func_name, statement, para_types, is_array
+    # because it is hard to go back to the previous line, we need to store the current line
+    return func_name, statement, para_types, is_array, line
 
-def find_a_procedure(f, func_name = ""):
+def find_a_procedure(f, func_name = "", cur_line = ""):
     target = "add /clusters[cluster]/databases[database] procedures " + func_name
+    if cur_line.startswith(target):
+        return extract_a_procedure(f)
+
+    # start to search target from the next line
     for line in f:
         if line.startswith(target):
             return extract_a_procedure(f)
-    return None, None, None, None
+    return None, None, None, None, None
 
 def process_spec_func(func_name, package, input_file, output_dir):
     f = open(input_file)
-    name, statement, para_types, is_array = find_a_procedure(f, func_name)
+    name, statement, para_types, is_array = find_a_procedure(f, func_name, "")
     f.close()
 
     if name:
@@ -156,8 +161,9 @@ def process_spec_func(func_name, package, input_file, output_dir):
 
 def process_whole_ddl(package, input_file, output_dir):
     f = open(input_file)
+    line = ""
     while True:
-        name, statement, para_types, is_array = find_a_procedure(f)
+        name, statement, para_types, is_array, line = find_a_procedure(f, cur_line = line)
         if not name:
             break
         generate_one_function(name, package, statement, para_types, is_array, output_dir + '/' + name + '.java')
