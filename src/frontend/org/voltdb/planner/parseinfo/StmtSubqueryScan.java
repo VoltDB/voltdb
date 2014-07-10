@@ -303,6 +303,11 @@ public class StmtSubqueryScan extends StmtTableScan {
         assert(root.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 1);
         assert(m_subqueryStmt != null);
 
+        // recursive check for its nested subqueries for should have receive node.
+        if (hasReceiveNode()) {
+            m_hasReceiveNode = true;
+            return root;
+        }
 
         m_hasReceiveNode = true;
         ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;

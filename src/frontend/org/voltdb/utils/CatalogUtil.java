@@ -91,6 +91,7 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -727,6 +728,17 @@ public abstract class CatalogUtil {
                 // default to 10 seconds
                 catCluster.setHeartbeattimeout(10);
             }
+
+            // copy schema modification behavior from xml to catalog
+            if (cluster.getSchema() != null) {
+                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+            }
+            else {
+                // Don't think we can get here, deployment schema guarantees a default value
+                hostLog.warn("Schema modification setting not found. " +
+                        "Forcing default behavior of UpdateCatalog to modify database schema.");
+                catCluster.setUseadhocschema(false);
+            }
         }
     }
 
@@ -824,6 +836,7 @@ public abstract class CatalogUtil {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 try {

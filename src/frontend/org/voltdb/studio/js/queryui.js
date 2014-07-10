@@ -174,7 +174,7 @@ function QueryUI(queryTab) {
                     if (param.toLowerCase() === 'null') {
                         parameterBank.push(null);
                     } else {
-                        if (param.startsWith(QuotedStringNonceLiteral)) {
+                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }

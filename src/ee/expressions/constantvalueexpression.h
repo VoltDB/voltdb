@@ -54,9 +54,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
-
 class ConstantValueExpression : public AbstractExpression {
     public:
     ConstantValueExpression(const NValue &value)

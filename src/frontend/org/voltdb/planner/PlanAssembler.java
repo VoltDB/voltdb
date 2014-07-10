@@ -246,8 +246,7 @@ public class PlanAssembler {
                 // End of the recursion. Nothing to simplify
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
-
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             for (ParsedColInfo groupbyCol: m_parsedSelect.m_groupByColumns) {

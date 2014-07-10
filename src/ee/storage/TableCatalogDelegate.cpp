@@ -34,9 +34,9 @@
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/persistenttable.h"
-#include "storage/StreamBlock.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+#include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
@@ -242,7 +242,9 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                                        catalog::Table const &catalogTable,
-                                                       const int32_t compactionThreshold)
+                                                       const int32_t compactionThreshold,
+                                                       bool &materialized,
+                                                       char *signatureHash)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -363,10 +365,15 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
+    SHA1_CTX shaCTX;
+    SHA1_Init(&shaCTX);
+    SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
+    SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames,
+                                                    schema, columnNames, signatureHash, materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
@@ -397,7 +404,9 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable,
-                                        m_compactionThreshold);
+                                        m_compactionThreshold,
+                                        m_materialized,
+                                        m_signatureHash);
     if (!m_table) {
         return false; // mixing ints and booleans here :(
     }
@@ -472,7 +481,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
 
     PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold));
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold, m_materialized, m_signatureHash));
     assert(newTable);
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 

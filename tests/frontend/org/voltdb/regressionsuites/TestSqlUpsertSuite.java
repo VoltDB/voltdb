@@ -183,11 +183,12 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         assert(success);
         builder.addServerConfig(config);
 
-        // Cluster
+        //*/ Cluster
         config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
+        //*/
 
         return builder;
     }

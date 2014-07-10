@@ -67,6 +67,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 
 using namespace std;
 using namespace voltdb;
@@ -121,7 +122,7 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature, &drStream, false);
             m_table = persistent_table;
         } else {
             temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
@@ -134,6 +135,8 @@ protected:
     Table* temp_table;
     Table* persistent_table;
     TempTableLimits limits;
+    MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(TableTest, ValueTypes) {

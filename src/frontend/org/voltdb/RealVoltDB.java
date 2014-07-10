@@ -167,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.4";
+    static final String m_defaultVersionString = "4.5";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.4\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.5\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -634,7 +634,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
             if (m_config.m_isEnterprise) {
                 try {
-                    Class<?> ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                    Class<?> ndrgwClass = null;
+                    if (Boolean.getBoolean("USE_DR_V2")) {
+                        ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
+                    } else {
+                        ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                    }
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
