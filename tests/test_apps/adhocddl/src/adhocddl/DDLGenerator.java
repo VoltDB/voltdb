@@ -34,12 +34,20 @@ public class DDLGenerator
 
     Random r = new Random();
 
+    /**
+     * Default construcor of DDLGenerator
+     */
     public DDLGenerator()
     {
         numOfCols = 50;
         idxStep = 10;
     }
 
+    /**
+     * Constructor of DDLGenerator
+     * @param col
+     * @param idxPercent
+     */
     public DDLGenerator(int col, double idxPercent)
     {
         numOfCols = col;
@@ -53,6 +61,11 @@ public class DDLGenerator
         }
     }
 
+    /**
+     * Generate a column with a random data type
+     * @param colNo
+     * @return column definition
+     */
     public String CreateColumn(int colNo)
     {
         int index = r.nextInt(datatype.length);
@@ -67,6 +80,12 @@ public class DDLGenerator
         }
     }
 
+    /**
+     * Generate a CREATE TABLE stmt
+     * @param tableNo
+     * @param prefix
+     * @return sql stmt
+     */
     public String CreateTable(int tableNo, String prefix)
     {
         StringBuffer sb = new StringBuffer();
@@ -86,17 +105,37 @@ public class DDLGenerator
         return sb.toString();
     }
 
+    /**
+     * Generate a DROP TABLE stmt
+     * @param tableNo
+     * @param prefix
+     * @return sql stmt
+     */
     public String DropTable(int tableNo, String prefix)
     {
         return "DROP TABLE " + prefix + tableNo + ";";
     }
 
+    /**
+     * Generate a CREATE PROCEDURE stmt
+     * @param procNo
+     * @param tableNo
+     * @param prefix
+     * @return sql stmt
+     */
     public String CreateProcedure(int procNo, int tableNo, String prefix)
     {
         String tableName = prefix + tableNo;
         return "CREATE PROCEDURE P" + procNo + "on" + tableName + " AS SELECT * FROM " + tableName + ";";
     }
 
+    /**
+     * Generate a DROP PROCEDURE stmt
+     * @param procNo
+     * @param tableNo
+     * @param prefix
+     * @return sql stmt
+     */
     public String DropProcedure(int procNo, int tableNo, String prefix)
     {
         String tableName = prefix + tableNo;

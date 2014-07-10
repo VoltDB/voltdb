@@ -31,6 +31,11 @@ public class Initializer {
 
     final InitConfig config;
 
+    /**
+     * Config to generate initial catalog
+     * @author yhe
+     *
+     */
     static class InitConfig extends CLIConfig {
         @Option(desc = "Number of tables in server")
         int numOfTables = 200;
@@ -48,12 +53,20 @@ public class Initializer {
         double idxPercent = 0.1;
     }
 
+    /**
+     * Default constructor
+     * @param config
+     * @throws IOException
+     */
     public Initializer(InitConfig config) throws IOException {
         this.config = config;
         System.out.println(config.getConfigDumpString());
     }
 
-
+    /**
+     * Generate the init ddl.sql file
+     * @throws IOException
+     */
     public void init() throws IOException {
         DDLGenerator DDLGen = new DDLGenerator(config.numOfCols, config.idxPercent);
         FileOutputStream fos = new FileOutputStream(new File("ddl.sql"));

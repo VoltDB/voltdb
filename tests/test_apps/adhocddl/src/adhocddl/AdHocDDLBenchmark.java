@@ -181,6 +181,11 @@ public class AdHocDDLBenchmark {
         connections.await();
     }
 
+    /**
+     * Test the exec time for AdHoc sqlstmt
+     * @param sqlstmt
+     * @return exec time
+     */
     public long runTest(String sqlstmt) {
         // synchronously call the "AdHoc" procedure
         try
@@ -207,6 +212,10 @@ public class AdHocDDLBenchmark {
         return 0;
     }
 
+    /**
+     * Run the config.numOfTests times CREATE and Drop
+     * @return avg exec time for CREATE and DROP in total
+     */
     public float averageLatencyTest()
     {
         String createStmt = DDLGen.CreateTable(0, config.table);
@@ -223,6 +232,12 @@ public class AdHocDDLBenchmark {
         return sum / config.numOfTests;
     }
 
+    /**
+     * Update catalog from the client side
+     * Exec AdHoc DDL in bunch
+     * @param startNo
+     * @param endNo
+     */
     public void updateServer(int startNo, int endNo)
     {
         StringBuffer sqlstmt = new StringBuffer();
@@ -237,6 +252,12 @@ public class AdHocDDLBenchmark {
         runTest(sqlstmt.toString());
     }
 
+    /**
+     * Clear all the tables and procedures in catalog from client
+     * Exec AdHoc DDL in bunch
+     * @param startNo
+     * @param endNo
+     */
     public void clearServer(int startNo, int endNo)
     {
         StringBuffer sqlstmt = new StringBuffer();
@@ -251,6 +272,13 @@ public class AdHocDDLBenchmark {
         runTest(sqlstmt.toString());
     }
 
+    /**
+     * Run test in bunch to generate stats for charts
+     * @param col
+     * @param fw
+     * @param label
+     * @throws IOException
+     */
     public void bunchTest(int col, FileWriter fw, String label) throws IOException
     {
         fullStatsContext.fetchAndResetBaseline();
