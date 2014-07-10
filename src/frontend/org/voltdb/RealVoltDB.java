@@ -94,6 +94,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
@@ -166,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.4";
+    static final String m_defaultVersionString = "4.5";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.4\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.5\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -190,7 +191,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private InitiatorStats m_initiatorStats;
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
-    String m_serializedCatalog;
     String m_httpPortExtraLogMessage = null;
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
@@ -262,7 +262,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
 
-    List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit;
+    List<Integer> m_partitionsToSitesAtStartupForExportInit;
 
     RestoreAgent m_restoreAgent = null;
 
@@ -321,6 +321,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     LicenseApi m_licenseApi;
     @SuppressWarnings("unused")
     private LatencyStats m_latencyStats;
+
+    private LatencyHistogramStats m_latencyHistogramStats;
 
     @Override
     public LicenseApi getLicenseApi() {
@@ -533,7 +535,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
-            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
+            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
@@ -632,7 +634,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
             if (m_config.m_isEnterprise) {
                 try {
-                    Class<?> ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                    Class<?> ndrgwClass = null;
+                    if (Boolean.getBoolean("USE_DR_V2")) {
+                        ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
+                    } else {
+                        ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                    }
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
@@ -656,6 +663,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
+            m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
+                    0, m_latencyHistogramStats);
+
 
             BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
             getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
@@ -705,7 +717,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
                             getBackendTargetType(),
-                            m_serializedCatalog,
                             m_catalogContext,
                             m_deployment.getCluster().getKfactor(),
                             csp,
@@ -1096,7 +1107,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 StartAction startAction,
-                                                List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
+                                                List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
@@ -1104,7 +1115,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
             initiators.add(initiator);
-            m_partitionsToSitesAtStartupForExportInit.add(Pair.of(partition, initiator.getInitiatorHSId()));
+            m_partitionsToSitesAtStartupForExportInit.add(partition);
         }
         return initiators;
     }
@@ -1862,6 +1873,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_catalogContext = null;
                 m_initiatorStats = null;
                 m_latencyStats = null;
+                m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearVersionCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
@@ -1983,10 +1995,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
             List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
 
-            List<Pair<Integer,Long>> partitions = new ArrayList<Pair<Integer, Long>>();
+            List<Integer> partitions = new ArrayList<Integer>();
             for (Long site : sites) {
                 Integer partition = siteTracker.getPartitionForSite(site);
-                partitions.add(Pair.of(partition, site));
+                partitions.add(partition);
             }
 
             // 1. update the export manager.

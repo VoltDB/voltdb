@@ -108,11 +108,19 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         }
     }
 
+    // Inline aggregation can be serial and hash
     AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
     if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline aggregation stuff...");
-        m_aggSerialExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggSerialExec);
+        VOLT_TRACE("init inline serial aggregation stuff...");
+        m_aggExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
+        assert(m_aggExec);
+    } else {
+        AggregatePlanNode* agg_hash_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE));
+        if (agg_hash_node != NULL) {
+            VOLT_TRACE("init inline hash aggregation stuff...");
+            m_aggExec = dynamic_cast<AggregateHashExecutor*>(agg_hash_node->getExecutor());
+            assert(m_aggExec);
+        }
     }
 
     //
@@ -186,14 +194,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     ProgressMonitorProxy pmp(m_engine, this, targetTable);
 
-    if (m_aggSerialExec != NULL) {
-        m_aggSerialExec->setAggregateOutputTable(m_outputTable);
+    if (m_aggExec != NULL) {
+        m_aggExec->setAggregateOutputTable(m_outputTable);
 
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        m_aggSerialExec->p_execute_init(params, &pmp, inputSchema);
+        m_aggExec->p_execute_init(params, &pmp, inputSchema);
     }
 
     //
@@ -274,8 +282,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     if (earlyReturn) {
-        if (m_aggSerialExec != NULL) {
-            m_aggSerialExec->p_execute_finish();
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
         }
         return true;
     }
@@ -424,7 +432,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             if (m_projectionNode != NULL)
             {
                 TableTuple temp_tuple;
-                if (m_aggSerialExec != NULL) {
+                if (m_aggExec != NULL) {
                     temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
                 } else {
                     temp_tuple = m_outputTable->tempTuple();
@@ -441,16 +449,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                 }
 
-                if (m_aggSerialExec != NULL) {
-                    m_aggSerialExec->p_execute_tuple(temp_tuple);
+                if (m_aggExec != NULL) {
+                    m_aggExec->p_execute_tuple(temp_tuple);
                 } else {
                     m_outputTable->insertTupleNonVirtual(temp_tuple);
                 }
             }
             else
             {
-                if (m_aggSerialExec != NULL) {
-                    m_aggSerialExec->p_execute_tuple(tuple);
+                if (m_aggExec != NULL) {
+                    m_aggExec->p_execute_tuple(tuple);
                 } else {
                     //
                     // Straight Insert
@@ -462,8 +470,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    if (m_aggSerialExec != NULL) {
-        m_aggSerialExec->p_execute_finish();
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_finish();
     }
 
 

@@ -18,11 +18,12 @@
 #ifndef RECOVERY_PROTO_MESSAGE_
 #define RECOVERY_PROTO_MESSAGE_
 
-#include "common/serializeio.h"
 #include "common/tabletuple.h"
+#include "common/declarations.h"
 
 namespace voltdb {
 class Pool;
+
 /*
  * A class for generating and receiving recovery messages. The class mixes read/write functionality along
  * with the ability to read/write several different types of payloads. RecoveryMsgType specifies the correct
@@ -44,7 +45,7 @@ public:
     /*
      * Prepare a recovery message for reading.
      */
-    RecoveryProtoMsg(ReferenceSerializeInput *in);
+    RecoveryProtoMsg(ReferenceSerializeInputBE *in);
 
     /*
      * Iterate over a recovery message and retrieve tuples for insertion/update.
@@ -66,13 +67,13 @@ public:
      */
     uint32_t totalTupleCount();
 
-    ReferenceSerializeInput* stream();
+    ReferenceSerializeInputBE* stream();
 
 private:
     /*
      * Input serializer.
      */
-    ReferenceSerializeInput *m_in;
+    ReferenceSerializeInputBE *m_in;
 
     /*
      * Type of this recovery message

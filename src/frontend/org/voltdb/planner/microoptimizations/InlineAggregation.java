@@ -69,7 +69,8 @@ public class InlineAggregation extends MicroOptimization {
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
 
         // EE Currently support: serial inline aggregate
-        if (aggplan.getPlanNodeType() != PlanNodeType.AGGREGATE) {
+        if (aggplan.getPlanNodeType() != PlanNodeType.AGGREGATE &&
+            aggplan.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) {
             return plan;
         }
 

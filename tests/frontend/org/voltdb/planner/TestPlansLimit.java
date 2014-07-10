@@ -23,20 +23,23 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
-public class TestPushDownLimit extends PlannerTestCase {
+public class TestPlansLimit extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(getClass().getResource("testplans-groupby-ddl.sql"),
-                    "testpushdownlimit", false);
+                    "testplanslimit", false);
     }
 
     public void testPushDownIntoScan() {
@@ -153,6 +156,50 @@ public class TestPushDownLimit extends PlannerTestCase {
             } else {
                 assertTrue(p.getChild(0).getPlanNodeType() == PlanNodeType.LIMIT);
             }
+        }
+    }
+
+
+    public void testInlineLimitWithOrderBy() {
+        List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
+        AbstractPlanNode p;
+
+        // no push down for aggregate nodes
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
+        checkInlineLimitWithOrderby(pns, false);
+
+
+        pns = compileToFragments("select A1 from T1 order by A1 limit 1");
+        checkInlineLimitWithOrderby(pns, true);
+
+        pns = compileToFragments("select B3 from T3 order by B3 limit 1");
+        checkInlineLimitWithOrderby(pns, true);
+
+        // no push down
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
+        checkInlineLimitWithOrderby(pns, false);
+
+        // Replicated table
+        pns = compileToFragments("select A1 from R1 order by A1 limit 1");
+        checkInlineLimitWithOrderby(pns, false);
+    }
+
+
+    private void checkInlineLimitWithOrderby(List<AbstractPlanNode> pns, boolean pushdown) {
+        AbstractPlanNode p;
+
+        p = pns.get(0).getChild(0);
+        printExplainPlan(pns);
+        assertTrue(p instanceof ProjectionPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+
+        if (pushdown) {
+            assertEquals(2, pns.size());
+            p = pns.get(1).getChild(0);
+            assertTrue(p instanceof OrderByPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
         }
     }
 

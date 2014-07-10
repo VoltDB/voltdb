@@ -18,13 +18,18 @@
 #ifndef TOPEND_H_
 #define TOPEND_H_
 #include "common/ids.h"
-#include <string>
 #include "common/FatalException.hpp"
-#include "storage/StreamBlock.h"
+
+#include <string>
+#include <queue>
+#include <vector>
+#include <boost/shared_ptr.hpp>
+#include <boost/shared_array.hpp>
 
 namespace voltdb {
 class Table;
 class Pool;
+class StreamBlock;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -41,7 +46,8 @@ class Topend {
     // Return 0 if the Topend wants the EE to stop processing the current fragment
     // or the number of tuples the EE should process before repeating this call.
     virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed,
+                int64_t currMemoryInBytes, int64_t peakMemoryInBytes) = 0;
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
@@ -56,10 +62,43 @@ class Topend {
             bool sync,
             bool endOfStream) = 0;
 
+    virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
+
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
     virtual ~Topend()
     {
     }
+};
+
+class DummyTopend : public Topend {
+public:
+    DummyTopend();
+
+    int loadNextDependency(
+        int32_t dependencyId, voltdb::Pool *pool, Table* destination);
+
+    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
+
+    std::string planForFragmentId(int64_t fragmentId);
+
+    void crashVoltDB(voltdb::FatalException e);
+
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+
+    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
+
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+    std::queue<int32_t> partitionIds;
+    std::queue<std::string> signatures;
+    std::deque<boost::shared_ptr<StreamBlock> > blocks;
+    std::vector<boost::shared_array<char> > data;
+    bool receivedDRBuffer;
+    bool receivedExportBuffer;
+
 };
 
 }

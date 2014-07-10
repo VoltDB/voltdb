@@ -127,7 +127,7 @@ public class VoltCompiler {
     public static String AUTOGEN_DDL_FILE_NAME = "autogen-ddl.sql";
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
-    public static final boolean DEBUG_VERIFY_CATALOG = System.getProperties().containsKey("verifycatalogdebug");
+    public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
 
     String m_projectFileURL = null;
     String m_currentFilename = null;
@@ -490,6 +490,9 @@ public class VoltCompiler {
         if (diffCmds != null && !diffCmds.equals("")) {
             VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
+        else {
+            Log.info("Catalog verification completed successfuly.");
+        }
     }
 
     /**
@@ -574,6 +577,19 @@ public class VoltCompiler {
 
         // Build DDL from Catalog Data
         String binDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
+
+        // generate the catalog report and write it to disk
+        try {
+            m_report = ReportMaker.report(m_catalog, m_warnings, binDDL);
+            File file = new File("catalog-report.html");
+            FileWriter fw = new FileWriter(file);
+            fw.write(m_report);
+            fw.close();
+            m_reportPath = file.getAbsolutePath();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
 
         jarOutput.put(AUTOGEN_DDL_FILE_NAME, binDDL.getBytes(Constants.UTF8ENCODING));
         if (DEBUG_VERIFY_CATALOG) {
@@ -793,19 +809,6 @@ public class VoltCompiler {
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
-
-        // generate the catalog report and write it to disk
-        try {
-            m_report = ReportMaker.report(m_catalog, m_warnings);
-            File file = new File("catalog-report.html");
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
 
         return m_catalog;
     }

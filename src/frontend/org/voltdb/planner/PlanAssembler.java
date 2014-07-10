@@ -243,8 +243,24 @@ public class PlanAssembler {
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            // Process the GROUP BY information, decide whether it is group by the partition column
+            for (ParsedColInfo groupbyCol: m_parsedSelect.m_groupByColumns) {
+                StmtTableScan scanTable = m_parsedSelect.m_tableAliasMap.get(groupbyCol.tableAlias);
+                // table alias may be from "VOLT_TEMP_TABLE".
+                if (scanTable != null && scanTable.getPartitioningColumns() != null) {
+                    for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+                        if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
+                            m_parsedSelect.setHasPartitionColumnInGroupby();
+                            break;
+                        }
+                    }
+                }
+                if (m_parsedSelect.hasPartitionColumnInGroupby()) {
+                    break;
+                }
+            }
             return;
         }
 
@@ -597,7 +613,7 @@ public class PlanAssembler {
     }
 
     private ParsedResultAccumulator planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
-        AbstractParsedStmt subQuery = subqueryScan.getSubquery();
+        AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = planId;
@@ -612,21 +628,12 @@ public class PlanAssembler {
             }
             return null;
         }
+        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
 
         // Remove the coordinator send/receive pair.
         // It will be added later for the whole plan
-        AbstractPlanNode root = compiledPlan.rootPlanGraph;
+        compiledPlan.rootPlanGraph = subqueryScan.processReceiveNode(compiledPlan.rootPlanGraph);
 
-        // There should be more cases for Joins have to be done on coordinator
-        // This case should also not be pushed down
-        boolean subScanCanPushdown = !root.hasAnyNodeOfType(PlanNodeType.AGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE) &&
-                !root.hasAnyNodeOfType(PlanNodeType.LIMIT) &&
-                !root.hasAnyNodeOfType(PlanNodeType.DISTINCT);
-        if (subScanCanPushdown) {
-            compiledPlan.rootPlanGraph = removeCoordinatorSendReceivePair(compiledPlan.rootPlanGraph);
-        }
-        subqueryScan.setSubqueriesPartitioning(currentPartitioning);
         subqueryScan.setBestCostPlan(compiledPlan);
 
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
@@ -802,8 +809,15 @@ public class PlanAssembler {
         if (m_parsedSelect.hasComplexGroupby()) {
             return false;
         }
-        // TODO(XIN): Maybe we can remove this projection node for more cases
-        // as optimization in the future.
+
+        if (root.getPlanNodeType() == PlanNodeType.RECEIVE &&
+                m_parsedSelect.hasPartitionColumnInGroupby()) {
+            // Top aggregate has been removed, its schema is exactly the same to
+            // its local aggregate node.
+            return false;
+        }
+
+        // TODO: Maybe we can remove this projection node for more cases as optimization in the future.
         return true;
     }
 
@@ -1439,7 +1453,7 @@ public class PlanAssembler {
         // Whether or not we can push the limit node down
         boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
-            sendNode = checkPushDownViability(root);
+            sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
             } else {
@@ -1476,27 +1490,44 @@ public class PlanAssembler {
             // ensure the order of the data on each partition.
             distributedPlan = handleOrderBy(distributedPlan);
 
-            // Apply the distributed limit.
-            distLimit.addAndLinkChild(distributedPlan);
-
-            // Add the distributed work back to the plan
-            sendNode.addAndLinkChild(distLimit);
+            if (distributedPlan instanceof OrderByPlanNode) {
+                // Inline the distributed limit.
+                distributedPlan.addInlinePlanNode(distLimit);
+                sendNode.addAndLinkChild(distributedPlan);
+            } else {
+                distLimit.addAndLinkChild(distributedPlan);
+                // Add the distributed work back to the plan
+                sendNode.addAndLinkChild(distLimit);
+            }
         }
+
+        // In future, inline LIMIT for aggregate node, join, Receive
+        // Then we do not need to distinguish the order by node.
 
         // Switch if has Complex aggregations
-        AbstractPlanNode projectionNode = root;
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
-            projectionNode.clearChildren();
-            child.clearParents();
-
-            topLimit.addAndLinkChild(child);
-            projectionNode.addAndLinkChild(topLimit);
-            return projectionNode;
+            if (child instanceof OrderByPlanNode) {
+                child.addInlinePlanNode(topLimit);
+            } else {
+                // In future, inline LIMIT for aggregate node
+                root.clearChildren();
+                child.clearParents();
+                topLimit.addAndLinkChild(child);
+                root.addAndLinkChild(topLimit);
+            }
         } else {
-            topLimit.addAndLinkChild(root);
-            return topLimit;
+            if (root instanceof OrderByPlanNode) {
+                root.addInlinePlanNode(topLimit);
+            } else if (root instanceof ProjectionPlanNode &&
+                    root.getChild(0) instanceof OrderByPlanNode) {
+                root.getChild(0).addInlinePlanNode(topLimit);
+            } else {
+                topLimit.addAndLinkChild(root);
+                root = topLimit;
+            }
         }
+        return root;
     }
 
 
@@ -1568,13 +1599,13 @@ public class PlanAssembler {
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
-        boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
+        boolean indexScanForGroupingOnly = false;
+        if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
@@ -1588,6 +1619,7 @@ public class PlanAssembler {
                         candidate.clearParents();
                         root.getChild(0).clearChildren();
                         root.getChild(0).addAndLinkChild(candidate);
+                        indexScanForGroupingOnly = true;
                     }
                 }
             }
@@ -1647,8 +1679,16 @@ public class PlanAssembler {
                 }
             }
             if (needHashAgg) {
-                aggNode = new HashAggregatePlanNode();
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                if ( m_parsedSelect.m_mvFixInfo.needed() ) {
+                    aggNode = new HashAggregatePlanNode();
+                } else {
+                    if (indexScanForGroupingOnly) {
+                        assert(root instanceof ReceivePlanNode);
+                        aggNode = new AggregatePlanNode();
+                    } else {
+                        aggNode = new HashAggregatePlanNode();
+                    }
+
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
@@ -1804,7 +1844,7 @@ public class PlanAssembler {
             }
         }
         // DISTINCT is redundant on a single-row result. Return early.
-        else if (containsAggregateExpression) {
+        else if (m_parsedSelect.hasAggregateExpression()) {
             return root;
         }
 
@@ -2005,7 +2045,7 @@ public class PlanAssembler {
      * @return If we can push it down, the receive node is returned. Otherwise,
      *         it returns null.
      */
-    protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
+    protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
         // Return a mid-plan send node, if one exists and can host a distributed limit node.
@@ -2026,15 +2066,10 @@ public class PlanAssembler {
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
-            if (!(receiveNode instanceof AggregatePlanNode) &&
-                !(receiveNode instanceof OrderByPlanNode) &&
+            // Delete the aggregate node case to handle ENG-6485, or say we don't push down meeting aggregate node
+            // TODO: We might want to optimize/push down "limit" for some cases
+            if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                return null;
-            }
-
-            // Limitation: can only push past coordinating aggregation nodes
-            if (receiveNode instanceof AggregatePlanNode &&
-                !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 return null;
             }
 
@@ -2042,8 +2077,11 @@ public class PlanAssembler {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
                     AbstractExpression rootExpr = col.expression;
                     // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-                    if (rootExpr instanceof TupleValueExpression) {
-                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                    // However, if group by partition key, limit can still push down if ordered by aggregate values.
+                    ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+                    for (AbstractExpression tve: tves) {
+                        if  (((TupleValueExpression) tve).hasAggregate() &&
+                                !m_parsedSelect.hasPartitionColumnInGroupby()) {
                             return null;
                         }
                     }

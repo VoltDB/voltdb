@@ -64,6 +64,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
@@ -179,7 +180,7 @@ public:
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         table = dynamic_cast<PersistentTable*>(
             TableFactory::getPersistentTable(database_id, "test_wide_table",
-                                             schema, columnNames,
+                                             schema, columnNames, signature, &drStream, false,
                                              -1, false, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
@@ -314,7 +315,7 @@ public:
         int partitionCount = 1;
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames, signature, &drStream, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -388,6 +389,8 @@ protected:
     char* m_exceptionBuffer;
     VoltDBEngine* m_engine;
     ThreadLocalPool m_pool;
+    MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(IndexTest, IntUnique) {

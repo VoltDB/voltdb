@@ -139,6 +139,8 @@ public class StatementPartitioning implements Cloneable{
      */
     private String m_fullColumnName;
 
+    private boolean m_joinValid = true;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -313,13 +315,19 @@ public class StatementPartitioning implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
+    public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
+        // reset this flag to forget the last result of the multiple partition access path.
+        // AdHoc with parameters will call this function at least two times
+        // By default this flag should be true.
+        m_joinValid = true;
+        boolean subqueryHasReceiveNode = false;
+        boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
         for (StmtTableScan tableScan : collection) {
             // Replicated tables don't need filter coverage.
@@ -338,6 +346,33 @@ public class StatementPartitioning implements Cloneable{
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
+
+                if (subScan.hasReceiveNode()) {
+                    if (subqueryHasReceiveNode) {
+                        // Has found another subquery with receive node on the same level
+                        // Not going to support this kind of subquery join with 2 fragment plan.
+                        m_joinValid = false;
+
+                        // Still needs to count the independent partition tables
+                        break;
+                    }
+                    subqueryHasReceiveNode = true;
+
+                    if (subScan.isTableAggregate()) {
+                        // Partition Table Aggregate only return one aggregate row.
+                        // It has been marked with receive node, any join or processing based on
+                        // this table aggregate subquery should be done on coordinator.
+                        // Joins: has to be replicated table
+                        // Any process based on this subquery should require 1 fragment only.
+                        continue;
+                    }
+                } else {
+                    // this subquery partition table without receive node
+                    hasPartitionedTableJoin = true;
+                }
+            } else {
+                // This table is a partition table
+                hasPartitionedTableJoin = true;
             }
 
             boolean unfiltered = true;
@@ -362,6 +397,16 @@ public class StatementPartitioning implements Cloneable{
         }
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
+        if (m_countOfIndependentlyPartitionedTables > 1) {
+            m_joinValid = false;
+        }
+
+        // This is the case that subquery with receive node join with another partition table
+        // on outer level. Not going to support this kind of join.
+        if (subqueryHasReceiveNode && hasPartitionedTableJoin) {
+            m_joinValid = false;
+        }
+
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
             for (Set<AbstractExpression> partitioningValues : eqSets) {
                 for (AbstractExpression constExpr : partitioningValues) {
@@ -376,8 +421,10 @@ public class StatementPartitioning implements Cloneable{
                 }
             }
         }
+    }
 
-        return m_countOfIndependentlyPartitionedTables;
+    public boolean isJoinValid() {
+        return m_joinValid;
     }
 
     private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,

@@ -112,6 +112,11 @@
     <not><isset property="volt.client.memory"/></not>
 </condition>
 
+<!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<condition property="verifycatalogdebug" value="true">
+    <not><isset property="verifycatalogdebug"/></not>
+</condition>
+
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
@@ -1330,6 +1335,7 @@ TEST CASES
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <jvmarg value="-XX:-UseSplitVerifier"/>
+            <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />

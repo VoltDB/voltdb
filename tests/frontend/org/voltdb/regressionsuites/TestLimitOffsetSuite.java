@@ -235,6 +235,54 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         validateTableOfLongs(result, new long[][] {{2,2}});
     }
 
+    public void testENG6485() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable result = null;
+
+        String insertProc = "C.insert";
+        client.callProcedure(insertProc, 1, 1, "foo");
+        client.callProcedure(insertProc, 2, 1, "foo");
+        client.callProcedure(insertProc, 3, 1, "foo");
+        client.callProcedure(insertProc, 4, 1, "bar");
+        client.callProcedure(insertProc, 5, 1, "bar");
+        client.callProcedure(insertProc, 7, 1, "woof");
+        client.callProcedure(insertProc, 8, 1, "woof");
+        client.callProcedure(insertProc, 9, 1, "foo");
+        client.callProcedure(insertProc, 10, 1, "foo");
+        client.callProcedure(insertProc, 11, 2, "foo");
+        client.callProcedure(insertProc, 12, 2, "foo");
+        client.callProcedure(insertProc, 13, 2, "woof");
+        client.callProcedure(insertProc, 14, 2, "woof");
+        client.callProcedure(insertProc, 15, 2, "woof");
+        client.callProcedure(insertProc, 16, 2, "bar");
+        client.callProcedure(insertProc, 17, 2, "bar");
+        client.callProcedure(insertProc, 18, 2, "foo");
+        client.callProcedure(insertProc, 19, 2, "foo");
+
+        result = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM C;").getResults()[0];
+        validateTableOfScalarLongs(result, new long[] {18});
+
+        result = client.callProcedure("@AdHoc", "SELECT name, count(id) FROM C GROUP BY name limit 1").getResults()[0];
+        if (result.advanceRow()) {
+            String name = result.getString(0);
+            long count = result.getLong(1);
+            switch (name){
+            case "foo":
+                assertEquals(9, count);
+                break;
+            case "bar":
+                assertEquals(4, count);
+                break;
+            case "woof":
+                assertEquals(5, count);
+                break;
+            }
+        }
+        else {
+            fail("cannot get data from table c");
+        }
+    }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
