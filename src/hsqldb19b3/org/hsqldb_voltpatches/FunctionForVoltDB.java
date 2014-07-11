@@ -119,7 +119,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20024;
 
-        static final int FUNC_CONCAT                 = 124;
+        static final int FUNC_CONCAT                      = 124;
 
         private static final FunctionId[] instances = {
 

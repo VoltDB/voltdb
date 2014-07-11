@@ -50,7 +50,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
-    public void notestExplicitErrorUDF() throws Exception
+    public void testExplicitErrorUDF() throws Exception
     {
         System.out.println("STARTING testExplicitErrorUDF");
         Client client = getClient();
@@ -137,7 +137,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void notestOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING OCTET_LENGTH");
         Client client = getClient();
         ClientResponse cr;
@@ -173,7 +173,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void notestPosition() throws NoConnectionsException, IOException, ProcCallException {
+    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Position");
         Client client = getClient();
         ClientResponse cr;
@@ -216,7 +216,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void notestCharLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Char length");
         Client client = getClient();
         ClientResponse cr;
@@ -250,7 +250,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
     }
 
-    public void notestDECODE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
         subtestDECODE();
         subtestDECODENoDefault();
         subtestDECODEVeryLong();
@@ -629,7 +629,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void notestFIELDFunction() throws Exception {
+    public void testFIELDFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -732,7 +732,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.wasNull());
     }
 
-    public void notestARRAY_ELEMENTFunction() throws Exception {
+    public void testARRAY_ELEMENTFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -831,7 +831,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.wasNull());
     }
 
-    public void notestARRAY_LENGTHFunction() throws Exception {
+    public void testARRAY_LENGTHFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -959,7 +959,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(0L,result.getLong(0));
     }
 
-    public void notestSINCE_EPOCH() throws Exception {
+    public void testSINCE_EPOCH() throws Exception {
         System.out.println("STARTING SINCE_EPOCH");
         Client client = getClient();
         ClientResponse cr;
@@ -1085,7 +1085,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void notestTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
+    public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
         ClientResponse cr;
@@ -1197,7 +1197,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void notestTRUNCATE() throws Exception {
+    public void testTRUNCATE() throws Exception {
         System.out.println("STARTING TRUNCATE with timestamp");
         Client client = getClient();
         ClientResponse cr;
@@ -1373,7 +1373,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(20138939800123456L, result.getTimestampAsLong(10));
     }
 
-    public void notestFunctionsWithInvalidJSON() throws Exception {
+    public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
         ClientResponse cr;
@@ -1437,7 +1437,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void notestFormatCurrency() throws Exception
+    public void testFormatCurrency() throws Exception
     {
         System.out.println("STARTING testFormatCurrency");
         Client client = getClient();
@@ -1784,7 +1784,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void notestConcat() throws NoConnectionsException, IOException, ProcCallException {
+    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
         ClientResponse cr;

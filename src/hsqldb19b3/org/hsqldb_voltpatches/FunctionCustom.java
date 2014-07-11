@@ -542,8 +542,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
-	public void setArguments(Expression[] nodes) {
+    public void setArguments(Expression[] nodes) {
 
         switch (funcType) {
 
@@ -583,8 +582,7 @@ public class FunctionCustom extends FunctionSQL {
         super.setArguments(nodes);
     }
 
-    @Override
-	public Expression getFunctionExpression() {
+    public Expression getFunctionExpression() {
 
         switch (funcType) {
 
@@ -606,8 +604,7 @@ public class FunctionCustom extends FunctionSQL {
         return super.getFunctionExpression();
     }
 
-    @Override
-	Object getValue(Session session, Object[] data) {
+    Object getValue(Session session, Object[] data) {
 
         switch (funcType) {
 
@@ -1167,8 +1164,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
-	public void resolveTypes(Session session, Expression parent) {
+    public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -1638,8 +1634,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    @Override
-	public String getSQL() {
+    public String getSQL() {
 
         switch (funcType) {
 

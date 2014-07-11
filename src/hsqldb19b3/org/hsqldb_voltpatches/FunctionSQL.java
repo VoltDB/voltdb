@@ -613,8 +613,7 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
-    @Override
-	public Object getValue(Session session) {
+    public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
 
@@ -1152,8 +1151,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
-    @Override
-	public void resolveTypes(Session session, Expression parent) {
+    public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -1707,8 +1705,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
-    @Override
-	public String getSQL() {
+    public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
 
@@ -1989,8 +1986,7 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
-    @Override
-	public boolean equals(Object other) {
+    public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
                 && funcType == ((FunctionSQL) other).funcType) {
@@ -2000,16 +1996,14 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
-    @Override
-	public int hashCode() {
+    public int hashCode() {
         return opType + funcType;
     }
 
     /**
      * Returns a String representation of this object. <p>
      */
-    @Override
-	public String describe(Session session, int blanks) {
+    public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
 
