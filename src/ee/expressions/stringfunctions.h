@@ -246,9 +246,9 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
 }
 
-/** implement the 2-argument SQL CONCAT function */
+/** implement the more-than-2-argument SQL CONCAT function */
 template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
+    assert(arguments.size() >= 2);
     const NValue& left = arguments[0];
     if (left.isNull()) {
         return getNullStringValue();
@@ -257,19 +257,21 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
         throwCastSQLException (left.getValueType(), VALUE_TYPE_VARCHAR);
     }
     int32_t lenLeft = left.getObjectLength_withoutNull();
-
-    const NValue& right = arguments[1];
-    if (right.isNull()) {
-        return getNullStringValue();
-    }
-    int32_t lenRight = right.getObjectLength_withoutNull();
     char *leftChars = reinterpret_cast<char*>(left.getObjectValue_withoutNull());
-    char *rightChars = reinterpret_cast<char*>(right.getObjectValue_withoutNull());
-
     std::string leftStr(leftChars, lenLeft);
-    leftStr.append(rightChars, lenRight);
 
-    return getTempStringValue(leftStr.c_str(),lenLeft+lenRight);
+    for(std::vector<NValue>::const_iterator iter = arguments.begin()+1; iter != arguments.end(); iter++) {
+        const NValue& next = *iter;
+        if (next.isNull()) {
+            return getNullStringValue();
+        }
+        int32_t lenNext = next.getObjectLength_withoutNull();
+        char *nextChars = reinterpret_cast<char*>(next.getObjectValue_withoutNull());
+        leftStr.append(nextChars, lenNext);
+        lenLeft += lenNext;
+    }
+
+    return getTempStringValue(leftStr.c_str(),lenLeft);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */

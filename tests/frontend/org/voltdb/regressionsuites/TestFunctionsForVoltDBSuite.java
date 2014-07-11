@@ -50,7 +50,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
-    public void testExplicitErrorUDF() throws Exception
+    public void notestExplicitErrorUDF() throws Exception
     {
         System.out.println("STARTING testExplicitErrorUDF");
         Client client = getClient();
@@ -137,7 +137,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestOctetLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING OCTET_LENGTH");
         Client client = getClient();
         ClientResponse cr;
@@ -173,7 +173,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestPosition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Position");
         Client client = getClient();
         ClientResponse cr;
@@ -216,7 +216,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestCharLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Char length");
         Client client = getClient();
         ClientResponse cr;
@@ -250,7 +250,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
     }
 
-    public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestDECODE() throws NoConnectionsException, IOException, ProcCallException {
         subtestDECODE();
         subtestDECODENoDefault();
         subtestDECODEVeryLong();
@@ -629,7 +629,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testFIELDFunction() throws Exception {
+    public void notestFIELDFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -732,7 +732,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.wasNull());
     }
 
-    public void testARRAY_ELEMENTFunction() throws Exception {
+    public void notestARRAY_ELEMENTFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -831,7 +831,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.wasNull());
     }
 
-    public void testARRAY_LENGTHFunction() throws Exception {
+    public void notestARRAY_LENGTHFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -959,7 +959,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(0L,result.getLong(0));
     }
 
-    public void testSINCE_EPOCH() throws Exception {
+    public void notestSINCE_EPOCH() throws Exception {
         System.out.println("STARTING SINCE_EPOCH");
         Client client = getClient();
         ClientResponse cr;
@@ -1085,7 +1085,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
         ClientResponse cr;
@@ -1197,7 +1197,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void testTRUNCATE() throws Exception {
+    public void notestTRUNCATE() throws Exception {
         System.out.println("STARTING TRUNCATE with timestamp");
         Client client = getClient();
         ClientResponse cr;
@@ -1373,7 +1373,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(20138939800123456L, result.getTimestampAsLong(10));
     }
 
-    public void testFunctionsWithInvalidJSON() throws Exception {
+    public void notestFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
         ClientResponse cr;
@@ -1437,7 +1437,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testFormatCurrency() throws Exception
+    public void notestFormatCurrency() throws Exception
     {
         System.out.println("STARTING testFormatCurrency");
         Client client = getClient();
@@ -1784,6 +1784,92 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void notestConcat() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat and its Operator");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT2", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("CONCAT2", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+    }
+
+    public void testConcatMoreThan2Para() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat with more than two parameters");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Yetian", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT3", "@Volt", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT3", "", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "@Volt", "", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT5", "@Volt", "D", "B", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        cr = client.callProcedure("CONCAT5", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        // TODO: fix this, it will automatically convert parameters to String?
+        cr = client.callProcedure("CONCAT2", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Yetian1", result.getString(1));
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1955,6 +2041,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

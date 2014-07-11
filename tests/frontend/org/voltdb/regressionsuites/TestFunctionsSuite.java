@@ -58,7 +58,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         "will you still free me (will memcheck see me) when Im sixty-four";
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
-    public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
+    public void notestFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
         Client client = getClient();
         ClientResponse cr = null;
@@ -87,7 +87,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testStringExpressionIndex() throws Exception {
+    public void notestStringExpressionIndex() throws Exception {
         System.out.println("STARTING testStringExpressionIndex");
         Client client = getClient();
         initialLoad(client, "P1");
@@ -161,7 +161,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void testNumericExpressionIndex() throws Exception {
+    public void notestNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
@@ -248,7 +248,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testAbsWithLimit_ENG3572() throws Exception
+    public void notestAbsWithLimit_ENG3572() throws Exception
     {
         System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
@@ -298,7 +298,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testAbs() throws Exception
+    public void notestAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
@@ -563,7 +563,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals( ! isHSQL(), caught);
     }
 
-    public void testSubstring() throws Exception
+    public void notestSubstring() throws Exception
     {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
@@ -719,7 +719,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testCurrentTimestamp() throws Exception
+    public void notestCurrentTimestamp() throws Exception
     {
         System.out.println("STARTING testCurrentTimestamp");
         /**
@@ -762,7 +762,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 
-    public void testTimestampConversions() throws Exception
+    public void notestTimestampConversions() throws Exception
     {
         Client client = getClient();
         ClientResponse cr = null;
@@ -1054,7 +1054,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(EXPECTED_SECONDS, decimalResult);
     }
 
-    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestParams() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING testParams");
         Client client = getClient();
         ClientResponse cr;
@@ -1429,7 +1429,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of " + fname);
     }
 
-    public void testManyNumericFunctions() throws Exception
+    public void notestManyNumericFunctions() throws Exception
     {
         subtestFromVarCharCasts();
         subtestToVarCharCasts();
@@ -1920,7 +1920,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Left and Right");
         Client client = getClient();
         ClientResponse cr;
@@ -2037,7 +2037,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestSpace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2069,7 +2069,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2131,7 +2131,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 //        }
     }
 
-    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestTrim() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Trim");
         Client client = getClient();
         ClientResponse cr;
@@ -2292,7 +2292,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
         ClientResponse cr;
@@ -2323,7 +2323,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("foofoofoo", result.getString(1));
     }
 
-    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestReplace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Replace");
         Client client = getClient();
         ClientResponse cr;
@@ -2367,7 +2367,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
-    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestOverlay() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Overlay");
         Client client = getClient();
         ClientResponse cr;
@@ -2525,7 +2525,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // Unicode character to UTF8 string character
-    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestChar() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test CHAR");
         Client client = getClient();
         ClientResponse cr;
@@ -2559,46 +2559,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(1));
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING test Concat and its Operator");
-        Client client = getClient();
-        ClientResponse cr;
-        VoltTable result;
-
-        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0, new Timestamp(1000000000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("CONCAT", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("CONCAT", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-    }
-
-
-    public void testCaseWhen() throws Exception {
+    public void notestCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
         VoltTable vt;
@@ -2743,7 +2704,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testCaseWhenLikeDecodeFunction() throws Exception {
+    public void notestCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
         String sql;
@@ -3179,10 +3140,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
-
-        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");

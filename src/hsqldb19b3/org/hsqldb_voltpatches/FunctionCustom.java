@@ -352,6 +352,11 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
+            	// A VoltDB extension to let CONCAT support more than 2 parameters
+            	// this line should be never called because volt check FunctionForVoltDB first
+            	voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+            	break;
+            	// End of VoltDB extension
             case FUNC_LEFT :
                 parseList = doubleParamList;
                 break;
@@ -537,7 +542,8 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    public void setArguments(Expression[] nodes) {
+    @Override
+	public void setArguments(Expression[] nodes) {
 
         switch (funcType) {
 
@@ -577,7 +583,8 @@ public class FunctionCustom extends FunctionSQL {
         super.setArguments(nodes);
     }
 
-    public Expression getFunctionExpression() {
+    @Override
+	public Expression getFunctionExpression() {
 
         switch (funcType) {
 
@@ -599,7 +606,8 @@ public class FunctionCustom extends FunctionSQL {
         return super.getFunctionExpression();
     }
 
-    Object getValue(Session session, Object[] data) {
+    @Override
+	Object getValue(Session session, Object[] data) {
 
         switch (funcType) {
 
@@ -1159,7 +1167,8 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    public void resolveTypes(Session session, Expression parent) {
+    @Override
+	public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -1629,7 +1638,8 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
-    public String getSQL() {
+    @Override
+	public String getSQL() {
 
         switch (funcType) {
 

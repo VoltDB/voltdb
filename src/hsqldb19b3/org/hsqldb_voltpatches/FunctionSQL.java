@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -612,7 +613,8 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
-    public Object getValue(Session session) {
+    @Override
+	public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
 
@@ -1150,7 +1152,8 @@ public class FunctionSQL extends Expression {
         }
     }
 
-    public void resolveTypes(Session session, Expression parent) {
+    @Override
+	public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -1704,7 +1707,8 @@ public class FunctionSQL extends Expression {
         }
     }
 
-    public String getSQL() {
+    @Override
+	public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
 
@@ -1985,7 +1989,8 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
-    public boolean equals(Object other) {
+    @Override
+	public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
                 && funcType == ((FunctionSQL) other).funcType) {
@@ -1995,14 +2000,16 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
-    public int hashCode() {
+    @Override
+	public int hashCode() {
         return opType + funcType;
     }
 
     /**
      * Returns a String representation of this object. <p>
      */
-    public String describe(Session session, int blanks) {
+    @Override
+	public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
 
