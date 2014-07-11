@@ -137,7 +137,7 @@ public class VoltCompiler {
     // generated html text for catalog report
     String m_report = null;
     String m_reportPath = null;
-
+    String m_canonicalDDL = null;
     Catalog m_catalog = null;
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
@@ -577,6 +577,7 @@ public class VoltCompiler {
 
         // Build DDL from Catalog Data
         String binDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
+        m_canonicalDDL = binDDL;
 
         // generate the catalog report and write it to disk
         try {
@@ -817,6 +818,10 @@ public class VoltCompiler {
         if (m_procInfoOverrides == null)
             return null;
         return m_procInfoOverrides.get(procName);
+    }
+
+    public String getCanonicalDDL() {
+        return m_canonicalDDL;
     }
 
     public Catalog getCatalog() {
