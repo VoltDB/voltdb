@@ -132,9 +132,7 @@ class CSVFileReader implements Runnable {
                 CSVLineWithMetaData lineData =
                         new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_listReader.getLineNumber());
-                if (!m_loader.insertRow(lineData, lineValues)) {
-                    break;
-                }
+                m_loader.insertRow(lineData, lineValues);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.

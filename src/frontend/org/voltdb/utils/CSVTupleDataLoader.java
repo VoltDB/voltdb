@@ -31,6 +31,7 @@ import org.voltdb.client.ProcedureCallback;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import org.voltdb.ClientResponseImpl;
 
 /**
  * A CSVDataLoader implementation that inserts one row at a time.
@@ -113,19 +114,21 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public boolean insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException    {
+    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException {
         try {
             PartitionSingleExecuteProcedureCallback cbmt =
                     new PartitionSingleExecuteProcedureCallback(metaData);
             if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
                 m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
-                return false;
+                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                        new VoltTable[0], "Failed to call procedure.", 0);
+                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
             }
-        } catch (IOException ex) {
-            m_errHandler.handleError(metaData, null, ex.toString());
-            return false;
+        } catch (Exception ex) {
+            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Failed to call procedure.", 0);
+            m_errHandler.handleError(metaData, response, ex.toString());
         }
-        return true;
     }
 
     @Override

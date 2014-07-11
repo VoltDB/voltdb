@@ -37,7 +37,7 @@ public interface CSVDataLoader {
      * @param values   The values to insert.
      * @throws InterruptedException
      */
-    public boolean insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException;
+    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException;
 
     /**
      * Close the loader.

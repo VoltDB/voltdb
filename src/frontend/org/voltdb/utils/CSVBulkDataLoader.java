@@ -59,9 +59,8 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public boolean insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException    {
+    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException {
         m_loader.insertRow(metaData, values);
-        return true;
     }
 
     @Override

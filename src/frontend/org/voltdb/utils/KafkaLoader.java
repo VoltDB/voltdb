@@ -60,13 +60,14 @@ public class KafkaLoader {
     }
 
     //Close the consumer after this app will exit.
-    public void closeConsumer() {
+    public void closeConsumer() throws InterruptedException {
         if (m_consumer != null) {
             m_consumer.stop();
             m_consumer = null;
         }
         if (m_es != null) {
             m_es.shutdownNow();
+            m_es.awaitTermination(365, TimeUnit.DAYS);
             m_es = null;
         }
     }
@@ -226,9 +227,12 @@ public class KafkaLoader {
                     long fc = m_failedCount.incrementAndGet();
                     if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
                             || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        m_log.error("Kafkaloader will exit.");
-                        closeConsumer();
-                        return true;
+                        try {
+                            m_log.error("Kafkaloader will exit.");
+                            closeConsumer();
+                            return true;
+                        } catch (InterruptedException ex) {
+                        }
                     }
                 }
             }
@@ -259,6 +263,7 @@ public class KafkaLoader {
             props.put("auto.commit.interval.ms", "1000");
             props.put("auto.commit.enable", "true");
             props.put("auto.offset.reset", "smallest");
+            props.put("rebalance.backoff.ms", "10000");
 
             m_consumerConfig = new ConsumerConfig(props);
 
@@ -298,9 +303,7 @@ public class KafkaLoader {
                 long offset = md.offset();
                 String smsg = new String(msg);
                 try {
-                    if (!m_loader.insertRow(new CSVLineWithMetaData(smsg, offset), m_csvParser.parseLine(smsg))) {
-                        System.exit(1);
-                    }
+                    m_loader.insertRow(new CSVLineWithMetaData(smsg, offset), m_csvParser.parseLine(smsg));
                 } catch (Exception ex) {
                     m_log.error("Consumer stopped", ex);
                     System.exit(1);
