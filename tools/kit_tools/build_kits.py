@@ -78,6 +78,20 @@ def buildPro():
 ################################################
 
 def buildRabbitMQExport(version):
+    # Only compile the RabbitMQ connector if version is >= 4.5
+    parts = version.split(".")
+    skip = True
+    try:
+        if len(parts) >= 2 and \
+           int(parts[0]) >= 4 and \
+           int(parts[1][0]) >= 5:
+            skip = False
+    except Exception as e:
+        pass
+
+    if skip:
+        return
+
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
@@ -88,8 +102,9 @@ def buildRabbitMQExport(version):
         run("pwd")
         run("gunzip voltdb-ent-%s.tar.gz" % version)
         run("tar uvf voltdb-ent-%s.tar voltdb-ent-%s/lib/extension/voltdb-rabbitmq.jar" % (version, version))
-        run("gzip voltdb-ent-%s.tar" % version)
-        run("zip -r voltdb-ent-%s.zip voltdb-ent-%s" % (version, version))
+        if versionHasZipTarget():
+            run("gzip voltdb-ent-%s.tar" % version)
+            run("zip -r voltdb-ent-%s.zip voltdb-ent-%s" % (version, version))
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
