@@ -30,7 +30,6 @@
 
 package voter.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -57,8 +56,6 @@ public class Vote extends VoltProcedure {
     // Records a vote
     public final SQLStmt insertVoteStmt = new SQLStmt(
             "INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
-    public final SQLStmt einsertVoteStmt = new SQLStmt(
-            "INSERT INTO export_votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
 
     public long run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber) {
 
@@ -86,7 +83,6 @@ public class Vote extends VoltProcedure {
 
         // Post the vote
         voltQueueSQL(insertVoteStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
-        voltQueueSQL(einsertVoteStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
         voltExecuteSQL(true);
 
         // Set the return value to 0: successful vote
