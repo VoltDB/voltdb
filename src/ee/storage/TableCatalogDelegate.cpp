@@ -29,6 +29,7 @@
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
+#include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -37,8 +38,11 @@
 #include "storage/tablefactory.h"
 #include "sha1/sha1.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
+#include <string>
 #include <vector>
 #include <map>
 
@@ -560,7 +564,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
         }
         else {
             std::string defaultValue = column->defaultvalue();
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
+            // this could probably use the temporary string pool instead?
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, ValueFactory::USE_LONG_TERM_STORAGE);
         }
 
         // find a source column in the existing table, if one exists
@@ -646,5 +651,57 @@ void TableCatalogDelegate::deleteCommand()
     }
 }
 
+static bool isDefaultNow(const std::string& defaultValue) {
+    std::vector<std::string> tokens;
+    boost::split(tokens, defaultValue, boost::is_any_of(":"));
+    if (tokens.size() != 2) {
+        return false;
+    }
+
+    int funcId = boost::lexical_cast<int>(tokens[1]);
+    if (funcId == FUNC_CURRENT_TIMESTAMP) {
+        return true;
+    }
+
+    return false;
+}
+
+// This method produces a row containing all the default values for
+// the table.  Note that if there are timestamp columns in the table
+// with a default value of "now", then the column will be populated
+// with whatever time you call this function.
+void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple) {
+    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
+    for (colIter = catalogTable->columns().begin();
+         colIter != catalogTable->columns().end();
+         colIter++) {
+
+        // TODO an optimization: can skip over the fields which will be
+        // overwritten by values from child node.
+
+        catalog::Column *col = colIter->second;
+        ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
+
+        switch (defaultColType) {
+        case VALUE_TYPE_INVALID:
+            tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
+            break;
+
+        case VALUE_TYPE_TIMESTAMP:
+            if (isDefaultNow(col->defaultvalue())) {
+                tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+                break;
+            }
+            // else, fall through to default case
+        default:
+
+            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
+                                                                         col->defaultvalue(),
+                                                                         ValueFactory::USE_TEMP_STORAGE);
+            tbTuple.setNValue(col->index(), defaultValue);
+            break;
+        }
+    }
+}
 
 }
