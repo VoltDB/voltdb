@@ -72,6 +72,9 @@ public:
     const std::vector<int>& getAggregateOutputColumns() const
     { return m_aggregateOutputColumns; }
 
+    const std::vector<int>& getPartialSerialAggregateOutputColumns() const
+    { return m_partialSerialGroupByColumns; }
+
     const std::vector<AbstractExpression*>& getAggregateInputExpressions() const
     { return m_aggregateInputExpressions; }
 
@@ -100,6 +103,7 @@ protected:
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
+    std::vector<int> m_partialSerialGroupByColumns;
     std::vector<AbstractExpression*> m_aggregateInputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 

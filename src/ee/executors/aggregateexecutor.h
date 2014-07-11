@@ -208,6 +208,9 @@ protected:
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
 
+    std::vector<int> m_partialSerialGroupByColumns;
+    TupleSchema* m_groupByKeyPartialHashSchema;
+
     ProgressMonitorProxy* m_pmp;
     TableTuple m_passThroughTupleSource;
 
@@ -216,6 +219,9 @@ protected:
     int m_offset;
     int m_tupleSkipped;
     bool m_earlyReturn;
+
+private:
+    TupleSchema* constructGroupBySchema(bool partial);
 };
 
 typedef boost::unordered_map<TableTuple,
@@ -239,9 +245,8 @@ public:
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
-protected:
-    virtual bool p_execute(const NValueArray& params);
 private:
+    virtual bool p_execute(const NValueArray& params);
     HashAggregateMapType m_hash;
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
 
@@ -265,11 +270,9 @@ public:
     void p_execute_tuple(const TableTuple& nextTuple);
 
     void p_execute_finish();
+
 protected:
-    virtual bool p_execute(const NValueArray& params);
-
     void getNextGroupByValues(const TableTuple& nextTuple);
-
     AggregateRow * m_aggregateRow;
     std::vector<NValue> m_inProgressGroupByValues;
     std::vector<NValue> m_nextGroupByValues;
@@ -278,7 +281,29 @@ protected:
     bool m_noInputRows;
     bool m_failPrePredicateOnFirstRow;
 
+private:
+    virtual bool p_execute(const NValueArray& params);
 };
+
+
+class AggregatePartialExecutor : public AggregateSerialExecutor
+{
+public:
+    AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
+        AggregateSerialExecutor(engine, abstract_node) { }
+    ~AggregatePartialExecutor() { }
+
+    void p_execute_tuple(const TableTuple& nextTuple);
+
+    void p_execute_finish();
+
+private:
+    virtual bool p_execute(const NValueArray& params);
+
+    HashAggregateMapType m_hash;
+    PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
+};
+
 
 }
 #endif
