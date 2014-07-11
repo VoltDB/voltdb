@@ -2041,7 +2041,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
-        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
+
         project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
