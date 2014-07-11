@@ -453,8 +453,26 @@ enum RecoveryMsgType {
 // Types of generic tasks that can be submitted to the EE
 // ------------------------------------------------------------------
 enum TaskType {
-    TASK_TYPE_VALIDATE_PARTITIONING = 0
+    TASK_TYPE_VALIDATE_PARTITIONING = 0,
+    TASK_TYPE_APPLY_BINARY_LOG = 1
 };
+
+
+// ------------------------------------------------------------------
+// Types of DR records
+// ------------------------------------------------------------------
+enum DRRecordType { DR_RECORD_INSERT = 0, DR_RECORD_DELETE = 1, DR_RECORD_UPDATE = 2, DR_RECORD_BEGIN_TXN = 3, DR_RECORD_END_TXN = 4 };
+
+// ------------------------------------------------------------------
+// Tuple serialization formats
+// ------------------------------------------------------------------
+enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZATION_DR = 1 };
+
+// ------------------------------------------------------------------
+// Endianess
+// ------------------------------------------------------------------
+enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
+
 
 // ------------------------------------------------------------------
 // Utility functions.

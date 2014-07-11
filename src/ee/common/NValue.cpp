@@ -308,7 +308,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInput &input, Pool *dataPool)
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
     {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
@@ -354,7 +354,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
 {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();

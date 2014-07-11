@@ -510,7 +510,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
         checkHasComplexAgg(pns);
 
-        // Test limit push down
+        // Test limit is not pushed down
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0) instanceof OrderByPlanNode);
@@ -518,10 +518,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
-        // inline limit
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        p = p.getChild(0);
         // inline aggregate
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
