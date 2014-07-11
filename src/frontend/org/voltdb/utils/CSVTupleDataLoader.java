@@ -124,10 +124,16 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                         new VoltTable[0], "Failed to call procedure.", 0);
                 m_errHandler.handleError(metaData, response, "Failed to call procedure.");
             }
-        } catch (Exception ex) {
+        } catch (NoConnectionsException ex) {
             ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0], "Failed to call procedure.", 0);
-            m_errHandler.handleError(metaData, response, ex.toString());
+            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+        } catch (IOException ex) {
+            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Failed to call procedure.", 0);
+            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+        } catch (Exception ex) {
+            m_errHandler.handleError(metaData, null, ex.toString());
         }
     }
 
