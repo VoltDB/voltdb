@@ -111,7 +111,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    TableTuple tbTuple = TableTuple(m_inputTable->schema());
+    // we need to use the schema of the target table here, not the input table
+    TableTuple &templateTuple = targetTable->tempTuple();
+
+    // initialize the template tuple with default values from the catalog
+    m_node->initTemplateTuple(m_engine, templateTuple);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 #ifdef DEBUG
@@ -135,24 +139,25 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // An insert is quite simple really. We just loop through our m_inputTable
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
-    assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
+    TableTuple inputTuple(m_inputTable->schema());
+    assert (inputTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
-    while (iterator.next(tbTuple)) {
-        /*/ enable for debug ...
-        std::cout << "DEBUG INSERTING TUPLE: " <<
-                tbTuple.debug(targetTable->name()).c_str() << " from schema " <<
-                m_inputTable->schema()->debug() << " into " <<
-                targetTable->schema()->debug() << std::endl;
+    while (iterator.next(inputTuple)) {
+
+        for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
+            templateTuple.setNValue(m_node->getFieldMap()[i], inputTuple.getNValue(i));
+        }
+
         // ... enable for debug */
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
-                   tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
+                   templateTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                    targetTable->schema()->debug().c_str());
 
         // if there is a partition column for the target table
         if (m_partitionColumn != -1) {
 
             // get the value for the partition column
-            NValue value = tbTuple.getNValue(m_partitionColumn);
+            NValue value = templateTuple.getNValue(m_partitionColumn);
             bool isLocal = m_engine->isLocalSite(value);
 
             // if it doesn't map to this site
@@ -160,7 +165,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 if (!m_multiPartition) {
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),
-                            tbTuple,
+                            templateTuple,
                             "Mispartitioned tuple in single-partition insert statement.");
                 }
 
@@ -177,7 +182,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         }
 
         // try to put the tuple into the target table
-        if (!targetTable->insertTuple(tbTuple)) {
+        if (!targetTable->insertTuple(templateTuple)) {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                        " target table '%s'",
                        m_inputTable->name().c_str(),

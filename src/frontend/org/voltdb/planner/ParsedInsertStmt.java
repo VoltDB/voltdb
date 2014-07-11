@@ -18,7 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -34,7 +34,13 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class ParsedInsertStmt extends AbstractParsedStmt {
 
-    private final HashMap<Column, AbstractExpression> m_columns = new HashMap<Column, AbstractExpression>();
+    /**
+     * A hash of the columns that were provided in the insert stmt,
+     * and the corresponding values that were provided.  It is a
+     * linked hash map so we retain the order in which the user
+     * specified the columns.
+     */
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
     final List<String> m_targetNames =  new ArrayList<String>();
     private AbstractParsedStmt m_subselect;
 

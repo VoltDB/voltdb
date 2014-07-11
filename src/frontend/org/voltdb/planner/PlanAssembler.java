@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -940,15 +941,14 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
-            String targetName = col.getKey().getTypeName();
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    "VOLT_TEMP_TABLE",
-                                                   targetName,
-                                                   targetName,
+                                                   col.getKey().getTypeName(),
+                                                   col.getKey().getTypeName(),
                                                    col.getValue()));
 
             // check if this column is an indexed column
-            if (affectedColumns.contains(targetName))
+            if (affectedColumns.contains(col.getKey().getTypeName()))
             {
                 updateNode.setUpdateIndexes(true);
             }
@@ -978,6 +978,77 @@ public class PlanAssembler {
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
+    static private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {
+
+        if (expr.getValueType().getValue() != column.getType() ||
+                expr.getValueSize() != column.getSize()) {
+            expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
+            expr.setValueType(VoltType.get((byte) column.getType()));
+            // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
+            // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
+            // the tuple that gets the result of the cast can be properly formatted as inline.
+            // A too-wide value survives the cast (to generic VARCHAR of any length) but the
+            // attempt to cache the result in the inline temp tuple storage will throw an early
+            // runtime error on be  half of the target table column.
+            // The important thing here is to leave the formatting hint in the output schema that
+            // drives the temp tuple layout.
+            expr.setValueSize(column.getSize());
+        }
+
+        return expr;
+    }
+
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, name , id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
     /**
      * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
      * and this will only generate a single plan.
@@ -991,292 +1062,81 @@ public class PlanAssembler {
             return null;
         m_bestAndOnlyPlanWasGenerated = true;
 
+        CompiledPlan retval = new CompiledPlan();
+        retval.readOnly = false;
+
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
-        boolean targetIsReplicated = targetTable.getIsreplicated();
+        CatalogMap<Column> targetTableColumns = targetTable.getColumns();
+
+        for (Column col : targetTableColumns) {
+            boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
+            if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
+                throw new PlanningErrorException("Column " + col.getName()
+                        + " has no default and is not nullable.");
+            }
+
+            // hint that this statement can be executed SP.
+            if (col.equals(m_partitioning.getPartitionColForDML())) {
+                AbstractExpression expr = m_parsedInsert.m_columns.get(col);
+                if (expr == null) {
+                    expr = defaultValueToExpr(col);
+                }
+
+                String fullColumnName = targetTable.getTypeName() + "." + col.getTypeName();
+                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
+            }
+        }
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
 
-        // get the ordered list of columns for the targettable using a helper
-        // function they're not guaranteed to be in order in the catalog
-        List<Column> columns = CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
-        Column partitioningColumn = null;
-        if ( ! m_partitioning.wasSpecifiedAsSingle()) {
-            partitioningColumn = targetTable.getPartitioncolumn();
-        }
-        CompiledPlan retval;
+        // The child of the insert node produces rows containing values
+        // from the VALUES clause.
+        // Right now it can only be a materialize node,
+        // but in the future it could be an arbitrary sub-plan produced from a sub-query.
+        MaterializePlanNode matNode = new MaterializePlanNode();
+        NodeSchema matSchema = new NodeSchema();
+        int[] fieldMap = new int[m_parsedInsert.m_columns.size()];
+        int i = 0;
 
-        AbstractParsedStmt subStmt = m_parsedInsert.getSubselect();
-        if (subStmt != null) {
-            // TODO: Maybe most or all of this processing should be taken care of much earlier,
-            // as soon as the subselect is parsed?
-            CompiledPlan subselectPlan = getBestCostPlan(subStmt, false);
-            // TODO: Add a speed bump (e.g. limit MAX_INT or OFFSET 0 or trivial projection) to the
-            // special case of "insert into XXX values (...) select * from XXX" which could infinitely
-            // replicate its table if it is not given some reason to break the process up into 2 phases,
-            // reading the target table (completely) to fill a temp table BEFORE starting to insert
-            // new rows into the target table.
-            int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
-            // Approximate # of exported partitioned columns == # of partitioned tables.
-            Set<Integer> exportedPartitioningColumns = new HashSet<>(partitionedTableCount);
-            // The EE's insert filters allow querying replicated data even when inserting into a
-            // partitioned target table.  Test that either the subquery is solely on replicated data ...
-            if (partitionedTableCount > 0) {
-                // ... OR is on partitioned data but exports one or more partitioning column(s).
-                // Ensure that in the partitioned select case, the target table is also partitioned.
-                if (targetIsReplicated) {
-                    throw new PlanningErrorException(
-                            "The replicated table, '" + targetTable.getTypeName() +
-                            "', must not be the recipient of partitioned data in a single statement. " +
-                            " Use separate INSERT and SELECT statements," +
-                            " optionally within a stored procedure." );
-                }
+        // The insert statement's set of columns are contained in a LinkedHashMap,
+        // meaning that we'll iterate over the columns here in the order that the user
+        // specified them in the original SQL.
+        for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.m_columns.entrySet()) {
+            Column col = e.getKey();
 
-                // There is currently no support for unions on partitioned data in this context.
-                // This is also checked for in ParsedInsertStmt::parse
-                if ( ! (subStmt instanceof ParsedSelectStmt)) {
-                    throw new PlanningErrorException(
-                            "The partitioned table '" + targetTable.getTypeName() +
-                            "' must not be updated directly from a UNION or other set operation.");
-                }
-                ParsedSelectStmt subselectStmt = (ParsedSelectStmt)subStmt;
-                // An exported partitioning column has the following attributes:
-                // -- it is based on a TupleValueExpression.
-                // -- the index of the TupleValueExpression is that of its table's partitioning column.
-                // -- (some day it can also be an exported partitioning column from a nested subquery).
-                // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
-                //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
-                //    roll-ups.
-                int columnPosition = 0;
-                for (ParsedColInfo displayCol : subselectStmt.displayColumns()) {
-                    AbstractExpression expr = displayCol.expression;
-                    if (expr instanceof TupleValueExpression) {
-                        TupleValueExpression tve = (TupleValueExpression)expr;
-                        StmtTableScan scan = subselectStmt.m_tableAliasMap.get(tve.getTableAlias());
-                        if (scan.isPartitionedOnColumnIndex(tve.getColumnIndex())) {
-                            exportedPartitioningColumns.add(columnPosition);
-                        }
-                    }
-                    ++columnPosition;
-                }
-                if (exportedPartitioningColumns.isEmpty()) {
-                    throw new PlanningErrorException(
-                            "The partitioning column '" + partitioningColumn.getName() +
-                            "' of the partitioned table '" + targetTable.getTypeName() +
-                            "' must be explicitly set to a partitioning column in the SELECT clause." +
-                            " Use separate INSERT and SELECT statements," +
-                            " optionally within a stored procedure." );
-                }
-                //TODO: It is a requirement that the partitioning column of the target table be set to
-                // one of these exported partitioning columns.
-                // All other cases, like inserting expressions or non-partitioning columns into the
-                // target table's partitioning column are not supported as a single statement.
-                // The only transactional method of implementing such cases is through multiple
-                // query and DML statements in a multi-partition stored procedure. This approach
-                // is more expensive but allows migration of data among the partitions.
+            AbstractExpression valExpr = e.getValue();
+            fieldMap[i] = col.getIndex();
 
-                // for each column in the table that is in the target column list...
-                int ii = 0;
-                for (Column column : columns) {
-                    //TODO: construct a column-by-column projection of subquery results and defined defaults
-                    // to the defined target columns.
-                    // Default values, cases requiring type casts, or any other projection capabilities
-                    // are the responsibilities of the insert node
-                    // likely with the help of an inline projection node and/OR a jsonified
-                    // representation of the target table's default value expressions that can be cached
-                    // in the DDL per target table instead of reserialized (in whole or in part) per insert
-                    // statement plan.
-                    //FIXME. For POC purposes, not supporting defaults or casting or
-                    // out-of-order listing of column names!
-                    int jj = m_parsedInsert.m_targetNames.indexOf(column.getTypeName());
-                    if (jj == -1) {
-                        //TODO: Here's where we would make proper arrangements for a default value.
-                        throw new PlanningErrorException(
-                                "Default values are not supported in 'INSERT INTO SELECT FROM'." +
-                                " Each column in table '" + targetTable.getTypeName() +
-                                "' must be provided an explicit value.");
-                    }
-                    if (jj != ii) {
-                        //TODO: Honor any order the columns may have been listed in.
-                        throw new PlanningErrorException(
-                                "Columns in 'INSERT ONTO SELECT FROM'." +
-                                " for table '" + targetTable.getTypeName() +
-                                "' must be listed in the order that they were defined.");
-                    }
-                    VoltType exprType = subselectStmt.displayColumns().get(jj).expression.getValueType();
-                    if (VoltType.get((byte)column.getType()) != exprType) {
-                        //TODO: Support trivial casts.
-                        throw new PlanningErrorException(
-                                "Column '" + column.getName() + "' in 'INSERT ONTO SELECT FROM'." +
-                                " for table '" + targetTable.getTypeName() +
-                                "' must be set to value of the same exact type.");
+            valExpr.setInBytes(col.getInbytes());
 
-                    }
-                    if (column.equals(partitioningColumn)) {
-                        if (( ! exportedPartitioningColumns.isEmpty()) &&
-                                ! exportedPartitioningColumns.contains(ii)) {
-                            throw new PlanningErrorException(
-                                    "The value being assigned to the partitioning column '" +
-                                    partitioningColumn.getName() +
-                                    "' of the partitioned table '" + targetTable.getTypeName() +
-                                    "' is not a partitioning column value in the SELECT clause. index=" + ii);
-                        }
-                    }
-                    ++ii;
-                }
-            }
+            // Patch over any mismatched expressions with an explicit cast.
+            // Most impossible-to-cast type combinations should have already been caught by the
+            // parser, but there are also runtime checks in the casting code
+            // -- such as for out of range values.
+            valExpr = castExprIfNeeded(valExpr, col);
 
-            // The subselectPlan is a close approximation of the result needed here, except
-            // that it needs the DML part at the top of its plan and needs to be marked as DML.
-            retval = subselectPlan;
-            retval.readOnly = false;
+            matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                    "VOLT_TEMP_TABLE",
+                    col.getTypeName(),
+                    col.getTypeName(),
+                    valExpr));
 
-            // connect the insert to the subselect tree.
-            insertNode.addAndLinkChild(subselectPlan.rootPlanGraph);
-
-            //TODO: rethink these criteria
-            // Consider factoring out common code between this case and the
-            // INSERT ... VALUES case below, either by putting the original
-            // INSERT ... VALUES code in an else block OR by passing the return value
-            // through a common post-process function.
-            if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-                assert( ! targetIsReplicated);
-                retval.replicatedTableDML = false;
-                insertNode.setMultiPartition(false);
-                retval.rootPlanGraph = insertNode;
-                return retval;
-            }
-
-            insertNode.setMultiPartition(true);
-            // The following is the moral equivalent of addSendReceivePair
-            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
-
-            // add a sum of counts (for partitioned inserts)
-            // or a limit to one received count row (for replicated inserts)
-            // and a send on top of the plan.
-            retval.replicatedTableDML = targetIsReplicated;
-            retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
-            return retval;
+            i++;
         }
 
-        retval = new CompiledPlan();
-        retval.readOnly = false;
-        retval.statementGuaranteesDeterminism(false, true);
+        // The field map tells the insert node
+        // where to put values produced by child into the row to be inserted.
+        insertNode.setFieldMap(fieldMap);
 
-        // the materialize node creates a tuple to insert (which is frankly not
-        // always optimal)
-        MaterializePlanNode materializeNode = new MaterializePlanNode();
-        NodeSchema mat_schema = new NodeSchema();
-
-        // for each column in the table in order...
-        for (Column column : columns) {
-
-            // get the expression for the column
-            AbstractExpression expr = m_parsedInsert.getValuesExpression(column);
-            // if there's no expression, make sure the column has
-            // some supported default value
-            if (expr == null) {
-                // if it's not nullable or defaulted we have a problem
-                if (column.getNullable() == false && column.getDefaulttype() == 0) {
-                    throw new PlanningErrorException("Column " + column.getName()
-                            + " has no default and is not nullable.");
-                }
-
-                boolean isConstantValue = true;
-                if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
-
-                    boolean isFunctionFormat = true;
-                    String timeValue = column.getDefaultvalue();
-                    try {
-                        Long.parseLong(timeValue);
-                        isFunctionFormat = false;
-                    } catch (NumberFormatException  e) {}
-                    if (isFunctionFormat) {
-                        try {
-                            java.sql.Timestamp.valueOf(timeValue);
-                            isFunctionFormat = false;
-                        } catch (IllegalArgumentException e) {}
-                    }
-
-                    if (isFunctionFormat) {
-                        String name = timeValue.split(":")[0];
-                        int id = Integer.parseInt(timeValue.split(":")[1]);
-
-                        FunctionExpression funcExpr = new FunctionExpression();
-                        funcExpr.setAttributes(name, name , id);
-
-                        funcExpr.setValueType(VoltType.TIMESTAMP);
-                        funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
-
-                        expr = funcExpr;
-                        isConstantValue = false;
-                    }
-                }
-                if (isConstantValue) {
-                    // Not Default sql function.
-                    ConstantValueExpression const_expr = new ConstantValueExpression();
-                    expr = const_expr;
-                    if (column.getDefaulttype() != 0) {
-                        const_expr.setValue(column.getDefaultvalue());
-                        const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
-                    }
-                    else {
-                        const_expr.setValue(null);
-                        const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
-                    }
-                }
-                assert(expr != null);
-            }
-
-            // Hint that this statement can be executed SP.
-            if (column.equals(m_partitioning.getPartitionColForDML())) {
-                String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
-                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
-            }
-
-            expr.setInBytes(column.getInbytes());
-
-            // The current insertexecutor implementation requires its input tuple from the
-            // materializeexecutor to be formatted exactly like the target persistent tuple.
-            // This requires the intervening outputschema to describe result columns of the
-            // exactly right type and size (at least for inlined sizes) as their target columns.
-            if (expr.getValueType().getValue() != column.getType() ||
-                    expr.getValueSize() != column.getSize()) {
-                // Patch over any mismatched expressions with an explicit cast.
-                // Most impossible-to-cast type combinations should have already been caught by the
-                // parser, but there are also runtime checks in the casting code
-                // -- such as for out of range values.
-                expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
-                expr.setValueType(VoltType.get((byte) column.getType()));
-                // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
-                // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
-                // the tuple that gets the result of the cast can be properly formatted as inline.
-                // A too-wide value survives the cast (to generic VARCHAR of any length) but the
-                // attempt to cache the result in the inline temp tuple storage will throw an early
-                // runtime error on bahalf of the target table column.
-                // The important thing here is to leave the formatting hint in the output schema that
-                // drives the temp tuple layout.
-                expr.setValueSize(column.getSize());
-            }
-            // add column to the materialize node.
-            // This table name is magic.
-            mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                                  "VOLT_TEMP_TABLE",
-                                                  column.getTypeName(),
-                                                  column.getTypeName(),
-                                                  expr));
-        }
-
-        materializeNode.setOutputSchema(mat_schema);
+        matNode.setOutputSchema(matSchema);
         // connect the insert and the materialize nodes together
-        insertNode.addAndLinkChild(materializeNode);
+        insertNode.addAndLinkChild(matNode);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-            assert( ! targetIsReplicated);
-            retval.replicatedTableDML = false;
             insertNode.setMultiPartition(false);
             retval.rootPlanGraph = insertNode;
             return retval;
@@ -1285,13 +1145,356 @@ public class PlanAssembler {
         insertNode.setMultiPartition(true);
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
-        // add a sum of counts (for partitioned inserts)
-        // or a limit to one received count row (for replicated inserts)
-        // and a send on top of the plan.
-        retval.replicatedTableDML = targetIsReplicated;
-        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
+        // add a count or a limit and send on top of the union
+        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         return retval;
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // /**
+    //  * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
+    //  * and this will only generate a single plan.
+    //  *
+    //  * @return The next plan for a given insert statement.
+    //  */
+    // private CompiledPlan getNextInsertPlan() {
+    //     // there's really only one way to do an insert, so just
+    //     // do it the right way once, then return null after that
+    //     if (m_bestAndOnlyPlanWasGenerated)
+    //         return null;
+    //     m_bestAndOnlyPlanWasGenerated = true;
+
+    //     // figure out which table we're inserting into
+    //     assert (m_parsedInsert.m_tableList.size() == 1);
+    //     Table targetTable = m_parsedInsert.m_tableList.get(0);
+    //     boolean targetIsReplicated = targetTable.getIsreplicated();
+
+    //     // the root of the insert plan is always an InsertPlanNode
+    //     InsertPlanNode insertNode = new InsertPlanNode();
+    //     insertNode.setTargetTableName(targetTable.getTypeName());
+
+    //     // get the ordered list of columns for the targettable using a helper
+    //     // function they're not guaranteed to be in order in the catalog
+    //     List<Column> columns = CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
+    //     Column partitioningColumn = null;
+    //     if ( ! m_partitioning.wasSpecifiedAsSingle()) {
+    //         partitioningColumn = targetTable.getPartitioncolumn();
+    //     }
+    //     CompiledPlan retval;
+
+    //     AbstractParsedStmt subStmt = m_parsedInsert.getSubselect();
+    //     if (subStmt != null) {
+    //         // TODO: Maybe most or all of this processing should be taken care of much earlier,
+    //         // as soon as the subselect is parsed?
+    //         CompiledPlan subselectPlan = getBestCostPlan(subStmt, false);
+    //         // TODO: Add a speed bump (e.g. limit MAX_INT or OFFSET 0 or trivial projection) to the
+    //         // special case of "insert into XXX values (...) select * from XXX" which could infinitely
+    //         // replicate its table if it is not given some reason to break the process up into 2 phases,
+    //         // reading the target table (completely) to fill a temp table BEFORE starting to insert
+    //         // new rows into the target table.
+    //         int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
+    //         // Approximate # of exported partitioned columns == # of partitioned tables.
+    //         Set<Integer> exportedPartitioningColumns = new HashSet<>(partitionedTableCount);
+    //         // The EE's insert filters allow querying replicated data even when inserting into a
+    //         // partitioned target table.  Test that either the subquery is solely on replicated data ...
+    //         if (partitionedTableCount > 0) {
+    //             // ... OR is on partitioned data but exports one or more partitioning column(s).
+    //             // Ensure that in the partitioned select case, the target table is also partitioned.
+    //             if (targetIsReplicated) {
+    //                 throw new PlanningErrorException(
+    //                         "The replicated table, '" + targetTable.getTypeName() +
+    //                         "', must not be the recipient of partitioned data in a single statement. " +
+    //                         " Use separate INSERT and SELECT statements," +
+    //                         " optionally within a stored procedure." );
+    //             }
+
+    //             // There is currently no support for unions on partitioned data in this context.
+    //             // This is also checked for in ParsedInsertStmt::parse
+    //             if ( ! (subStmt instanceof ParsedSelectStmt)) {
+    //                 throw new PlanningErrorException(
+    //                         "The partitioned table '" + targetTable.getTypeName() +
+    //                         "' must not be updated directly from a UNION or other set operation.");
+    //             }
+    //             ParsedSelectStmt subselectStmt = (ParsedSelectStmt)subStmt;
+    //             // An exported partitioning column has the following attributes:
+    //             // -- it is based on a TupleValueExpression.
+    //             // -- the index of the TupleValueExpression is that of its table's partitioning column.
+    //             // -- (some day it can also be an exported partitioning column from a nested subquery).
+    //             // -- ideally the process of "GROUPING BY" a partitioning key should not throw off this
+    //             //    analysis so that "INSERT INTO SELECT" can be used to write arbitrary materialized
+    //             //    roll-ups.
+    //             int columnPosition = 0;
+    //             for (ParsedColInfo displayCol : subselectStmt.displayColumns()) {
+    //                 AbstractExpression expr = displayCol.expression;
+    //                 if (expr instanceof TupleValueExpression) {
+    //                     TupleValueExpression tve = (TupleValueExpression)expr;
+    //                     StmtTableScan scan = subselectStmt.m_tableAliasMap.get(tve.getTableAlias());
+    //                     if (scan.isPartitionedOnColumnIndex(tve.getColumnIndex())) {
+    //                         exportedPartitioningColumns.add(columnPosition);
+    //                     }
+    //                 }
+    //                 ++columnPosition;
+    //             }
+    //             if (exportedPartitioningColumns.isEmpty()) {
+    //                 throw new PlanningErrorException(
+    //                         "The partitioning column '" + partitioningColumn.getName() +
+    //                         "' of the partitioned table '" + targetTable.getTypeName() +
+    //                         "' must be explicitly set to a partitioning column in the SELECT clause." +
+    //                         " Use separate INSERT and SELECT statements," +
+    //                         " optionally within a stored procedure." );
+    //             }
+    //             //TODO: It is a requirement that the partitioning column of the target table be set to
+    //             // one of these exported partitioning columns.
+    //             // All other cases, like inserting expressions or non-partitioning columns into the
+    //             // target table's partitioning column are not supported as a single statement.
+    //             // The only transactional method of implementing such cases is through multiple
+    //             // query and DML statements in a multi-partition stored procedure. This approach
+    //             // is more expensive but allows migration of data among the partitions.
+
+    //             // for each column in the table that is in the target column list...
+    //             int ii = 0;
+    //             for (Column column : columns) {
+    //                 //TODO: construct a column-by-column projection of subquery results and defined defaults
+    //                 // to the defined target columns.
+    //                 // Default values, cases requiring type casts, or any other projection capabilities
+    //                 // are the responsibilities of the insert node
+    //                 // likely with the help of an inline projection node and/OR a jsonified
+    //                 // representation of the target table's default value expressions that can be cached
+    //                 // in the DDL per target table instead of reserialized (in whole or in part) per insert
+    //                 // statement plan.
+    //                 //FIXME. For POC purposes, not supporting defaults or casting or
+    //                 // out-of-order listing of column names!
+    //                 int jj = m_parsedInsert.m_targetNames.indexOf(column.getTypeName());
+    //                 if (jj == -1) {
+    //                     //TODO: Here's where we would make proper arrangements for a default value.
+    //                     throw new PlanningErrorException(
+    //                             "Default values are not supported in 'INSERT INTO SELECT FROM'." +
+    //                             " Each column in table '" + targetTable.getTypeName() +
+    //                             "' must be provided an explicit value.");
+    //                 }
+    //                 if (jj != ii) {
+    //                     //TODO: Honor any order the columns may have been listed in.
+    //                     throw new PlanningErrorException(
+    //                             "Columns in 'INSERT ONTO SELECT FROM'." +
+    //                             " for table '" + targetTable.getTypeName() +
+    //                             "' must be listed in the order that they were defined.");
+    //                 }
+    //                 VoltType exprType = subselectStmt.displayColumns().get(jj).expression.getValueType();
+    //                 if (VoltType.get((byte)column.getType()) != exprType) {
+    //                     //TODO: Support trivial casts.
+    //                     throw new PlanningErrorException(
+    //                             "Column '" + column.getName() + "' in 'INSERT ONTO SELECT FROM'." +
+    //                             " for table '" + targetTable.getTypeName() +
+    //                             "' must be set to value of the same exact type.");
+
+    //                 }
+    //                 if (column.equals(partitioningColumn)) {
+    //                     if (( ! exportedPartitioningColumns.isEmpty()) &&
+    //                             ! exportedPartitioningColumns.contains(ii)) {
+    //                         throw new PlanningErrorException(
+    //                                 "The value being assigned to the partitioning column '" +
+    //                                 partitioningColumn.getName() +
+    //                                 "' of the partitioned table '" + targetTable.getTypeName() +
+    //                                 "' is not a partitioning column value in the SELECT clause. index=" + ii);
+    //                     }
+    //                 }
+    //                 ++ii;
+    //             }
+    //         }
+
+    //         // The subselectPlan is a close approximation of the result needed here, except
+    //         // that it needs the DML part at the top of its plan and needs to be marked as DML.
+    //         retval = subselectPlan;
+    //         retval.readOnly = false;
+
+    //         // connect the insert to the subselect tree.
+    //         insertNode.addAndLinkChild(subselectPlan.rootPlanGraph);
+
+    //         //TODO: rethink these criteria
+    //         // Consider factoring out common code between this case and the
+    //         // INSERT ... VALUES case below, either by putting the original
+    //         // INSERT ... VALUES code in an else block OR by passing the return value
+    //         // through a common post-process function.
+    //         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+    //             assert( ! targetIsReplicated);
+    //             retval.replicatedTableDML = false;
+    //             insertNode.setMultiPartition(false);
+    //             retval.rootPlanGraph = insertNode;
+    //             return retval;
+    //         }
+
+    //         insertNode.setMultiPartition(true);
+    //         // The following is the moral equivalent of addSendReceivePair
+    //         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
+
+    //         // add a sum of counts (for partitioned inserts)
+    //         // or a limit to one received count row (for replicated inserts)
+    //         // and a send on top of the plan.
+    //         retval.replicatedTableDML = targetIsReplicated;
+    //         retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
+    //         return retval;
+    //     }
+
+    //     retval = new CompiledPlan();
+    //     retval.readOnly = false;
+    //     retval.statementGuaranteesDeterminism(false, true);
+
+    //     // the materialize node creates a tuple to insert (which is frankly not
+    //     // always optimal)
+    //     MaterializePlanNode materializeNode = new MaterializePlanNode();
+    //     NodeSchema mat_schema = new NodeSchema();
+
+    //     // for each column in the table in order...
+    //     for (Column column : columns) {
+
+    //         // get the expression for the column
+    //         AbstractExpression expr = m_parsedInsert.getValuesExpression(column);
+    //         // if there's no expression, make sure the column has
+    //         // some supported default value
+    //         if (expr == null) {
+    //             // if it's not nullable or defaulted we have a problem
+    //             if (column.getNullable() == false && column.getDefaulttype() == 0) {
+    //                 throw new PlanningErrorException("Column " + column.getName()
+    //                         + " has no default and is not nullable.");
+    //             }
+
+    //             boolean isConstantValue = true;
+    //             if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+    //                 boolean isFunctionFormat = true;
+    //                 String timeValue = column.getDefaultvalue();
+    //                 try {
+    //                     Long.parseLong(timeValue);
+    //                     isFunctionFormat = false;
+    //                 } catch (NumberFormatException  e) {}
+    //                 if (isFunctionFormat) {
+    //                     try {
+    //                         java.sql.Timestamp.valueOf(timeValue);
+    //                         isFunctionFormat = false;
+    //                     } catch (IllegalArgumentException e) {}
+    //                 }
+
+    //                 if (isFunctionFormat) {
+    //                     String name = timeValue.split(":")[0];
+    //                     int id = Integer.parseInt(timeValue.split(":")[1]);
+
+    //                     FunctionExpression funcExpr = new FunctionExpression();
+    //                     funcExpr.setAttributes(name, name , id);
+
+    //                     funcExpr.setValueType(VoltType.TIMESTAMP);
+    //                     funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+    //                     expr = funcExpr;
+    //                     isConstantValue = false;
+    //                 }
+    //             }
+    //             if (isConstantValue) {
+    //                 // Not Default sql function.
+    //                 ConstantValueExpression const_expr = new ConstantValueExpression();
+    //                 expr = const_expr;
+    //                 if (column.getDefaulttype() != 0) {
+    //                     const_expr.setValue(column.getDefaultvalue());
+    //                     const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+    //                 }
+    //                 else {
+    //                     const_expr.setValue(null);
+    //                     const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+    //                 }
+    //             }
+    //             assert(expr != null);
+    //         }
+
+    //         // Hint that this statement can be executed SP.
+    //         if (column.equals(m_partitioning.getPartitionColForDML())) {
+    //             String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
+    //             m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
+    //         }
+
+    //         expr.setInBytes(column.getInbytes());
+
+    //         // The current insertexecutor implementation requires its input tuple from the
+    //         // materializeexecutor to be formatted exactly like the target persistent tuple.
+    //         // This requires the intervening outputschema to describe result columns of the
+    //         // exactly right type and size (at least for inlined sizes) as their target columns.
+    //         if (expr.getValueType().getValue() != column.getType() ||
+    //                 expr.getValueSize() != column.getSize()) {
+    //             // Patch over any mismatched expressions with an explicit cast.
+    //             // Most impossible-to-cast type combinations should have already been caught by the
+    //             // parser, but there are also runtime checks in the casting code
+    //             // -- such as for out of range values.
+    //             expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
+    //             expr.setValueType(VoltType.get((byte) column.getType()));
+    //             // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
+    //             // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
+    //             // the tuple that gets the result of the cast can be properly formatted as inline.
+    //             // A too-wide value survives the cast (to generic VARCHAR of any length) but the
+    //             // attempt to cache the result in the inline temp tuple storage will throw an early
+    //             // runtime error on bahalf of the target table column.
+    //             // The important thing here is to leave the formatting hint in the output schema that
+    //             // drives the temp tuple layout.
+    //             expr.setValueSize(column.getSize());
+    //         }
+    //         // add column to the materialize node.
+    //         // This table name is magic.
+    //         mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+    //                                               "VOLT_TEMP_TABLE",
+    //                                               column.getTypeName(),
+    //                                               column.getTypeName(),
+    //                                               expr));
+    //     }
+
+    //     materializeNode.setOutputSchema(mat_schema);
+    //     // connect the insert and the materialize nodes together
+    //     insertNode.addAndLinkChild(materializeNode);
+
+    //     if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+    //         assert( ! targetIsReplicated);
+    //         retval.replicatedTableDML = false;
+    //         insertNode.setMultiPartition(false);
+    //         retval.rootPlanGraph = insertNode;
+    //         return retval;
+    //     }
+
+    //     insertNode.setMultiPartition(true);
+    //     AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
+
+    //     // add a sum of counts (for partitioned inserts)
+    //     // or a limit to one received count row (for replicated inserts)
+    //     // and a send on top of the plan.
+    //     retval.replicatedTableDML = targetIsReplicated;
+    //     retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetIsReplicated);
+    //     return retval;
+    // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Adds a sum or limit node followed by a send node to the given DML node. If the DML target
