@@ -48,6 +48,14 @@ import org.voltdb.VoltType;
 
 // TODO: NString, (N)Clob, AsciiStream, (N)CharacterStream all feel dubious to me.  VoltDB stores data in UTF-8 - somewhere along the lines there should be a conversion.
 // TODO: Blob, Bytes, BinaryStream are debatable.  Here as well, I merely grab a varchar field's binary data.  With the internal conversion to UTF-8, this isn't going to work very well... Maybe embed Base64 encoding until binary field support is available?
+
+// The ResultSet 'cursorPosition' is made consistent with the enum 'Position' defined in this class
+// Initially the cursor points to beforeFirst position (activeRowIndex = -1) and hence cursorPosition is initialized with the beforeFirst enum value
+// beforeFirst method sets the cursorPosition to beforeFirst enum value and Resets the activeRowIndex value to -1
+// afterLast method sets the cursorPosition to afterLast enum value BUT does not change the activeRowIndex value
+// calling previous at first row sets the cursorPosition to beforeFirst enum value and activeRowIndex value to -1
+// calling next at last row sets the cursorPosition to afterLast enum value and sets the activeRowIndex value equal to table 'rowCount'
+
 public class JDBC4ResultSet implements java.sql.ResultSet {
     private final Statement statement;
     protected VoltTable table;
@@ -55,7 +63,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     private int fetchDirection = FETCH_FORWARD;
     private int fetchSize = 0;
     private int rowCount;
-    private Position cursorPosition = Position.middle;
+    private Position cursorPosition = Position.beforeFirst;
     private enum Position {
                 beforeFirst, middle, afterLast
     }
@@ -90,45 +98,41 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean absolute(int row) throws SQLException {
         checkClosed();
-
+        if (rowCount == 0) {
+            if (row == 0) {
+               return true;
+            }
+            return false;
+        }
         if (row == 0) {
             beforeFirst();
             return true;
         }
-
-        if (rowCount == 0)
-        {
-            if (row == 0)
-                return true;
-            return false;
-        }
-
         if (rowCount + row < 0) {
             beforeFirst();
             return false;
         }
-
         if (row > rowCount) {
             cursorPosition = Position.afterLast;
-            if(row == rowCount+1)
+            if(row == rowCount+1) {
                 return true;
-            else return false;
-        }
-
-        if (cursorPosition == Position.afterLast || cursorPosition == Position.beforeFirst) {
-            cursorPosition = Position.middle;
-        }
-
-        try {
-            if(table.getActiveRowIndex() > row && row > 0)
-                    return table.advanceToRow(row-1);
-           if(row < 0 )
-            {
-                row += rowCount;
-                row++;
             }
-            table.resetRowPosition();
-            table.advanceToRow(0);
+            else {
+                return false;
+            }
+        }
+        try {
+            // for negative row numbers or row numbers lesser then activeRowIndex, resetRowPosition
+            // method is called and the cursor advances to the desired row from top of the table
+            if(row < 0 || table.getActiveRowIndex() > row || table.getActiveRowIndex() < 0) {
+                if(row < 0) {
+                    row += rowCount;
+                    row++;
+                }
+                table.resetRowPosition();
+                table.advanceToRow(0);
+            }
+            cursorPosition = Position.middle;
             return table.advanceToRow(row-1);
         } catch (Exception x) {
             throw SQLError.get(x);
@@ -140,17 +144,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public void afterLast() throws SQLException {
         checkClosed();
-
-        if (table.getActiveRowIndex() < rowCount) {
-            cursorPosition = Position.afterLast;
-            return;
-        }
-
-        try {
-            table.advanceToRow(table.getRowCount());
-        } catch (Exception x) {
-            throw SQLError.get(x);
-        }
+        cursorPosition = Position.afterLast;
     }
 
     // Moves the cursor to the front of this ResultSet object, just before the
@@ -209,11 +203,16 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean first() throws SQLException {
         checkClosed();
-        if (rowCount == 0)
+        if (rowCount == 0) {
             return false;
+        }
+        if (cursorPosition != Position.middle) {
+            cursorPosition = Position.middle;
+        }
         try {
-            if (table.getActiveRowIndex() != 0)
+            if (table.getActiveRowIndex() != 0){
                 table.resetRowPosition();
+            }
             return table.advanceToRow(0);
         } catch (Exception x) {
             throw SQLError.get(x);
@@ -723,11 +722,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public int getRow() throws SQLException {
         checkClosed();
 
-        if (cursorPosition == Position.afterLast)
+        if (cursorPosition != Position.middle) {
             return 0;
-
-        if (cursorPosition == Position.beforeFirst)
-            return 0;
+        }
 
         try {
             return table.getActiveRowIndex() + 1;
@@ -958,7 +955,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean isAfterLast() throws SQLException {
         checkClosed();
         try {
-            return table.getActiveRowIndex() >= table.getRowCount();
+            if(cursorPosition == Position.afterLast) {
+                return true;
+            }
+            return false;
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -970,7 +970,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean isBeforeFirst() throws SQLException {
         checkClosed();
         try {
-            return table.getActiveRowIndex() < 0;
+            if(cursorPosition == Position.beforeFirst) {
+                return true;
+            }
+            return false;
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -999,7 +1002,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean isLast() throws SQLException {
         checkClosed();
         try {
-            return table.getActiveRowIndex() == table.getRowCount() - 1;
+            return table.getActiveRowIndex() == rowCount - 1;
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -1010,12 +1013,16 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean last() throws SQLException {
         checkClosed();
         try {
-            if (table.getRowCount() == 0) {
+            if (rowCount == 0) {
                 return false;
             }
-            table.resetRowPosition();
-            table.advanceToRow(0);
-            return table.advanceToRow(table.getRowCount() - 1);
+
+            if (cursorPosition != Position.middle) {
+                cursorPosition = Position.middle;
+                table.resetRowPosition();
+                table.advanceToRow(0);
+            }
+            return table.advanceToRow(rowCount - 1);
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -1040,14 +1047,13 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean next() throws SQLException {
         checkClosed();
-
         if (cursorPosition == Position.afterLast || table.getActiveRowIndex() == rowCount - 1) {
             cursorPosition = Position.afterLast;
             return false;
         }
-        if (cursorPosition == Position.beforeFirst)
+        if (cursorPosition == Position.beforeFirst) {
             cursorPosition = Position.middle;
-
+        }
         try {
             return table.advanceRow();
         } catch (Exception x) {
@@ -1059,19 +1065,18 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean previous() throws SQLException {
         checkClosed();
-
         if (cursorPosition == Position.afterLast) {
-            cursorPosition = Position.middle;
             return last();
         }
-
         if (cursorPosition == Position.beforeFirst || table.getActiveRowIndex() == -1) {
             beforeFirst();
             return false;
         }
-
         try {
-            return table.advanceToRow(table.getActiveRowIndex() - 1);
+            int tempRowIndex = table.getActiveRowIndex();
+            table.resetRowPosition();
+            table.advanceToRow(0);
+            return table.advanceToRow(tempRowIndex - 1);
         } catch (Exception x) {
             throw SQLError.get(x);
         }
@@ -1088,40 +1093,45 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     public boolean relative(int rows) throws SQLException {
         checkClosed();
 
-        if (rowCount == 0)
+        if (rowCount == 0) {
             return false;
-
-        if (table.getActiveRowIndex() + rows >= rowCount) {
-            cursorPosition = Position.afterLast;
-            if (table.getActiveRowIndex() + rows == rowCount)
-                return true;
-             return false;
         }
-
+        if (cursorPosition == Position.afterLast && rows > 0) {
+            return false;
+        }
         if (cursorPosition == Position.beforeFirst && rows <= 0) {
             return false;
         }
-
-        if (rows + table.getActiveRowIndex() < 0) {
+        if (table.getActiveRowIndex() + rows >= rowCount) {
+            cursorPosition = Position.afterLast;
+            if (table.getActiveRowIndex() + rows == rowCount) {
+                return true;
+            }
+            return false;
+        }
+        if (rows + table.getActiveRowIndex() < 0 && cursorPosition != Position.afterLast) {
             beforeFirst();
             return false;
         }
-
         try {
-            if (rows < 0) {
-                int temp_activeRowIndex = table.getActiveRowIndex();
+            // for negative row numbers, resetRowPosition method is called
+            // and the cursor advances to the desired row from top of the table
+            int rowsToMove = table.getActiveRowIndex() + rows;
+            if (cursorPosition == Position.beforeFirst || rows < 0) {
+                if(cursorPosition == Position.afterLast) {
+                    rowsToMove = rowCount + rows;
+                }
+                else if(cursorPosition == Position.beforeFirst) {
+                    rowsToMove = rows - 1;
+                }
+                else {
+                    rowsToMove = table.getActiveRowIndex() + rows;
+                }
                 table.resetRowPosition();
                 table.advanceToRow(0);
-                return table.advanceToRow(temp_activeRowIndex + rows);
-            }
-            if (cursorPosition == Position.beforeFirst) {
-                cursorPosition = Position.middle;
-                table.resetRowPosition();
-                table.advanceToRow(0);
-                return table.advanceToRow(rows - 1);
             }
             cursorPosition = Position.middle;
-            return table.advanceToRow(table.getActiveRowIndex() + rows);
+            return table.advanceToRow(rowsToMove);
         } catch (Exception x) {
             throw SQLError.get(x);
         }

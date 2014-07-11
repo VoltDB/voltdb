@@ -217,6 +217,7 @@ public class TestJDBCResultSet {
     @Test
     public void testFirst() throws Exception {
 
+        assertEquals(hsql3RowRS.absolute(2), volt3RowRS.absolute(2));
         assertTrue(hsql3RowRS.first() == volt3RowRS.first());
         assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
         assertEquals(hsql3RowRS.getInt(1), volt3RowRS.getInt(1));
@@ -236,32 +237,61 @@ public class TestJDBCResultSet {
         hsql3RowRS.beforeFirst();
         volt3RowRS.beforeFirst();
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
-        hsql3RowRS.next();
-        volt3RowRS.next();
+
+        assertEquals(hsql3RowRS.next(), volt3RowRS.next());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
     }
 
     @Test
     public void testAfterLast() throws Exception {
 
-        hsql3RowRS.next();
-        volt3RowRS.next();
+        assertEquals(hsql3RowRS.next(), volt3RowRS.next());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         hsql3RowRS.afterLast();
         volt3RowRS.afterLast();
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
+        assertEquals(hsql3RowRS.previous(), volt3RowRS.previous());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
+    }
+
+    @Test
+    public void testIsBeforeFirst() throws Exception {
+
+        hsql3RowRS.beforeFirst();
+        volt3RowRS.beforeFirst();
+        assertEquals(hsql3RowRS.isBeforeFirst(), volt3RowRS.isBeforeFirst());
+    }
+
+    @Test
+    public void testIsAfterLast() throws Exception {
+
+        hsql3RowRS.afterLast();
+        volt3RowRS.afterLast();
+        assertEquals(hsql3RowRS.isAfterLast(), volt3RowRS.isAfterLast());
+    }
+
+    @Test
+    public void testIsFirst() throws Exception {
+
+        hsql3RowRS.beforeFirst();
+        volt3RowRS.beforeFirst();
+        assertEquals( hsql3RowRS.isFirst(), volt3RowRS.isFirst());
+    }
+
+    @Test
+    public void testIsLast() throws Exception {
+
+        hsql3RowRS.afterLast();
+        volt3RowRS.afterLast();
+        assertEquals(hsql3RowRS.isLast(), volt3RowRS.isLast());
     }
 
     @Test
     public void testAbsolute() throws Exception {
 
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
+        assertEquals(hsql3RowRS.previous(), volt3RowRS.previous());
         assertEquals(hsql3RowRS.absolute(2), volt3RowRS.absolute(2));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
@@ -285,47 +315,49 @@ public class TestJDBCResultSet {
     @Test
     public void testRelative() throws Exception {
 
-        hsql3RowRS.next();
-        volt3RowRS.next();
+        assertEquals(hsql3RowRS.next(), volt3RowRS.next());
         assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
 
         hsql3RowRS.beforeFirst();
         volt3RowRS.beforeFirst();
         assertEquals(hsql3RowRS.relative(0), volt3RowRS.relative(0));
 
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
+        assertEquals(hsql3RowRS.relative(-3), volt3RowRS.relative(-3));
+        assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
+
+        assertEquals(hsql3RowRS.previous(), volt3RowRS.previous());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         assertEquals(hsql3RowRS.relative(2), volt3RowRS.relative(2));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
+        assertEquals(hsql3RowRS.absolute(4), volt3RowRS.absolute(4));
         assertEquals(hsql3RowRS.relative(-3), volt3RowRS.relative(-3));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
         assertEquals(hsql3RowRS.relative(-10), volt3RowRS.relative(-10));
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
+
+        hsql3RowRS.afterLast();
+        volt3RowRS.afterLast();
+        assertEquals(hsql3RowRS.relative(1), volt3RowRS.relative(1));
     }
 
     @Test
     public void testNextBoundaryRows() throws SQLException {
 
-        hsql3RowRS.last();
-        volt3RowRS.last();
-        hsql3RowRS.next();
-        volt3RowRS.next();
+        assertEquals(hsql3RowRS.last(), volt3RowRS.last());
+        assertEquals(hsql3RowRS.next(), volt3RowRS.next());
         assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
 
-        hsql3RowRS.absolute(4);
-        volt3RowRS.absolute(4);
+        assertEquals(hsql3RowRS.absolute(4), volt3RowRS.absolute(4));
         assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
     }
 
     @Test
     public void testPreviousBoundaryRows() throws SQLException {
 
-        hsql3RowRS.previous();
-        volt3RowRS.previous();
+        assertEquals(hsql3RowRS.previous(), volt3RowRS.previous());
         assertTrue(hsql3RowRS.getRow() == volt3RowRS.getRow());
     }
 
@@ -342,6 +374,28 @@ public class TestJDBCResultSet {
 
         assertTrue(hsqlEmptyRS.last() == voltEmptyRS.last());
         assertTrue(hsqlEmptyRS.getRow() == voltEmptyRS.getRow());
+    }
+
+    @Test
+    public void testEmptyBeforeFirst() throws Exception {
+
+        hsql3RowRS.beforeFirst();
+        volt3RowRS.beforeFirst();
+        assertEquals(hsqlEmptyRS.getRow(), voltEmptyRS.getRow());
+
+        assertEquals(hsql3RowRS.next(), volt3RowRS.next());
+        assertEquals(hsqlEmptyRS.getRow(), voltEmptyRS.getRow());
+    }
+
+    @Test
+    public void testEmptyAfterLast() throws Exception {
+
+        hsql3RowRS.afterLast();
+        volt3RowRS.afterLast();
+        assertEquals(hsqlEmptyRS.getRow(), voltEmptyRS.getRow());
+
+        assertEquals(hsql3RowRS.previous(), volt3RowRS.previous());
+        assertEquals(hsqlEmptyRS.getRow(), voltEmptyRS.getRow());
     }
 
     @Test
