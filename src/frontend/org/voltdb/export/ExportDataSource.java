@@ -790,7 +790,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void submitAcceptMastership() {
+    /**
+     * Trigger an execution of the mastership runnable by the associated
+     * executor service
+     */
+    public void acceptMastership() {
+        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         m_es.execute(new Runnable() {
             @Override
             public void run() {
@@ -803,15 +808,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         });
-    }
-
-    /**
-     * Trigger an execution of the mastership runnable by the associated
-     * executor service
-     */
-    public void acceptMastership() {
-        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        submitAcceptMastership();
     }
 
     /**
