@@ -33,13 +33,19 @@ namespace voltdb
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
-              m_uso(uso)
+              m_uso(uso),
+              m_startSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
-              m_uso(other->m_uso)
+              m_uso(other->m_uso),
+              m_startSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
         {
         }
 
@@ -83,6 +89,30 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
+        int64_t startSpHandle() {
+            return m_startSpHandle;
+        }
+
+        void startSpHandle(int64_t spHandle) {
+            m_startSpHandle = spHandle;
+        }
+
+        int64_t lastSpHandle() {
+            return m_lastSpHandle;
+        }
+
+        void lastSpHandle(int64_t spHandle) {
+            m_lastSpHandle = spHandle;
+        }
+
+        int64_t lastCommittedSpHandle() {
+            return m_lastCommittedSpHandle;
+        }
+
+        void lastCommittedSpHandle(int64_t spHandle) {
+            m_lastCommittedSpHandle = spHandle;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
@@ -109,6 +139,9 @@ namespace voltdb
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
+        int64_t m_startSpHandle;
+        int64_t m_lastSpHandle;
+        int64_t m_lastCommittedSpHandle;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;
