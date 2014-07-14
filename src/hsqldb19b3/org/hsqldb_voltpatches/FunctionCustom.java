@@ -164,7 +164,7 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.DAYOFWEEK, FUNC_EXTRACT);
         customRegularFuncMap.put(Tokens.DAYOFYEAR, FUNC_EXTRACT);
         customRegularFuncMap.put(Tokens.QUARTER, FUNC_EXTRACT);
-        customRegularFuncMap.put(Tokens.WEEK_OF_YEAR, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.WEEK, FUNC_EXTRACT);
         customRegularFuncMap.put(Tokens.SECONDS_MIDNIGHT, FUNC_EXTRACT);
         customRegularFuncMap.put(Tokens.LTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.RTRIM, FUNC_TRIM_CHAR);
