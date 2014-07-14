@@ -255,7 +255,6 @@ public class VoltProjectBuilder {
     private String m_snapshotFrequency = null;
     private String m_pathToDeployment = null;
     private String m_voltRootPath = null;
-    private String m_canonicalDDL = null;
 
     private boolean m_ppdEnabled = false;
     private String m_ppdPrefix = "none";
@@ -608,11 +607,6 @@ public class VoltProjectBuilder {
                        m_ppdEnabled,  m_snapshotPath, m_ppdPrefix);
     }
 
-
-    public String getCanonicalDDL() {
-        return m_canonicalDDL;
-    }
-
     public boolean compile(final VoltCompiler compiler,
                            final String jarPath,
                            final String voltRoot,
@@ -712,9 +706,6 @@ public class VoltProjectBuilder {
             compiler.enableDetailedCapture();
         }
         boolean success = compiler.compileWithProjectXML(projectPath, jarPath);
-        if(success) {
-            m_canonicalDDL = compiler.getCanonicalDDL();
-        }
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {

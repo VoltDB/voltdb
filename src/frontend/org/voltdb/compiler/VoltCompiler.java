@@ -137,7 +137,7 @@ public class VoltCompiler {
     // generated html text for catalog report
     String m_report = null;
     String m_reportPath = null;
-    String m_canonicalDDL = null;
+    static String m_canonicalDDL = null;
     Catalog m_catalog = null;
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();

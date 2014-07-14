@@ -23,6 +23,8 @@
 
 package org.voltdb.canonicalddl;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -30,6 +32,7 @@ import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -41,15 +44,13 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
     public String getFirstCanonicalDDL() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
 
+        VoltCompiler compiler = new VoltCompiler();
         final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("fullDDL.sql");
-        String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        builder.addSchema(schemaPath);
-
-        boolean success = builder.compile(pathToCatalog);
+        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
+        boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
         assertTrue(success);
-        return builder.getCanonicalDDL();
+        return compiler.getCanonicalDDL();
     }
 
     public String getSecondCanonicalDDL() throws Exception
@@ -57,13 +58,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
+        VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
-        String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        builder.addSchema(schemaPath);
-
-        boolean success = builder.compile(pathToCatalog);
+        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
+        builder.setUseAdhocSchema(true);
+        boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
+        assertTrue(success);
+System.out.println(pathToCatalog);
+System.out.println(pathToSchema);
+System.out.println(success);
+        success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
@@ -73,23 +79,24 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         startSystem(config);
 
-        System.out.println(firstCanonicalDDL);
-
-//        ClientResponse resp = m_client.callProcedure("@AdHoc", firstCanonicalDDL);
-//        System.out.println(resp.getResults()[0]);
+        m_client.callProcedure("@AdHoc", firstCanonicalDDL);
 
         teardownSystem();
-        return builder.getCanonicalDDL();
+        return compiler.getCanonicalDDL();
     }
 
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
 
+        FileOutputStream fos1 = new FileOutputStream(new File("/home/yhe/1.txt"));
         firstCanonicalDDL = getFirstCanonicalDDL();
+        fos1.write(firstCanonicalDDL.getBytes());
+
+        FileOutputStream fos2 = new FileOutputStream(new File("/home/yhe/2.txt"));
         secondCanonicalDDL = getSecondCanonicalDDL();
-//        System.out.println(firstCanonicalDDL);
-//        System.out.println("===============");
-//        System.out.println(secondCanonicalDDL);
+        fos2.write(secondCanonicalDDL.getBytes());
+
+        assertEquals(firstCanonicalDDL, secondCanonicalDDL);
     }
 
 }

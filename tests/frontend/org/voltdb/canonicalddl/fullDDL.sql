@@ -8,33 +8,11 @@ CREATE TABLE T1
 ,   volume INTEGER
 );
 
-CREATE UNIQUE INDEX area 
+CREATE INDEX area 
 ON 
 T1 
 (
     width * length
-);
-
-CREATE TABLE T2
-(
-    width INTEGER
-,   length INTEGER
-,   area INTEGER NOT NULL
-,   volume INTEGER
-);
-
-PARTITION TABLE T2 
-ON 
-COLUMN 
-    area
-;
-
-CREATE ASSUMEUNIQUE INDEX absVal 
-ON 
-T2
-(
-    ABS(area * 2)
-,   ABS(volume / 2)
 );
 
 -- hash index
@@ -46,14 +24,14 @@ CREATE TABLE T3
 ,   id INTEGER
 );
 
-CREATE UNIQUE INDEX abs_Hash_idx 
+CREATE INDEX abs_Hash_idx 
 ON 
 T3 
 (
     ABS(val)
 );
 
-CREATE UNIQUE INDEX nomeaninghashweirdidx 
+CREATE INDEX nomeaninghashweirdidx 
 ON 
 T3 
 (
@@ -73,78 +51,6 @@ T3
     )
 ,   id
 );
-
-
--- CREATE ROLE
--- basic
-
-CREATE ROLE guest;
-
-CREATE ROLE user 
-WITH 
-    adhoc
-,   defaultproc;
-
-CREATE ROLE admin 
-WITH 
-    sysproc
-,   adhoc
-,   defaultproc;
-
-
--- CREATE PROCEDURE AS
--- as sql stmt
-
-CREATE TABLE User 
-(
-    age INTEGER
-,   name VARCHAR(20)
-);
-
-CREATE PROCEDURE p1 
-ALLOW 
-    admin
-AS 
-    SELECT COUNT(*)
-         , name 
-    FROM User 
-    WHERE age = ?
-    GROUP BY name
-;
-
-CREATE PROCEDURE p2 
-ALLOW 
-    admin
-AS 
-    INSERT INTO User 
-    VALUES (?, ?)
-;
-
--- as source code
-
-CREATE PROCEDURE p3 
-ALLOW 
-    admin 
-AS 
-    ###
-    stmt = new SQLStmt('SELECT age, name FROM User WHERE age = ?')
-    transactOn = { int key -> 
-                   voltQueueSQL(stmt,key)
-                   voltExecuteSQL(true)
-	             }
-    ### LANGUAGE GROOVY
-;
-
-
--- CREATE PROCEDURE FROM CLASS
--- basic
-
-CREATE PROCEDURE 
-ALLOW 
-    admin 
-FROM CLASS 
-    org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
-;
 
 
 -- CREATE TABLE
@@ -222,17 +128,6 @@ CREATE TABLE T11
     )
 );
 
-PARTITION TABLE T12 ON COLUMN C1;
-CREATE TABLE T12 
-(
-    C1 INTEGER NOT NULL
-,   C2 INTEGER DEFAULT 123 NOT NULL
-,   CONSTRAINT au ASSUMEUNIQUE
-    (
-        C2
-    )
-);
-
 -- table constraints
 
 CREATE TABLE T13 
@@ -248,17 +143,6 @@ CREATE TABLE T14
 (
     C INTEGER
 ,   CONSTRAINT uni1 UNIQUE
-    (
-        C
-    )
-);
-
-PARTITION TABLE T15 ON COLUMN C2;
-CREATE TABLE T15 
-(
-    C INTEGER
-,   C2 TINYINT NOT NULL
-,   CONSTRAINT assumeuni ASSUMEUNIQUE
     (
         C
     )
@@ -290,16 +174,6 @@ CREATE TABLE T18
     )
 );
 
-PARTITION TABLE T19 ON COLUMN C2;
-CREATE TABLE T19 
-(
-    C INTEGER
-,   C2 TINYINT NOT NULL
-,   ASSUMEUNIQUE
-    (
-        C
-    )
-);
 
 CREATE TABLE T20 
 (
@@ -309,26 +183,6 @@ CREATE TABLE T20
 
 
 -- both column and table constraints
-
-PARTITION TABLE T21 ON COLUMN C3;
-CREATE TABLE T21 
-(
-    C1 TINYINT DEFAULT 127 NOT NULL
-,   C2 SMALLINT DEFAULT 32767 NOT NULL
-,   C3 INTEGER DEFAULT 2147483647 NOT NULL
-,   C4 BIGINT NOT NULL
-,   C5 FLOAT NOT NULL
-,   C6 DECIMAL ASSUMEUNIQUE NOT NULL
-,   C7 VARCHAR(32) NOT NULL
-,   C8 VARBINARY(32) NOT NULL
-,   C9 TIMESTAMP DEFAULT NOW NOT NULL
-,   C10 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,   ASSUMEUNIQUE 
-    (
-        C1
-    ,   C9
-    )
-);
 
 CREATE TABLE T22 
 (
@@ -417,70 +271,3 @@ AS
     GROUP BY C1
           ,  C2
 ;
-
-
--- EXPORT TABLE
--- basic
-
-CREATE TABLE T25 
-(
-    id INTEGER NOT NULL
-);
-EXPORT TABLE T25;
-
-
--- IMPORT CLASS
--- basic
-
-IMPORT CLASS org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;
-CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testImportProc;
-
-
--- PARTITION PROCEDURE
--- basic
-
-CREATE TABLE T26 
-(
-    age BIGINT NOT NULL
-,   gender TINYINT
-);
-
-CREATE PROCEDURE p4 
-ALLOW 
-    admin 
-AS 
-    SELECT COUNT(*) 
-    FROM T26 
-    WHERE age = ?;
-    
-PARTITION TABLE T26 ON COLUMN age;
-
-PARTITION PROCEDURE p4 
-ON 
-TABLE 
-    T26 
-COLUMN 
-    age 
-PARAMETER 
-    0
-;
-
-PARTITION PROCEDURE testCreateProcFromClassProc 
-ON 
-TABLE 
-    T26 
-COLUMN 
-    age
-;
-
-
--- PARTITION TABLE
--- basic
-
-CREATE TABLE T27 
-(
-    C INTEGER NOT NULL
-);
-
-PARTITION TABLE T27 ON COLUMN C;
-
