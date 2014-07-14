@@ -2109,7 +2109,7 @@ public class Tokens {
         // A VoltDB extension to extract timestamp field function
         commandSet.put(T_DAYOFWEEK, DAYOFWEEK);
         commandSet.put(T_DAYOFYEAR, DAYOFYEAR);
-        commandSet.put(T_WEEK, WEEK_OF_YEAR);
+        commandSet.put(T_WEEK, WEEK);
         commandSet.put(T_WEEK_OF_YEAR, WEEK_OF_YEAR);
         // end of extension
         commandSet.put(T_DAY_NAME, DAY_NAME);
