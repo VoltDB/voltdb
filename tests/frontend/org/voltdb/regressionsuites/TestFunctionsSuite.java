@@ -3216,7 +3216,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         } catch (IOException e) {
             assertFalse(true);
         }
-/*
+
         project.addStmtProcedure("WHERE_ABS", "select count(*) from P1 where ABS(ID) > 9");
         project.addStmtProcedure("WHERE_ABSFF", "select count(*) from P1 where ABS(ID - 0.4) > 9.5");
         project.addStmtProcedure("WHERE_ABSIF", "select count(*) from P1 where ABS(ID) > 9.5");
@@ -3539,7 +3539,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
-*/
+
         project.addStmtProcedure("GET_YEAR", "select id, YEAR(PAST) from P1 order by id");
         project.addStmtProcedure("GET_MONTH", "select id, MONTH(PAST) from P1 order by id");
         project.addStmtProcedure("GET_DAY", "select id, DAY(PAST) from P1 order by id");
@@ -3547,12 +3547,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("GET_MINUTE", "select id, MINUTE(PAST) from P1 order by id");
         project.addStmtProcedure("GET_SECOND", "select id, cast(SECOND(PAST) as VARCHAR) from P1 order by id");
         project.addStmtProcedure("GET_QUARTER", "select id, QUARTER(PAST) from P1 order by id");
-        // TODO: enable these in the parser
-        //project.addStmtProcedure("GET_DAY_NAME", "select id, DAY_NAME(PAST) from P1 order by id");
-        //project.addStmtProcedure("GET_MONTH_NAME", "select id, MONTH_NAME(PAST) from P1 order by id");
-        //project.addStmtProcedure("GET_DAY_OF_WEEK", "select id, DAY_OF_WEEK(PAST) from P1 order by id");
-        //project.addStmtProcedure("GET_DAY_OF_MONTH", "select id, DAY_OF_MONTH(PAST) from P1 order by id");
-        //project.addStmtProcedure("GET_DAY_OF_YEAR", "select id, DAY_OF_YEAR(PAST) from P1 order by id");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
