@@ -277,6 +277,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // only GROUP BY cols in SELECT clause
         pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
+        printExplainPlan(pns);
         checkGroupByOnlyPlan(false, false, true);
 
         // SELECT cols in GROUP BY and other aggregate cols
@@ -1307,6 +1308,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
                         p instanceof AbstractJoinPlanNode);
             }
         }
+
+    }
+
+
+    public void testPartialSerialAggregate() {
+        String sql;
+        // Has index on F_D1, serial aggregate on F_D1 and hash aggregate on F_D2
+        sql = "SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2";
+        pns = compileToFragments(sql);
+        printExplainPlan(pns);
+
+//        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+//            "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+//            "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+//            "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
+//        pns = compileToFragments(sql);
+//        printExplainPlan(pns);
+
 
     }
 }

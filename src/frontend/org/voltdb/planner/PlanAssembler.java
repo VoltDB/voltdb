@@ -1432,6 +1432,82 @@ public class PlanAssembler {
         return root;
     }
 
+    private AbstractPlanNode findSeqScanCandidateForGroupBy(AbstractPlanNode candidate) {
+        if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
+                ! candidate.isSubQuery()) {
+            // scan on sub-query does not support index, early exit here
+            return candidate;
+        }
+
+        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
+            assert(candidate.getChildCount() == 2);
+            return findSeqScanCandidateForGroupBy(candidate.getChild(1));
+        }
+
+        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            return findSeqScanCandidateForGroupBy(candidate.getChild(0));
+        }
+
+        return null;
+    }
+
+    class IndexGroupByInfo {
+        boolean m_distributedChanged = false;
+        AbstractPlanNode m_indexAccess = null;
+
+        boolean m_isIndexScanPlanRoot = false;
+    }
+
+    /**
+     *
+     * @param candidate
+     * @return
+     */
+    private boolean processIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
+        // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+        // by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
+        // down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node,
+        // but it shouldn't hurt (much?) anyway.
+
+        // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+        // by the GROUP BY keys.
+
+        if (! m_parsedSelect.isGrouped()) {
+            return false;
+        }
+
+        AbstractPlanNode sourceSeqScan = findSeqScanCandidateForGroupBy(candidate);
+        if (sourceSeqScan == null) {
+            return false;
+        }
+        assert(sourceSeqScan instanceof SeqScanPlanNode);
+
+        AbstractPlanNode parent = null;
+        if (sourceSeqScan.getParentCount() > 0) {
+            parent = sourceSeqScan.getParent(0);
+        }
+        AbstractPlanNode indexAccess = indexAccessForGroupByExprs(sourceSeqScan);
+
+        if (indexAccess.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
+            // does not find proper index to replace sequential scan
+            return false;
+        }
+
+        gbInfo.m_indexAccess = indexAccess;
+        if (parent == null) {
+            gbInfo.m_isIndexScanPlanRoot = true;
+        } else {
+            // have a parent and would like to replace the sequential scan to index scan
+            indexAccess.clearParents();
+            parent.clearChildren();
+            parent.addAndLinkChild(indexAccess);
+
+            gbInfo.m_distributedChanged = true;
+        }
+
+        return true;
+    }
+
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         AggregatePlanNode aggNode = null;
 
@@ -1441,30 +1517,18 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        boolean indexScanForGroupingOnly = false;
         if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode topAggNode = null;
+            IndexGroupByInfo gbInfo = new IndexGroupByInfo();
+
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
-                // by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
-                // down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node,
-                // but it shouldn't hurt (much?) anyway.
-                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
-                    candidate = indexAccessForGroupByExprs(candidate);
-                    if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-                        candidate.clearParents();
-                        root.getChild(0).clearChildren();
-                        root.getChild(0).addAndLinkChild(candidate);
-                        indexScanForGroupingOnly = true;
-                    }
-                }
+                processIndexScanForGroupBy(candidate, gbInfo);
+
+            } else if (processIndexScanForGroupBy(root, gbInfo) && gbInfo.m_isIndexScanPlanRoot) {
+                root = gbInfo.m_indexAccess;
             }
-            else if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
-                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
-                // by the GROUP BY keys.
-                root = indexAccessForGroupByExprs(root);
-            }
+
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
@@ -1519,7 +1583,7 @@ public class PlanAssembler {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     aggNode = new HashAggregatePlanNode();
                 } else {
-                    if (indexScanForGroupingOnly) {
+                    if (gbInfo.m_distributedChanged) {
                         assert(root instanceof ReceivePlanNode);
                         aggNode = new AggregatePlanNode();
                     } else {
