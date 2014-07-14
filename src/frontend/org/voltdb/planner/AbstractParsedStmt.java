@@ -20,7 +20,6 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -180,24 +179,27 @@ public abstract class AbstractParsedStmt {
      */
     abstract void parse(VoltXMLElement stmtElement);
 
-    void parseTargetColumns(VoltXMLElement columnsNode, Table table, List<String> targetNames, HashMap<Column, AbstractExpression> columns)
+    void parseTargetColumns(VoltXMLElement columnsNode, Table table, HashMap<Column, AbstractExpression> columns)
     {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("column"));
 
             String name = child.attributes.get("name");
             assert(name != null);
-            if (targetNames != null) {
-                targetNames.add(name);
-            }
             Column col = table.getColumns().getExact(name.trim());
 
-            assert(child.children.size() == 1);
-            VoltXMLElement subChild = child.children.get(0);
-            AbstractExpression expr = parseExpressionTree(subChild);
-            assert(expr != null);
-            expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
-            ExpressionUtil.finalizeValueTypes(expr);
+            // May be no children of column node in the case of
+            //   INSERT INTO ... SELECT ...
+
+            AbstractExpression expr = null;
+            if (child.children.size() != 0) {
+                assert(child.children.size() == 1);
+                VoltXMLElement subChild = child.children.get(0);
+                expr = parseExpressionTree(subChild);
+                assert(expr != null);
+                expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                ExpressionUtil.finalizeValueTypes(expr);
+            }
             columns.put(col, expr);
         }
     }

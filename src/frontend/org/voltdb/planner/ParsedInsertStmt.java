@@ -17,16 +17,17 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 
 /**
  *
@@ -41,8 +42,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * specified the columns.
      */
     public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
-    final List<String> m_targetNames =  new ArrayList<String>();
-    private AbstractParsedStmt m_subselect;
+    private ParsedSelectStmt m_subselect;
 
     /**
     * Class constructor
@@ -67,16 +67,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(node, table, m_targetNames, m_columns);
-            }
-            else if (node.name.equalsIgnoreCase("targets")) {
-                for (VoltXMLElement nameNode : node.children) {
-                    assert(nameNode.name.equals("column"));
-                    String name = nameNode.attributes.get("name");
-                    assert(name != null);
-                    m_targetNames.add(name);
-                    assert(nameNode.children.isEmpty());
-                }
+                parseTargetColumns(node, table, m_columns);
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 // TODO: When INSERT ... SELECT is supported, it's unclear whether the source tables need to be
@@ -84,17 +75,17 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 // and how the target table would then be distinguished
                 // (positionally? in a separate member?) and/or how soon thereafter the SELECT
                 // clause will need to allow joins.
-                m_subselect = parseSubquery(node);
+                m_subselect = (ParsedSelectStmt)parseSubquery(node);
             }
             else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
-                        "The table '" + tableName +
-                        "' must not be updated directly from a UNION or other set operation.");
+                        "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
             // else ... assert if there are unexpected child elements of the insert node?
         }
-        if (m_subselect != null) {
 
+        if (m_subselect != null) {
+            // Put other static checks here?  What belongs here and what belongs in PlanAssembler?
         }
     }
 
@@ -104,8 +95,11 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         retval += "COLUMNS:\n";
         for (Entry<Column, AbstractExpression> col : m_columns.entrySet()) {
-            retval += "\tColumn: " + col.getKey().getTypeName() + ": ";
-            retval += col.getValue().toString() + "\n";
+            retval += "\tColumn: " + col.getKey().getTypeName();
+            if (col.getValue() != null) {
+                retval += ": " + col.getValue().toString();
+            }
+            retval += "\n";
         }
 
         if (m_subselect != null) {
@@ -115,8 +109,72 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return retval;
     }
 
-    public AbstractExpression getValuesExpression(Column column) {
-        return m_columns.get(column);
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, name , id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
+    public AbstractExpression getExpressionForPartitioning(Column column) {
+        AbstractExpression expr = null;
+        if (m_subselect != null) {
+            // Currently insert into select is only supported for the SP/SP case.
+            return null;
+        }
+        else {
+            expr = m_columns.get(column);
+            if (expr == null) {
+                expr = defaultValueToExpr(column);
+            }
+        }
+
+        assert(expr != null);
+        return expr;
     }
 
     /**

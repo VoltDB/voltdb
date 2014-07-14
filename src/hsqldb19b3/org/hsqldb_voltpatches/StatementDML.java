@@ -1253,12 +1253,7 @@ public class StatementDML extends StatementDMQL {
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        VoltXMLElement columns;
-        if (expressions == null) {
-            columns = new VoltXMLElement("targets");
-        } else {
-            columns = new VoltXMLElement("columns");
-        }
+        VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
 
         for (int i = 0; i < columnMap.length; i++)
@@ -1319,6 +1314,9 @@ public class StatementDML extends StatementDMQL {
 
         case StatementTypes.INSERT :
             xml = new VoltXMLElement("insert");
+
+            assert(insertExpression != null || queryExpression != null);
+
             if (queryExpression == null) {
                 voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
             } else {
@@ -1326,8 +1324,6 @@ public class StatementDML extends StatementDMQL {
                 VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
                 xml.children.add(child);
             }
-            // INSERT has no child node or condition,
-            // UNTIL we support "INSERT INTO <table> SELECT ... FROM ... WHERE..."
             break;
 
         case StatementTypes.UPDATE_CURSOR :
