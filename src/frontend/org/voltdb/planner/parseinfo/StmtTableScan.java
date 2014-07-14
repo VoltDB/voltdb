@@ -84,4 +84,6 @@ public abstract class StmtTableScan {
         }
     }
 
+    abstract public boolean isPartitionedOnColumnIndex(int columnIndex);
+
 }

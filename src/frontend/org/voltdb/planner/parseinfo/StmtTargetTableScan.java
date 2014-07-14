@@ -117,4 +117,20 @@ public class StmtTargetTableScan extends StmtTableScan {
     public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
     }
+
+    //This column index is being treated as the index into the table,
+    // not any particular projection of the table
+    // -- that is, particularly, NOT the list of columns currently in use by the statement.
+    @Override
+    public boolean isPartitionedOnColumnIndex(int columnIndex) {
+        if (m_table.getIsreplicated()) {
+            return false;
+        }
+        Column partitionCol = m_table.getPartitioncolumn();
+        if (partitionCol == null) {
+            return false;
+        }
+        return partitionCol.getIndex() == columnIndex;
+    }
+
 }
