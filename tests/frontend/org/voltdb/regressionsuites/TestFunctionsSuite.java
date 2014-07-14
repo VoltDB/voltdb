@@ -3034,6 +3034,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("STARTING test functions extracting fields in timestamp ...");
         Client cl = getClient();
         VoltTable result;
+        String sql;
 
         ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null, Timestamp.valueOf("2014-07-15 01:02:03.456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -3042,32 +3043,23 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = cl.callProcedure("P1.insert", 2, null, null, null, Timestamp.valueOf("2012-12-31 12:59:30"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = cl.callProcedure("GET_YEAR");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
+        sql = "select id, YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
 
-        cr = cl.callProcedure("GET_MONTH");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 7}, {1, 2}, {2, 12}});
+        sql = "select id, MONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 7}, {1, 2}, {2, 12}});
 
-        cr = cl.callProcedure("GET_DAY");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 15}, {1, 29}, {2, 31}});
+        sql = "select id, DAY(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 15}, {1, 29}, {2, 31}});
 
-        cr = cl.callProcedure("GET_HOUR");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 1}, {1, 12}, {2, 12}});
+        sql = "select id, HOUR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 1}, {1, 12}, {2, 12}});
 
-        cr = cl.callProcedure("GET_MINUTE");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 2}, {1, 20}, {2, 59}});
+        sql = "select id, MINUTE(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2}, {1, 20}, {2, 59}});
 
-        cr = cl.callProcedure("GET_SECOND");
+        sql = "select id, cast(SECOND(past) as VARCHAR) from p1 order by id;";
+        cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         if (isHSQL()) {
@@ -3077,13 +3069,10 @@ public class TestFunctionsSuite extends RegressionSuite {
             validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000", "30.000000000000"});
         }
 
+        sql = "select id, QUARTER(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 3}, {1, 1}, {2, 4}});
 
-        cr = cl.callProcedure("GET_QUARTER");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{0, 3}, {1, 1}, {2, 4}});
-
-        String sql = "select DAY_OF_WEEK(past) from p1 order by id;";
+        sql = "select DAY_OF_WEEK(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
         sql = "select DAYOFWEEK(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
@@ -3539,14 +3528,6 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
-
-        project.addStmtProcedure("GET_YEAR", "select id, YEAR(PAST) from P1 order by id");
-        project.addStmtProcedure("GET_MONTH", "select id, MONTH(PAST) from P1 order by id");
-        project.addStmtProcedure("GET_DAY", "select id, DAY(PAST) from P1 order by id");
-        project.addStmtProcedure("GET_HOUR", "select id, HOUR(PAST) from P1 order by id");
-        project.addStmtProcedure("GET_MINUTE", "select id, MINUTE(PAST) from P1 order by id");
-        project.addStmtProcedure("GET_SECOND", "select id, cast(SECOND(PAST) as VARCHAR) from P1 order by id");
-        project.addStmtProcedure("GET_QUARTER", "select id, QUARTER(PAST) from P1 order by id");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

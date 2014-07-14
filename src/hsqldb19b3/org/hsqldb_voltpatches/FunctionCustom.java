@@ -169,7 +169,12 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.LTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.RTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.LEFT, FUNC_LEFT);
-
+        // A VoltDB extension to extract timestamp field function
+        customRegularFuncMap.put(Tokens.DAY_OF_WEEK, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.DAY_OF_MONTH, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.DAY_OF_YEAR, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.WEEK_OF_YEAR, FUNC_EXTRACT);
+        // end of extension
         //
         customRegularFuncMap.put(Tokens.IDENTITY, FUNC_IDENTITY);
         customRegularFuncMap.put(Tokens.TIMESTAMPADD, FUNC_TIMESTAMPADD);
@@ -312,6 +317,7 @@ public class FunctionCustom extends FunctionSQL {
                     break;
 
                 case Tokens.DAYOFMONTH :
+                case Tokens.DAY_OF_MONTH:
                     function.extractSpec = Tokens.DAY;
                     break;
 
