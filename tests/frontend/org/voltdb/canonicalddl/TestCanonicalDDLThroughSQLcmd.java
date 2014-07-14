@@ -63,15 +63,25 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
+
+        boolean success;
+
+
         builder.setUseAdhocSchema(true);
-        boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
-        assertTrue(success);
-System.out.println(pathToCatalog);
-System.out.println(pathToSchema);
-System.out.println(success);
+        builder.addLiteralSchema("--nothing");
         success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+
+
+
+        success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
+        assertTrue(success);
+
+
+
+
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
