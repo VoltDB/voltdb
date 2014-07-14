@@ -58,7 +58,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         "will you still free me (will memcheck see me) when Im sixty-four";
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
-    public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
+    public void notestFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
         Client client = getClient();
         ClientResponse cr = null;
@@ -87,7 +87,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testStringExpressionIndex() throws Exception {
+    public void notestStringExpressionIndex() throws Exception {
         System.out.println("STARTING testStringExpressionIndex");
         Client client = getClient();
         initialLoad(client, "P1");
@@ -161,7 +161,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void testNumericExpressionIndex() throws Exception {
+    public void notestNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
@@ -248,7 +248,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testAbsWithLimit_ENG3572() throws Exception
+    public void notestAbsWithLimit_ENG3572() throws Exception
     {
         System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
@@ -298,7 +298,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testAbs() throws Exception
+    public void notestAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
@@ -563,7 +563,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals( ! isHSQL(), caught);
     }
 
-    public void testSubstring() throws Exception
+    public void notestSubstring() throws Exception
     {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
@@ -719,7 +719,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testCurrentTimestamp() throws Exception
+    public void notestCurrentTimestamp() throws Exception
     {
         System.out.println("STARTING testCurrentTimestamp");
         /**
@@ -762,7 +762,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 
-    public void testTimestampConversions() throws Exception
+    public void notestTimestampConversions() throws Exception
     {
         Client client = getClient();
         ClientResponse cr = null;
@@ -1054,7 +1054,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(EXPECTED_SECONDS, decimalResult);
     }
 
-    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestParams() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING testParams");
         Client client = getClient();
         ClientResponse cr;
@@ -1429,7 +1429,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of " + fname);
     }
 
-    public void testManyNumericFunctions() throws Exception
+    public void notestManyNumericFunctions() throws Exception
     {
         subtestFromVarCharCasts();
         subtestToVarCharCasts();
@@ -1920,7 +1920,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Left and Right");
         Client client = getClient();
         ClientResponse cr;
@@ -2037,7 +2037,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestSpace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2069,7 +2069,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2131,7 +2131,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 //        }
     }
 
-    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestTrim() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Trim");
         Client client = getClient();
         ClientResponse cr;
@@ -2292,7 +2292,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
         ClientResponse cr;
@@ -2323,7 +2323,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("foofoofoo", result.getString(1));
     }
 
-    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestReplace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Replace");
         Client client = getClient();
         ClientResponse cr;
@@ -2367,7 +2367,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
-    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestOverlay() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Overlay");
         Client client = getClient();
         ClientResponse cr;
@@ -2525,7 +2525,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // Unicode character to UTF8 string character
-    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestChar() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test CHAR");
         Client client = getClient();
         ClientResponse cr;
@@ -2559,7 +2559,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(1));
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
         ClientResponse cr;
@@ -2598,7 +2598,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void testCaseWhen() throws Exception {
+    public void notestCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
         VoltTable vt;
@@ -2743,7 +2743,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testCaseWhenLikeDecodeFunction() throws Exception {
+    public void notestCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
         String sql;
@@ -2979,8 +2979,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
     }
 
-    public void testCoalesce() throws Exception {
-        System.out.println("STARTING test Case COALESCE function...");
+    public void notestCoalesce() throws Exception {
+        System.out.println("STARTING test COALESCE function...");
         Client cl = getClient();
 
         // one row with three sets of nulls
@@ -3028,6 +3028,81 @@ public class TestFunctionsSuite extends RegressionSuite {
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data types"));
         }
+    }
+
+    public void testManyExtractTimeFieldFunction() throws Exception {
+        System.out.println("STARTING test functions extracting fields in timestamp ...");
+        Client cl = getClient();
+        VoltTable result;
+
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null, Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 1, null, null, null, Timestamp.valueOf("2012-02-29 12:20:30.123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 2, null, null, null, Timestamp.valueOf("2012-12-31 12:59:30"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = cl.callProcedure("GET_YEAR");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
+
+        cr = cl.callProcedure("GET_MONTH");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 7}, {1, 2}, {2, 12}});
+
+        cr = cl.callProcedure("GET_DAY");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 15}, {1, 29}, {2, 31}});
+
+        cr = cl.callProcedure("GET_HOUR");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 1}, {1, 12}, {2, 12}});
+
+        cr = cl.callProcedure("GET_MINUTE");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 2}, {1, 20}, {2, 59}});
+
+        cr = cl.callProcedure("GET_SECOND");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        if (isHSQL()) {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000", "30.123000", "30.000000"});
+        }
+        else {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000", "30.000000000000"});
+        }
+
+
+        cr = cl.callProcedure("GET_QUARTER");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 3}, {1, 1}, {2, 4}});
+
+        String sql = "select DAY_OF_WEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        sql = "select DAYOFWEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+
+        sql = "select DAY_OF_MONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+        sql = "select DAYOFMONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+
+        sql = "select DAY_OF_YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
+        sql = "select DAYOFYEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
+
+        // TODO: Is 12-31th the 52th week of a year, or the first week of the year?
+        sql = "select WEEK_OF_YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
+        sql = "select WEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
     }
 
     //
@@ -3141,7 +3216,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         } catch (IOException e) {
             assertFalse(true);
         }
-
+/*
         project.addStmtProcedure("WHERE_ABS", "select count(*) from P1 where ABS(ID) > 9");
         project.addStmtProcedure("WHERE_ABSFF", "select count(*) from P1 where ABS(ID - 0.4) > 9.5");
         project.addStmtProcedure("WHERE_ABSIF", "select count(*) from P1 where ABS(ID) > 9.5");
@@ -3464,6 +3539,20 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
+*/
+        project.addStmtProcedure("GET_YEAR", "select id, YEAR(PAST) from P1 order by id");
+        project.addStmtProcedure("GET_MONTH", "select id, MONTH(PAST) from P1 order by id");
+        project.addStmtProcedure("GET_DAY", "select id, DAY(PAST) from P1 order by id");
+        project.addStmtProcedure("GET_HOUR", "select id, HOUR(PAST) from P1 order by id");
+        project.addStmtProcedure("GET_MINUTE", "select id, MINUTE(PAST) from P1 order by id");
+        project.addStmtProcedure("GET_SECOND", "select id, cast(SECOND(PAST) as VARCHAR) from P1 order by id");
+        project.addStmtProcedure("GET_QUARTER", "select id, QUARTER(PAST) from P1 order by id");
+        // TODO: enable these in the parser
+        //project.addStmtProcedure("GET_DAY_NAME", "select id, DAY_NAME(PAST) from P1 order by id");
+        //project.addStmtProcedure("GET_MONTH_NAME", "select id, MONTH_NAME(PAST) from P1 order by id");
+        //project.addStmtProcedure("GET_DAY_OF_WEEK", "select id, DAY_OF_WEEK(PAST) from P1 order by id");
+        //project.addStmtProcedure("GET_DAY_OF_MONTH", "select id, DAY_OF_MONTH(PAST) from P1 order by id");
+        //project.addStmtProcedure("GET_DAY_OF_YEAR", "select id, DAY_OF_YEAR(PAST) from P1 order by id");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

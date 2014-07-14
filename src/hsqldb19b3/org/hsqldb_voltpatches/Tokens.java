@@ -2106,13 +2106,19 @@ public class Tokens {
         commandSet.put(T_ZONE, ZONE);
 
         //
-        commandSet.put(T_DAY_NAME, DAY_NAME);
-        commandSet.put(T_MONTH_NAME, MONTH_NAME);
+        // A VotDB extension to extract timestamp field function
+        commandSet.put(T_DAY_NAME, DAYNAME);
+        commandSet.put(T_MONTH_NAME, NONTHNAME);
         commandSet.put(T_QUARTER, QUARTER);
-        commandSet.put(T_DAY_OF_WEEK, DAY_OF_WEEK);
-        commandSet.put(T_DAY_OF_MONTH, DAY_OF_MONTH);
-        commandSet.put(T_DAY_OF_YEAR, DAY_OF_YEAR);
+        commandSet.put(T_DAY_OF_WEEK, DAYOFWEEK);
+        commandSet.put(T_DAY_OF_MONTH, DAYOFMONTH);
+        commandSet.put(T_DAY_OF_YEAR, DAYOFYEAR);
         commandSet.put(T_DAYOFMONTH, DAYOFMONTH);
+        commandSet.put(T_DAYOFWEEK, DAYOFWEEK);
+        commandSet.put(T_DAYOFYEAR, DAYOFYEAR);
+        commandSet.put(T_WEEK, WEEK_OF_YEAR);
+        commandSet.put(T_WEEK_OF_YEAR, WEEK_OF_YEAR);
+        // end of extension
         commandSet.put(T_BITLENGTH, BITLENGTH);
         commandSet.put(T_OCTETLENGTH, OCTETLENGTH);
         commandSet.put(T_ACOS, ACOS);
