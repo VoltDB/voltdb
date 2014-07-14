@@ -669,15 +669,11 @@ public class SQLCommand
                     else if (paramType.equals("sysinfoselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!SysInfoSelectors.contains(p))
-                            throw new Exception("Invalid SysInfo Selector: " + param);
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("metadataselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!MetaDataSelectors.contains(p))
-                            throw new Exception("Invalid Meta-Data Selector: " + param);
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
@@ -790,10 +786,6 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
-    private static final List<String> MetaDataSelectors =
-        Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
-                      "PROCEDURES", "PROCEDURECOLUMNS");
     private static Map<String,Map<Integer, List<String>>> Procedures =
             Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
     private static void loadSystemProcedures()
