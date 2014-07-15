@@ -1516,6 +1516,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+        hmconfig.startAction = m_config.m_startAction;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
