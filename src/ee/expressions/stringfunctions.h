@@ -20,6 +20,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
+#include <boost/scoped_array.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -270,8 +271,8 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     }
 
     size_t cur = 0;
-    // TODO: use smart pointer here
-    char *buffer = new char[size];
+    boost::scoped_array<char> smart(new char[size]);
+    char *buffer = smart.get();
     for(std::vector<NValue>::const_iterator iter = arguments.begin(); iter !=arguments.end(); iter++) {
         size_t cur_size = iter->getObjectLength_withoutNull();
         char *next = reinterpret_cast<char*>(iter->getObjectValue_withoutNull());
@@ -280,7 +281,6 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     }
 
     NValue rv = getTempStringValue(buffer, cur);
-    delete buffer;
     return rv;
 }
 
