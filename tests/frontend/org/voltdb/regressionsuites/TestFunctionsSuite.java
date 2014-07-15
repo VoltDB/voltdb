@@ -3036,7 +3036,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         VoltTable result;
         String sql;
 
-        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null, Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = cl.callProcedure("P1.insert", 1, null, null, null, Timestamp.valueOf("2012-02-29 12:20:30.123"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -3066,7 +3067,8 @@ public class TestFunctionsSuite extends RegressionSuite {
             validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000", "30.123000", "30.000000"});
         }
         else {
-            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000", "30.000000000000"});
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000",
+                    "30.000000000000"});
         }
 
         sql = "select id, QUARTER(past) from p1 order by id;";
@@ -3087,7 +3089,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         sql = "select DAYOFYEAR(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
 
-        // TODO: Is 12-31th the 52th week of a year, or the first week of the year?
+        // WEEK 1 is often the correct answer for the last day of the year.
+        // See https://en.wikipedia.org/wiki/ISO_week_year#Last_week
         sql = "select WEEK_OF_YEAR(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
         sql = "select WEEK(past) from p1 order by id;";
