@@ -23,8 +23,6 @@
 
 package org.voltdb.canonicalddl;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -63,25 +61,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
-
         boolean success;
 
-
+        // Use VoltProjectBuilder to write catalog and deployment.xml
         builder.setUseAdhocSchema(true);
         builder.addLiteralSchema("--nothing");
         success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-
-
-
+        // User VoltCompiler to replace the catalog
         success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
         assertTrue(success);
-
-
-
-
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
@@ -97,14 +88,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
-
-        FileOutputStream fos1 = new FileOutputStream(new File("/home/yhe/1.txt"));
         firstCanonicalDDL = getFirstCanonicalDDL();
-        fos1.write(firstCanonicalDDL.getBytes());
-
-        FileOutputStream fos2 = new FileOutputStream(new File("/home/yhe/2.txt"));
         secondCanonicalDDL = getSecondCanonicalDDL();
-        fos2.write(secondCanonicalDDL.getBytes());
 
         assertEquals(firstCanonicalDDL, secondCanonicalDDL);
     }
