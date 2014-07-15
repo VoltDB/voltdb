@@ -449,8 +449,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     }
                 }
             }
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Validation of start action fails", false, e);
+        } catch (KeeperException e) {
+            logger.error("Failed to validate the start actions", e);
+        } catch (InterruptedException e) {
+            logger.error("Interrupted during start action validation", e);
         }
     }
 

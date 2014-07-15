@@ -28,9 +28,9 @@ import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.CoreZK;
+import org.voltdb.StartAction;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,14 +51,15 @@ public class TestHostMessenger {
         createdMessengers.clear();
     }
 
-    private HostMessenger createHostMessenger(int index) throws Exception {
-        return createHostMessenger(index, true);
+    private HostMessenger createHostMessenger(int index, StartAction action) throws Exception {
+        return createHostMessenger(index, action, true);
     }
 
-    private HostMessenger createHostMessenger(int index, boolean start) throws Exception {
+    private HostMessenger createHostMessenger(int index, StartAction action, boolean start) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (2181 + index);
+        config.startAction = action;
         HostMessenger hm = new HostMessenger(config);
         createdMessengers.add(hm);
         if (start) {
@@ -69,7 +70,7 @@ public class TestHostMessenger {
 
     @Test
     public void testSingleHost() throws Exception {
-        HostMessenger hm = createHostMessenger(0);
+        HostMessenger hm = createHostMessenger(0, StartAction.CREATE);
 
         Mailbox m1 = hm.createMailbox();
 
@@ -89,11 +90,11 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHost() throws Exception {
-        HostMessenger hm1 = createHostMessenger(0);
+        HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE);
 
-        final HostMessenger hm2 = createHostMessenger(1, false);
+        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, false);
 
-        final HostMessenger hm3 = createHostMessenger(2, false);
+        final HostMessenger hm3 = createHostMessenger(2, StartAction.CREATE, false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         Thread hm2Start = new Thread() {
