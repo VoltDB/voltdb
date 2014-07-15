@@ -55,4 +55,6 @@ public interface CSVDataLoader {
      * @return The number of rows failed to be inserted.
      */
     public long getFailedRows();
+
+    public void setFlushInterval(int delay, int seconds);
 }
