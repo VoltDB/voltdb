@@ -30,6 +30,8 @@ public class AdvertisedDataSource
     final public int partitionId;
     final public String signature;
     final public String tableName;
+    //Set to other than partition column in case of kafka.
+    private String m_partitionColumnName = "";
     final public long m_generation;
     final public long systemStartTimestamp;
     final public ArrayList<String> columnNames = new ArrayList<String>();
@@ -66,6 +68,7 @@ public class AdvertisedDataSource
     }
 
     public AdvertisedDataSource(int p_id, String t_signature, String t_name,
+            String partitionColumnName,
             long systemStartTimestamp,
             long generation,
             ArrayList<String> names,
@@ -76,6 +79,7 @@ public class AdvertisedDataSource
         partitionId = p_id;
         signature = t_signature;
         tableName = t_name;
+        m_partitionColumnName = partitionColumnName;
         m_generation = generation;
         this.systemStartTimestamp = systemStartTimestamp;
 
@@ -102,8 +106,20 @@ public class AdvertisedDataSource
         return columnLengths.get(index);
     }
 
+    //This is for setting column other than partition column of table.
+    //Kafka uses any arbitrary column for using its value for kafka key
+    public void setPartitionColumnName(String partitionColumnName) {
+        m_partitionColumnName = partitionColumnName;
+    }
+
+    public String getPartitionColumnName() {
+        return m_partitionColumnName;
+    }
+
     @Override
     public String toString() {
-        return "Generation: " + m_generation + " Table: " + tableName + " partition " + partitionId + " signature " + signature;
+        return "Generation: " + m_generation + " Table: " + tableName
+                + " partition " + partitionId + " signature " + signature
+                + " partitionColumn " + m_partitionColumnName;
     }
 }

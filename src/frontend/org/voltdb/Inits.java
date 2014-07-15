@@ -352,9 +352,13 @@ public class Inits {
             } while (catalogStuff == null);
 
             String serializedCatalog = null;
+            byte[] catalogJarBytes = catalogStuff.bytes;
             try {
-                Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
-                serializedCatalog = loadResults.getFirst();
+                Pair<InMemoryJarfile, String> loadResults =
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes);
+                serializedCatalog =
+                    CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
+                catalogJarBytes = loadResults.getFirst().getFullJarBytes();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
@@ -386,7 +390,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        catalogStuff.bytes,
+                        catalogJarBytes,
                         // Our starter catalog has set the deployment hash, just yoink it out for now
                         m_rvdb.m_catalogContext.deploymentHash,
                         catalogStuff.version, -1);

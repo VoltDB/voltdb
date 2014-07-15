@@ -51,12 +51,20 @@
     </xs:all>
   </xs:complexType>
 
+  <xs:simpleType name="schemaType">
+      <xs:restriction base="xs:string">
+          <xs:enumeration value="catalog"/>
+          <xs:enumeration value="adhoc"/>
+      </xs:restriction>
+  </xs:simpleType>
+
   <!-- <cluster> -->
   <xs:complexType name="clusterType">
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
     <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
+    <xs:attribute name="schema" type="schemaType" default="catalog"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -84,13 +92,13 @@
     </xs:restriction>
   </xs:simpleType>
 
-    <xs:simpleType name="elasticPauseType">
+  <xs:simpleType name="elasticPauseType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
 
-      <xs:simpleType name="elasticThroughputType">
+  <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
@@ -274,6 +282,7 @@
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

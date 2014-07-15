@@ -386,6 +386,23 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        try {
+            client.callProcedure("@AdHoc", stmt);
+        }
+        catch (ProcCallException pce) {
+            String msg = pce.getMessage();
+            String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
+                    expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
+            assertTrue(diagnostic, msg.contains(expectedMsg));
+            return;
+        }
+
+        String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
+                expectedMsg + ", but instead it threw nothing.";
+        fail(diagnostic);
+    }
+
 
     // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.

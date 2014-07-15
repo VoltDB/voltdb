@@ -65,10 +65,14 @@ public abstract class AbstractParsedStmt {
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
 
-    //User specified join order, null if none is specified
+    // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
     public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
+
+    // This list is used to identify the order of the table aliases returned by
+    // the parser for possible use as a default join order.
+    protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -386,7 +390,6 @@ public abstract class AbstractParsedStmt {
             if (subquery == null) {
                 tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
             } else {
-                // Temp table always have name SYSTEM_SUBQUERY + hashCode.
                 tableScan = new StmtSubqueryScan(subquery, tableAlias);
             }
             m_tableAliasMap.put(tableAlias, tableScan);
@@ -586,6 +589,9 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
+        // Hsql rejects name conflicts in a single query
+        m_tableAliasList.add(tableAlias);
+
         // Possible sub-query
         AbstractParsedStmt subquery = parseSubQuery(tableNode);
 

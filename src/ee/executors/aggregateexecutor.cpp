@@ -386,7 +386,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 
 inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
 {
-    m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
@@ -489,8 +488,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     while (it.next(nextTuple)) {
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
-
     AggregateHashExecutor::p_execute_finish();
+
+    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -540,6 +540,7 @@ void AggregateHashExecutor::p_execute_finish() {
     nextGroupByKeyTuple.move(NULL);
 
     m_hash.clear();
+    m_memoryPool.purge();
 }
 
 inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
@@ -591,6 +592,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
+    cleanupInputTempTable(input_table);
     return true;
 }
 
@@ -662,6 +664,8 @@ void AggregateSerialExecutor::p_execute_finish()
     delete m_aggregateRow;
     m_nextGroupByValues.clear();
     m_inProgressGroupByValues.clear();
+
+    m_memoryPool.purge();
 }
 
 }

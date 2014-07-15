@@ -140,7 +140,7 @@ void SHA1_Transform(uint32_t state[5], const uint8_t buffer[64])
     block = (CHAR64LONG16*)workspace;
     memcpy(block, buffer, 64);
 #else
-    block = (CHAR64LONG16*)buffer;
+    block = (CHAR64LONG16*)const_cast<uint8_t*>(buffer);
 #endif
 
     /* Copy context->state[] to working vars */
@@ -236,9 +236,9 @@ void SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE])
         finalcount[i] = (unsigned char)((context->count[(i >= 4 ? 0 : 1)]
          >> ((3-(i & 3)) * 8) ) & 255);  /* Endian independent */
     }
-    SHA1_Update(context, (uint8_t *)"\200", 1);
+    SHA1_Update(context, (const uint8_t *)"\200", 1);
     while ((context->count[0] & 504) != 448) {
-        SHA1_Update(context, (uint8_t *)"\0", 1);
+        SHA1_Update(context, (const uint8_t *)"\0", 1);
     }
     SHA1_Update(context, finalcount, 8);  /* Should cause a SHA1_Transform() */
     for (i = 0; i < SHA1_DIGEST_SIZE; i++) {

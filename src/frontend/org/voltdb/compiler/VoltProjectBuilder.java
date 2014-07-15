@@ -69,6 +69,7 @@ import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -280,6 +281,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticTargetThroughput = null;
     private Integer m_elasticTargetPauseTime = null;
 
+    private boolean m_useAdhocSchema = false;
+
     public VoltProjectBuilder setElasticTargetThroughput(int target) {
         m_elasticTargetThroughput = target;
         return this;
@@ -292,6 +295,11 @@ public class VoltProjectBuilder {
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
         m_deadHostTimeout = deadHostTimeout;
+    }
+
+    public void setUseAdhocSchema(boolean useIt)
+    {
+        m_useAdhocSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -949,6 +957,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
+        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
