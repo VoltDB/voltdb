@@ -41,7 +41,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         AGGREGATE_DISTINCT,
         AGGREGATE_OUTPUT_COLUMN,
         AGGREGATE_EXPRESSION,
-        GROUPBY_EXPRESSIONS;
+        GROUPBY_EXPRESSIONS,
+        PARTIAL_GROUPBY_COLUMNS
+        ;
     }
 
     protected List<ExpressionType> m_aggregateTypes = new ArrayList<ExpressionType>();
@@ -58,6 +60,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // At the moment these are guaranteed to be TVES.  This might always be true
     protected List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
+
+    protected List<Integer> m_partialGroupByColumns = new ArrayList<Integer>();
 
     // True if this aggregate node is the coordinator summary aggregator
     // for an aggregator that was pushed down. Must know to correctly
@@ -313,7 +317,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         stringer.endArray();
 
-        if (!m_groupByExpressions.isEmpty())
+        if (! m_groupByExpressions.isEmpty())
         {
             stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
             for (int i = 0; i < m_groupByExpressions.size(); i++) {
@@ -322,7 +326,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 stringer.endObject();
             }
             stringer.endArray();
+
+            if (! m_partialGroupByColumns.isEmpty()) {
+                stringer.key(Members.PARTIAL_GROUPBY_COLUMNS.name()).array();
+                for (Integer ith: m_partialGroupByColumns) {
+                    stringer.value(ith.longValue());
+                }
+                stringer.endArray();
+            }
         }
+
         if (m_prePredicate != null) {
             stringer.key(Members.PRE_PREDICATE.name()).value(m_prePredicate);
         }

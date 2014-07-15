@@ -142,6 +142,7 @@ struct AggregateRow
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
  */
+
 class AggregateExecutorBase : public AbstractExecutor
 {
 public:
@@ -153,6 +154,10 @@ public:
     {
         if (m_groupByKeySchema != NULL) {
             TupleSchema::freeTupleSchema(m_groupByKeySchema);
+        }
+
+        if (m_groupByKeyPartialHashSchema != NULL) {
+            TupleSchema::freeTupleSchema(m_groupByKeyPartialHashSchema);
         }
     }
     void executeAggBase(const NValueArray& params);
@@ -238,7 +243,7 @@ class AggregateHashExecutor : public AggregateExecutorBase
 {
 public:
     AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node) { }
+        AggregateExecutorBase(engine, abstract_node), m_inputSchema(NULL) { }
     ~AggregateHashExecutor() { }
 
     void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
@@ -265,7 +270,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    virtual void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
     void p_execute_tuple(const TableTuple& nextTuple);
 
@@ -291,7 +296,7 @@ class AggregatePartialExecutor : public AggregateSerialExecutor
 public:
     AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateSerialExecutor(engine, abstract_node) { }
-    ~AggregatePartialExecutor() { }
+    ~AggregatePartialExecutor();
 
     void p_execute_tuple(const TableTuple& nextTuple);
 
@@ -304,6 +309,25 @@ private:
     PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
 };
 
+
+inline AggregateExecutorBase* getInlineAggregateExecutor(const AbstractPlanNode* node) {
+    AbstractPlanNode* aggNode = NULL;
+    AggregateExecutorBase* aggExec = NULL;
+    if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_PARTIALAGGREGATE)) ) {
+        VOLT_TRACE("init inline partial aggregation stuff...");
+        aggExec = dynamic_cast<AggregatePartialExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    } else if ( NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE)) ) {
+        VOLT_TRACE("init inline serial aggregation stuff...");
+        aggExec = dynamic_cast<AggregateSerialExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    } else if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE)) ) {
+        VOLT_TRACE("init inline hash aggregation stuff...");
+        aggExec = dynamic_cast<AggregateHashExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    }
+    return aggExec;
+}
 
 }
 #endif

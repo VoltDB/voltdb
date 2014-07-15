@@ -73,7 +73,7 @@ public:
     { return m_aggregateOutputColumns; }
 
     const std::vector<int>& getPartialSerialAggregateOutputColumns() const
-    { return m_partialSerialGroupByColumns; }
+    { return m_partialGroupByColumns; }
 
     const std::vector<AbstractExpression*>& getAggregateInputExpressions() const
     { return m_aggregateInputExpressions; }
@@ -103,7 +103,6 @@ protected:
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
-    std::vector<int> m_partialSerialGroupByColumns;
     std::vector<AbstractExpression*> m_aggregateInputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 
@@ -112,7 +111,9 @@ protected:
     //
     std::vector<AbstractExpression*> m_groupByExpressions;
 
-    PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
+    std::vector<int> m_partialGroupByColumns;
+
+    PlanNodeType m_type; //AGGREGATE, PARTIALAGGREGATE, HASHAGGREGATE
 
     // ENG-1565: for accelerating min() / max() using index purpose only
     AbstractExpression* m_prePredicate;

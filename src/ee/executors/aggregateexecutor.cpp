@@ -354,7 +354,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     if (!node->isInline()) {
         setTempOutputTable(limits);
     }
-
     m_partialSerialGroupByColumns = node->getPartialSerialAggregateOutputColumns();
 
     m_aggTypes = node->getAggregates();
@@ -368,7 +367,10 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_postPredicate = node->getPostPredicate();
 
     m_groupByKeySchema = constructGroupBySchema(false);
-    m_groupByKeyPartialHashSchema = constructGroupBySchema(true);
+
+    if (m_partialSerialGroupByColumns.size() > 0) {
+        m_groupByKeyPartialHashSchema = constructGroupBySchema(true);
+    }
 
     return true;
 }
@@ -720,6 +722,9 @@ void AggregateSerialExecutor::p_execute_finish()
 //
 // Partial aggregate
 //
+
+AggregatePartialExecutor::~AggregatePartialExecutor() {
+}
 
 
 bool AggregatePartialExecutor::p_execute(const NValueArray& params)
