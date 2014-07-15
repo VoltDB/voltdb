@@ -530,4 +530,31 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         }
         assertTrue(expectedTypes.isEmpty());
     }
+
+    public void testGetClasses() throws Exception
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
+            "create procedure proc1 as select * from Table1 where Column1=?;" +
+            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc2 as select * from Table1 where Column2=?;" +
+            "import class org.voltdb_testprocs.fullddlfeatures.*;" +
+            "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;";
+
+        VoltCompiler c = compileForDDLTest2(schema);
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+        VoltTable classes = dut.getMetaData("classes");
+        System.out.println(classes);
+        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+        assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(1, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc"));
+        assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
+        assertEquals(0, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+    }
 }
