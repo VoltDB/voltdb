@@ -58,7 +58,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         "will you still free me (will memcheck see me) when Im sixty-four";
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
-    public void notestFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
+    public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
         Client client = getClient();
         ClientResponse cr = null;
@@ -87,7 +87,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void notestStringExpressionIndex() throws Exception {
+    public void testStringExpressionIndex() throws Exception {
         System.out.println("STARTING testStringExpressionIndex");
         Client client = getClient();
         initialLoad(client, "P1");
@@ -161,7 +161,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void notestNumericExpressionIndex() throws Exception {
+    public void testNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
@@ -248,7 +248,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void notestAbsWithLimit_ENG3572() throws Exception
+    public void testAbsWithLimit_ENG3572() throws Exception
     {
         System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
@@ -298,7 +298,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void notestAbs() throws Exception
+    public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
@@ -563,7 +563,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals( ! isHSQL(), caught);
     }
 
-    public void notestSubstring() throws Exception
+    public void testSubstring() throws Exception
     {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
@@ -719,7 +719,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void notestCurrentTimestamp() throws Exception
+    public void testCurrentTimestamp() throws Exception
     {
         System.out.println("STARTING testCurrentTimestamp");
         /**
@@ -1073,7 +1073,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(EXPECTED_WEEK, result);
     }
 
-    public void notestParams() throws NoConnectionsException, IOException, ProcCallException {
+    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING testParams");
         Client client = getClient();
         ClientResponse cr;
@@ -1448,7 +1448,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("ENDING test of " + fname);
     }
 
-    public void notestManyNumericFunctions() throws Exception
+    public void testManyNumericFunctions() throws Exception
     {
         subtestFromVarCharCasts();
         subtestToVarCharCasts();
@@ -1939,7 +1939,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void notestLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Left and Right");
         Client client = getClient();
         ClientResponse cr;
@@ -2056,7 +2056,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void notestSpace() throws NoConnectionsException, IOException, ProcCallException {
+    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2088,7 +2088,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void notestLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
         ClientResponse cr;
@@ -2150,7 +2150,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 //        }
     }
 
-    public void notestTrim() throws NoConnectionsException, IOException, ProcCallException {
+    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Trim");
         Client client = getClient();
         ClientResponse cr;
@@ -2311,7 +2311,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void notestRepeat() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
         ClientResponse cr;
@@ -2342,7 +2342,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("foofoofoo", result.getString(1));
     }
 
-    public void notestReplace() throws NoConnectionsException, IOException, ProcCallException {
+    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Replace");
         Client client = getClient();
         ClientResponse cr;
@@ -2386,7 +2386,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
-    public void notestOverlay() throws NoConnectionsException, IOException, ProcCallException {
+    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Overlay");
         Client client = getClient();
         ClientResponse cr;
@@ -2544,7 +2544,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // Unicode character to UTF8 string character
-    public void notestChar() throws NoConnectionsException, IOException, ProcCallException {
+    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test CHAR");
         Client client = getClient();
         ClientResponse cr;
@@ -2578,7 +2578,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(1));
     }
 
-    public void notestConcat() throws NoConnectionsException, IOException, ProcCallException {
+    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
         ClientResponse cr;
@@ -2617,7 +2617,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
 
-    public void notestCaseWhen() throws Exception {
+    public void testCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
         VoltTable vt;
@@ -2762,7 +2762,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void notestCaseWhenLikeDecodeFunction() throws Exception {
+    public void testCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
         String sql;
@@ -2998,7 +2998,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
     }
 
-    public void notestCoalesce() throws Exception {
+    public void testCoalesce() throws Exception {
         System.out.println("STARTING test COALESCE function...");
         Client cl = getClient();
 
@@ -3049,7 +3049,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
-    public void notestManyExtractTimeFieldFunction() throws Exception {
+    public void testManyExtractTimeFieldFunction() throws Exception {
         System.out.println("STARTING test functions extracting fields in timestamp ...");
         Client cl = getClient();
         VoltTable result;
