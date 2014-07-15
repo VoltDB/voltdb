@@ -24,6 +24,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cstring>
 #include <locale>
 #include <iomanip>
 
@@ -246,32 +247,41 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
 }
 
-/** implement the more-than-2-argument SQL CONCAT function */
+/** implement the 2-or-more-argument SQL CONCAT function */
 template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& arguments) {
     assert(arguments.size() >= 2);
-    const NValue& left = arguments[0];
-    if (left.isNull()) {
-        return getNullStringValue();
-    }
-    if (left.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (left.getValueType(), VALUE_TYPE_VARCHAR);
-    }
-    int32_t lenLeft = left.getObjectLength_withoutNull();
-    char *leftChars = reinterpret_cast<char*>(left.getObjectValue_withoutNull());
-    std::string leftStr(leftChars, lenLeft);
-
-    for(std::vector<NValue>::const_iterator iter = arguments.begin()+1; iter != arguments.end(); iter++) {
-        const NValue& next = *iter;
-        if (next.isNull()) {
+    int64_t size = 0;
+    for(std::vector<NValue>::const_iterator iter = arguments.begin(); iter !=arguments.end(); iter++) {
+        if (iter->isNull()) {
             return getNullStringValue();
         }
-        int32_t lenNext = next.getObjectLength_withoutNull();
-        char *nextChars = reinterpret_cast<char*>(next.getObjectValue_withoutNull());
-        leftStr.append(nextChars, lenNext);
-        lenLeft += lenNext;
+        if (iter->getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (iter->getValueType(), VALUE_TYPE_VARCHAR);
+        }
+        size += (int64_t) iter->getObjectLength_withoutNull();
+        if (size > (int64_t)INT32_MAX) {
+            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                               "The result of CONCAT function is out of range");
+        }
     }
 
-    return getTempStringValue(leftStr.c_str(),lenLeft);
+    if (size == 0) {
+        return getNullStringValue();
+    }
+
+    size_t cur = 0;
+    // TODO: use smart pointer here
+    char *buffer = new char[size];
+    for(std::vector<NValue>::const_iterator iter = arguments.begin(); iter !=arguments.end(); iter++) {
+        size_t cur_size = iter->getObjectLength_withoutNull();
+        char *next = reinterpret_cast<char*>(iter->getObjectValue_withoutNull());
+        memcpy((void *)(buffer + cur), (void *)next, cur_size);
+        cur += cur_size;
+    }
+
+    NValue rv = getTempStringValue(buffer, cur);
+    delete buffer;
+    return rv;
 }
 
 /** implement the 2-argument SQL SUBSTRING function */

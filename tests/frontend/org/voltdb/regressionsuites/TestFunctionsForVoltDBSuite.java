@@ -1822,7 +1822,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("Xin@VoltDB", result.getString(1));
     }
 
-    public void testConcatMoreThan2Para() throws NoConnectionsException, IOException, ProcCallException {
+    public void testConcatMoreThan2Param() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat with more than two parameters");
         Client client = getClient();
         ClientResponse cr;
@@ -1861,13 +1861,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
 
-        // TODO: fix this, it will automatically convert parameters to String?
-        cr = client.callProcedure("CONCAT2", 1, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Yetian1", result.getString(1));
+        try {
+            cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
+
+        }
     }
 
     //
