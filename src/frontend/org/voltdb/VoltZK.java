@@ -102,6 +102,9 @@ public class VoltZK {
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
+    // flag of initialization process complete
+    public static final String init_completed = "/db/init_completed";
+
     public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 

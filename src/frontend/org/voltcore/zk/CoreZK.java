@@ -17,11 +17,15 @@
 
 package org.voltcore.zk;
 
+import java.io.UnsupportedEncodingException;
 import java.util.LinkedList;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.StartAction;
+import org.voltdb.VoltDB;
 
 /**
  * CoreZK provides constants for all voltcore-registered
@@ -46,6 +50,10 @@ public class CoreZK {
     public static final String hostids = "/core/hostids";
     public static final String hostids_host = "/core/hostids/host";
 
+    // start action of node in the current system (ephemeral)
+    public static final String start_action = "/core/start_action";
+    public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
         root, hosts, readyhosts, hostids
@@ -69,6 +77,32 @@ public class CoreZK {
             org.voltdb.VoltDB.crashLocalVoltDB(
                     e.getMessage(), false, e);
         }
+    }
+
+    public static void createStartActionNode(ZooKeeper zk, final int hostId, StartAction action) {
+        byte [] startActionBytes = null;
+        try {
+            startActionBytes = action.toString().getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            VoltDB.crashLocalVoltDB("Utf-8 encoding is not supported in current platform", false, e);
+        }
+
+        zk.create(CoreZK.start_action_node + hostId, startActionBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL,
+                new ZKUtil.StringCallback() {
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, String name) {
+                        KeeperException.Code code = KeeperException.Code.get(rc);
+                        if (code == KeeperException.Code.OK) {
+                            System.out.println("The /start_action/node_" + hostId + "znode creation succeed");
+                        } else {
+                            System.out.println("The /start_action/node_" + hostId + "znode creation failed: " + code);
+                        }
+                    }
+                }, null);
+    }
+
+    public static int getHostIDFromChildName(String childName) {
+        return Integer.parseInt(childName.split("_")[1]);
     }
 
     /**
