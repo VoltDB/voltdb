@@ -380,18 +380,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
             CoreZK.createHierarchy(m_zk);
 
-            m_zk.create(CoreZK.start_action, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
-                    new ZKUtil.StringCallback(){
-                        @Override
-                        public void processResult(int rc, String path, Object ctx, String name) {
-                            KeeperException.Code code = KeeperException.Code.get(rc);
-                            if (code == KeeperException.Code.OK) {
-                                System.out.println("The /start_action znode creation succeed");
-                            } else {
-                                System.out.println("The /start_action znode creation failed: " + code);
-                            }
-                        }
-                    }, null);
+            m_zk.create(CoreZK.start_action, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
 
             /*
              * This creates the ephemeral sequential node with host id 0 which

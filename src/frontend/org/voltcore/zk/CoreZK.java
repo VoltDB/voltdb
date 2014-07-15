@@ -21,7 +21,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.LinkedList;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.StartAction;
@@ -88,17 +87,7 @@ public class CoreZK {
         }
 
         zk.create(CoreZK.start_action_node + hostId, startActionBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL,
-                new ZKUtil.StringCallback() {
-                    @Override
-                    public void processResult(int rc, String path, Object ctx, String name) {
-                        KeeperException.Code code = KeeperException.Code.get(rc);
-                        if (code == KeeperException.Code.OK) {
-                            System.out.println("The /start_action/node_" + hostId + "znode creation succeed");
-                        } else {
-                            System.out.println("The /start_action/node_" + hostId + "znode creation failed: " + code);
-                        }
-                    }
-                }, null);
+                new ZKUtil.StringCallback(), null);
     }
 
     public static int getHostIDFromChildName(String childName) {
