@@ -104,7 +104,6 @@ SnapshotCompletionInterest
         @Override
         public void run() {
             //After restore it is safe to initialize partition tracking
-            m_replayAgent.initPartitionTracking();
             changeState();
         }
     };
