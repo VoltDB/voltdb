@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cstring>
 #include <stdint.h>
+#include <limits>
 
 #define MAGIC_HEADER_SPACE_FOR_JAVA 8
 namespace voltdb
