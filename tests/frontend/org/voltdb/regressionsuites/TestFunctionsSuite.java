@@ -921,6 +921,12 @@ public class TestFunctionsSuite extends RegressionSuite {
             result = r.getLong(columnIndex++);
             assertEquals(EXPECTED_WEEK, result);
         }
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{6}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{9}});
+        }
 
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
@@ -973,6 +979,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
 
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{3}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{18}});
+        }
+
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1021,6 +1034,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_WEEK = 27;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{4}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{5}});
+        }
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1071,6 +1091,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_WEEK = 27;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{0}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{2}});
+        }
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -3103,7 +3130,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         else {
             // call our ee function, and so return different value
-            validateTableOfLongs(cl, sql,new long[][]{{2}, {3}, {1}});
+            validateTableOfLongs(cl, sql,new long[][]{{1}, {2}, {0}});
         }
 
         sql = "select DAYOFMONTH(past) from p1 order by id;";

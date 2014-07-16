@@ -129,7 +129,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_WEEK>() const {
 }
 
 /** implement the timestamp WEEKDAY extract function **/
-// It is almost the same as FUNC_EXTRACT_DAY_OF_WEEK, but return 0-based value
+// It is almost the same as FUNC_EXTRACT_DAY_OF_WEEK
+// Monday-0, ..., Saturday-5, Sunday-6
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEKDAY>() const {
     if (isNull()) {
         return *this;
@@ -137,7 +138,7 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEKDAY>() const {
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
-    return getTinyIntValue((int8_t)(as_date.day_of_week()));
+    return getTinyIntValue((int8_t)((as_date.day_of_week() + 6) % 7));
 }
 
 /** implement the timestamp WEEK OF YEAR extract function **/
