@@ -1767,6 +1767,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
+            else if (task.procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                catProc =
+                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+            }
         }
 
         if (user == null) {
@@ -1851,6 +1859,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // PRO SYSPROC SPECIAL HANDLING
 
             if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@UpdateClasses")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             }
             else if (task.procName.equals("@SnapshotSave")) {

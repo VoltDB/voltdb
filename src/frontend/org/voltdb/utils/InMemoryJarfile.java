@@ -219,6 +219,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     public class JarLoader extends ClassLoader {
         final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
         final Set<String> m_classNames = new HashSet<String>();
+        final Set<String> m_simpleNames = new HashSet<String>();
 
         void noteUpdated(String key) {
             if (!key.endsWith(".class"))
@@ -226,6 +227,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             String javaClassName = key.replace(File.separatorChar, '.');
             javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
             m_classNames.add(javaClassName);
+            String simpleName =
+                javaClassName.substring(javaClassName.lastIndexOf(File.separatorChar) + 1);
+            m_simpleNames.add(simpleName);
         }
 
         void noteRemoved(String key) {
@@ -235,6 +239,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
             m_classNames.remove(javaClassName);
             m_cache.remove(javaClassName);
+            String simpleName =
+                javaClassName.substring(javaClassName.lastIndexOf(File.separatorChar) + 1);
+            m_simpleNames.remove(simpleName);
         }
 
         // prevent this from being publicly called
@@ -291,6 +298,11 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
         public Set<String> getClassNames() {
             return m_classNames;
+        }
+
+        public Set<String> getSimpleClassNames()
+        {
+            return m_simpleNames;
         }
     }
 

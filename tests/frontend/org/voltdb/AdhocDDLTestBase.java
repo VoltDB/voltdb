@@ -75,6 +75,13 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
+    protected boolean findClassInSystemCatalog(String classname) throws Exception
+    {
+        VoltTable classes = m_client.callProcedure("@SystemCatalog", "CLASSES").getResults()[0];
+        boolean found = VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", classname);
+        return found;
+    }
+
     protected boolean findProcedureInSystemCatalog(String proc) throws Exception
     {
         VoltTable procedures = m_client.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];

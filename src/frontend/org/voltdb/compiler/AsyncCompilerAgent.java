@@ -170,11 +170,21 @@ public class AsyncCompilerAgent {
             // We have an @UAC.  Is it okay to run it?
             // If we weren't provided catalogBytes, it's a deployment-only change and okay to take
             // master and adhoc DDL method chosen
-            if (w.catalogBytes != null && !w.onReplica && w.useAdhocDDL) {
+            if (w.invocationName.equals("@UpdateApplicationCatalog") &&
+                w.catalogBytes != null && !w.onReplica && w.useAdhocDDL)
+            {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Cluster is configured to use AdHoc DDL to change application " +
                             "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            else if (w.invocationName.equals("@UpdateClasses") && !w.onReplica && !w.useAdhocDDL) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use @UpdateApplicationCatalog " +
+                            "to change application schema.  Use of @UpdateClasses is forbidden.");
                 w.completionHandler.onCompletion(errResult);
                 return;
             }

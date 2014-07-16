@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import java.io.IOException;
+import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -73,6 +74,21 @@ public class AsyncCompilerAgentHelper
                     // Shouldn't ever get here
                     retval.errorMsg =
                         "Unexpected failure in applying DDL statements to original catalog";
+                    return retval;
+                }
+            }
+        }
+        else {
+            if (work.invocationName.equals("@UpdateClasses")) {
+                try {
+                    InMemoryJarfile jarfile = new InMemoryJarfile(work.catalogBytes);
+                    newCatalogBytes = addJarClassesToCatalog(context.getCatalogJarBytes(),
+                            jarfile);
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                    retval.encodedDiffCommands = null;
+                    retval.errorMsg = e.getMessage();
                     return retval;
                 }
             }
@@ -192,5 +208,26 @@ public class AsyncCompilerAgentHelper
                 catch (IOException ioe) {}
             }
         }
+    }
+
+    private byte[] addJarClassesToCatalog(byte[] oldCatalogBytes, InMemoryJarfile newJarfile)
+        throws IOException
+    {
+        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
+        boolean foundClasses = false;
+        for (Entry<String, byte[]> e : newJarfile.entrySet()) {
+            String filename = e.getKey();
+            if (!filename.endsWith(".class")) {
+                continue;
+            }
+            foundClasses = true;
+            jarfile.put(e.getKey(), e.getValue());
+        }
+        // if we actually mutated the catalog, recompile it
+        if (foundClasses) {
+            VoltCompiler compiler = new VoltCompiler();
+            compiler.compileInMemoryJarfile(jarfile);
+        }
+        return jarfile.getFullJarBytes();
     }
 }
