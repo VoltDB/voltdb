@@ -3093,25 +3093,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         sql = "select id, QUARTER(past) from p1 order by id;";
         validateTableOfLongs(cl, sql, new long[][]{{0, 3}, {1, 1}, {2, 4}});
 
-        sql = "select DAY_OF_WEEK(past) from p1 order by id;";
-        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
         sql = "select DAYOFWEEK(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
 
-        sql = "select DAY_OF_MONTH(past) from p1 order by id;";
-        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+        sql = "select WEEKDAY(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+
         sql = "select DAYOFMONTH(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
 
-        sql = "select DAY_OF_YEAR(past) from p1 order by id;";
-        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
         sql = "select DAYOFYEAR(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
 
         // WEEK 1 is often the correct answer for the last day of the year.
         // See https://en.wikipedia.org/wiki/ISO_week_year#Last_week
-        sql = "select WEEK_OF_YEAR(past) from p1 order by id;";
-        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
         sql = "select WEEK(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
     }

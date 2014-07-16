@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -292,11 +293,11 @@ public class FunctionSQL extends Expression {
             case FUNC_EXTRACT :
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
-                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 17, Tokens.YEAR,
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
-                    Tokens.DAY_NAME, Tokens.MONTH_NAME,
+                    Tokens.DAY_NAME, Tokens.MONTH_NAME, Tokens.WEEKDAY,
                     Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
@@ -2089,14 +2090,12 @@ public class FunctionSQL extends Expression {
             // case DTIType.QUARTER :
                 volt_alias = "quarter";
                 break;
-            case Tokens.DAY_OF_MONTH :
-            // case DTIType.DAY_OF_MONTH :
-                volt_alias = "day_of_month";
-                break;
             case Tokens.DAY_OF_YEAR :
             // case DTIType.DAY_OF_YEAR :
                 volt_alias = "day_of_year";
                 break;
+            case Tokens.WEEKDAY :
+            	keywordConstant = Tokens.WEEKDAY;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";
@@ -2129,6 +2128,9 @@ public class FunctionSQL extends Expression {
             case Tokens.MONTH :
                 volt_alias = "month";
                 break;
+            case Tokens.DAY_OF_MONTH :
+            // case DTIType.DAY_OF_MONTH :
+                keywordConstant = Tokens.DAY;
             case Tokens.DAY :
                 volt_alias = "day";
                 break;

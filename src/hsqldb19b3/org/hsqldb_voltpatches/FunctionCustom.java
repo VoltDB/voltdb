@@ -169,12 +169,11 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.LTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.RTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.LEFT, FUNC_LEFT);
-        // A VoltDB extension to extract timestamp field function
-        customRegularFuncMap.put(Tokens.DAY_OF_WEEK, FUNC_EXTRACT);
-        customRegularFuncMap.put(Tokens.DAY_OF_MONTH, FUNC_EXTRACT);
-        customRegularFuncMap.put(Tokens.DAY_OF_YEAR, FUNC_EXTRACT);
-        customRegularFuncMap.put(Tokens.WEEK_OF_YEAR, FUNC_EXTRACT);
+        // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
+        customRegularFuncMap.put(Tokens.WEEKOFYEAR, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.WEEKDAY, FUNC_EXTRACT);
         // end of extension
+
         //
         customRegularFuncMap.put(Tokens.IDENTITY, FUNC_IDENTITY);
         customRegularFuncMap.put(Tokens.TIMESTAMPADD, FUNC_TIMESTAMPADD);
@@ -318,13 +317,17 @@ public class FunctionCustom extends FunctionSQL {
 
                  // A VoltDB extension to customize the SQL function set support
                 case Tokens.WEEK :
+                case Tokens.WEEKOFYEAR:
                 	function.extractSpec = Tokens.WEEK_OF_YEAR;
                 	break;
-                case Tokens.DAYOFMONTH :
-                case Tokens.DAY_OF_MONTH:
-                    function.extractSpec = Tokens.DAY;
-                    break;
+                case Tokens.WEEKDAY :
+                	function.extractSpec = Tokens.DAY_OF_WEEK;
+                	break;
                 // End of VoltDB extension
+
+                case Tokens.DAYOFMONTH :
+                    function.extractSpec = Tokens.DAY_OF_MONTH;
+                    break;
 
                 case Tokens.DAYOFWEEK :
                     function.extractSpec = Tokens.DAY_OF_WEEK;
