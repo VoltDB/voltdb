@@ -2095,7 +2095,9 @@ public class FunctionSQL extends Expression {
                 volt_alias = "day_of_year";
                 break;
             case Tokens.WEEKDAY :
-            	keywordConstant = Tokens.WEEKDAY;
+            	//keywordConstant = Tokens.WEEKDAY;
+            	volt_alias = "weekday";
+            	break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";

@@ -321,7 +321,7 @@ public class FunctionCustom extends FunctionSQL {
                 	function.extractSpec = Tokens.WEEK_OF_YEAR;
                 	break;
                 case Tokens.WEEKDAY :
-                	function.extractSpec = Tokens.DAY_OF_WEEK;
+                	function.extractSpec = Tokens.WEEKDAY;
                 	break;
                 // End of VoltDB extension
 

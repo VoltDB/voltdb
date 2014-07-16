@@ -3097,7 +3097,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
 
         sql = "select WEEKDAY(past) from p1 order by id;";
-        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        if (isHSQL()) {
+            // we modify the hsql parser, and so it maps to extract week_of_day
+            validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        }
+        else {
+            // call our ee function, and so return different value
+            validateTableOfLongs(cl, sql,new long[][]{{2}, {3}, {1}});
+        }
 
         sql = "select DAYOFMONTH(past) from p1 order by id;";
         validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});

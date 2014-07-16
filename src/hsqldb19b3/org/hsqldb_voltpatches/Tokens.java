@@ -1926,6 +1926,11 @@ public class Tokens {
         reservedKeys.put(Tokens.T_WITHOUT, WITHOUT);
         reservedKeys.put(Tokens.T_WHILE, WHILE);
         reservedKeys.put(Tokens.T_YEAR, YEAR);
+
+        // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+        reservedKeys.put(Tokens.T_WEEKOFYEAR, WEEKOFYEAR);    // For compliant with MySQL
+        reservedKeys.put(Tokens.T_WEEKDAY, WEEKDAY);          // For compliant with MySQL
+        // End of VoltDB extension
     }
 
     private static final IntValueHashMap commandSet = new IntValueHashMap(251);

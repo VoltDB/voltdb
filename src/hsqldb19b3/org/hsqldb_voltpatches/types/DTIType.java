@@ -35,10 +35,10 @@ import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
-import org.hsqldb_voltpatches.Session;
 
 /**
  * Common elements for Type instances for DATETIME and INTERVAL.<p>
@@ -194,7 +194,7 @@ public abstract class DTIType extends Type {
             if (i == startPartIndex) {
                 int startDigits = precision == 0 ? 2
                                                  : (int) precision;
-                int zeros = (int) startDigits - getPrecisionExponent(part);
+                int zeros = startDigits - getPrecisionExponent(part);
 /*
                 for (int j = 0; j < zeros; j++) {
                     buffer.append('0');
@@ -375,6 +375,13 @@ public abstract class DTIType extends Type {
 
             case Tokens.SECONDS_MIDNIGHT :
                 return SECONDS_MIDNIGHT;
+
+            // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+            case Tokens.WEEKDAY :
+            	// Maybe we should return something else, since WEEKDAY is different from day_of_week
+            	// But it works now...
+            	return DAY_OF_WEEK;
+            // End of VoltDB extension
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
