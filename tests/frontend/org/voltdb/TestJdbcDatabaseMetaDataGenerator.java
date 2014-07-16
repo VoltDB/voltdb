@@ -67,43 +67,6 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         tjar.delete();
     }
 
-    boolean moveToMatchingRow(VoltTable table, String columnName,
-                              String columnValue)
-    {
-        boolean found = false;
-        table.resetRowPosition();
-        while (table.advanceRow())
-        {
-            if (((String)table.get(columnName, VoltType.STRING)).
-                    equalsIgnoreCase(columnValue.toUpperCase()))
-            {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
-
-    boolean moveToMatchingTupleRow(VoltTable table, String column1Name,
-                              String column1Value, String column2Name,
-                              String column2Value)
-    {
-        boolean found = false;
-        table.resetRowPosition();
-        while (table.advanceRow())
-        {
-            if (((String)table.get(column1Name, VoltType.STRING)).
-                    equalsIgnoreCase(column1Value.toUpperCase()) &&
-                    ((String)table.get(column2Name, VoltType.STRING)).
-                    equalsIgnoreCase(column2Value.toUpperCase()))
-            {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
-
     public void testGetTables() throws Exception
     {
         String schema =
@@ -121,15 +84,15 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
         assertEquals(4, tables.getRowCount());
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Table2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table2"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "View1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
-        assertFalse(moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
+        assertFalse(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
     }
 
     private void assertWithNullCheck(Object expected, Object value, VoltTable table)
@@ -159,7 +122,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                   VoltTable columns,
                                   Object[] expected)
     {
-        assertTrue(moveToMatchingRow(columns, "COLUMN_NAME", columnName));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(columns, "COLUMN_NAME", columnName));
         assertEquals(expected[0], columns.get("DATA_TYPE", VoltType.INTEGER));
         assertTrue("SQL Typename mismatch",
                    columns.get("TYPE_NAME", VoltType.STRING).equals(expected[1]));
@@ -375,35 +338,35 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
         assertEquals(7, indexes.getRowCount());
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column3"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column4"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column4"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column5"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column5"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -411,7 +374,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -419,7 +382,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -427,7 +390,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertFalse(moveToMatchingRow(indexes, "COLUMN_NAME", "NotAColumn"));
+        assertFalse(VoltTableTestHelpers.moveToMatchingRow(indexes, "COLUMN_NAME", "NotAColumn"));
     }
 
     public void testGetPrimaryKeys() throws Exception
@@ -447,19 +410,19 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         System.out.println(pkeys);
         assertEquals(6, pkeys.getColumnCount());
         assertEquals(4, pkeys.getRowCount());
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY1", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column2"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column3"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column3"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)2, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column4"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column4"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)3, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
@@ -482,13 +445,13 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         System.out.println(params);
         assertEquals(20, params.getColumnCount());
         assertEquals(4, params.getRowCount()); // 2 real and 2 crud inserts
-        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("PRECISION", VoltType.INTEGER));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("LENGTH", VoltType.INTEGER));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER));
         assertEquals("PARTITION_PARAMETER", params.get("REMARKS", VoltType.STRING));
-        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes() * 8 - 1,
                      params.get("PRECISION", VoltType.INTEGER));
@@ -547,13 +510,13 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
         VoltTable classes = dut.getMetaData("classes");
         System.out.println(classes);
-        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));
         assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(1, classes.get("ACTIVE_PROC", VoltType.INTEGER));
-        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc"));
         assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
-        assertTrue(moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
         assertEquals(0, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
     }
