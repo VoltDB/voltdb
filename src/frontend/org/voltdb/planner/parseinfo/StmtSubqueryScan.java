@@ -47,8 +47,8 @@ import org.voltdb.types.PlanNodeType;
 public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
     private final AbstractParsedStmt m_subqueryStmt;
-    private ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
+    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    private final Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
 
@@ -432,13 +432,5 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
     }
 
-    @Override
-    public boolean isPartitionedOnColumnIndex(int columnIndex) {
-        // TODO: Implement a method of identifying whether the indexed display column
-        // of the subquery is projecting out a partitioning key of an underlying table or subquery
-        // All such keys are interchangeable here. They must have been constrained to be
-        // members of a single equivalence set in the partitioning for the statement.
-        return false;
-    }
 
 }

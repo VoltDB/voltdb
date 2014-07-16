@@ -62,7 +62,7 @@ public class TestHSQLDB extends TestCase {
         public int read() throws IOException { return sr.read(); }
     }
 
-    /*public void notestCatalogRead() {
+    /*public void testCatalogRead() {
         String ddl = "create table test (cash integer default 23);";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -107,7 +107,7 @@ public class TestHSQLDB extends TestCase {
         return hsql;
     }
 
-    /*public void notestWithTPCCDDL() throws HSQLParseException {
+    /*public void testWithTPCCDDL() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
         assertTrue(hsql != null);
 
@@ -129,7 +129,7 @@ public class TestHSQLDB extends TestCase {
         assertTrue(doc != null);
     }
 
-    public void notestDMLFromTPCCNewOrder() {
+    public void testDMLFromTPCCNewOrder() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 
@@ -190,7 +190,7 @@ public class TestHSQLDB extends TestCase {
         }
     }
 
-    public void notestSqlInToXML() throws HSQLParseException {
+    public void testSqlInToXML() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
         assertTrue(hsql != null);
         VoltXMLElement stmt;
@@ -236,7 +236,7 @@ public class TestHSQLDB extends TestCase {
                 "Unsupported subquery");
     }
 
-    public void notestVarbinary() {
+    public void testVarbinary() {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         URL url = getClass().getResource("hsqltest-varbinaryddl.sql");
 
@@ -283,7 +283,7 @@ public class TestHSQLDB extends TestCase {
         System.out.println(xml);
     }
 
-    /*public void notestSimpleSQL() {
+    /*public void testSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 
@@ -319,7 +319,7 @@ public class TestHSQLDB extends TestCase {
 
     }*/
 
-    /*public void notestDeleteIssue() {
+    /*public void testDeleteIssue() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
 

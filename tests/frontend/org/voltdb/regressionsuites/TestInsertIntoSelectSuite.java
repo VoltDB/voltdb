@@ -49,75 +49,76 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
         try {
-            project.addLiteralSchema(
-                    "CREATE TABLE target_p (bi bigint not null," +
-                            "vc varchar(100) default '" + vcDefault +"'," +
-                            "ii integer default " + intDefault + "," +
-                            "ti tinyint default " + intDefault + ");" +
-                            "partition table target_p on column bi;" +
+            String schema =
+                "CREATE TABLE target_p (bi bigint not null," +
+                "vc varchar(100) default '" + vcDefault +"'," +
+                "ii integer default " + intDefault + "," +
+                "ti tinyint default " + intDefault + ");" +
+                "partition table target_p on column bi;" +
 
-                    "CREATE TABLE source_p1 (bi bigint not null," +
-                    "vc varchar(100)," +
-                    "ii integer," +
-                    "ti tinyint);" +
-                    "partition table source_p1 on column bi;" +
+                "CREATE TABLE source_p1 (bi bigint not null," +
+                "vc varchar(100)," +
+                "ii integer," +
+                "ti tinyint);" +
+                "partition table source_p1 on column bi;" +
 
-                    "CREATE TABLE source_p2 (bi bigint not null," +
-                    "vc varchar(100)," +
-                    "ii integer," +
-                    "ti tinyint);" +
-                    "partition table source_p2 on column bi;" +
+                "CREATE TABLE source_p2 (bi bigint not null," +
+                "vc varchar(100)," +
+                "ii integer," +
+                "ti tinyint);" +
+                "partition table source_p2 on column bi;" +
 
-                    "CREATE TABLE source_r (bi bigint not null," +
-                    "vc varchar(100)," +
-                    "ii integer," +
-                    "ti tinyint);" +
+                "CREATE TABLE source_r (bi bigint not null," +
+                "vc varchar(100)," +
+                "ii integer," +
+                "ti tinyint);" +
 
-                    "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
-                    "partition procedure insert_p_source_p on table target_p column bi;" +
+                "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
+                "partition procedure insert_p_source_p on table target_p column bi;" +
 
-                    "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
-                    "partition procedure insert_p_use_defaults on table target_p column bi;" +
+                "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
+                "partition procedure insert_p_use_defaults on table target_p column bi;" +
 
-                    "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
-                    "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
+                "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
+                "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
 
-                    "create procedure insert_p_source_p_agg as insert into target_p (bi, vc, ii, ti) " +
-                    "select bi, max(vc), max(ii), min(ti)" + " from source_p1 where bi = ? group by bi;" +
-                    "partition procedure insert_p_source_p_agg on table target_p column bi;" +
+                "create procedure insert_p_source_p_agg as insert into target_p (bi, vc, ii, ti) " +
+                "select bi, max(vc), max(ii), min(ti)" + " from source_p1 where bi = ? group by bi;" +
+                "partition procedure insert_p_source_p_agg on table target_p column bi;" +
 
-                        // transpose ti, ii, columns so there are implicit integer->tinyint and tinyint->integer casts
-                        "create procedure insert_p_source_p_cast as insert into target_p (bi, vc, ti, ii) select * from source_p1 where bi = ?;" +
-                        "partition procedure insert_p_source_p_cast on table target_p column bi;" +
+                // transpose ti, ii, columns so there are implicit integer->tinyint and tinyint->integer casts
+                "create procedure insert_p_source_p_cast as insert into target_p (bi, vc, ti, ii) select * from source_p1 where bi = ?;" +
+                "partition procedure insert_p_source_p_cast on table target_p column bi;" +
 
-                        // source_p2.ii contains values that will not fit into tinyint, so this procedure should throw an out-of-range conversion exception
-                        "create procedure insert_p_source_p_cast_out_of_range as " +
-                        "insert into target_p (bi, vc, ti, ii) " +
-                        "select * from source_p2 where bi = ?;" +
-                        "partition procedure insert_p_source_p_cast_out_of_range on table target_p column bi;" +
+                // source_p2.ii contains values that will not fit into tinyint, so this procedure should throw an out-of-range conversion exception
+                "create procedure insert_p_source_p_cast_out_of_range as " +
+                "insert into target_p (bi, vc, ti, ii) " +
+                "select * from source_p2 where bi = ?;" +
+                "partition procedure insert_p_source_p_cast_out_of_range on table target_p column bi;" +
 
-                        // Implicit string->int and int->string conversion.
-                        "create procedure insert_p_source_p_nonsensical_cast as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
-                        "partition procedure insert_p_source_p_nonsensical_cast on table target_p column bi;" +
+                // Implicit string->int and int->string conversion.
+                "create procedure insert_p_source_p_nonsensical_cast as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
+                "partition procedure insert_p_source_p_nonsensical_cast on table target_p column bi;" +
 
-                        "create procedure select_and_insert_into_source as " +
-                        "insert into source_p1 (bi, vc, ti, ii) select bi, vc, ti, 1000 * ii from source_p1 where bi = ? order by bi, ti;" +
-                        "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
+                "create procedure select_and_insert_into_source as " +
+                "insert into source_p1 (bi, vc, ti, ii) select bi, vc, ti, 1000 * ii from source_p1 where bi = ? order by bi, ti;" +
+                "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
 
-                        // HSQL seems to want a cast for the parameter
-                        // Note that there is no filter in source_p
-                        "create procedure insert_param_in_select_list as " +
-                            "insert into target_p (bi, vc, ii, ti) " +
-                                "select cast(? as bigint), vc, ii, ti from source_r order by ii;" +
-                        "partition procedure insert_param_in_select_list on table target_p column bi;" +
+                // HSQL seems to want a cast for the parameter
+                // Note that there is no filter in source_p
+                "create procedure insert_param_in_select_list as " +
+                "insert into target_p (bi, vc, ii, ti) " +
+                "select cast(? as bigint), vc, ii, ti from source_r order by ii;" +
+                "partition procedure insert_param_in_select_list on table target_p column bi;" +
 
-                        "create procedure InsertIntoSelectWithJoin as " +
-                        "insert into target_p " +
-                        "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
-                        "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
-                        "where sp1.bi = ?;" +
-                        "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
-                    "");
+                "create procedure InsertIntoSelectWithJoin as " +
+                "insert into target_p " +
+                "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
+                "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
+                "where sp1.bi = ?;" +
+                "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
+                "";
+        project.addLiteralSchema(schema);
         } catch (IOException error) {
             fail(error.getMessage());
         }

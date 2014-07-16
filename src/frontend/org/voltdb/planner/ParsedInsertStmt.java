@@ -42,6 +42,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * specified the columns.
      */
     public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+
+    /**
+     * The SELECT statement for INSERT INTO ... SELECT.
+     */
     private ParsedSelectStmt m_subselect;
 
     /**
@@ -55,9 +59,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        // A simple INSERT ... VALUES statement (all that's supported initially) has no underlying
-        // table scans, so the table list should actually be empty until the statement's target
-        // table is inserted, below.
+        // An INSERT statement may have table scans if its an INSERT INTO ... SELECT,
+        // but those table scans will belong to the corresponding ParsedSelectStmt
         assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
@@ -70,22 +73,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 parseTargetColumns(node, table, m_columns);
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                // TODO: When INSERT ... SELECT is supported, it's unclear whether the source tables need to be
-                // reflected in the m_tableList -- that would likely be propagated here --
-                // and how the target table would then be distinguished
-                // (positionally? in a separate member?) and/or how soon thereafter the SELECT
-                // clause will need to allow joins.
                 m_subselect = (ParsedSelectStmt)parseSubquery(node);
             }
             else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
                         "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
-            // else ... assert if there are unexpected child elements of the insert node?
-        }
-
-        if (m_subselect != null) {
-            // Put other static checks here?  What belongs here and what belongs in PlanAssembler?
         }
     }
 
