@@ -24,6 +24,7 @@ import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -213,6 +214,8 @@ public class PartitionDRGateway {
                 }
             }
         }
-        DBBPool.wrapBB(buf).discard();
+        final BBContainer cont = DBBPool.wrapBB(buf);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
     }
 }
