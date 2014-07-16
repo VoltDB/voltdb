@@ -154,9 +154,11 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
         }
 
-        PlannerDomValue partialGroupByColumnsArray = obj.valueForKey("PARTIAL_GROUPBY_COLUMNS");
-        for (int i = 0; i < partialGroupByColumnsArray.arrayLen(); i++) {
-            m_partialGroupByColumns.push_back(partialGroupByColumnsArray.valueAtIndex(i).asInt());
+        if (obj.hasNonNullKey("PARTIAL_GROUPBY_COLUMNS")) {
+            PlannerDomValue partialGroupByColumnsArray = obj.valueForKey("PARTIAL_GROUPBY_COLUMNS");
+            for (int i = 0; i < partialGroupByColumnsArray.arrayLen(); i++) {
+                m_partialGroupByColumns.push_back(partialGroupByColumnsArray.valueAtIndex(i).asInt());
+            }
         }
     }
 

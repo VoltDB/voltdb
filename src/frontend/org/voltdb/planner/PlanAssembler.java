@@ -782,15 +782,11 @@ public class PlanAssembler {
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( (root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
-                (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ||
-                (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
-                (root.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+        if ( root instanceof AggregatePlanNode ||
+             root.getPlanNodeType() == PlanNodeType.DISTINCT ||
+             root.getPlanNodeType() == PlanNodeType.PROJECTION) {
             return false;
         }
-
-        // has not start to inline aggregate
-        assert(root.getInlinePlanNode(PlanNodeType.AGGREGATE) == null);
 
         // Assuming the restrictions: Order by columns are (1) columns from table
         // (2) tag from display columns (3) actual expressions from display columns
@@ -1465,61 +1461,53 @@ public class PlanAssembler {
 
         AbstractPlanNode m_indexAccess = null;
 
-        public boolean accessPlanChanged() {
-            return m_indexAccess != null;
-        }
         public boolean isChangedToSerialAggregate() {
-            return m_serialAgg && accessPlanChanged();
+            return m_serialAgg && m_indexAccess != null;
         }
 
         public boolean isChangedToPartialAggregate() {
-            return !m_serialAgg && accessPlanChanged();
+            return !m_serialAgg && m_indexAccess != null;
         }
 
-        public void proccessGroupByInfo(AbstractPlanNode root) {
+        public boolean needHashAggregator(AbstractPlanNode root) {
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
             // of an index scan.
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.
-            m_needHashAggregate = m_parsedSelect.isGrouped();
-
-            if (accessPlanChanged()) {
-                if (! m_multPartition) {
-                    m_needHashAggregate = false;
-                }
-                return;
+            if (! m_parsedSelect.isGrouped()) {
+                return false;
             }
 
-            if (m_needHashAggregate) {
-                boolean predeterminedOrdering = false;
-                if (root instanceof IndexScanPlanNode) {
-                    if (((IndexScanPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
-                        predeterminedOrdering = true;
-                    }
-                }
-                else if (root instanceof AbstractJoinPlanNode) {
-                    if (((AbstractJoinPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
-                        predeterminedOrdering = true;
-                    }
-                }
-                if (predeterminedOrdering) {
-                    // The ordering predetermined by indexed access is known to cover (at least) the
-                    // ORDER BY columns.
-                    // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will need
-                    // partial aggregate.
-                    if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
-                        m_needHashAggregate = false;
-                    }
+            if (isChangedToSerialAggregate() && ! m_multPartition) {
+                return false;
+            }
+
+            boolean predeterminedOrdering = false;
+            if (root instanceof IndexScanPlanNode) {
+                if (((IndexScanPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
+                    predeterminedOrdering = true;
                 }
             }
+            else if (root instanceof AbstractJoinPlanNode) {
+                if (((AbstractJoinPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
+                    predeterminedOrdering = true;
+                }
+            }
+            if (predeterminedOrdering) {
+                // The ordering predetermined by indexed access is known to cover (at least) the
+                // ORDER BY columns.
+                // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will need
+                // partial aggregate.
+                if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
-        public boolean needHashAgg() {
-            return m_needHashAggregate;
-        }
-        private boolean m_needHashAggregate;
     }
 
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(AbstractPlanNode candidate) {
@@ -1541,12 +1529,21 @@ public class PlanAssembler {
         return null;
     }
 
-    private boolean processIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
-        // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
-        // by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
-        // down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node,
-        // but it shouldn't hurt (much?) anyway.
+    /**
+     * For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+     * by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
+     * down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node.
+     * @param candidate
+     * @param gbInfo
+     * @return whether planner can switch to index scan or not from sequential scan
+     */
+    private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
         if (! m_parsedSelect.isGrouped()) {
+            return false;
+        }
+
+        // TODO (xin): support join later
+        if (m_parsedSelect.m_tableAliasList.size() > 1) {
             return false;
         }
 
@@ -1596,13 +1593,12 @@ public class PlanAssembler {
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
                 gbInfo.m_multPartition = true;
-                processIndexScanForGroupBy(candidate, gbInfo);
+                switchToIndexScanForGroupBy(candidate, gbInfo);
 
-            } else if (processIndexScanForGroupBy(root, gbInfo) && gbInfo.m_isIndexScanPlanRoot) {
+            } else if (switchToIndexScanForGroupBy(root, gbInfo) && gbInfo.m_isIndexScanPlanRoot) {
                 root = gbInfo.m_indexAccess;
             }
-            gbInfo.proccessGroupByInfo(root);
-            boolean needHashAgg = gbInfo.needHashAgg();
+            boolean needHashAgg = gbInfo.needHashAggregator(root);
 
             // Construct the aggregate nodes
             if (needHashAgg) {
@@ -1823,13 +1819,14 @@ public class PlanAssembler {
                 continue;
             }
             List<Integer> coveredGroupByColumns = new ArrayList<>();
-            if (groupbyColumnsCovered(index, fromTableAlias, coveredGroupByColumns, allBindings)) {
-                if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
-                    maxCoveredGroupByColumns = coveredGroupByColumns;
-                    pickedupInde = index;
-                    if (maxCoveredGroupByColumns.size() == groupBys.size()) {
-                        foundAllGroupByCoveredIndex = true;
-                    }
+
+            processGroupbyColumnsCovered(index, fromTableAlias, coveredGroupByColumns, allBindings);
+            if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
+                maxCoveredGroupByColumns = coveredGroupByColumns;
+                pickedupInde = index;
+                if (maxCoveredGroupByColumns.size() == groupBys.size()) {
+                    foundAllGroupByCoveredIndex = true;
+                    break;
                 }
             }
         }
@@ -1847,35 +1844,47 @@ public class PlanAssembler {
         return indexScanNode;
     }
 
-    private boolean groupbyColumnsCovered(Index index, String fromTableAlias,
+    private void processGroupbyColumnsCovered(Index index, String fromTableAlias,
             List<Integer> coveredGroupByColumns, List<AbstractExpression> allBindings) {
-        Integer ithCovered = 0;
-
         ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
 
-            for (ParsedColInfo gbCol : groupBys) {
-                AbstractExpression expr = gbCol.expression;
-                if ( ! (expr instanceof TupleValueExpression)) {
-                    return false;
-                }
-                TupleValueExpression grouptve = (TupleValueExpression)expr;
-                if ( ! fromTableAlias.equals(grouptve.getTableAlias())) {
-                    return false;
-                }
-                String gbColName = grouptve.getColumnName();
+            for (int j = 0; j < indexedColRefs.size(); j++) {
+                String indexColumnName = indexedColRefs.get(j).getColumn().getName();
+
                 // ignore order of keys in GROUP BY expr
-                for (int j = 0; j < indexedColRefs.size(); j++) {
-                    // don't compare column index here, because resolveColumnIndex is not yet called
-                    if (indexedColRefs.get(j).getColumn().getName().equals(gbColName)) {
-                        coveredGroupByColumns.add(ithCovered);
+                int ithCovered = 0;
+                boolean foundPrefixedColumn = false;
+                for (; ithCovered < groupBys.size(); ithCovered++) {
+                    AbstractExpression expr = groupBys.get(ithCovered).expression;
+                    if ( ! (expr instanceof TupleValueExpression)) {
+                        return;
+                    }
+                    TupleValueExpression grouptve = (TupleValueExpression)expr;
+                    if ( ! fromTableAlias.equals(grouptve.getTableAlias())) {
+                        return;
+                    }
+                    String gbColName = grouptve.getColumnName();
+
+                    if (gbColName.equals(indexColumnName)) {
+                        foundPrefixedColumn = true;
                         break;
                     }
                 }
-                ithCovered++;
+                if (! foundPrefixedColumn) {
+                    // no prefix match any more or covered all group by columns already
+                    break;
+                }
+                coveredGroupByColumns.add(ithCovered);
+
+                if (coveredGroupByColumns.size() == groupBys.size()) {
+                    // covered all group by columns already
+                    return;
+                }
             }
+
         } else {
             StmtTableScan fromTableScan = m_parsedSelect.m_tableAliasMap.get(fromTableAlias);
             // either pure expression index or mix of expressions and simple columns
@@ -1885,26 +1894,36 @@ public class PlanAssembler {
             } catch (JSONException e) {
                 e.printStackTrace();
                 // This case sounds impossible
-                return false;
+                return;
             }
-            for (ParsedColInfo gbCol : groupBys) {
-                AbstractExpression expr = gbCol.expression;
 
+            for (int j = 0; j < indexedExprs.size(); j++) {
+                AbstractExpression indexExpr = indexedExprs.get(j);
                 // ignore order of keys in GROUP BY expr
-                for (int j = 0; j < indexedExprs.size(); j++) {
-                    AbstractExpression indexExpr = indexedExprs.get(j);
-                    List<AbstractExpression> binding = expr.bindingToIndexedExpression(indexExpr);
+
+                int ithCovered = 0;
+                List<AbstractExpression> binding = null;
+                for (; ithCovered < groupBys.size(); ithCovered++) {
+                    AbstractExpression expr = groupBys.get(ithCovered).expression;
+                    binding = expr.bindingToIndexedExpression(indexExpr);
                     if (binding != null) {
-                        allBindings.addAll(binding);
-                        coveredGroupByColumns.add(ithCovered);
                         break;
                     }
                 }
-                ithCovered++;
-            }
-        }
+                if (binding == null) {
+                    // no prefix match any more or covered all group by columns already
+                    break;
+                }
+                allBindings.addAll(binding);
+                coveredGroupByColumns.add(ithCovered);
 
-        return true;
+                if (coveredGroupByColumns.size() == groupBys.size()) {
+                    // covered all group by columns already
+                    return;
+                }
+            }
+
+        }
     }
 
     /**

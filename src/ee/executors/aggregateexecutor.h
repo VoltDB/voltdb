@@ -180,8 +180,6 @@ public:
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
-    void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
-
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
     /// through any additional columns from the input table.
@@ -214,6 +212,7 @@ protected:
     AbstractExpression* m_postPredicate;
 
     std::vector<int> m_partialSerialGroupByColumns;
+    std::vector<int> m_partialHashGroupByColumns;
     TupleSchema* m_groupByKeyPartialHashSchema;
 
     ProgressMonitorProxy* m_pmp;
@@ -251,6 +250,8 @@ public:
     void p_execute_finish();
 
 private:
+    void initHashGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
+
     virtual bool p_execute(const NValueArray& params);
     HashAggregateMapType m_hash;
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
@@ -270,7 +271,7 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor() { }
 
-    virtual void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
     void p_execute_tuple(const TableTuple& nextTuple);
 
@@ -298,12 +299,17 @@ public:
         AggregateSerialExecutor(engine, abstract_node) { }
     ~AggregatePartialExecutor();
 
+    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+
     void p_execute_tuple(const TableTuple& nextTuple);
 
     void p_execute_finish();
 
 private:
     virtual bool p_execute(const NValueArray& params);
+
+    void initPartialHashGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple,
+            const TableTuple& nxtTuple);
 
     HashAggregateMapType m_hash;
     PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;

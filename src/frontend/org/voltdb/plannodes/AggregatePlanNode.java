@@ -348,7 +348,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        String aggType = getPlanNodeType() == PlanNodeType.AGGREGATE ? "Serial": "Hash";
+        String aggType = "Hash";
+        if (getPlanNodeType() == PlanNodeType.AGGREGATE) {
+            aggType = "Serial";
+        } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
+            aggType = "Partial serial";
+        }
+
         sb.append(aggType + " AGGREGATION ops: ");
         int ii = 0;
         for (ExpressionType e : m_aggregateTypes) {
@@ -415,5 +421,18 @@ public class AggregatePlanNode extends AbstractPlanNode {
                                                   Members.GROUPBY_EXPRESSIONS.name(), null);
         m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
+    }
+
+    public static AggregatePlanNode getInlineAggregationNode(AbstractPlanNode node) {
+        AggregatePlanNode aggNode =
+                (AggregatePlanNode) (node.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        if (aggNode == null) {
+            aggNode = (HashAggregatePlanNode) (node.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        }
+        if (aggNode == null) {
+            aggNode = (PartialAggregatePlanNode) (node.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
+        }
+
+        return aggNode;
     }
 }
