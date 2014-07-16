@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -51,6 +52,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Text;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -422,6 +424,158 @@ public class CatalogBuilder {
             }
         }
         return success;
+    }
+
+    private void buildDatabaseElement(Document doc, final Element database) {
+
+        // /project/database/groups
+        final Element groups = doc.createElement("groups");
+        database.appendChild(groups);
+
+        // groups/group
+        if (m_groups.isEmpty()) {
+            final Element group = doc.createElement("group");
+            group.setAttribute("name", "default");
+            group.setAttribute("sysproc", "true");
+            group.setAttribute("defaultproc", "true");
+            group.setAttribute("adhoc", "true");
+            groups.appendChild(group);
+        }
+        else {
+            for (final GroupInfo info : m_groups) {
+                final Element group = doc.createElement("group");
+                group.setAttribute("name", info.name);
+                group.setAttribute("sysproc", info.sysproc ? "true" : "false");
+                group.setAttribute("defaultproc", info.defaultproc ? "true" : "false");
+                group.setAttribute("adhoc", info.adhoc ? "true" : "false");
+                groups.appendChild(group);
+            }
+        }
+
+        // /project/database/schemas
+        final Element schemas = doc.createElement("schemas");
+        database.appendChild(schemas);
+
+        // schemas/schema
+        for (final String schemaPath : m_schemas) {
+            final Element schema = doc.createElement("schema");
+            schema.setAttribute("path", schemaPath);
+            schemas.appendChild(schema);
+        }
+
+        // /project/database/procedures
+        final Element procedures = doc.createElement("procedures");
+        database.appendChild(procedures);
+
+        // procedures/procedure
+        for (final ProcedureInfo procedure : m_procedures) {
+            if (procedure.cls == null)
+                continue;
+            assert(procedure.sql == null);
+
+            final Element proc = doc.createElement("procedure");
+            proc.setAttribute("class", procedure.cls.getName());
+            // build up @groups. This attribute should be redesigned
+            if (procedure.groups.length > 0) {
+                final StringBuilder groupattr = new StringBuilder();
+                for (final String group : procedure.groups) {
+                    if (groupattr.length() > 0)
+                        groupattr.append(",");
+                    groupattr.append(group);
+                }
+                proc.setAttribute("groups", groupattr.toString());
+            }
+            procedures.appendChild(proc);
+        }
+
+        // procedures/procedures (that are stmtprocedures)
+        for (final ProcedureInfo procedure : m_procedures) {
+            if (procedure.sql == null)
+                continue;
+            assert(procedure.cls == null);
+
+            final Element proc = doc.createElement("procedure");
+            proc.setAttribute("class", procedure.name);
+            if (procedure.partitionInfo != null);
+            proc.setAttribute("partitioninfo", procedure.partitionInfo);
+            // build up @groups. This attribute should be redesigned
+            if (procedure.groups.length > 0) {
+                final StringBuilder groupattr = new StringBuilder();
+                for (final String group : procedure.groups) {
+                    if (groupattr.length() > 0)
+                        groupattr.append(",");
+                    groupattr.append(group);
+                }
+                proc.setAttribute("groups", groupattr.toString());
+            }
+
+            final Element sql = doc.createElement("sql");
+            if (procedure.joinOrder != null) {
+                sql.setAttribute("joinorder", procedure.joinOrder);
+            }
+            proc.appendChild(sql);
+
+            final Text sqltext = doc.createTextNode(procedure.sql);
+            sql.appendChild(sqltext);
+
+            procedures.appendChild(proc);
+        }
+
+        if (m_partitionInfos.size() > 0) {
+            // /project/database/partitions
+            final Element partitions = doc.createElement("partitions");
+            database.appendChild(partitions);
+
+            // partitions/table
+            for (final Entry<String, String> partitionInfo : m_partitionInfos.entrySet()) {
+                final Element table = doc.createElement("partition");
+                table.setAttribute("table", partitionInfo.getKey());
+                table.setAttribute("column", partitionInfo.getValue());
+                partitions.appendChild(table);
+            }
+        }
+
+        // /project/database/classdependencies
+        final Element classdeps = doc.createElement("classdependencies");
+        database.appendChild(classdeps);
+
+        // classdependency
+        for (final Class<?> supplemental : m_supplementals) {
+            final Element supp= doc.createElement("classdependency");
+            supp.setAttribute("class", supplemental.getName());
+            classdeps.appendChild(supp);
+        }
+
+        // project/database/export
+        if (m_exportTables.size() > 0) {
+            final Element export = doc.createElement("export");
+            database.appendChild(export);
+
+            // turn list into stupid comma separated attribute list
+            String groupsattr = "";
+            if (m_elAuthGroups != null) {
+                for (String s : m_elAuthGroups) {
+                    if (groupsattr.isEmpty()) {
+                        groupsattr += s;
+                    }
+                    else {
+                        groupsattr += "," + s;
+                    }
+                }
+                export.setAttribute("groups", groupsattr);
+            }
+
+            if (m_exportTables.size() > 0) {
+                final Element tables = doc.createElement("tables");
+                export.appendChild(tables);
+
+                for (String exportTableName : m_exportTables) {
+                    final Element table = doc.createElement("table");
+                    table.setAttribute("name", exportTableName);
+                    tables.appendChild(table);
+                }
+            }
+        }
     }
 
     /**
