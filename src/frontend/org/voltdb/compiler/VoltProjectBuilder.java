@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -29,6 +28,7 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,17 +40,6 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
@@ -649,7 +638,7 @@ public class VoltProjectBuilder {
         // this stuff could all be converted to org.voltdb.compiler.projectfile.*
         // jaxb objects and (WE ARE!) marshaled to XML. Just needs some elbow grease.
         // (see the deployment file code below, which has been converted).
-
+/*
         DocumentBuilderFactory docFactory;
         DocumentBuilder docBuilder;
         Document doc;
@@ -695,17 +684,30 @@ public class VoltProjectBuilder {
             return false;
         }
 
-        /*String xml = result.getWriter().toString();
-        System.out.println(xml);*/
+//        String xml = result.getWriter().toString();
+//        System.out.println(xml);
 
         final File projectFile =
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
+
+        */
+        final String projectPath = null;
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
-        boolean success = compiler.compileWithProjectXML(projectPath, jarPath);
+
+        int index = 0;
+        String[] schemaPath = new String[m_schemas.size()];
+        Iterator<String> ite = m_schemas.iterator();
+        while(ite.hasNext())
+        {
+            schemaPath[index] = ite.next();
+            index++;
+        }
+
+        boolean success = compiler.compileWithProjectXML(projectPath, jarPath, schemaPath);
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
