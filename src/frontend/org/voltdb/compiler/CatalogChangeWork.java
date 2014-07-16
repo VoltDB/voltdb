@@ -30,12 +30,14 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] catalogBytes, String deploymentString,
-            ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
+            String invocationName, ProcedureInvocationType type,
+            long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData, type, originalTxnId, originalUniqueId,
+              adminConnection, clientData, invocationName, type,
+              originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
               completionHandler);
         if (catalogBytes != null) {
@@ -62,6 +64,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.hostname,
               adhocDDL.adminConnection,
               adhocDDL.clientData,
+              adhocDDL.invocationName,
               adhocDDL.invocationType,
               adhocDDL.originalTxnId,
               adhocDDL.originalUniqueId,

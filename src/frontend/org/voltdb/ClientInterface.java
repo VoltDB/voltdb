@@ -1496,7 +1496,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
-                task.type, task.originalTxnId, task.originalUniqueId,
+                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
@@ -1534,7 +1534,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
-                    task.type, task.originalTxnId, task.originalUniqueId,
+                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
