@@ -1014,7 +1014,7 @@ public class PlanAssembler {
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
 
-        AbstractParsedStmt subselect = m_parsedInsert.getSubselect();
+        ParsedSelectStmt subselect = m_parsedInsert.getSubselect();
         if (subselect != null) {
             if (!m_partitioning.wasSpecifiedAsSingle()) {
                 // for now, insert-into-select is only supported for the SP/SP case.
@@ -1023,6 +1023,7 @@ public class PlanAssembler {
 
             // setupForNewPlans ensures that we're not writing to a replicated table in a SP SP.
             assert (!targetTable.getIsreplicated());
+
         }
 
         CompiledPlan retval = new CompiledPlan();

@@ -180,7 +180,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     /**
      * @return the m_subselect
      */
-    public AbstractParsedStmt getSubselect() {
+    public ParsedSelectStmt getSubselect() {
         return m_subselect;
     }
 

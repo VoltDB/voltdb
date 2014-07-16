@@ -1133,9 +1133,10 @@ class NValue {
                 return result;
             }
         }
-        char errorDetail[strLength+10]; // Allocate enough extra for the text in the snprintf format.
-        snprintf(errorDetail, sizeof(errorDetail), "value: '%s'", safeBuffer);
-        throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, errorDetail);
+
+        std::ostringstream oss;
+        oss << "Could not convert string value '" << safeBuffer << "' to a number.";
+        throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, oss.str().c_str());
     }
 
     NValue castAsBigInt() const {

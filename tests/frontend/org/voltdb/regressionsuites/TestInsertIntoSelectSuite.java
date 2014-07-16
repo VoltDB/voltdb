@@ -29,6 +29,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestInsertIntoSelectSuite extends RegressionSuite {
@@ -47,43 +49,75 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
         try {
-                project.addLiteralSchema(
-                                "CREATE TABLE target_p (bi bigint not null," +
-                                                           "vc varchar(100) default '" + vcDefault +"'," +
-                                                           "ii integer default " + intDefault + "," +
-                                                           "ti tinyint default " + intDefault + ");" +
+            project.addLiteralSchema(
+                    "CREATE TABLE target_p (bi bigint not null," +
+                            "vc varchar(100) default '" + vcDefault +"'," +
+                            "ii integer default " + intDefault + "," +
+                            "ti tinyint default " + intDefault + ");" +
                             "partition table target_p on column bi;" +
 
-                                "CREATE TABLE source_p1 (bi bigint not null," +
-                                           "vc varchar(100)," +
-                                           "ii integer," +
-                                           "ti tinyint);" +
-                                           "partition table source_p1 on column bi;" +
+                    "CREATE TABLE source_p1 (bi bigint not null," +
+                    "vc varchar(100)," +
+                    "ii integer," +
+                    "ti tinyint);" +
+                    "partition table source_p1 on column bi;" +
 
-                                "CREATE TABLE source_p2 (bi bigint not null," +
-                                           "vc varchar(100)," +
-                                           "ii integer," +
-                                           "ti tinyint);" +
-                                           "partition table source_p2 on column bi;" +
+                    "CREATE TABLE source_p2 (bi bigint not null," +
+                    "vc varchar(100)," +
+                    "ii integer," +
+                    "ti tinyint);" +
+                    "partition table source_p2 on column bi;" +
 
-                            "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
-                            "partition procedure insert_p_source_p on table target_p column bi;" +
+                    "CREATE TABLE source_r (bi bigint not null," +
+                    "vc varchar(100)," +
+                    "ii integer," +
+                    "ti tinyint);" +
 
-                            "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
-                            "partition procedure insert_p_use_defaults on table target_p column bi;" +
+                    "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
+                    "partition procedure insert_p_source_p on table target_p column bi;" +
 
-                            "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
-                            "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
+                    "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
+                    "partition procedure insert_p_use_defaults on table target_p column bi;" +
 
-                            "create procedure CountTargetP as select count(*) from target_p;" +
+                    "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
+                    "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
 
-                                        "create procedure InsertIntoSelectWithJoin as " +
-                                                "insert into target_p " +
-                                                        "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
-                                                        "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
-                                                        "where sp1.bi = ?;" +
-                                        "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
-                                "");
+                    "create procedure insert_p_source_p_agg as insert into target_p (bi, vc, ii, ti) " +
+                    "select bi, max(vc), max(ii), min(ti)" + " from source_p1 where bi = ? group by bi;" +
+                    "partition procedure insert_p_source_p_agg on table target_p column bi;" +
+
+                        // transpose ti, ii, columns so there are implicit integer->tinyint and tinyint->integer casts
+                        "create procedure insert_p_source_p_cast as insert into target_p (bi, vc, ti, ii) select * from source_p1 where bi = ?;" +
+                        "partition procedure insert_p_source_p_cast on table target_p column bi;" +
+
+                        // source_p2.ii contains values that will not fit into tinyint, so this procedure should throw an out-of-range conversion exception
+                        "create procedure insert_p_source_p_cast_out_of_range as " +
+                        "insert into target_p (bi, vc, ti, ii) " +
+                        "select * from source_p2 where bi = ?;" +
+                        "partition procedure insert_p_source_p_cast_out_of_range on table target_p column bi;" +
+
+                        // Implicit string->int and int->string conversion.
+                        "create procedure insert_p_source_p_nonsensical_cast as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
+                        "partition procedure insert_p_source_p_nonsensical_cast on table target_p column bi;" +
+
+                        "create procedure select_and_insert_into_source as " +
+                        "insert into source_p1 (bi, vc, ti, ii) select bi, vc, ti, 1000 * ii from source_p1 where bi = ? order by bi, ti;" +
+                        "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
+
+                        // HSQL seems to want a cast for the parameter
+                        // Note that there is no filter in source_p
+                        "create procedure insert_param_in_select_list as " +
+                            "insert into target_p (bi, vc, ii, ti) " +
+                                "select cast(? as bigint), vc, ii, ti from source_r order by ii;" +
+                        "partition procedure insert_param_in_select_list on table target_p column bi;" +
+
+                        "create procedure InsertIntoSelectWithJoin as " +
+                        "insert into target_p " +
+                        "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
+                        "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
+                        "where sp1.bi = ?;" +
+                        "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
+                    "");
         } catch (IOException error) {
             fail(error.getMessage());
         }
@@ -103,8 +137,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         return builder;
     }
 
-    private static void initializeTables(Client client) throws Exception {
-
+    private static void clearTables(Client client) throws Exception {
         ClientResponse resp = client.callProcedure("@AdHoc", "delete from source_p1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
@@ -113,34 +146,53 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         resp = client.callProcedure("@AdHoc", "delete from target_p");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+    }
 
+    private static void initializeTables(Client client) throws Exception {
+
+        ClientResponse resp = null;
+
+        clearTables(client);
 
         for (int i=0; i < 10; i++) {
 
-            resp = client.callProcedure("SOURCE_P1.insert", i, Integer.toHexString(i), i, i);
+            resp = client.callProcedure("SOURCE_P1.insert", i, Long.toHexString(i), i, i);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P1.insert", i, Integer.toHexString(-i), -i, -i);
+            resp = client.callProcedure("SOURCE_P1.insert", i, Long.toHexString(-i), -i, -i);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P1.insert", i, Integer.toHexString(i * 11), i * 11, i * 11);
+            resp = client.callProcedure("SOURCE_P1.insert", i, Long.toHexString(i * 11), i * 11, i * 11);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P1.insert", i, Integer.toHexString(i * -11), i * -11, i * -11);
+            resp = client.callProcedure("SOURCE_P1.insert", i, Long.toHexString(i * -11), i * -11, i * -11);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
             int j = i + 5;
 
-            resp = client.callProcedure("SOURCE_P2.insert", j, Integer.toHexString(j), j, j);
+            resp = client.callProcedure("SOURCE_P2.insert", j, Long.toHexString(j), j, j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P2.insert", j, Integer.toHexString(-j), -j, -j);
+            resp = client.callProcedure("SOURCE_P2.insert", j, Long.toHexString(-j), -j, -j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P2.insert", j, Integer.toHexString(j * 11), j * 11, (j * 11) % 128);
+            resp = client.callProcedure("SOURCE_P2.insert", j, Long.toHexString(j * 11), j * 11, (j * 11) % 128);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_P2.insert", j, Integer.toHexString(j * -11), j * -11, -((j * 11) % 128));
+            resp = client.callProcedure("SOURCE_P2.insert", j, Long.toHexString(j * -11), j * -11, -((j * 11) % 128));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j), j, j);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(-j), -j, -j);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * 11), j * 11, (j * 11) % 128);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * -11), j * -11, -((j * 11) % 128));
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
     }
@@ -148,40 +200,91 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
     public void testPartitionedTableSimple() throws Exception
     {
         final Client client = getClient();
+        ClientResponse resp;
+
+        // Running the procedure with the first parameter (100) will cause 0 rows to be inserted
+        // The second parameter (5) will insert 4 rows into the target table
+        long[] params = new long[] {100, 5};
+        String[] procs = new String[] {"insert_p_source_p", "insert_p_source_p_cast"};
+
+        for (long param : params) {
+            for (String proc : procs) {
+
+                initializeTables(client);
+
+                resp = client.callProcedure(proc, param);
+                assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+                long numRowsInserted = resp.getResults()[0].asScalarLong();
+
+                // verify that the corresponding rows in both tables are the same
+                String selectAllSource = "select * from source_p1 where bi = " + param + " order by bi, ii";
+                String selectAllTarget = "select * from target_p order by bi, ii";
+
+                resp = client.callProcedure("@AdHoc", selectAllSource);
+                assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+                VoltTable sourceRows = resp.getResults()[0];
+
+                resp = client.callProcedure("@AdHoc", selectAllTarget);
+                assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+                VoltTable targetRows = resp.getResults()[0];
+
+                int i = 0;
+                while(targetRows.advanceRow()) {
+                    assertEquals(true, sourceRows.advanceRow());
+                    assertEquals(sourceRows.getLong(0), targetRows.getLong(0));
+                    assertEquals(sourceRows.getString(1), targetRows.getString(1));
+                    assertEquals(sourceRows.getLong(2), targetRows.getLong(2));
+                    assertEquals(sourceRows.getLong(3), targetRows.getLong(3));
+                    i++;
+                }
+
+                assertEquals(numRowsInserted, i);
+            }
+        }
+    }
+
+    public void testSelectWithAggregation() throws Exception {
+        final Client client = getClient();
+        final long partitioningValue = 7;
 
         initializeTables(client);
 
-        ClientResponse resp;
-
-        resp = client.callProcedure("insert_p_source_p", 5);
+        ClientResponse resp = client.callProcedure("insert_p_source_p_agg", partitioningValue);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        validateTableOfScalarLongs(resp.getResults()[0], new long[] {1});
 
-        long numRows = resp.getResults()[0].asScalarLong();
-        assertEquals(4, numRows);
-
-        resp = client.callProcedure("CountTargetP");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(numRows, resp.getResults()[0].asScalarLong());
-
-        // verify that the corresponding rows in both tables are the same
-        String selectAllSource = "select * from source_p1 where bi = 5 order by bi, ii";
-        String selectAllTarget = "select * from target_p order by bi, ii";
-
-        resp = client.callProcedure("@AdHoc", selectAllSource);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable sourceRows = resp.getResults()[0];
-
-        resp = client.callProcedure("@AdHoc", selectAllTarget);
+        resp = client.callProcedure("@AdHoc", "select * from target_p order by bi");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable targetRows = resp.getResults()[0];
 
-        while(sourceRows.advanceRow()) {
-                assertEquals(true, targetRows.advanceRow());
-                assertEquals(sourceRows.getLong(0), targetRows.getLong(0));
-                assertEquals(sourceRows.getString(1), targetRows.getString(1));
-                assertEquals(sourceRows.getLong(2), targetRows.getLong(2));
-                assertEquals(sourceRows.getLong(3), targetRows.getLong(3));
-        }
+        assertTrue(targetRows.advanceRow());
+
+        assertEquals(partitioningValue, targetRows.getLong(0));
+        assertEquals(Long.toHexString(-partitioningValue), targetRows.getString(1));
+        assertEquals(partitioningValue * 11, targetRows.getLong(2));
+        assertEquals(partitioningValue * -11, targetRows.getLong(3));
+
+        assertFalse(targetRows.advanceRow());
+    }
+
+    public void testOutOfRangeImplicitCasts() throws Exception {
+        final Client client = getClient();
+        final long partitioningValue = 14;
+
+        initializeTables(client);
+
+        verifyProcFails(client, "value is out of range", "insert_p_source_p_cast_out_of_range", partitioningValue);
+    }
+
+    public void testNonsensicalCasts() throws Exception {
+        final Client client = getClient();
+        final long partitioningValue = 5;
+
+        initializeTables(client);
+
+        verifyProcFails(client, "Could not convert string value",
+                "insert_p_source_p_nonsensical_cast", partitioningValue);
     }
 
     public void testPartitionedTableWithSelectJoin() throws Exception
@@ -230,6 +333,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         ClientResponse resp;
         long partitioningValue = 8;
 
+        // Both inserts use the select to produce values only for a subset of columns.
         String[] procs = new String[] {"insert_p_use_defaults", "insert_p_use_defaults_reorder"};
 
         for (String proc : procs) {
@@ -259,12 +363,75 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 assertEquals(intDefault, targetRows.getLong(2));
                 assertEquals(sp1Rows.getLong(3), targetRows.getLong(3));
             }
+            assertFalse(sp1Rows.advanceRow());
         }
+    }
+
+    public void testInsertIntoSelectSameTable() throws Exception {
+        final Client client = getClient();
+        initializeTables(client);
+
+        final long partitioningValue = 3;
+        ClientResponse resp = client.callProcedure("select_and_insert_into_source", partitioningValue);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        validateTableOfScalarLongs(resp.getResults()[0], new long[] {4});
+
+        String selectOrigRows = "select * from source_p1 where bi = ? and abs(ii) < 1000 order by bi, ii";
+        String selectNewRows = "select * from source_p1 where bi = ? and abs(ii) > 1000 order by bi, ii";
+
+        resp = client.callProcedure("@AdHoc", selectOrigRows, partitioningValue);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable origRows = resp.getResults()[0];
+
+        resp = client.callProcedure("@AdHoc", selectNewRows, partitioningValue);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable newRows = resp.getResults()[0];
+
+        while (origRows.advanceRow()) {
+            assertTrue(newRows.advanceRow());
+
+            assertEquals(origRows.getLong(0), newRows.getLong(0));
+            assertEquals(origRows.getString(1), newRows.getString(1));
+            assertEquals(origRows.getLong(2) * 1000, newRows.getLong(2));
+            assertEquals(origRows.getLong(3), newRows.getLong(3));
+
+        }
+        assertFalse(newRows.advanceRow());
+    }
+
+    private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse resp = client.callProcedure("@AdHoc", adHocQuery);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        return resp.getResults()[0];
+    }
+
+    public void testSelectListParam() throws Exception {
+        final Client client = getClient();
+        initializeTables(client);
+
+        final long partitioningValue = 7;
+        ClientResponse resp = client.callProcedure("insert_param_in_select_list", partitioningValue);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        // tables should be identical except for "bi"
+        VoltTable sourceRows = getRows(client, "select * from source_r order by ii");
+        VoltTable targetRows = getRows(client, "select * from target_p order by ii");
+
+        //fail("target: " + targetRows);
+
+        while (sourceRows.advanceRow()) {
+            assertTrue(targetRows.advanceRow());
+
+            assertEquals(partitioningValue, targetRows.getLong(0));
+            assertEquals(sourceRows.getString(1), targetRows.getString(1));
+            assertEquals(sourceRows.getLong(2), targetRows.getLong(2));
+            assertEquals(sourceRows.getLong(3), targetRows.getLong(3));
+        }
+        assertFalse(targetRows.advanceRow());
     }
 
     public void testInsertIntoSelectAdHocFails() throws IOException {
         // for now only SP/SP is supported for insert-into-select
-        verifyStmtFails(getClient(), "insert into target_p select * from source_p1",
-                "only supported for single-partition stored procedures");
+        verifyStmtFails(getClient(), "insert into target_p select * from source_p1", "only supported for single-partition stored procedures");
     }
 }

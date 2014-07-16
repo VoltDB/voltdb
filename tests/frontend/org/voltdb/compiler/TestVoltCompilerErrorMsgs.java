@@ -140,5 +140,15 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 "create procedure MyInsert as insert into blah (sval) " +
                     "select sval from indexed_blah where sval = ? union select sval from indexed_blah where sval = ?;");
 
+        ddlErrorTest("number of target columns does not match that of query expression",
+                "create procedure MyInsert as insert into partitioned_blah (sval) select sval, sval || '!' from indexed_blah where sval = ?;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // parameter in select list needs a cast.
+        ddlErrorTest("data type cast needed for parameter or null literal",
+                "create procedure insert_param_in_select_list as " +
+                    "insert into partitioned_blah (ival, sval) " +
+                        "select ival, ? from blah order by ival, sval;",
+                "partition procedure insert_param_in_select_list on table partitioned_blah column sval;");
     }
 }

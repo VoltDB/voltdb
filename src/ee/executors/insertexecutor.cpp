@@ -118,16 +118,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     m_node->initTemplateTuple(m_engine, templateTuple);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-#ifdef DEBUG
-    //
-    // This should probably just be a warning in the future when we are
-    // running in a distributed cluster
-    //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_TRACE("No tuples were found in our input table '%s'", m_inputTable->name().c_str());
-        return false;
-    }
-#endif
 
     // count the number of successful inserts
     int modifiedTuples = 0;
@@ -148,7 +138,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             templateTuple.setNValue(m_node->getFieldMap()[i], inputTuple.getNValue(i));
         }
 
-        // ... enable for debug */
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    templateTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                    targetTable->schema()->debug().c_str());
