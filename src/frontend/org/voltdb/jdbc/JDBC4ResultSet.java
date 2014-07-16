@@ -124,11 +124,11 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         try {
             // for negative row numbers or row numbers lesser then activeRowIndex, resetRowPosition
             // method is called and the cursor advances to the desired row from top of the table
-            if(row < 0 || table.getActiveRowIndex() > row || table.getActiveRowIndex() < 0) {
-                if(row < 0) {
-                    row += rowCount;
-                    row++;
-                }
+            if(row < 0) {
+                row += rowCount;
+                row++;
+            }
+            if(table.getActiveRowIndex() > row || cursorPosition != Position.middle) {
                 table.resetRowPosition();
                 table.advanceToRow(0);
             }
@@ -152,12 +152,8 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public void beforeFirst() throws SQLException {
         checkClosed();
-        try {
-            cursorPosition = Position.beforeFirst;
-            table.resetRowPosition();
-        } catch (Exception x) {
-            throw SQLError.get(x);
-        }
+        cursorPosition = Position.beforeFirst;
+        table.resetRowPosition();
     }
 
     // Cancels the updates made to the current row in this ResultSet object.
@@ -721,11 +717,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public int getRow() throws SQLException {
         checkClosed();
-
         if (cursorPosition != Position.middle) {
             return 0;
         }
-
         try {
             return table.getActiveRowIndex() + 1;
         } catch (Exception x) {
@@ -954,14 +948,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean isAfterLast() throws SQLException {
         checkClosed();
-        try {
-            if(cursorPosition == Position.afterLast) {
-                return true;
-            }
-            return false;
-        } catch (Exception x) {
-            throw SQLError.get(x);
+        if(cursorPosition == Position.afterLast) {
+            return true;
         }
+        return false;
     }
 
     // Retrieves whether the cursor is before the first row in this ResultSet
@@ -969,14 +959,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean isBeforeFirst() throws SQLException {
         checkClosed();
-        try {
-            if(cursorPosition == Position.beforeFirst) {
-                return true;
-            }
-            return false;
-        } catch (Exception x) {
-            throw SQLError.get(x);
+        if(cursorPosition == Position.beforeFirst) {
+            return true;
         }
+        return false;
     }
 
     // Retrieves whether this ResultSet object has been closed.
@@ -990,6 +976,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean isFirst() throws SQLException {
         checkClosed();
+        if(cursorPosition != Position.middle) {
+            return false;
+        }
         try {
             return table.getActiveRowIndex() == 0;
         } catch (Exception x) {
@@ -1001,6 +990,9 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean isLast() throws SQLException {
         checkClosed();
+        if(cursorPosition != Position.middle) {
+            return false;
+        }
         try {
             return table.getActiveRowIndex() == rowCount - 1;
         } catch (Exception x) {
@@ -1012,11 +1004,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
     @Override
     public boolean last() throws SQLException {
         checkClosed();
+        if (rowCount == 0) {
+            return false;
+        }
         try {
-            if (rowCount == 0) {
-                return false;
-            }
-
             if (cursorPosition != Position.middle) {
                 cursorPosition = Position.middle;
                 table.resetRowPosition();
@@ -1068,7 +1059,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
         if (cursorPosition == Position.afterLast) {
             return last();
         }
-        if (cursorPosition == Position.beforeFirst || table.getActiveRowIndex() == -1) {
+        if (cursorPosition == Position.beforeFirst || table.getActiveRowIndex() <= 0) {
             beforeFirst();
             return false;
         }
@@ -1126,6 +1117,10 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
                 }
                 else {
                     rowsToMove = table.getActiveRowIndex() + rows;
+                }
+                if(rowsToMove < 0){
+                    beforeFirst();
+                    return false;
                 }
                 table.resetRowPosition();
                 table.advanceToRow(0);

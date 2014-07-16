@@ -341,6 +341,18 @@ public class TestJDBCResultSet {
         hsql3RowRS.afterLast();
         volt3RowRS.afterLast();
         assertEquals(hsql3RowRS.relative(1), volt3RowRS.relative(1));
+
+        hsql3RowRS.absolute(3);
+        volt3RowRS.absolute(3);
+        assertEquals(hsql3RowRS.absolute(3), volt3RowRS.absolute(3));
+        assertEquals(hsql3RowRS.relative(-3), volt3RowRS.relative(-3));
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
+
+        assertEquals(hsql3RowRS.absolute(1), volt3RowRS.absolute(1));
+        hsql3RowRS.afterLast();
+        volt3RowRS.afterLast();
+        assertEquals(hsql3RowRS.relative(-4), volt3RowRS.relative(-4));
+        assertEquals(hsql3RowRS.getRow(), volt3RowRS.getRow());
     }
 
     @Test
