@@ -89,7 +89,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class SnapshotUtil {
 
     public final static String HASH_EXTENSION = ".hash";
-    public final static String COMPLETION_EXTENSION = ".complete";
+    public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
     public static final String JSON_NONCE = "nonce";
@@ -442,14 +442,14 @@ public class SnapshotUtil {
 
         final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
         if (f.exists()) {
-            throw new IOException(".complete file was already exist: " + f);
+            throw new IOException(".complete file was already existed: " + f);
         }
         return new Runnable() {
             @Override
             public void run() {
                 try {
                     if (!f.createNewFile()) {
-                        System.err.println("Can not create .complete file for " + f.getName());
+                        System.err.println("Failed to create .complete file for " + f.getName());
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
