@@ -35,10 +35,10 @@ import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
+import org.hsqldb_voltpatches.Session;
 
 /**
  * Common elements for Type instances for DATETIME and INTERVAL.<p>
@@ -194,7 +194,7 @@ public abstract class DTIType extends Type {
             if (i == startPartIndex) {
                 int startDigits = precision == 0 ? 2
                                                  : (int) precision;
-                int zeros = startDigits - getPrecisionExponent(part);
+                int zeros = (int) startDigits - getPrecisionExponent(part);
 /*
                 for (int j = 0; j < zeros; j++) {
                     buffer.append('0');
