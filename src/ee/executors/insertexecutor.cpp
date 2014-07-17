@@ -135,7 +135,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     while (iterator.next(inputTuple)) {
 
         for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
-            templateTuple.setNValue(m_node->getFieldMap()[i], inputTuple.getNValue(i));
+            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
+                                                           inputTuple.getNValue(i),
+                                                           ExecutorContext::getTempStringPool());
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",

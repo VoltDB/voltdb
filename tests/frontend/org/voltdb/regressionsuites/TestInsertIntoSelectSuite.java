@@ -69,7 +69,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "partition table source_p2 on column bi;" +
 
                 "CREATE TABLE source_r (bi bigint not null," +
-                "vc varchar(100)," +
+                "vc varchar(4)," +
                 "ii integer," +
                 "ti tinyint);" +
 
@@ -118,7 +118,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "where sp1.bi = ?;" +
                 "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
                 "";
-        project.addLiteralSchema(schema);
+            project.addLiteralSchema(schema);
         } catch (IOException error) {
             fail(error.getMessage());
         }
@@ -135,6 +135,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertTrue(t2);
         builder.addServerConfig(config);
         // ... disable for speed) */
+
         return builder;
     }
 
@@ -187,15 +188,20 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j), j, j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(-j), -j, -j);
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(-j).substring(0, 3), -j, -j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
             resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * 11), j * 11, (j * 11) % 128);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * -11), j * -11, -((j * 11) % 128));
+            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * -11).substring(0, 3), j * -11, -((j * 11) % 128));
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
+    }
+
+    public void testInsertIntoSelectAdHocFails() throws IOException {
+        // for now only SP/SP is supported for insert-into-select
+        verifyStmtFails(getClient(), "insert into target_p select * from source_p1", "only supported for single-partition stored procedures");
     }
 
     public void testPartitionedTableSimple() throws Exception
@@ -301,19 +307,19 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         assertEquals(4, resp.getResults()[0].asScalarLong());
 
-        String selectSp1 = "select * from source_p1 where bi = " + partitioningValue;
-        String selectSp2 = "select * from source_p2 where bi = " + partitioningValue;
-        String selectTarget = "select * from target_p";
+        String selectSp1 = "select * from source_p1 where bi = ? order by bi, ii";
+        String selectSp2 = "select * from source_p2 where bi = ? order by bi, ii";
+        String selectTarget = "select * from target_p order by bi, ii";
 
         resp = client.callProcedure("@AdHoc", selectTarget);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable targetRows = resp.getResults()[0];
 
-        resp = client.callProcedure("@AdHoc", selectSp1);
+        resp = client.callProcedure("@AdHoc", selectSp1, partitioningValue);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable sp1Rows = resp.getResults()[0];
 
-        resp = client.callProcedure("@AdHoc", selectSp2);
+        resp = client.callProcedure("@AdHoc", selectSp2, partitioningValue);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable sp2Rows = resp.getResults()[0];
 
@@ -343,16 +349,14 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             resp = client.callProcedure(proc, partitioningValue);
             validateTableOfScalarLongs(resp.getResults()[0], new long[] {4});
 
-            resp = client.callProcedure("@AdHoc", "select * from target_p");
-
-            String selectSp1 = "select * from source_p1 where bi = " + partitioningValue;
-            String selectTarget = "select * from target_p";
+            String selectSp1 = "select * from source_p1 where bi = ? order by bi, ti";
+            String selectTarget = "select * from target_p order by bi, ti";
 
             resp = client.callProcedure("@AdHoc", selectTarget);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable targetRows = resp.getResults()[0];
 
-            resp = client.callProcedure("@AdHoc", selectSp1);
+            resp = client.callProcedure("@AdHoc", selectSp1, partitioningValue);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable sp1Rows = resp.getResults()[0];
 
@@ -431,8 +435,4 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertFalse(targetRows.advanceRow());
     }
 
-    public void testInsertIntoSelectAdHocFails() throws IOException {
-        // for now only SP/SP is supported for insert-into-select
-        verifyStmtFails(getClient(), "insert into target_p select * from source_p1", "only supported for single-partition stored procedures");
-    }
 }

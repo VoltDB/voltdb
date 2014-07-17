@@ -1104,11 +1104,15 @@ public class PlanAssembler {
             matNode.setOutputSchema(matSchema);
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
+
+            retval.statementGuaranteesDeterminism(false, true);
         } else {
             retval = getBestCostPlan(subselect, false);
-
             retval.readOnly = false;
 
+            boolean orderIsDeterministic = m_parsedInsert.getSubselect().isOrderDeterministic();
+            boolean hasLimitOrOffset = m_parsedInsert.getSubselect().hasLimitOrOffset();
+            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
             insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
