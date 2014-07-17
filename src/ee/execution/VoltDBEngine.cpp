@@ -811,11 +811,11 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // now find all of the indexes to remove
             //////////////////////////////////////////
 
-            bool found = false;
             // iterate through all of the existing indexes
             for (int i = 0; i < currentIndexes.size(); i++) {
                 std::string currentIndexId = currentIndexes[i]->getId();
 
+                bool found = false;
                 // iterate through all of the catalog indexes,
                 //  looking for a match.
                 map<string, catalog::Index*>::const_iterator indexIter;
