@@ -1100,10 +1100,6 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
             }
             return false;
         }
-        if (rows + table.getActiveRowIndex() < 0 && cursorPosition != Position.afterLast) {
-            beforeFirst();
-            return false;
-        }
         try {
             // for negative row numbers, resetRowPosition method is called
             // and the cursor advances to the desired row from top of the table
