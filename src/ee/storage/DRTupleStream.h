@@ -84,6 +84,19 @@ public:
     void rollbackTo(size_t mark) {}
 };
 
+class DRTupleStreamDisableGuard {
+public:
+    DRTupleStreamDisableGuard(DRTupleStream *stream) : m_stream(stream), m_oldValue(stream->m_enabled) {
+        stream->m_enabled = false;
+    }
+    ~DRTupleStreamDisableGuard() {
+        m_stream->m_enabled = m_oldValue;
+    }
+private:
+    DRTupleStream *m_stream;
+    const bool m_oldValue;
+};
+
 }
 
 #endif

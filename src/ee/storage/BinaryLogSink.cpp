@@ -74,7 +74,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
                 TableTuple deleteTuple = table->lookupTuple(tempTuple);
                 table->deleteTuple(deleteTuple, false);
             } else {
-                table->insertTuple(tempTuple);
+                table->insertPersistentTuple(tempTuple, false);
             }
             break;
         }
