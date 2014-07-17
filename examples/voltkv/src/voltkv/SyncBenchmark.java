@@ -369,14 +369,14 @@ public class SyncBenchmark {
             while (warmupComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
-                    // Get a key/value pair, synchronously
+                    // Get a key/value pair using inbuilt select procedure, synchronously
                     try {
                         client.callProcedure("STORE.select", processor.generateRandomKeyForRetrieval());
                     }
                     catch (Exception e) {}
                 }
                 else {
-                    // Put a key/value pair, synchronously
+                    // Put a key/value pair using inbuilt upsert procedure, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
                         client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());
@@ -388,7 +388,7 @@ public class SyncBenchmark {
             while (benchmarkComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
-                    // Get a key/value pair, synchronously
+                    // Get a key/value pair using inbuilt select procedure, synchronously
                     try {
                         ClientResponse response = client.callProcedure("STORE.select",
                                 processor.generateRandomKeyForRetrieval());
@@ -411,7 +411,7 @@ public class SyncBenchmark {
                     }
                 }
                 else {
-                    // Put a key/value pair, synchronously
+                    // Put a key/value pair using inbuilt upsert procedure, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
                         client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());

@@ -179,7 +179,7 @@ public class JDBCBenchmark
                         final PayloadProcessor.Pair pair = processor.generateForStore();
                         try
                         {
-                            // Put a key/value pair, asynchronously
+                            // Put a key/value pair using inbuilt upsert procedure, asynchronously
                             putCS.setString(1, pair.Key);
                             putCS.setBytes(2, pair.getStoreValue());
                             putCS.executeUpdate();

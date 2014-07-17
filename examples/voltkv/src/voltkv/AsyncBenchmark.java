@@ -463,11 +463,11 @@ public class AsyncBenchmark {
         while (warmupEndTime > System.currentTimeMillis()) {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
+                // Get a key/value pair using inbuilt select procedure, asynchronously
                 client.callProcedure(new NullCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
             }
             else {
-                // Put a key/value pair, asynchronously
+                // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 client.callProcedure(new NullCallback(), "STORE.upsert", pair.Key, pair.getStoreValue());
             }
@@ -488,11 +488,11 @@ public class AsyncBenchmark {
         while (benchmarkEndTime > System.currentTimeMillis()) {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
+                // Get a key/value pair using inbuilt select procedure, asynchronously
                 client.callProcedure(new GetCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
             }
             else {
-                // Put a key/value pair, asynchronously
+                // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 client.callProcedure(new PutCallback(pair), "STORE.upsert", pair.Key, pair.getStoreValue());
             }
