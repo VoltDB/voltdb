@@ -641,10 +641,10 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
+        AggregateSerialExecutor::p_execute_tuple(nextTuple);
         if (m_earlyReturn) {
             return true;
         }
-        AggregateSerialExecutor::p_execute_tuple(nextTuple);
     }
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");

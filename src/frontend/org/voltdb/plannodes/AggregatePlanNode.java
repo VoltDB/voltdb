@@ -384,17 +384,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
             sb.append(" HAVING " + m_postPredicate.explain("VOLT_TEMP_TABLE"));
         }
 
-        for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
-            // don't bother with inlined projections
-            if (( ! m_verboseExplainForDebugging) &&
-                (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
-                continue;
-            }
-            String newIndent = indent + indent;
-            sb.append("\n" + newIndent + "inline ");
-            sb.append(inlineNode.explainPlanForNode(newIndent));
-        }
-
         return sb.toString();
     }
 
