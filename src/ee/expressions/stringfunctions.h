@@ -271,8 +271,8 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     }
 
     size_t cur = 0;
-    boost::scoped_array<char> smart(new char[size]);
-    char *buffer = smart.get();
+    char *buffer = new char[size];
+    boost::scoped_array<char> smart(buffer);
     for(std::vector<NValue>::const_iterator iter = arguments.begin(); iter !=arguments.end(); iter++) {
         size_t cur_size = iter->getObjectLength_withoutNull();
         char *next = reinterpret_cast<char*>(iter->getObjectValue_withoutNull());
@@ -280,8 +280,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
         cur += cur_size;
     }
 
-    NValue rv = getTempStringValue(buffer, cur);
-    return rv;
+    return getTempStringValue(buffer, cur);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
