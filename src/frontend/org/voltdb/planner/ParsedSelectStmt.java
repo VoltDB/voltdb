@@ -1021,11 +1021,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 aggColumnIt.remove();
             }
         }
-        // If there is no OFFSET the GROUP BY columns can be dropped as well - we only need a single row anyway
-        if (!selectStmt.hasOffset()) {
-            selectStmt.groupByColumns.clear();
-            selectStmt.orderColumns.clear();
-        }
         selectStmt.needComplexAggregation();
 
         // Drop DISTINCT expression
