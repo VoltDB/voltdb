@@ -60,7 +60,6 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     {
         assert(jarFileName != null);
         assert(siteCount > 0);
-        final String buildType = System.getenv().get("BUILD");
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
         if (LocalCluster.isMemcheckDefined() && target.equals(BackendTarget.NATIVE_EE_JNI)) {
