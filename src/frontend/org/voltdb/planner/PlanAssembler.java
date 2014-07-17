@@ -1335,17 +1335,14 @@ public class PlanAssembler {
                 root.addAndLinkChild(topLimit);
             }
         } else {
-            if (isInlineLimitPlanNodePossible(root))
-            {
+            if (isInlineLimitPlanNodePossible(root)) {
                 root.addInlinePlanNode(topLimit);
             } else if (root instanceof ProjectionPlanNode &&
-                    isInlineLimitPlanNodePossible(root.getChild(0)) )
-            {
+                    isInlineLimitPlanNodePossible(root.getChild(0)) ) {
                 // In future, inlined this projection node for OrderBy and Aggregate
                 // Then we could delete this ELSE IF block.
                 root.getChild(0).addInlinePlanNode(topLimit);
-            } else
-            {
+            } else {
                 topLimit.addAndLinkChild(root);
                 root = topLimit;
             }
