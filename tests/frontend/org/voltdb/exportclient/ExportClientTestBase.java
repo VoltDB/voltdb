@@ -62,6 +62,11 @@ public class ExportClientTestBase {
 
     static AdvertisedDataSource constructTestSource(boolean replicated, int partition)
     {
+        return constructTestSource(replicated, partition, "yankeelover");
+    }
+
+    static AdvertisedDataSource constructTestSource(boolean replicated, int partition, String tableName)
+    {
         ArrayList<String> col_names = new ArrayList<String>();
         ArrayList<VoltType> col_types = new ArrayList<VoltType>();
         for (int i = 0; i < COLUMN_TYPES.length; i++)
@@ -72,7 +77,7 @@ public class ExportClientTestBase {
         String partCol = replicated ? null : "smallint";
         //clear the table
         vtable.clearRowData();
-        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", "yankeelover",
+        AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", tableName,
                 partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
                 AdvertisedDataSource.ExportFormat.FOURDOTFOUR);
         return source;
