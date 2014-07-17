@@ -801,6 +801,7 @@ public class VoltCompiler {
             try {
                 compileDatabaseNode(database, ddlReaderList, jarOutput);
             } catch (final VoltCompilerException e) {
+                e.printStackTrace();
                 return null;
             }
         }
