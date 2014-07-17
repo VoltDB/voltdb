@@ -371,7 +371,7 @@ public class SyncBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        client.callProcedure("Get", processor.generateRandomKeyForRetrieval());
+                        client.callProcedure("STORE.select", processor.generateRandomKeyForRetrieval());
                     }
                     catch (Exception e) {}
                 }
@@ -379,7 +379,7 @@ public class SyncBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());
                     }
                     catch (Exception e) {}
                 }
@@ -390,7 +390,7 @@ public class SyncBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        ClientResponse response = client.callProcedure("Get",
+                        ClientResponse response = client.callProcedure("STORE.select",
                                 processor.generateRandomKeyForRetrieval());
 
                         final VoltTable pairData = response.getResults()[0];
@@ -414,7 +414,7 @@ public class SyncBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
@@ -447,7 +447,7 @@ public class SyncBenchmark {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
-                                     "Put",
+                                     "STORE.upsert",
                                      String.format(processor.KeyFormat, i),
                                      processor.generateForStore().getStoreValue());
             }

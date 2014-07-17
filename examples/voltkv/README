@@ -46,6 +46,12 @@ For more on benchmarking and tips on application tuning, make sure you visit the
  - http://voltdb.com/search/node/benchmark
  - http://voltdb.com/search/node/tuning
 
+Calling stored procedures
+-------------------------
+
+Clients can make procedure calls to the server. A Get procedure call is equivalent to calling STORE.select procedure and for the PUT procedure calls (insert or update) STORE.upsert procedure can be called.
+All the three types of clients supports Select and Upsert procedures.
+
 run.sh actions described
 ---------------------
 
