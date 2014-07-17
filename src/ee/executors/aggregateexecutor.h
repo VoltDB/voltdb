@@ -278,7 +278,6 @@ public:
     void p_execute_finish();
 
 protected:
-    void getNextGroupByValues(const TableTuple& nextTuple);
     AggregateRow * m_aggregateRow;
     std::vector<NValue> m_inProgressGroupByValues;
     std::vector<NValue> m_nextGroupByValues;
@@ -289,15 +288,16 @@ protected:
 
 private:
     virtual bool p_execute(const NValueArray& params);
+    void getNextGroupByValues(const TableTuple& nextTuple);
 };
 
 
-class AggregatePartialExecutor : public AggregateSerialExecutor
+class AggregatePartialExecutor : public AggregateExecutorBase
 {
 public:
     AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateSerialExecutor(engine, abstract_node) { }
-    ~AggregatePartialExecutor();
+        AggregateExecutorBase(engine, abstract_node) { }
+    ~AggregatePartialExecutor() {};
 
     void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
@@ -308,11 +308,19 @@ public:
 private:
     virtual bool p_execute(const NValueArray& params);
 
+    void getNextGroupByValues(const TableTuple& nextTuple);
     void initPartialHashGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple,
             const TableTuple& nxtTuple);
 
+    std::vector<NValue> m_inProgressGroupByValues;
+    std::vector<NValue> m_nextGroupByValues;
+
     HashAggregateMapType m_hash;
     PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
+
+    const TupleSchema * m_inputSchema;
+
+    bool m_atTheFirstRow;
 };
 
 
