@@ -94,23 +94,23 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "}";
 
         ClientResponse cr;
-        cr = client.callProcedure("JS1.insert",1,String.format(jstemplate, 1, 1, 1, 1, 1, 1, "one"));
+        cr = client.callProcedure("JS1.insert", 1, String.format(jstemplate, 1, 1, 1, 1, 1, 1, "one"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",2,String.format(jstemplate, 2, 2, 2, 2, 2, 2, "two"));
+        cr = client.callProcedure("JS1.insert", 2, String.format(jstemplate, 2, 2, 2, 2, 2, 2, "two"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",3,String.format(jstemplate, 3, 3, 3, 3, 3, 3, "three"));
+        cr = client.callProcedure("JS1.insert", 3, String.format(jstemplate, 3, 3, 3, 3, 3, 3, "three"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",4,"{\"id\":4,\"bool\": false}");
+        cr = client.callProcedure("JS1.insert", 4, "{\"id\":4,\"bool\": false}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",5,"{}");
+        cr = client.callProcedure("JS1.insert", 5, "{}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",6,"[]");
+        cr = client.callProcedure("JS1.insert", 6, "[]");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",7,"{\"id\":7,\"funky\": null}");
+        cr = client.callProcedure("JS1.insert", 7, "{\"id\":7,\"funky\": null}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",8, null);
+        cr = client.callProcedure("JS1.insert", 8, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
+        cr = client.callProcedure("JS1.insert", 9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
@@ -180,7 +180,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(8L,result.getLong(0));
 
-        cr = client.callProcedure("InnerFieldProc", "贾鑫Vo" ,"wakarimasen");
+        cr = client.callProcedure("InnerFieldProc", "贾鑫Vo", "wakarimasen");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(3, result.getRowCount());
