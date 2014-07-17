@@ -924,8 +924,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     expr, (AbstractExpression) colInfo.expression.clone());
             // Check if this column contains aggregate expression
             if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
-                List<AbstractExpression> agrExprssions = colInfo.expression.findAllSubexpressionsOfClass(AggregateExpression.class);
-                selectStmt.m_aggregationList.addAll(agrExprssions);
+                // we are not creating any new aggregate expressions so
+                // the aggregation list doen't need to be updated. Only HAVING expression itself
                 havingList.add(equalityExpr);
             } else {
                 whereList.add(equalityExpr);
@@ -944,12 +944,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 havingList.add(selectStmt.having);
             }
             selectStmt.having = ExpressionUtil.combine(havingList);
+            // reprocess HAVING expressions
+            ExpressionUtil.finalizeValueTypes(selectStmt.having);
         }
 
-        // reprocess HAVING expressions
-        if (selectStmt.having != null) {
-            selectStmt.parseHavingExpression(false);
-        }
         selectStmt.m_aggregationList = null;
 
         if (selectStmt.needComplexAggregation()) {
@@ -977,64 +975,64 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @return existsExpr
      */
     protected static void simplifyExistsExpression(ParsedSelectStmt selectStmt) {
-        // Replace the display columns with a single dummy column "1"
-        boolean canSimplifyDisplaySchema = !selectStmt.hasAggregateExpression;
-        if (canSimplifyDisplaySchema && selectStmt.displayColumns.size() == 1) {
-            ParsedColInfo col = selectStmt.displayColumns.get(0);
-            canSimplifyDisplaySchema = !(col.expression instanceof ConstantValueExpression);
+        // Collect having, group by column names
+        Set<String> havingColumnNamesSet = new HashSet<String>();
+        Set<String> groupByColumnNamesSet = new HashSet<String>();
+        if (selectStmt.having != null) {
+            List<TupleValueExpression> havingTves = ExpressionUtil.getTupleValueExpressions(selectStmt.having);
+            for (TupleValueExpression tve : havingTves) {
+                havingColumnNamesSet.add(tve.getColumnAlias());
+            }
         }
-        if (canSimplifyDisplaySchema) {
-            // add a single dummy output column
-            ParsedColInfo col = new ParsedColInfo();
-            ConstantValueExpression colExpr = new ConstantValueExpression();
-            colExpr.setValueType(VoltType.NUMERIC);
-            colExpr.setValue("1");
-            col.expression = colExpr;
-            ExpressionUtil.finalizeValueTypes(col.expression);
+        for (ParsedSelectStmt.ParsedColInfo colInfo: selectStmt.groupByColumns) {
+            groupByColumnNamesSet.add(colInfo.alias);
+        }
 
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
-            col.columnName = "$$_EXISTS_$$";
-            col.alias = "$$_EXISTS_$$";
-            col.index = 0;
-            selectStmt.displayColumns.clear();
-            selectStmt.projectSchema = null;
-            selectStmt.displayColumns.add(col);
-            selectStmt.placeTVEsinColumns();
+        ArrayList<ParsedColInfo> aggrExpressions = new ArrayList<ParsedColInfo>();
+        aggrExpressions.addAll(selectStmt.aggResultColumns);
+        selectStmt.aggResultColumns = aggrExpressions;
+
+       // Replace the display schema with the single dummy column
+        selectStmt.displayColumns.clear();
+        ParsedColInfo col = new ParsedColInfo();
+        ConstantValueExpression colExpr = new ConstantValueExpression();
+        colExpr.setValueType(VoltType.NUMERIC);
+        colExpr.setValue("1");
+        col.expression = colExpr;
+        ExpressionUtil.finalizeValueTypes(col.expression);
+
+        col.tableName = "VOLT_TEMP_TABLE";
+        col.tableAlias = "VOLT_TEMP_TABLE";
+        col.columnName = "$$_EXISTS_$$";
+        col.alias = "$$_EXISTS_$$";
+        col.index = 0;
+        selectStmt.projectSchema = null;
+        selectStmt.displayColumns.add(col);
+        selectStmt.placeTVEsinColumns();
+
+        // Iterate over the aggregate columns and delete all columns that are not
+        // part of the HAVING or GROUP BY expressions (used to be in the original display schema
+        Iterator<ParsedColInfo> aggColumnIt = selectStmt.aggResultColumns.iterator();
+        while (aggColumnIt.hasNext()) {
+            ParsedColInfo aggrColumn = aggColumnIt.next();
+            boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
+                    !groupByColumnNamesSet.contains(aggrColumn.alias);
+            if (canDropColumn) {
+                aggColumnIt.remove();
+            }
         }
+        // If there is no OFFSET the GROUP BY columns can be dropped as well - we only need a single row anyway
+        if (!selectStmt.hasOffset()) {
+            selectStmt.groupByColumns.clear();
+            selectStmt.orderColumns.clear();
+        }
+        selectStmt.needComplexAggregation();
 
         // Drop DISTINCT expression
         selectStmt.distinct = false;
 
         // Add LIMIT 1
         selectStmt.limit = 1;
-
-//        // Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
-//        if (selectStmt.having == null) {
-//            selectStmt.hasComplexAgg = false;
-//            selectStmt.hasComplexGroupby = false;
-//            selectStmt.hasAggregateExpression = false;
-//            selectStmt.hasAverage = false;
-//            if (selectStmt.aggResultColumns != selectStmt.displayColumns) {
-//                // Clear out aggregate columns if they differes from the display ones
-//                // We don't want to clear the display columns
-//                selectStmt.aggResultColumns.clear();
-//            }
-//            selectStmt.orderColumns.clear();
-//            selectStmt.groupByColumns.clear();
-//
-//            selectStmt.groupByExpressions = null;
-//
-//            selectStmt.avgPushdownDisplayColumns = null;
-//            selectStmt.avgPushdownAggResultColumns = null;
-//            selectStmt.avgPushdownOrderColumns = null;
-//            selectStmt.avgPushdownHaving = null;
-//            selectStmt.avgPushdownNewAggSchema = null;
-//
-//            selectStmt.aggResultColumns = selectStmt.displayColumns;
-//        }
-//        selectStmt.placeTVEsinColumns();
-
     }
 
     /**
