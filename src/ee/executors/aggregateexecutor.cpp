@@ -367,7 +367,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_postPredicate = node->getPostPredicate();
 
     m_groupByKeySchema = constructGroupBySchema(false);
-
+    m_groupByKeyPartialHashSchema = NULL;
     if (m_partialSerialGroupByColumns.size() > 0) {
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
             if (std::find(m_partialSerialGroupByColumns.begin(),
