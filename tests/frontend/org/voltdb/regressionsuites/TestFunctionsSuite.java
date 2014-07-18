@@ -2605,45 +2605,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(1));
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING test Concat and its Operator");
-        Client client = getClient();
-        ClientResponse cr;
-        VoltTable result;
-
-        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0, new Timestamp(1000000000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("CONCAT", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("CONCAT", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-    }
-
-
     public void testCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
@@ -3574,8 +3535,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
 
         project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
