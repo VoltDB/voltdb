@@ -276,12 +276,12 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         switch(funcType) {
         case FunctionId.FUNC_CONCAT:
-        	for (int ii = 0; ii < nodes.length; ii++) {
+            for (int ii = 0; ii < nodes.length; ii++) {
                 if (nodes[ii].dataType == null && nodes[ii].isParam) {
                     nodes[ii].dataType = Type.SQL_VARCHAR;
                 }
-        	}
-        	break;
+            }
+            break;
         /*
          * The types to the FIELD functions parameters are VARCHAR
          */
