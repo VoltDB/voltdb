@@ -1865,7 +1865,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
-
         }
     }
 
