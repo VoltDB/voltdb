@@ -82,7 +82,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
-import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -1008,9 +1007,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             !initCompleted) {
                         int nodeId = VoltZK.getHostIDFromChildName(child);
                         if (nodeId == m_messenger.getHostId()) {
-                            // make sure delete /core/hosts/host* first to avoid later waitForJoin check fail
-                            zk.delete(CoreZK.hosts_host + nodeId, -1);
-                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must create first");
+                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must CREATE first");
                         } else {
                             hostLog.warn("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
                         }
