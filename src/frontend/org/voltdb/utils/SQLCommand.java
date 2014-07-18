@@ -514,8 +514,12 @@ public class SQLCommand
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
+
+    private static long m_startTime;
     private static void executeQuery(String query) throws Exception
     {
+        m_startTime = System.nanoTime();
+
         if (ExecuteCall.matcher(query).find())
         {
             query = ExecuteCall.matcher(query).replaceFirst("");
@@ -765,6 +769,8 @@ public class SQLCommand
     {
         if (response.getStatus() != ClientResponse.SUCCESS)
             throw new Exception("Execution Error: " + response.getStatusString());
+
+        long elapsedTime = System.nanoTime() - m_startTime;
         for (VoltTable t : response.getResults()) {
             long rowCount;
             if (!isUpdateResult(t)) {
@@ -776,7 +782,8 @@ public class SQLCommand
                 rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
-                System.out.printf("\n\n(%d row(s) affected)\n", rowCount);
+                System.out.printf("\n\n(Returned %d rows in %.2fs)\n",
+                        rowCount, elapsedTime / 1000000000.0);
             }
         }
     }
@@ -839,6 +846,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@ApplyBinaryLogSP",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception

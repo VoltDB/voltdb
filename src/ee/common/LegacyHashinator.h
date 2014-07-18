@@ -41,7 +41,7 @@ public:
      * be const
      */
     static LegacyHashinator* newInstance(const char *config) {
-        ReferenceSerializeInput input(config, 4);
+        ReferenceSerializeInputBE input(config, 4);
         return new LegacyHashinator(input.readInt());
     }
 

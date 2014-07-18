@@ -17,6 +17,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool adminstartup     "Does the server start in admin mode?"
   CommandLog* logconfig "Command log configuration"
   int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
+  bool useadhocschema   "Manage the database schemas via catalog updates or adhoc DDL"
 end
 
 begin Deployment   "Run-time deployment settings"

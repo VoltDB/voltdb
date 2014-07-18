@@ -164,8 +164,9 @@ public class TestPlansLimit extends PlannerTestCase {
         List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
         AbstractPlanNode p;
 
+        // no push down for aggregate nodes
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, true);
+        checkInlineLimitWithOrderby(pns, false);
 
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");

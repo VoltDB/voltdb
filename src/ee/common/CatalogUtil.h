@@ -92,6 +92,10 @@ bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIn
     return false;
 }
 
+bool isTableMaterialized(const catalog::Table &table) {
+    return table.materializer() != NULL;
+}
+
 
 #endif
 

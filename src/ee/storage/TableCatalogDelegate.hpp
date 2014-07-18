@@ -33,6 +33,7 @@ class PersistentTable;
 class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
+class DRTupleStream;
 
 // There might be a better place for this, but current callers happen to have this header in common.
 template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
@@ -83,6 +84,15 @@ class TableCatalogDelegate : public CatalogDelegate {
     static std::string getIndexIdString(const catalog::Index &catalogIndex);
     static std::string getIndexIdString(const TableIndexScheme &indexScheme);
 
+    /**
+     * Sets each field in the tuple to the default value for the table.
+     * Assumes that the tuple's schema is the same as the table's.
+     * Note that if there are timestamp fields with default of NOW,
+     * then they will be evaluated when you call this function (so
+     * don't call this method and then cache the tuple for later use).
+     */
+    void initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple);
+
     // ADXXX: should be const
     Table *getTable() {
         return m_table;
@@ -104,15 +114,29 @@ class TableCatalogDelegate : public CatalogDelegate {
         return m_signature;
     }
 
+    const char* signatureHash() {
+        return m_signatureHash;
+    }
+
+    /*
+     * Returns true if this table is a materialized view
+     */
+    bool materialized() {
+        return m_materialized;
+    }
   private:
     static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                             catalog::Table const &catalogTable,
-                                            const int32_t compactionThreshold);
+                                            const int32_t compactionThreshold,
+                                            bool &materialized,
+                                            char *signatureHash);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
+    bool m_materialized;
     std::string m_signature;
     const int32_t m_compactionThreshold;
+    char m_signatureHash[20];
 };
 
 }

@@ -795,6 +795,28 @@ public class TestFunctionsSuite extends RegressionSuite {
             strTime = "2013-12-31 23:59:59.999999";
             cr = client.callProcedure("R2.insert", 4, strTime, 14, 1.1, strTime);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            // test only given date
+            strTime = "2014-07-02";
+            cr = client.callProcedure("R2.insert", 5, strTime + " 00:00:00.000000", 15, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-03";
+            cr = client.callProcedure("R2.insert", 6, strTime, 16, 1.1, strTime +" 00:00:00.000000");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-04";
+            cr = client.callProcedure("R2.insert", 7, strTime, 17, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+            // test AdHoc cast
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-04 00:00:00.000000' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-04 00:00:00.000000");
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-05' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-05 00:00:00.000000");
 
             cr = client.callProcedure("VERIFY_TIMESTAMP_STRING_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -808,10 +830,14 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("VERIFY_STRING_TIMESTAMP_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            if (r.getRowCount() != 0) {
-                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() + " rows:");
+            // there should be 2 rows wrong, because the cast always return a long format string, but we
+            // have two rows containing short format strings
+            if (r.getRowCount() != 2) {
+                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
                 System.out.println(r.toString());
-                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
             }
 
             cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");
@@ -889,6 +915,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
+        int EXPECTED_WEEK = 36;
+        if (!isHSQL()) {
+            // hsql got wrong answer 37
+            result = r.getLong(columnIndex++);
+            assertEquals(EXPECTED_WEEK, result);
+        }
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{6}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{9}});
+        }
+
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
         // http://disc.gsfc.nasa.gov/julian_calendar.shtml
@@ -936,6 +975,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
+        EXPECTED_WEEK = 47;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{3}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{18}});
+        }
+
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -980,6 +1030,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{4}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{5}});
+        }
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1026,6 +1087,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("37.123000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{0}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{2}});
+        }
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -2533,45 +2605,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(null, result.getString(1));
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING test Concat and its Operator");
-        Client client = getClient();
-        ClientResponse cr;
-        VoltTable result;
-
-        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0, new Timestamp(1000000000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("CONCAT", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("CONCAT", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
-
-        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
-    }
-
-
     public void testCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
@@ -2747,6 +2780,332 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     }
 
+    private static StringBuilder joinStringArray(String[] params, String sep) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : params) {
+            sb.append(s).append(sep);
+        }
+        sb.delete(sb.length()-sep.length(), sb.length());
+        return sb;
+    }
+
+    // concat params with a sql query string, and test the return value
+    private void doTestCoalesceWithoutConst(Client cl, String[] params,
+                                                   String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ...) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ...)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
+    }
+
+    private void doTestCoalesceWithConst(Client cl, String[] params,
+                                                String cst ,String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        allPara += ","+cst;
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ..., cst) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ..., cst)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
+    }
+
+    // col1 is not null while col2 is null
+    private void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == coalesce(col2, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "1");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "1");
+    }
+
+    private void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
+        // coalesce(col1, col2) == coalesce(col2, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, "NULL", "0");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, "NULL", "0");
+    }
+
+    // Both the columns are not null
+    private void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "2");
+        // coalesce(col2, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col2, "2");
+    }
+
+    // All the columns are not null
+    private void doTestCoalesceTriNotNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "3");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "3");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "3");
+        // coalesce(col3, col1, col2) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col3, "3");
+        // coalesce(col3, col2, col1) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col3, "3");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "3");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "3");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "3");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "3");
+        // coalesce(col3, col1, col2, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col3, "3");
+        // coalesce(col3, col2, col1, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col3, "3");
+    }
+
+    // col3 is null
+    private void doTestCoalesceTriOneNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "2");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "2");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "2");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "2");
+        // coalesce(col3, col2, col2) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col2, "2");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "2");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "2");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "2");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "2");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "2");
+        // coalesce(col3, col1, col2, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col2, "2");
+    }
+
+    // col2 and col3 are null
+    private void doTestCoalesceTriTwoNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "1");
+        // coalesce(col2, col1, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col1, "1");
+        // coalesce(col2, col3, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col1, "1");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "1");
+        // coalesce(col3, col2, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col1, "1");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "1");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "1");
+        // coalesce(col2, col1, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col1, "1");
+        // coalesce(col2, col3, col1, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col1, "1");
+    }
+
+    // all columns are null
+    private void doTestCoalesceTriAllNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception{
+        // coalesce(col1, col2, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, "NULL", "0");
+        // coalesce(col1, col3, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, "NULL", "0");
+        // coalesce(col2, col1, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, "NULL", "0");
+        // coalesce(col2, col3, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, "NULL", "0");
+        // coalesce(col3, col1, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, "NULL", "0");
+        // coalesce(col3, col2, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, "NULL", "0");
+        // coalesce(col1, col2, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, cst, "0");
+        // coalesce(col1, col3, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, cst, "0");
+        // coalesce(col2, col1, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, cst, "0");
+        // coalesce(col2, col3, col1, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, cst, "0");
+    }
+
+    private void doTestTwoColCoalesce(Client cl, String col1, String col2) throws Exception {
+        doTestCoalescePairBothNull(cl, col1, col2);
+        doTestCoalescePairOneNull(cl, col1, col2);
+        doTestCoalescePairNotNull(cl, col1, col2);
+    }
+
+    private void doTestThreeColCoalesce(Client cl, String col1,
+                                        String col2, String col3, String cst) throws Exception {
+        doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriTwoNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriOneNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
+    }
+
+    public void testCoalesce() throws Exception {
+        System.out.println("STARTING test COALESCE function...");
+        Client cl = getClient();
+
+        // one row with three sets of nulls
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID) values (0);");
+        // one row with one set of non-null columns and two sets of nulls
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1) values (1,1,1,1,1,'1',100000)");
+        // TODO: below is wrong, because the null timestamp will be regarded as an invalid input by hsql
+        //cl.callProcedure("C_NULL.insert", 1,1,1,1,1,"1",new Timestamp(1000000000000L), null, null, null, null, null);
+        // two sets of non-null columns and one set of null column
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1,I2,F2,D2,V2,T2)"
+                                + " values (2,1,1,1,1,'1',100000,2,2,2,'2',200000)");
+        // three set non-nulls
+        cl.callProcedure("C_NULL.insert", 3,1,1,1,1,"1",new Timestamp(1000000000000L),
+                                              2,2,2,"2",new Timestamp(2000000000000L),
+                                              3,3,3,"3",new Timestamp(3000000000000L));
+
+        doTestTwoColCoalesce(cl, "I1", "I2");
+        doTestTwoColCoalesce(cl, "F1", "F2");
+        doTestTwoColCoalesce(cl, "D1", "D2");
+        doTestTwoColCoalesce(cl, "V1", "V2");
+        doTestTwoColCoalesce(cl, "T1", "T2");
+
+        doTestThreeColCoalesce(cl, "I1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "F1", "F2", "F3", "100.0");
+        doTestThreeColCoalesce(cl, "D1", "D2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "V1", "V2", "V3", "'hahaha'");
+        doTestThreeColCoalesce(cl, "T1", "T2", "T3", "CAST ('2014-07-09 00:00:00.000000' as TIMESTAMP)");
+
+        // test compatiable types
+        doTestThreeColCoalesce(cl, "S1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "S1", "F2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "I1", "F2", "D3", "100.0");
+
+        // test incompatiable types
+        // TODO: Is the exception throwed by coalesce? Or by decode?
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "T3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
+    }
+
+    public void testManyExtractTimeFieldFunction() throws Exception {
+        System.out.println("STARTING test functions extracting fields in timestamp ...");
+        Client cl = getClient();
+        VoltTable result;
+        String sql;
+
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 1, null, null, null, Timestamp.valueOf("2012-02-29 12:20:30.123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 2, null, null, null, Timestamp.valueOf("2012-12-31 12:59:30"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        sql = "select id, YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
+
+        sql = "select id, MONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 7}, {1, 2}, {2, 12}});
+
+        sql = "select id, DAY(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 15}, {1, 29}, {2, 31}});
+
+        sql = "select id, HOUR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 1}, {1, 12}, {2, 12}});
+
+        sql = "select id, MINUTE(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2}, {1, 20}, {2, 59}});
+
+        sql = "select id, cast(SECOND(past) as VARCHAR) from p1 order by id;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        if (isHSQL()) {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000", "30.123000", "30.000000"});
+        }
+        else {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000",
+                    "30.000000000000"});
+        }
+
+        sql = "select id, QUARTER(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 3}, {1, 1}, {2, 4}});
+
+        sql = "select DAYOFWEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+
+        sql = "select WEEKDAY(past) from p1 order by id;";
+        if (isHSQL()) {
+            // we modify the hsql parser, and so it maps to extract week_of_day
+            validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        }
+        else {
+            // call our ee function, and so return different value
+            validateTableOfLongs(cl, sql,new long[][]{{1}, {2}, {0}});
+        }
+
+        sql = "select DAYOFMONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+
+        sql = "select DAYOFYEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
+
+        // WEEK 1 is often the correct answer for the last day of the year.
+        // See https://en.wikipedia.org/wiki/ISO_week_year#Last_week
+        sql = "select WEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -2830,6 +3189,27 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "T3 TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "T4 TIMESTAMP DEFAULT '2012-12-12 12:12:12.121212', " +
                 "PRIMARY KEY (ID) ); " +
+
+                "CREATE TABLE C_NULL ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "S1 SMALLINT DEFAULT NULL, " +
+                "I1 INTEGER DEFAULT NULL, " +
+                "F1 FLOAT DEFAULT NULL, " +
+                "D1 DECIMAL DEFAULT NULL, " +
+                "V1 VARCHAR(10) DEFAULT NULL, " +
+                "T1 TIMESTAMP DEFAULT NULL, " +
+                "I2 INTEGER DEFAULT NULL, " +
+                "F2 FLOAT DEFAULT NULL, " +
+                "D2 DECIMAL DEFAULT NULL, " +
+                "V2 VARCHAR(10) DEFAULT NULL, " +
+                "T2 TIMESTAMP DEFAULT NULL, " +
+                "I3 INTEGER DEFAULT NULL, " +
+                "F3 FLOAT DEFAULT NULL, " +
+                "D3 DECIMAL DEFAULT NULL, " +
+                "V3 VARCHAR(10) DEFAULT NULL, " +
+                "T3 TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE C_NULL ON COLUMN ID;" +
 
                 "";
         try {
@@ -3089,7 +3469,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
                 "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
-                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = ?");
+                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
@@ -3155,8 +3535,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
 
         project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");

@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -46,6 +47,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.common.Constants;
+import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -75,6 +77,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final byte [] m_signatureBytes;
     private final long m_generation;
     private final int m_partitionId;
+    private final ExportFormat m_format;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
@@ -113,6 +116,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             {
         checkNotNull( onDrain, "onDrain runnable is null");
 
+        m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
             @Override
@@ -253,6 +257,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_columnTypes.add(columnType);
                 m_columnLengths.add(column.getInt("length"));
             }
+
+            if (jsObj.has("format")) {
+                m_format = ExportFormat.valueOf(jsObj.getString("format"));
+            } else {
+                m_format = ExportFormat.FOURDOTFOUR;
+            }
+
             try {
                 m_partitionColumnName = jsObj.getString("partitionColumnName");
             } catch (Exception ex) {
@@ -346,6 +357,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             stringer.endObject();
         }
         stringer.endArray();
+        stringer.key("format").value(ExportFormat.FOURDOTFOUR.toString());
         stringer.key("partitionColumnName").value(m_partitionColumnName);
     }
 
@@ -516,7 +528,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                    if (!m_es.isShutdown()) {
+                        pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                    }
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {
@@ -583,27 +597,34 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    /*
-                     * The poll is blocking through the future, shouldn't
-                     * call poll a second time until a response has been given
-                     * which nulls out the field
-                     */
-                    if (m_pollFuture != null) {
-                        fut.setException(new RuntimeException("Should not poll more than once"));
-                        return;
+        try {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        /*
+                         * The poll is blocking through the future, shouldn't
+                         * call poll a second time until a response has been given
+                         * which nulls out the field
+                         */
+                        if (m_pollFuture != null) {
+                            fut.setException(new RuntimeException("Should not poll more than once"));
+                            return;
+                        }
+                        if (!m_es.isShutdown()) {
+                            pollImpl(fut);
+                        }
+                    } catch (Exception e) {
+                        exportLog.error("Exception polling export buffer", e);
+                    } catch (Error e) {
+                        VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                     }
-                    pollImpl(fut);
-                } catch (Exception e) {
-                    exportLog.error("Exception polling export buffer", e);
-                } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                 }
-            }
-        });
+            });
+        } catch (RejectedExecutionException e) {
+            //Don't expect this to happen outside of test, but in test it's harmless
+            exportLog.info("Polling from export data source rejected, this should be harmless");
+        }
         return fut;
     }
 
@@ -682,14 +703,33 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void discard() {
             checkDoubleFree();
-            m_backingCont.discard();
             try {
-                ack(m_uso);
-            } finally {
-                forwardAckToOtherReplicas(m_uso);
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            m_backingCont.discard();
+                            try {
+                                if (!m_es.isShutdown()) {
+                                    ackImpl(m_uso);
+                                }
+                            } finally {
+                                forwardAckToOtherReplicas(m_uso);
+                            }
+                        } catch (Exception e) {
+                            exportLog.error("Error acking export buffer", e);
+                        } catch (Error e) {
+                            VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
+                        }
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                //Don't expect this to happen outside of test, but in test it's harmless
+                exportLog.info("Acking export data task rejected, this should be harmless");
+                //With the executor service stopped, it is safe to discard the backing container
+                m_backingCont.discard();
             }
         }
-
     }
 
     private void forwardAckToOtherReplicas(long uso) {
@@ -720,7 +760,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    ackImpl(uso);
+                    if (!m_es.isShutdown()) {
+                        ackImpl(uso);
+                    }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
@@ -754,7 +796,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        m_es.execute(m_onMastership);
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (!m_es.isShutdown()) {
+                        m_onMastership.run();
+                    }
+                } catch (Exception e) {
+                    exportLog.error("Error in accepting mastership", e);
+                }
+            }
+        });
     }
 
     /**
@@ -764,5 +817,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
+    }
+
+    public ExportFormat getExportFormat() {
+        return m_format;
     }
 }
