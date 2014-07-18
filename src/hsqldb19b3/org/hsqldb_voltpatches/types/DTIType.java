@@ -375,6 +375,12 @@ public abstract class DTIType extends Type {
 
             case Tokens.SECONDS_MIDNIGHT :
                 return SECONDS_MIDNIGHT;
+            // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+            case Tokens.WEEKDAY :
+            	// Maybe we should return something else, since WEEKDAY is different from day_of_week
+            	// But it works now...
+            	return DAY_OF_WEEK;
+            // End of VoltDB extension
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");

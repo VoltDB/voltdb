@@ -915,6 +915,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
+        int EXPECTED_WEEK = 36;
+        if (!isHSQL()) {
+            // hsql got wrong answer 37
+            result = r.getLong(columnIndex++);
+            assertEquals(EXPECTED_WEEK, result);
+        }
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{6}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 1";
+            validateTableOfLongs(client, sql, new long[][]{{9}});
+        }
+
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
         // http://disc.gsfc.nasa.gov/julian_calendar.shtml
@@ -962,6 +975,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
+        EXPECTED_WEEK = 47;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{3}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 2";
+            validateTableOfLongs(client, sql, new long[][]{{18}});
+        }
+
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1006,6 +1030,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{4}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 3";
+            validateTableOfLongs(client, sql, new long[][]{{5}});
+        }
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1052,6 +1087,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("37.123000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        if (!isHSQL()) {
+            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{0}});
+            sql = "select EXTRACT(DAY_OF_MONTH FROM PAST) from P1 where ID = 4";
+            validateTableOfLongs(client, sql, new long[][]{{2}});
+        }
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -2980,7 +3026,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     public void testCoalesce() throws Exception {
-        System.out.println("STARTING test Case COALESCE function...");
+        System.out.println("STARTING test COALESCE function...");
         Client cl = getClient();
 
         // one row with three sets of nulls
@@ -3028,6 +3074,75 @@ public class TestFunctionsSuite extends RegressionSuite {
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data types"));
         }
+    }
+
+    public void testManyExtractTimeFieldFunction() throws Exception {
+        System.out.println("STARTING test functions extracting fields in timestamp ...");
+        Client cl = getClient();
+        VoltTable result;
+        String sql;
+
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 1, null, null, null, Timestamp.valueOf("2012-02-29 12:20:30.123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 2, null, null, null, Timestamp.valueOf("2012-12-31 12:59:30"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        sql = "select id, YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
+
+        sql = "select id, MONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 7}, {1, 2}, {2, 12}});
+
+        sql = "select id, DAY(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 15}, {1, 29}, {2, 31}});
+
+        sql = "select id, HOUR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 1}, {1, 12}, {2, 12}});
+
+        sql = "select id, MINUTE(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2}, {1, 20}, {2, 59}});
+
+        sql = "select id, cast(SECOND(past) as VARCHAR) from p1 order by id;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        if (isHSQL()) {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000", "30.123000", "30.000000"});
+        }
+        else {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000",
+                    "30.000000000000"});
+        }
+
+        sql = "select id, QUARTER(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 3}, {1, 1}, {2, 4}});
+
+        sql = "select DAYOFWEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+
+        sql = "select WEEKDAY(past) from p1 order by id;";
+        if (isHSQL()) {
+            // we modify the hsql parser, and so it maps to extract week_of_day
+            validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        }
+        else {
+            // call our ee function, and so return different value
+            validateTableOfLongs(cl, sql,new long[][]{{1}, {2}, {0}});
+        }
+
+        sql = "select DAYOFMONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+
+        sql = "select DAYOFYEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
+
+        // WEEK 1 is often the correct answer for the last day of the year.
+        // See https://en.wikipedia.org/wiki/ISO_week_year#Last_week
+        sql = "select WEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
     }
 
     //
@@ -3393,7 +3508,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
                 "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
-                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = ?");
+                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
