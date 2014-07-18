@@ -1777,6 +1777,90 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat and its Operator");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT2", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("CONCAT2", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+    }
+
+    public void testConcatMoreThan2Param() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat with more than two parameters");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Yetian", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT3", "@Volt", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT3", "", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "@Volt", "", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT5", "@Volt", "D", "B", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        cr = client.callProcedure("CONCAT5", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        try {
+            cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1948,6 +2032,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+
+        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
