@@ -482,6 +482,12 @@ public class VoltProjectBuilder {
             {
                 sb.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
+
+            if(procedure.partitionInfo != null)
+            {
+                String[] token = procedure.partitionInfo.split(":")[0].split("\\.");
+                sb.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + ";");
+            }
         }
 
         try {
