@@ -342,6 +342,30 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             final boolean added = m_groups.add(info);
+            StringBuffer sb = new StringBuffer();
+            sb.append("CREATE ROLE " + info.name + " WITH ");
+            if(info.adhoc)
+            {
+                sb.append("adhoc, ");
+            }
+            if(info.defaultproc)
+            {
+                sb.append("defaultproc, ");
+            }
+            if(info.sysproc)
+            {
+                sb.append("sysproc, ");
+            }
+
+            int length = sb.length();
+            sb.replace(length - 2, length, ";");
+
+            try {
+                addLiteralSchema(sb.toString());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
             if (!added) {
                 assert(added);
             }
@@ -430,7 +454,27 @@ public class VoltProjectBuilder {
         StringBuffer sb = new StringBuffer();
         for (final ProcedureInfo procedure : procedures) {
             m_procedures.add(procedure);
-            sb.append("CREATE PROCEDURE FROM CLASS " + procedure.cls.getName() + ";");
+
+            StringBuffer roleInfo = new StringBuffer();
+            if(procedure.groups.length != 0)
+            {
+                roleInfo.append(" ALLOW ");
+                for(int i = 0; i < procedure.groups.length; i++)
+                {
+                    roleInfo.append(procedure.groups[i] + ",");
+                }
+                int length = roleInfo.length();
+                roleInfo.replace(length - 1, length, " ");
+            }
+
+            if(procedure.cls != null)
+            {
+                sb.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
+            }
+            else if(procedure.sql != null)
+            {
+                sb.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql + ";");
+            }
         }
 
         try {
@@ -536,6 +580,11 @@ public class VoltProjectBuilder {
     public void setTableAsExportOnly(String name) {
         assert(name != null);
         m_exportTables.add(name);
+        try {
+            addLiteralSchema("Export TABLE " + name + ";");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
