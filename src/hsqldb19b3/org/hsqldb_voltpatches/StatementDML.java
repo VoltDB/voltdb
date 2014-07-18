@@ -169,7 +169,6 @@ public class StatementDML extends StatementDMQL {
               null);
     }
 
-    @Override
     Result getResult(Session session) {
 
         Result result = null;
@@ -202,7 +201,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // this fk references -> other  :  other read lock
-    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         if (!baseTable.isTemp()) {
@@ -236,7 +234,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // other fk references this :  if constraint trigger action  : other write lock
-    @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
         if (baseTable.isTemp()) {

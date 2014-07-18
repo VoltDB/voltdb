@@ -179,7 +179,6 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    @Override
     public Result execute(Session session) {
 
         Result result = getAccessRightsResult(session);
@@ -228,7 +227,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * For the creation of the statement
      */
-    @Override
     public void setGeneratedColumnInfo(int generate, ResultMetaData meta) {
 
         // can support INSERT_SELECT also
@@ -305,7 +303,6 @@ public abstract class StatementDMQL extends Statement {
         return values;
     }
 
-    @Override
     public boolean hasGeneratedColumns() {
         return generatedIndexes != null;
     }
@@ -361,7 +358,6 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    @Override
     public void clearVariables() {
 
         isValid            = false;
@@ -511,7 +507,6 @@ public abstract class StatementDMQL extends Statement {
      * Returns the metadata, which is empty if the CompiledStatement does not
      * generate a Result.
      */
-    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -533,7 +528,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Returns the metadata for the placeholder parameters.
      */
-    @Override
     public ResultMetaData getParametersMetaData() {
         return parameterMetaData;
     }
@@ -602,7 +596,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Retrieves a String representation of this object.
      */
-    @Override
     public String describe(Session session) {
 
         try {
@@ -811,10 +804,8 @@ public abstract class StatementDMQL extends Statement {
                                      "]\n");
     }
 
-    @Override
     public void resolve() {}
 
-    @Override
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }

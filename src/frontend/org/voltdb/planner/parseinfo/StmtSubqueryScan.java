@@ -47,8 +47,8 @@ import org.voltdb.types.PlanNodeType;
 public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
     private final AbstractParsedStmt m_subqueryStmt;
-    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private final Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
+    private ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
 
@@ -394,12 +394,12 @@ public class StmtSubqueryScan extends StmtTableScan {
      * @param root the complete plan node.
      * @return the plan without the send/receive pair.
      */
-    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
+    static public AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
         assert(root != null);
         return removeCoordinatorSendReceivePairRecursive(root, root);
     }
 
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
+    static public AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
             AbstractPlanNode current) {
         if (current instanceof ReceivePlanNode) {
             assert(current.getChildCount() == 1);
@@ -431,6 +431,5 @@ public class StmtSubqueryScan extends StmtTableScan {
             return root;
         }
     }
-
 
 }

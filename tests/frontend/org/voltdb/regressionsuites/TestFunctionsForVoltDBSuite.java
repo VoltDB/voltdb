@@ -574,7 +574,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
 
         verifyStmtFails(client, "select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny)  from R3 where id = 2",
-                "Could not convert string value 'tiny null' to a number.");
+                "Could not convert to number");
     }
 
     /**

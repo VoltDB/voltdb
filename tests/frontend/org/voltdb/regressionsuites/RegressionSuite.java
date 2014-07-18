@@ -412,7 +412,7 @@ public class RegressionSuite extends TestCase {
         }
 
         String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
-                expectedMsg + ", but instead it threw nothing.";
+                expectedMsg + "\", but instead it threw nothing.";
         fail(diagnostic);
     }
 

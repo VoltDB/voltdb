@@ -105,11 +105,15 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
 
                 // HSQL seems to want a cast for the parameter
-                // Note that there is no filter in source_p
+                // Note that there is no filter in source_r
                 "create procedure insert_param_in_select_list as " +
                 "insert into target_p (bi, vc, ii, ti) " +
                 "select cast(? as bigint), vc, ii, ti from source_r order by ii;" +
                 "partition procedure insert_param_in_select_list on table target_p column bi;" +
+
+                "create procedure insert_wrong_partition as " +
+                "insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r; " +
+                "partition procedure insert_wrong_partition on table target_p column bi; " +
 
                 "create procedure InsertIntoSelectWithJoin as " +
                 "insert into target_p " +
@@ -123,18 +127,25 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
+        boolean success;
+
         // JNI
         config = new LocalCluster("iisf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER (disable to opt for speed over coverage...
         config = new LocalCluster("iisf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
         // ... disable for speed) */
+
+        config = new LocalCluster("iisf-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
 
         return builder;
     }
@@ -198,6 +209,12 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
     }
+
+  private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
+  ClientResponse resp = client.callProcedure("@AdHoc", adHocQuery);
+  assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+  return resp.getResults()[0];
+}
 
     public void testInsertIntoSelectAdHocFails() throws IOException {
         // for now only SP/SP is supported for insert-into-select
@@ -281,7 +298,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         initializeTables(client);
 
-        verifyProcFails(client, "value is out of range", "insert_p_source_p_cast_out_of_range", partitioningValue);
+        verifyProcFails(client, "out of range", "insert_p_source_p_cast_out_of_range", partitioningValue);
     }
 
     public void testNonsensicalCasts() throws Exception {
@@ -290,7 +307,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
 
         initializeTables(client);
 
-        verifyProcFails(client, "Could not convert string value",
+        verifyProcFails(client, "invalid character value",
                 "insert_p_source_p_nonsensical_cast", partitioningValue);
     }
 
@@ -404,12 +421,6 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertFalse(newRows.advanceRow());
     }
 
-    private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
-        ClientResponse resp = client.callProcedure("@AdHoc", adHocQuery);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        return resp.getResults()[0];
-    }
-
     public void testSelectListParam() throws Exception {
         final Client client = getClient();
         initializeTables(client);
@@ -433,6 +444,18 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             assertEquals(sourceRows.getLong(3), targetRows.getLong(3));
         }
         assertFalse(targetRows.advanceRow());
+    }
+
+    public void testInsertWrongPartitionFails() throws Exception {
+
+        if (m_config.getNodeCount() > 1) {
+            Client client = getClient();
+            initializeTables(client);
+
+            final long partitioningValue = 9;
+            verifyProcFails(client, "Mispartitioned tuple in single-partition insert statement.",
+                    "insert_wrong_partition", partitioningValue);
+        }
     }
 
 }

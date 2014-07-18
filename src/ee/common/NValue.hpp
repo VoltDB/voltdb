@@ -1135,7 +1135,7 @@ class NValue {
         }
 
         std::ostringstream oss;
-        oss << "Could not convert string value '" << safeBuffer << "' to a number.";
+        oss << "Could not convert to number: '" << safeBuffer << "' contains invalid character value.";
         throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, oss.str().c_str());
     }
 

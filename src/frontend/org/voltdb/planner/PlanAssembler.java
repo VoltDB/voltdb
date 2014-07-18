@@ -397,7 +397,7 @@ public class PlanAssembler {
         // micro-optimizations apply (to the partial plan vs. the coordinated plan),
         // especially the determinism rewrites.
         if ( ! coordinateResult) {
-            retval.rootPlanGraph = removeCoordinatorSendReceivePair(retval.rootPlanGraph);
+            retval.rootPlanGraph = StmtSubqueryScan.removeCoordinatorSendReceivePair(retval.rootPlanGraph);
         }
         return retval;
     }
@@ -2052,62 +2052,6 @@ public class PlanAssembler {
 
     public String getErrorMessage() {
         return m_recentErrorMsg;
-    }
-
-
-
-    /**
-     * Remove the coordinator send/receive pair if any from the graph.
-     *FIXME? As noted at the point of call, it may be smarter not to generate these nodes at all in
-     * subquery cases where they are not needed, just to pull them out later.
-     *
-     * @param root the complete plan node.
-     * @return the plan without the send/receive pair.
-     */
-    private static AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
-        assert(root != null);
-        AbstractPlanNode current = root;
-        AbstractPlanNode expectable = current;
-        while ( ! (current instanceof ReceivePlanNode)) {
-            //FIXME? We might want to be more selective about the types of nodes (if any?)
-            // we are willing to skip to find the target send/receive pair. --paul
-            // This causes us to quit rather than skip NestLoopJoins or leaf nodes.
-            if (current.getChildCount() == 1) {
-                // This is still a coordinator node
-                current = current.getChild(0);
-                if ((expectable.getChild(0) == current) && expectable instanceof ProjectionPlanNode) {
-                    expectable = current;
-                }
-            } else {
-                // We are about to branch and leave the coordinator
-                return root;
-            }
-        }
-        if (current != expectable) {
-            throw new RuntimeException("Paul was not expecting this.");
-        }
-        assert(current.getChildCount() == 1);
-        AbstractPlanNode child = current.getChild(0);
-        assert(child instanceof SendPlanNode);
-        assert(child.getChildCount() == 1);
-        child = child.getChild(0);
-        //FIXME? Not sure why it would be necessary or correct to specifically
-        // drop a non-inline projection node found below the send node. --paul
-        if (child instanceof ProjectionPlanNode) {
-            assert(child.getChildCount() == 1);
-            child = child.getChild(0);
-            throw new RuntimeException("Paul was not expecting this, either.");
-        }
-        child.clearParents();
-        if (current == root) {
-            return child;
-        } else {
-            assert(current.getParentCount() == 1);
-            AbstractPlanNode parent = current.getParent(0);
-            parent.unlinkChild(current);
-            parent.addAndLinkChild(child);
-        }
-        return root;
     }
 
     /**
