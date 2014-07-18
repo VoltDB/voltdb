@@ -121,7 +121,14 @@ public class VoltProjectBuilder {
             this.groups = groups;
             this.cls = null;
             this.name = name;
-            this.sql = sql;
+            if(sql.endsWith(";"))
+            {
+                this.sql = sql;
+            }
+            else
+            {
+                this.sql = sql + ";";
+            }
             this.partitionInfo = partitionInfo;
             this.joinOrder = joinOrder;
             assert(this.name != null);
@@ -473,11 +480,12 @@ public class VoltProjectBuilder {
             }
             else if(procedure.sql != null)
             {
-                sb.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql + ";");
+                sb.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
         }
 
         try {
+            System.out.println(sb.toString());
             addLiteralSchema(sb.toString());
         } catch (IOException e) {
             e.printStackTrace();
