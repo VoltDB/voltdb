@@ -1252,7 +1252,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leader = config.m_leader;
     }
 
-    public boolean isMemcheckDefined() {
+    public static boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;
