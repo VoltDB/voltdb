@@ -461,12 +461,16 @@ public class VoltProjectBuilder {
             m_supplementals.add(supplemental);
     }
 
-    public void addPartitionInfo(final String tableName, final String partitionColumnName) throws IOException {
+    public void addPartitionInfo(final String tableName, final String partitionColumnName) {
         assert(m_partitionInfos.containsKey(tableName) == false);
         m_partitionInfos.put(tableName, partitionColumnName);
 
         String tempSQL = "PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";";
-        addLiteralSchema(tempSQL);
+        try {
+            addLiteralSchema(tempSQL);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setHTTPDPort(int port) {
