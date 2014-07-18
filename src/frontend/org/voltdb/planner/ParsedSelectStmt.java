@@ -812,10 +812,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_aggregationList.clear();
         assert(havingNode.children.size() == 1);
         having = parseExpressionTree(havingNode.children.get(0));
-        parseHavingExpression(isDistributed);
-    }
-
-    private void parseHavingExpression(boolean isDistributed) {
         assert(having != null);
         if (isDistributed) {
             having = having.replaceAVG();
@@ -956,12 +952,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             selectStmt.aggResultColumns = selectStmt.displayColumns;
         }
         selectStmt.placeTVEsinColumns();
-
-        // Prepare for the AVG push-down optimization only if it might be required.
-        if (selectStmt.mayNeedAvgPushdown()) {
-            selectStmt.m_aggregationList.clear();
-            selectStmt.parseHavingExpression(true);
-        }
     }
 
     /**
@@ -969,7 +959,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *  1. Replace the display columns with a single dummy column "1"
      *  2. Drop DISTINCT expression
      *  3. Add LIMIT 1
-     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+     *  4. @TODO Remove ORDER BY, GROUP BY expressions
+     *           if HAVING and OFFSET expression is not present
      *
      * @param selectStmt
      * @return existsExpr
