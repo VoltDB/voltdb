@@ -1009,7 +1009,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         int nodeId = VoltZK.getHostIDFromChildName(child);
                         if (nodeId == m_messenger.getHostId()) {
                             // make sure delete /core/hosts/host* first to avoid later waitForJoin check fail
-                            zk.delete(CoreZK.hostids_host + nodeId, -1);
+                            zk.delete(CoreZK.hosts_host + nodeId, -1);
                             VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must create first");
                         } else {
                             hostLog.warn("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
