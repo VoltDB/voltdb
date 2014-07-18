@@ -23,7 +23,9 @@
 
 package org.voltcore.messaging;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
@@ -52,7 +54,6 @@ public class TestStartAction {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (2181 + index);
-        config.startAction = action;
         HostMessenger hm = new HostMessenger(config);
         createdMessengers.add(hm);
         if (start) {

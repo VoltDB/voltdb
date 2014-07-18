@@ -23,17 +23,19 @@
 
 package org.voltcore.messaging;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.StartAction;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class TestHostMessenger {
 
@@ -59,7 +61,6 @@ public class TestHostMessenger {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (2181 + index);
-        config.startAction = action;
         HostMessenger hm = new HostMessenger(config);
         createdMessengers.add(hm);
         if (start) {

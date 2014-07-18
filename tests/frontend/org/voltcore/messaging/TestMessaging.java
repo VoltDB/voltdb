@@ -35,7 +35,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import junit.framework.TestCase;
 
 import org.voltcore.utils.PortGenerator;
-import org.voltdb.StartAction;
 
 public class TestMessaging extends TestCase {
 
@@ -152,7 +151,6 @@ public class TestMessaging extends TestCase {
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
                     HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
-                    config.startAction = StartAction.CREATE;
                     final HostMessenger messenger = new HostMessenger(config);
                     currentMessenger = messenger;
                     messengers[hostId] = currentMessenger;
@@ -300,7 +298,6 @@ public class TestMessaging extends TestCase {
     private static HostMessenger.Config getConfig() {
         HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
         config.factory = new MessageFactory();
-        config.startAction = StartAction.CREATE;
         return config;
     }
 
@@ -498,7 +495,6 @@ public class TestMessaging extends TestCase {
         public void run() {
             try {
                 HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
-                config.startAction = StartAction.CREATE;
                 HostMessenger msg = new HostMessenger(config);
                 msg.start();
                 m_ready.set(true);

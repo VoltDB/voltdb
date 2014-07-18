@@ -66,6 +66,8 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -80,6 +82,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -266,6 +269,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     RestoreAgent m_restoreAgent = null;
 
+    private ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+
     private volatile boolean m_isRunning = false;
 
     @Override
@@ -447,6 +452,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
+
+            // race to create start action nodes and then verify theirs compatibility.
+            m_messenger.getZK().create(VoltZK.start_action, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+            VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
+            validateStartAction();
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin && !m_joining) {
@@ -965,6 +975,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     hostLog.error("Failed to set daily system info logging: " + e.getMessage());
                 }
             }
+        }
+    }
+
+    class StartActionWatcher implements Watcher {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    validateStartAction();
+                }
+            });
+        }
+    }
+
+    private void validateStartAction() {
+        try {
+            ZooKeeper zk = m_messenger.getZK();
+            boolean initCompleted = zk.exists(VoltZK.init_completed, false) != null;
+            List<String> children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
+            if (!children.isEmpty()) {
+                for (String child : children) {
+                    byte[] data = zk.getData(VoltZK.start_action + "/" + child, false, null);
+                    if (data == null) {
+                        VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+                    }
+                    String startAction = new String(data);
+                    if ((startAction.equals(StartAction.JOIN.toString()) ||
+                            startAction.equals(StartAction.REJOIN.toString()) ||
+                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
+                            !initCompleted) {
+                        int nodeId = VoltZK.getHostIDFromChildName(child);
+                        if (nodeId == m_messenger.getHostId()) {
+                            // make sure delete /core/hosts/host* first to avoid later waitForJoin check fail
+                            zk.delete(CoreZK.hostids_host + nodeId, -1);
+                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must create first");
+                        } else {
+                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
+                        }
+                    }
+                }
+            }
+        } catch (KeeperException e) {
+            hostLog.error("Failed to validate the start actions", e);
+        } catch (InterruptedException e) {
+            hostLog.error("Interrupted during start action validation", e);
         }
     }
 
@@ -1516,7 +1572,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
-        hmconfig.startAction = m_config.m_startAction;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 

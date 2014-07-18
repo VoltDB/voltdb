@@ -37,9 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
@@ -58,16 +55,13 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -100,7 +94,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
-        public StartAction startAction;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -213,8 +206,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
-
-    private ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get(hsId);
@@ -380,8 +371,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
             CoreZK.createHierarchy(m_zk);
 
-            m_zk.create(CoreZK.start_action, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
-
             /*
              * This creates the ephemeral sequential node with host id 0 which
              * this node already used for itself. Just recording that fact.
@@ -400,9 +389,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             byte[] payload = instance_id.toString(4).getBytes("UTF-8");
             m_zk.create(CoreZK.instance_id, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-            CoreZK.createStartActionNode(m_zk, m_localHostId, m_config.startAction);
-            validateStartAction();
-
             /*
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
@@ -411,49 +397,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
-    }
-
-    class StartActionWatcher implements Watcher {
-        @Override
-        public void process(WatchedEvent event) {
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    validateStartAction();
-                }
-            });
-        }
-    }
-
-    private void validateStartAction() {
-        try {
-            boolean initCompleted = m_zk.exists(VoltZK.init_completed, false) != null;
-            List<String> children = m_zk.getChildren(CoreZK.start_action, new StartActionWatcher(), null);
-            if (!children.isEmpty()) {
-                for (String child : children) {
-                    byte[] data = m_zk.getData(CoreZK.start_action + "/" + child, false, null);
-                    if (data == null) {
-                        VoltDB.crashLocalVoltDB("Couldn't find " + CoreZK.start_action + "/" + child);
-                    }
-                    String startAction = new String(data);
-                    if ((startAction.equals(StartAction.JOIN.toString()) ||
-                            startAction.equals(StartAction.REJOIN.toString()) ||
-                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
-                            !initCompleted) {
-                        int nodeId = CoreZK.getHostIDFromChildName(child);
-                        if (nodeId == m_localHostId) {
-                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must create first");
-                        } else {
-                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
-                        }
-                    }
-                }
-            }
-        } catch (KeeperException e) {
-            logger.error("Failed to validate the start actions", e);
-        } catch (InterruptedException e) {
-            logger.error("Interrupted during start action validation", e);
-        }
     }
 
     //For test only
@@ -776,10 +719,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 new InetSocketAddress(m_config.internalInterface, m_config.internalPort);
             hostInfoBytes = addr.toString().getBytes("UTF-8");
         }
-
-        CoreZK.createStartActionNode(m_zk, m_localHostId, m_config.startAction);
-
-        validateStartAction();
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
