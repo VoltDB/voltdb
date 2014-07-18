@@ -232,6 +232,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
+    private ReplicaDRGateway m_replicaDRGateway = null;
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -635,7 +636,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    if (Boolean.getBoolean("USE_DR_V2")) {
+                    boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
+                    if (useDRV2) {
                         ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     } else {
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
@@ -643,6 +645,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
+
+                    if (useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                        Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.AgentReceiver");
+                        Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                                String.class,
+                                HostMessenger.class,
+                                Cartographer.class,
+                                CatalogContext.class,
+                                boolean.class);
+                        // TODO: Do this a real way, not with a property
+                        String masterHost = System.getProperty("DR_MASTER_HOST");
+                        if (masterHost == null) {
+                            VoltDB.crashLocalVoltDB("Cannot start as replica without specifying a master cluster");
+                        }
+                        m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
+                                masterHost,
+                                m_messenger,
+                                m_cartographer,
+                                m_catalogContext,
+                                true);
+                        m_globalServiceElector.registerService(m_replicaDRGateway);
+                    }
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -1838,6 +1862,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
+                if (m_replicaDRGateway != null) {
+                    try {
+                        m_replicaDRGateway.shutdown();
+                        m_replicaDRGateway.join();
+                    } catch (InterruptedException e) {
+                        hostLog.warn("Interrupted shutting down dr replication", e);
+                    }
+                }
+
                 if (m_snapshotIOAgent != null) {
                     m_snapshotIOAgent.shutdown();
                 }
@@ -2416,6 +2449,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_nodeDRGateway != null) {
                 m_nodeDRGateway.start();
                 m_nodeDRGateway.bindPorts();
+            }
+            if (m_replicaDRGateway != null) {
+                m_replicaDRGateway.start();
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);

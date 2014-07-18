@@ -1620,11 +1620,24 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * one to try and complete the work. C'est la vie.
      */
     public void requestUserSnapshot(final StoredProcedureInvocation invocation, final Connection c) {
+        requestUserSnapshot(invocation, new SnapshotResultReceiver() {
+            @Override
+            public void receiveRespose(ByteBuffer buf) {
+                c.writeStream().enqueue(buf);
+            }
+        });
+    }
+
+    public interface SnapshotResultReceiver {
+        void receiveRespose(ByteBuffer buf);
+    }
+
+    public void requestUserSnapshot(final StoredProcedureInvocation invocation, final SnapshotResultReceiver receiver) {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    submitUserSnapshotRequest(invocation, c);
+                    submitUserSnapshotRequest(invocation, receiver);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Exception submitting user snapshot request", true, e);
                 }
@@ -1645,7 +1658,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     }
 
-    private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
+    private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final SnapshotResultReceiver receiver) {
         Object params[] = invocation.getParams().toArray();
 
         try {
@@ -1654,7 +1667,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              */
             SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(params);
 
-            createAndWatchRequestNode(invocation.clientHandle, c, snapInfo,
+            createAndWatchRequestNode(invocation.clientHandle, receiver, snapInfo,
                     false);
         } catch (Exception e) {
             VoltTable tables[] = new VoltTable[0];
@@ -1671,7 +1684,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
+            receiver.receiveRespose(buf);
             return;
         }
     }
@@ -1683,6 +1696,21 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                           final Connection c,
                                           SnapshotInitiationInfo snapInfo,
                                           boolean notifyChanges) throws ForwardClientException {
+        createAndWatchRequestNode(clientHandle,
+                new SnapshotResultReceiver() {
+                    @Override
+                    public void receiveRespose(ByteBuffer buf) {
+                        c.writeStream().enqueue(buf);
+                    }
+                },
+                snapInfo,
+                notifyChanges);
+    }
+
+    private void createAndWatchRequestNode(final long clientHandle,
+                                           final SnapshotResultReceiver receiver,
+                                           SnapshotInitiationInfo snapInfo,
+                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
         final String requestId = createRequestNode(snapInfo);
         if (requestId == null) {
@@ -1690,7 +1718,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } else {
             if (!snapInfo.isTruncationRequest()) {
                 try {
-                    registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
+                    registerUserSnapshotResponseWatch(requestId, clientHandle, receiver, notifyChanges);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
                 }
@@ -1712,7 +1740,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 ByteBuffer buf = ByteBuffer.allocate(resp.getSerializedSize() + 4);
                 buf.putInt(buf.capacity() - 4);
                 resp.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
+                receiver.receiveRespose(buf);
             }
         }
 
@@ -1763,7 +1791,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void registerUserSnapshotResponseWatch(
             final String requestId,
             final long clientHandle,
-            final Connection c,
+            final SnapshotResultReceiver receiver,
             final boolean notifyChanges) throws Exception {
         final String responseNode = VoltZK.user_snapshot_response + requestId;
         Stat exists = m_zk.exists(responseNode, new Watcher() {
@@ -1779,7 +1807,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 processUserSnapshotRequestResponse(
                                             event,
                                             clientHandle,
-                                            c,
+                                            receiver,
                                             notifyChanges);
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB(
@@ -1802,7 +1830,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         KeeperState.SyncConnected,
                         responseNode),
                         clientHandle,
-                        c,
+                        receiver,
                         notifyChanges);
         }
     }
@@ -1810,7 +1838,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     void processUserSnapshotRequestResponse(
             final WatchedEvent event,
             final long clientHandle,
-            final Connection c,
+            final SnapshotResultReceiver receiver,
             final boolean notifyChanges) throws Exception {
         byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
         try {
@@ -1827,7 +1855,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf2.putInt(buf2.capacity() - 4);
         response.flattenToBuffer(buf2).flip();
-        c.writeStream().enqueue(buf2);
+        receiver.receiveRespose(buf2);
 
         /*
          * If the caller wants to be notified of final results for the snapshot
@@ -1848,7 +1876,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                     processUserSnapshotRequestResponse(
                                                 event,
                                                 clientHandle,
-                                                c,
+                                                receiver,
                                                 false);
                                 } catch (Exception e) {
                                     VoltDB.crashLocalVoltDB(
@@ -1866,7 +1894,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
             // Set the watcher
             if (m_zk.exists(event.getPath(), watcher) != null) {
-                processUserSnapshotRequestResponse(event, clientHandle, c, false);
+                processUserSnapshotRequestResponse(event, clientHandle, receiver, false);
             }
         }
     }
