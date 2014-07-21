@@ -851,12 +851,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             extraIndent = "";
         }
         else {
-            String nodePlan = explainPlanForNode(indent);
-            if (m_skipInitalIndentationForExplain) {
-                sb.append(" " + nodePlan + "\n");
-            } else {
-                sb.append(indent + nodePlan + "\n");
+            if ( ! m_skipInitalIndentationForExplain) {
+                sb.append(indent);
             }
+            String nodePlan = explainPlanForNode(indent);
+            sb.append(nodePlan + "\n");
         }
 
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
@@ -867,7 +866,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
             inlineNode.setSkipInitalIndentationForExplain(true);
 
-            sb.append(indent + extraIndent + "inline");
+            sb.append(indent + extraIndent + "inline ");
             inlineNode.explainPlan_recurse(sb, indent + extraIndent);
         }
 
