@@ -21,10 +21,13 @@ import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 
 /**
  *
@@ -38,7 +41,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * linked hash map so we retain the order in which the user
      * specified the columns.
      */
-    public LinkedHashMap<Column, AbstractExpression> columns = new LinkedHashMap<Column, AbstractExpression>();
+    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+
+    /**
+     * The SELECT statement for INSERT INTO ... SELECT.
+     */
+    private ParsedSelectStmt m_subselect;
 
     /**
     * Class constructor
@@ -51,12 +59,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        // A simple INSERT ... VALUES statement (all that's supported initially) has no underlying
-        // table scans, so the table list should actually be empty until the statement's target
-        // table is inserted, below.
-        // TODO: When INSERT ... SELECT is supported, it's unclear how the source and target tables will
-        // be distinguished (positionally? in separate members?) and/or how soon thereafter the SELECT
-        // clause will need to allow joins.
+        // An INSERT statement may have table scans if its an INSERT INTO ... SELECT,
+        // but those table scans will belong to the corresponding ParsedSelectStmt
         assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
@@ -66,7 +70,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(node, table, columns);
+                parseTargetColumns(node, table, m_columns);
+            }
+            else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+                m_subselect = (ParsedSelectStmt)parseSubquery(node);
+            }
+            else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+                throw new PlanningErrorException(
+                        "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
         }
     }
@@ -76,12 +87,94 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "COLUMNS:\n";
-        for (Entry<Column, AbstractExpression> col : columns.entrySet()) {
-            retval += "\tColumn: " + col.getKey().getTypeName() + ": ";
-            retval += col.getValue().toString() + "\n";
+        for (Entry<Column, AbstractExpression> col : m_columns.entrySet()) {
+            retval += "\tColumn: " + col.getKey().getTypeName();
+            if (col.getValue() != null) {
+                retval += ": " + col.getValue().toString();
+            }
+            retval += "\n";
         }
-        retval = retval.trim();
 
+        if (m_subselect != null) {
+            retval += "SUBSELECT:\n";
+            retval += m_subselect.toString();
+        }
         return retval;
     }
+
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, name , id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
+    public AbstractExpression getExpressionForPartitioning(Column column) {
+        AbstractExpression expr = null;
+        if (m_subselect != null) {
+            // Currently insert into select is only supported for the SP/SP case.
+            return null;
+        }
+        else {
+            expr = m_columns.get(column);
+            if (expr == null) {
+                expr = defaultValueToExpr(column);
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
+    /**
+     * @return the m_subselect
+     */
+    public ParsedSelectStmt getSubselect() {
+        return m_subselect;
+    }
+
 }

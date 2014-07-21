@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
@@ -537,7 +538,7 @@ public class StatementDML extends StatementDMQL {
         newData.beforeFirst();
 
         while (newData.hasNext()) {
-            Object[] data = (Object[]) newData.getNext();
+            Object[] data = newData.getNext();
 
             baseTable.insertRow(session, store, data);
 
@@ -1257,7 +1258,9 @@ public class StatementDML extends StatementDMQL {
             VoltXMLElement column = new VoltXMLElement("column");
             columns.children.add(column);
             column.attributes.put("name", targetTable.getColumn(columnMap[i]).getName().name);
-            column.children.add(expressions[i].voltGetXML(session));
+            if (expressions != null) {
+                column.children.add(expressions[i].voltGetXML(session));
+            }
         }
     }
 
@@ -1286,7 +1289,7 @@ public class StatementDML extends StatementDMQL {
     {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
-        VoltXMLElement child = targetRangeVariables[0].voltGetRangeVariableXML(session);
+        VoltXMLElement child = rangeVariables[0].voltGetRangeVariableXML(session);
         assert(child != null);
         xml.children.add(child);
     }
@@ -1308,9 +1311,16 @@ public class StatementDML extends StatementDMQL {
 
         case StatementTypes.INSERT :
             xml = new VoltXMLElement("insert");
-            voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
-            // INSERT has no child node or condition,
-            // UNTIL we support "INSERT INTO <table> SELECT ... FROM ... WHERE..."
+
+            assert(insertExpression != null || queryExpression != null);
+
+            if (queryExpression == null) {
+                voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
+            } else {
+                voltAppendTargetColumns(session, insertColumnMap, null, xml);
+                VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
+                xml.children.add(child);
+            }
             break;
 
         case StatementTypes.UPDATE_CURSOR :

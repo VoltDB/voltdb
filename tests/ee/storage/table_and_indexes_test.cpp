@@ -300,6 +300,7 @@ class TableAndIndexTest : public Test {
  * Check that inserting, deleting and updating works and propagates via DR buffers
  */
 TEST_F(TableAndIndexTest, DrTest) {
+    drStream.m_enabled = true;
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
