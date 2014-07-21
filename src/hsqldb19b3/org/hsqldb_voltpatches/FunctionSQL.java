@@ -292,7 +292,7 @@ public class FunctionSQL extends Expression {
             case FUNC_EXTRACT :
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
-                	// A VoltDB extension to support more selectors
+                    // A VoltDB extension to support more selectors
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
                     /* disable 1 line ...
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
