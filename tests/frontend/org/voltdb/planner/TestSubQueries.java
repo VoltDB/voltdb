@@ -1725,7 +1725,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScan(pn, "R2", "A", "C");
 
-
         // Join with partitioned tables
 
         // Join on coordinator: LEFT OUTER JOIN, replicated table on left side
@@ -1776,9 +1775,6 @@ public class TestSubQueries extends PlannerTestCase {
 
         // LEFT partition table
         planNodes = compileToFragments("SELECT T1.CC FROM P1 LEFT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1828,9 +1824,6 @@ public class TestSubQueries extends PlannerTestCase {
 
         // RIGHT partition table
         planNodes = compileToFragments("SELECT T1.CC FROM P1 RIGHT JOIN (SELECT A, count(*) CC FROM P2 GROUP BY A) T1 ON T1.A = P1.A ");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);

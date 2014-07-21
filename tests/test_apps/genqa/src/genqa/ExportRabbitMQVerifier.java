@@ -63,6 +63,7 @@ public class ExportRabbitMQVerifier {
             channel.exchangeDeclare("testExchange", "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
             channel.queueBind(dataQueue, "testExchange", "EXPORT_PARTITIONED_TABLE.#");
+            channel.queueBind(dataQueue, "testExchange", "EXPORT_PARTITIONED_TABLE2.#");
             channel.queueBind(dataQueue, "testExchange", "EXPORT_REPLICATED_TABLE.#");
             String doneQueue = channel.queueDeclare().getQueue();
             channel.queueBind(doneQueue, "testExchange", "EXPORT_DONE_TABLE.#");
