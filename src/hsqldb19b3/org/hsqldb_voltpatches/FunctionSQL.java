@@ -292,12 +292,12 @@ public class FunctionSQL extends Expression {
             case FUNC_EXTRACT :
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
-                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 17, Tokens.YEAR,
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
                     Tokens.DAY_NAME, Tokens.MONTH_NAME, Tokens.WEEKDAY,
-                    Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
+                    Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR, Tokens.WEEK,
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
                 };
@@ -2101,6 +2101,8 @@ public class FunctionSQL extends Expression {
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";
                 break;
+            case Tokens.WEEK:
+            	keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
                 volt_alias = "week_of_year";
