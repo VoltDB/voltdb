@@ -118,18 +118,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     m_node->initTemplateTuple(m_engine, templateTuple);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-#ifdef DEBUG
-    //
-    // This should probably just be a warning in the future when we are
-    // running in a distributed cluster
-    //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                   m_inputTable->name().c_str());
-        return false;
-    }
-#endif
-    assert ( ! m_inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;
@@ -147,7 +135,18 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     while (iterator.next(inputTuple)) {
 
         for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
-            templateTuple.setNValue(m_node->getFieldMap()[i], inputTuple.getNValue(i));
+            // Most executors will just call setNValue instead of
+            // setNValueAllocateForObjectCopies.
+            //
+            // However, We need to call
+            // setNValueAlocateForObjectCopies here.  Sometimes the
+            // input table's schema has an inlined string field, and
+            // it's being assigned to the target table's outlined
+            // string field.  In this case we need to tell the NValue
+            // where to allocate the string data.
+            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
+                                                           inputTuple.getNValue(i),
+                                                           ExecutorContext::getTempStringPool());
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",

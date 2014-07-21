@@ -39,7 +39,7 @@ using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
-      m_enabled(false),
+      m_enabled(true),
       m_partitionId(0)
 {}
 
