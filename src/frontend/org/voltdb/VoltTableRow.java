@@ -204,6 +204,7 @@ public abstract class VoltTableRow {
     public boolean advanceToRow(int rowIndex) {
         int rows_to_move = rowIndex - m_activeRowIndex;
         m_activeRowIndex = rowIndex;
+
         if (m_activeRowIndex >= getRowCount())
             return false;
         if (rows_to_move < 0) // this is "advance" to row, don't move backwards

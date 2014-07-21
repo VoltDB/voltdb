@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -245,8 +246,7 @@ public class PlanAssembler {
                 // End of the recursion. Nothing to simplify
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
-
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             for (ParsedColInfo groupbyCol: m_parsedSelect.m_groupByColumns) {
@@ -968,6 +968,77 @@ public class PlanAssembler {
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
+    static private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {
+
+        if (expr.getValueType().getValue() != column.getType() ||
+                expr.getValueSize() != column.getSize()) {
+            expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
+            expr.setValueType(VoltType.get((byte) column.getType()));
+            // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
+            // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
+            // the tuple that gets the result of the cast can be properly formatted as inline.
+            // A too-wide value survives the cast (to generic VARCHAR of any length) but the
+            // attempt to cache the result in the inline temp tuple storage will throw an early
+            // runtime error on be  half of the target table column.
+            // The important thing here is to leave the formatting hint in the output schema that
+            // drives the temp tuple layout.
+            expr.setValueSize(column.getSize());
+        }
+
+        return expr;
+    }
+
+    private AbstractExpression defaultValueToExpr(Column column) {
+        AbstractExpression expr = null;
+
+        boolean isConstantValue = true;
+        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+            boolean isFunctionFormat = true;
+            String timeValue = column.getDefaultvalue();
+            try {
+                Long.parseLong(timeValue);
+                isFunctionFormat = false;
+            } catch (NumberFormatException  e) {}
+            if (isFunctionFormat) {
+                try {
+                    java.sql.Timestamp.valueOf(timeValue);
+                    isFunctionFormat = false;
+                } catch (IllegalArgumentException e) {}
+            }
+
+            if (isFunctionFormat) {
+                String name = timeValue.split(":")[0];
+                int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                FunctionExpression funcExpr = new FunctionExpression();
+                funcExpr.setAttributes(name, name , id);
+
+                funcExpr.setValueType(VoltType.TIMESTAMP);
+                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                expr = funcExpr;
+                isConstantValue = false;
+            }
+        }
+        if (isConstantValue) {
+            // Not Default sql function.
+            ConstantValueExpression const_expr = new ConstantValueExpression();
+            expr = const_expr;
+            if (column.getDefaulttype() != 0) {
+                const_expr.setValue(column.getDefaultvalue());
+                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+            }
+            else {
+                const_expr.setValue(null);
+                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+            }
+        }
+
+        assert(expr != null);
+        return expr;
+    }
+
     /**
      * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
      * and this will only generate a single plan.
@@ -984,123 +1055,73 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
+        CatalogMap<Column> targetTableColumns = targetTable.getColumns();
+
+        for (Column col : targetTableColumns) {
+            boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
+            if (needsValue && !m_parsedInsert.columns.containsKey(col)) {
+                throw new PlanningErrorException("Column " + col.getName()
+                        + " has no default and is not nullable.");
+            }
+
+            // hint that this statement can be executed SP.
+            if (col.equals(m_partitioning.getPartitionColForDML())) {
+                AbstractExpression expr = m_parsedInsert.columns.get(col);
+                if (expr == null) {
+                    expr = defaultValueToExpr(col);
+                }
+
+                String fullColumnName = targetTable.getTypeName() + "." + col.getTypeName();
+                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
+            }
+        }
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
 
-        // the materialize node creates a tuple to insert (which is frankly not
-        // always optimal)
-        MaterializePlanNode materializeNode = new MaterializePlanNode();
-        NodeSchema mat_schema = new NodeSchema();
+        // The child of the insert node produces rows containing values
+        // from the VALUES clause.
+        // Right now it can only be a materialize node,
+        // but in the future it could be an arbitrary sub-plan produced from a sub-query.
+        MaterializePlanNode matNode = new MaterializePlanNode();
+        NodeSchema matSchema = new NodeSchema();
+        int[] fieldMap = new int[m_parsedInsert.columns.size()];
+        int i = 0;
 
-        // get the ordered list of columns for the targettable using a helper
-        // function they're not guaranteed to be in order in the catalog
-        List<Column> columns =
-            CatalogUtil.getSortedCatalogItems(targetTable.getColumns(), "index");
+        // The insert statement's set of columns are contained in a LinkedHashMap,
+        // meaning that we'll iterate over the columns here in the order that the user
+        // specified them in the original SQL.
+        for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.columns.entrySet()) {
+            Column col = e.getKey();
 
-        // for each column in the table in order...
-        for (Column column : columns) {
+            AbstractExpression valExpr = e.getValue();
+            fieldMap[i] = col.getIndex();
 
-            // get the expression for the column
-            AbstractExpression expr = m_parsedInsert.columns.get(column);
-            // if there's no expression, make sure the column has
-            // some supported default value
-            if (expr == null) {
-                // if it's not nullable or defaulted we have a problem
-                if (column.getNullable() == false && column.getDefaulttype() == 0) {
-                    throw new PlanningErrorException("Column " + column.getName()
-                            + " has no default and is not nullable.");
-                }
+            valExpr.setInBytes(col.getInbytes());
 
-                boolean isConstantValue = true;
-                if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+            // Patch over any mismatched expressions with an explicit cast.
+            // Most impossible-to-cast type combinations should have already been caught by the
+            // parser, but there are also runtime checks in the casting code
+            // -- such as for out of range values.
+            valExpr = castExprIfNeeded(valExpr, col);
 
-                    boolean isFunctionFormat = true;
-                    String timeValue = column.getDefaultvalue();
-                    try {
-                        Long.parseLong(timeValue);
-                        isFunctionFormat = false;
-                    } catch (NumberFormatException  e) {}
-                    if (isFunctionFormat) {
-                        try {
-                            java.sql.Timestamp.valueOf(timeValue);
-                            isFunctionFormat = false;
-                        } catch (IllegalArgumentException e) {}
-                    }
+            matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                    "VOLT_TEMP_TABLE",
+                    col.getTypeName(),
+                    col.getTypeName(),
+                    valExpr));
 
-                    if (isFunctionFormat) {
-                        String name = timeValue.split(":")[0];
-                        int id = Integer.parseInt(timeValue.split(":")[1]);
-
-                        FunctionExpression funcExpr = new FunctionExpression();
-                        funcExpr.setAttributes(name, name , id);
-
-                        funcExpr.setValueType(VoltType.TIMESTAMP);
-                        funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
-
-                        expr = funcExpr;
-                        isConstantValue = false;
-                    }
-                }
-                if (isConstantValue) {
-                    // Not Default sql function.
-                    ConstantValueExpression const_expr = new ConstantValueExpression();
-                    expr = const_expr;
-                    if (column.getDefaulttype() != 0) {
-                        const_expr.setValue(column.getDefaultvalue());
-                        const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
-                    }
-                    else {
-                        const_expr.setValue(null);
-                        const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
-                    }
-                }
-                assert(expr != null);
-            }
-
-            // Hint that this statement can be executed SP.
-            if (column.equals(m_partitioning.getPartitionColForDML())) {
-                String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
-                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
-            }
-
-            expr.setInBytes(column.getInbytes());
-
-            // The current insertexecutor implementation requires its input tuple from the
-            // materializeexecutor to be formatted exactly like the target persistent tuple.
-            // This requires the intervening outputschema to describe result columns of the
-            // exactly right type and size (at least for inlined sizes) as their target columns.
-            if (expr.getValueType().getValue() != column.getType() ||
-                    expr.getValueSize() != column.getSize()) {
-                // Patch over any mismatched expressions with an explicit cast.
-                // Most impossible-to-cast type combinations should have already been caught by the
-                // parser, but there are also runtime checks in the casting code
-                // -- such as for out of range values.
-                expr = new OperatorExpression(ExpressionType.OPERATOR_CAST, expr, null);
-                expr.setValueType(VoltType.get((byte) column.getType()));
-                // We don't really support parameterized casting, such as specifically to "VARCHAR(3)"
-                // vs. just VARCHAR, but set the size parameter anyway in this case to make sure that
-                // the tuple that gets the result of the cast can be properly formatted as inline.
-                // A too-wide value survives the cast (to generic VARCHAR of any length) but the
-                // attempt to cache the result in the inline temp tuple storage will throw an early
-                // runtime error on bahalf of the target table column.
-                // The important thing here is to leave the formatting hint in the output schema that
-                // drives the temp tuple layout.
-                expr.setValueSize(column.getSize());
-            }
-            // add column to the materialize node.
-            // This table name is magic.
-            mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                                  "VOLT_TEMP_TABLE",
-                                                  column.getTypeName(),
-                                                  column.getTypeName(),
-                                                  expr));
+            i++;
         }
 
-        materializeNode.setOutputSchema(mat_schema);
+        // The field map tells the insert node
+        // where to put values produced by child into the row to be inserted.
+        insertNode.setFieldMap(fieldMap);
+
+        matNode.setOutputSchema(matSchema);
         // connect the insert and the materialize nodes together
-        insertNode.addAndLinkChild(materializeNode);
+        insertNode.addAndLinkChild(matNode);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
@@ -1274,7 +1295,7 @@ public class PlanAssembler {
         // Whether or not we can push the limit node down
         boolean canPushDown = ! m_parsedSelect.hasDistinct();
         if (canPushDown) {
-            sendNode = checkPushDownViability(root);
+            sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
                 canPushDown = false;
             } else {
@@ -1866,7 +1887,7 @@ public class PlanAssembler {
      * @return If we can push it down, the receive node is returned. Otherwise,
      *         it returns null.
      */
-    protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
+    protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
         // Return a mid-plan send node, if one exists and can host a distributed limit node.
@@ -1887,15 +1908,10 @@ public class PlanAssembler {
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
-            if (!(receiveNode instanceof AggregatePlanNode) &&
-                !(receiveNode instanceof OrderByPlanNode) &&
+            // Delete the aggregate node case to handle ENG-6485, or say we don't push down meeting aggregate node
+            // TODO: We might want to optimize/push down "limit" for some cases
+            if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                return null;
-            }
-
-            // Limitation: can only push past coordinating aggregation nodes
-            if (receiveNode instanceof AggregatePlanNode &&
-                !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 return null;
             }
 
