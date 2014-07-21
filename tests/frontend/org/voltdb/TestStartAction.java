@@ -21,62 +21,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltcore.messaging;
+package org.voltdb;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.util.ArrayList;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltdb.StartAction;
-import org.voltdb.VoltDB;
 
 public class TestStartAction {
-    private static final ArrayList<HostMessenger> createdMessengers = new ArrayList<HostMessenger>();
+    private MockVoltDB m_mvoltdb;
 
     @Before
     public void setUp() throws Exception {
+        m_mvoltdb = new MockVoltDB();
+        VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
     }
 
     @After
     public void tearDown() throws Exception {
-        for (HostMessenger hm : createdMessengers) {
-            hm.shutdown();
-        }
-        createdMessengers.clear();
-    }
-
-    private HostMessenger createHostMessenger(int index, StartAction action, boolean start) throws Exception {
-        HostMessenger.Config config = new HostMessenger.Config();
-        config.internalPort = config.internalPort + index;
-        config.zkInterface = "127.0.0.1:" + (2181 + index);
-        HostMessenger hm = new HostMessenger(config);
-        createdMessengers.add(hm);
-        if (start) {
-            hm.start();
-        }
-        return hm;
+        m_mvoltdb.shutdown(null);
+        VoltDB.replaceVoltDBInstanceForTest(null);
     }
 
     @Test
     public void testCreateAndJoin() throws Exception {
-        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, false);
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.JOIN, false);
-
-        try {
-            hm1.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
+        m_mvoltdb.createStartActionNode(0, StartAction.JOIN);
+        m_mvoltdb.createStartActionNode(1, StartAction.CREATE);
 
         try {
             VoltDB.ignoreCrash = true;
-            hm2.start();
+            m_mvoltdb.validateStartAction();
             VoltDB.ignoreCrash = false;
         } catch (AssertionError e) {}
 
@@ -86,19 +62,12 @@ public class TestStartAction {
 
     @Test
     public void testCreateAndRejoin() throws Exception {
-        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, false);
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.REJOIN, false);
-
-        try {
-            hm1.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
+        m_mvoltdb.createStartActionNode(0, StartAction.REJOIN);
+        m_mvoltdb.createStartActionNode(1, StartAction.CREATE);
 
         try {
             VoltDB.ignoreCrash = true;
-            hm2.start();
+            m_mvoltdb.validateStartAction();
             VoltDB.ignoreCrash = false;
         } catch (AssertionError e) {}
 
@@ -108,19 +77,12 @@ public class TestStartAction {
 
     @Test
     public void testCreateAndLiveRejoin() throws Exception {
-        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, false);
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.LIVE_REJOIN, false);
-
-        try {
-            hm1.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
+        m_mvoltdb.createStartActionNode(0, StartAction.LIVE_REJOIN);
+        m_mvoltdb.createStartActionNode(1, StartAction.CREATE);
 
         try {
             VoltDB.ignoreCrash = true;
-            hm2.start();
+            m_mvoltdb.validateStartAction();
             VoltDB.ignoreCrash = false;
         } catch (AssertionError e) {}
 
@@ -130,25 +92,16 @@ public class TestStartAction {
 
     @Test
     public void testCreateAndCreate() throws Exception {
-        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, false);
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, false);
-
-        try {
-            hm1.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
+        m_mvoltdb.createStartActionNode(0, StartAction.CREATE);
+        m_mvoltdb.createStartActionNode(1, StartAction.CREATE);
 
         try {
             VoltDB.ignoreCrash = true;
-            hm2.start();
+            m_mvoltdb.validateStartAction();
             VoltDB.ignoreCrash = false;
         } catch (AssertionError e) {}
 
         assertFalse(VoltDB.wasCrashCalled);
-        hm1.waitForGroupJoin(2);
-        hm2.waitForGroupJoin(2);
         VoltDB.wasCrashCalled = false;
     }
 

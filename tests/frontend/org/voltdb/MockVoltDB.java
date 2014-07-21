@@ -34,14 +34,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -53,6 +57,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
@@ -124,6 +129,14 @@ public class MockVoltDB implements VoltDBInterface
                     getLocalMetadata().getBytes("UTF-8"),
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL);
+
+            m_hostMessenger.getZK().create(
+                    VoltZK.start_action,
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT,
+                    new ZKUtil.StringCallback(),
+                    null);
 
             m_statsAgent = new StatsAgent();
             m_statsAgent.registerMailbox(m_hostMessenger,
@@ -327,6 +340,54 @@ public class MockVoltDB implements VoltDBInterface
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
         voltconfig = config;
+    }
+
+    public void createStartActionNode(int index, StartAction action) {
+        VoltZK.createStartActionNode(m_hostMessenger.getZK(), m_hostMessenger.getHostId() + index, action);
+    }
+
+    class StartActionWatcher implements Watcher {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    validateStartAction();
+                }
+            });
+        }
+    }
+
+    public void validateStartAction() {
+        try {
+            ZooKeeper zk = m_hostMessenger.getZK();
+            boolean initCompleted = zk.exists(VoltZK.init_completed, false) != null;
+            List<String> children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
+            if (!children.isEmpty()) {
+                for (String child : children) {
+                    byte[] data = zk.getData(VoltZK.start_action + "/" + child, false, null);
+                    if (data == null) {
+                        VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+                    }
+                    String startAction = new String(data);
+                    if ((startAction.equals(StartAction.JOIN.toString()) ||
+                            startAction.equals(StartAction.REJOIN.toString()) ||
+                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
+                            !initCompleted) {
+                        int nodeId = VoltZK.getHostIDFromChildName(child);
+                        if (nodeId == m_hostMessenger.getHostId()) {
+                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must CREATE first");
+                        } else {
+                            System.err.println("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
+                        }
+                    }
+                }
+            }
+        } catch (KeeperException e) {
+            System.err.println("Failed to validate the start actions:" + e.getMessage());
+        } catch (InterruptedException e) {
+            System.err.println("Interrupted during start action validation:" + e.getMessage());
+        }
     }
 
     @Override
