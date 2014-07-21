@@ -438,7 +438,7 @@ public class SnapshotUtil {
     /**
      * Write the .complete file for finished snapshot
      */
-    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId) throws IOException {
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
 
         final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
         if (f.exists()) {
@@ -449,7 +449,7 @@ public class SnapshotUtil {
             public void run() {
                 try {
                     if (!f.createNewFile()) {
-                        System.err.println("Failed to create .complete file for " + f.getName());
+                        logger.warn("Failed to create .complete file for " + f.getName());
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
