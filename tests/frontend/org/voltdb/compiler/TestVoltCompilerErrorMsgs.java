@@ -150,5 +150,11 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                     "insert into partitioned_blah (ival, sval) " +
                         "select ival, ? from blah order by ival, sval;",
                 "partition procedure insert_param_in_select_list on table partitioned_blah column sval;");
+
+        // inserting into replicated table should fail
+        ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
+                "create procedure insert_into_replicated_select as " +
+                "insert into blah select * from partitioned_blah;" +
+                "partition procedure insert_into_replicated_select on table partitioned_blah column sval;");
     }
 }

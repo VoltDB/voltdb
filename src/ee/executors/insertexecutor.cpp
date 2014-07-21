@@ -135,6 +135,15 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     while (iterator.next(inputTuple)) {
 
         for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
+            // Most executors will just call setNValue instead of
+            // setNValueAllocateForObjectCopies.
+            //
+            // However, We need to call
+            // setNValueAlocateForObjectCopies here.  Sometimes the
+            // input table's schema has an inlined string field, and
+            // it's being assigned to the target table's outlined
+            // string field.  In this case we need to tell the NValue
+            // where to allocate the string data.
             templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
                                                            inputTuple.getNValue(i),
                                                            ExecutorContext::getTempStringPool());

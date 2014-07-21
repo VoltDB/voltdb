@@ -53,7 +53,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "CREATE TABLE target_p (bi bigint not null," +
                 "vc varchar(100) default '" + vcDefault +"'," +
                 "ii integer default " + intDefault + "," +
-                "ti tinyint default " + intDefault + ");" +
+                "ti tinyint default " + intDefault + " not null);" +
                 "partition table target_p on column bi;" +
 
                 "CREATE TABLE source_p1 (bi bigint not null," +
@@ -72,6 +72,8 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "vc varchar(4)," +
                 "ii integer," +
                 "ti tinyint);" +
+
+                "create procedure get_all_target_rows as select * from target_p order by bi, vc, ii, ti;" +
 
                 "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
                 "partition procedure insert_p_source_p on table target_p column bi;" +
@@ -115,12 +117,116 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r; " +
                 "partition procedure insert_wrong_partition on table target_p column bi; " +
 
-                "create procedure InsertIntoSelectWithJoin as " +
+                "create procedure insert_select_violate_constraint as " +
+                "insert into target_p (bi, ti) " +
+                "select bi, case ti when 55 then null else ti end from source_p1 where bi = ? order by ti asc;" +
+                "partition procedure insert_select_violate_constraint on table target_p column bi; " +
+
+                // More complex insert-into-select stored procedures below.
+                // Each procedure has a "verify_" partner that produces the rows to be inserted
+                // The verify procedures are not partitioned, to avoid masking potential issues
+
+                // join two partitioned tables
+                "create procedure insert_select_with_join as " +
                 "insert into target_p " +
                 "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
                 "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
                 "where sp1.bi = ?;" +
-                "partition procedure InsertIntoSelectWithJoin on table target_p column bi;" +
+                "partition procedure insert_select_with_join on table target_p column bi;" +
+
+                "create procedure verify_insert_select_with_join as " +
+                "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
+                "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
+                "where sp1.bi = ? order by sp1.bi, sp1.vc, sp2.ii, sp2.ti;" +
+
+                // Join partitioned to replicated table
+                "create procedure insert_select_join_replicated as " +
+                "insert into target_p " +
+                "select sp1.bi, sp1.vc, sr.ii, sr.ti from source_p1 as sp1 inner join source_r as sr on " +
+                "sr.bi = sp1.bi and sr.ii = sp1.ii where sp1.bi = ?; " +
+                "partition procedure insert_select_join_replicated on table target_p column bi;" +
+
+                "create procedure verify_insert_select_join_replicated as " +
+                "select sp1.bi, sp1.vc, sr.ii, sr.ti from source_p1 as sp1 inner join source_r as sr on " +
+                "sr.bi = sp1.bi and sr.ii = sp1.ii where sp1.bi = ?" +
+                "order by sp1.bi, sp1.vc, sr.ii, sr.ti; " +
+
+                // select from subquery
+                "create procedure insert_select_subquery as " +
+                "insert into target_p " +
+                "select * " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "where sp1_subq.bi = ?; " +
+                "partition procedure insert_select_subquery on table target_p column bi;" +
+
+                "create procedure verify_insert_select_subquery as " +
+                "select * " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "where sp1_subq.bi = ? order by bi, vc, ii, ti; " +
+
+                // select from subquery---partitioning predicate is inside subquery
+                "create procedure insert_select_subquery_inner_filter as " +
+                "insert into target_p " +
+                "select * " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1 where bi = ?) as sp1_subq; " +
+                "partition procedure insert_select_subquery_inner_filter on table target_p column bi;" +
+
+                "create procedure verify_insert_select_subquery_inner_filter as " +
+                "select * " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1 where bi = ?) as sp1_subq " +
+                "order by bi, vc, ii, ti; " +
+
+                // select from subquery joined with table
+                "create procedure insert_select_subquery_join as " +
+                "insert into target_p " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "inner join source_p2 as sp2 on sp1_subq.bi = sp2.bi and sp1_subq.ii = sp2.ii " +
+                "where sp1_subq.bi = ?; " +
+                "partition procedure insert_select_subquery_join on table target_p column bi; " +
+
+                "create procedure verify_insert_select_subquery_join as " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "inner join source_p2 as sp2 on sp1_subq.bi = sp2.bi and sp1_subq.ii = sp2.ii " +
+                "where sp1_subq.bi = ? order by sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti; " +
+
+                // select from two subqueries and join them
+                "create procedure insert_select_join_two_subqueries as " +
+                "insert into target_p " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
+                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
+                "where sp1_subq.bi = ?; " +
+                "partition procedure insert_select_join_two_subqueries on table target_p column bi; " +
+
+                "create procedure verify_insert_select_join_two_subqueries as " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
+                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
+                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
+                "where sp1_subq.bi = ? " +
+                "order by sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti; " +
+
+                // select from two nested subqueries joined to another subquery
+                "create procedure insert_select_nested_subqueries  as " +
+                "insert into target_p " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from (select bi, 'nested ' || vc as vc, ii, ti from source_p1) as sp1_subq_subq) as sp1_subq " +
+                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
+                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
+                "where sp1_subq.bi = ?; " +
+                "partition procedure insert_select_nested_subqueries  on table target_p column bi; " +
+
+                "create procedure verify_insert_select_nested_subqueries  as " +
+                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
+                "from (select bi, 'subq + ' || vc as vc, ii, ti from (select bi, 'nested ' || vc as vc, ii, ti from source_p1) as sp1_subq_subq) as sp1_subq " +
+                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
+                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
+                "where sp1_subq.bi = ? " +
+                "order by sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti; " +
+
                 "";
             project.addLiteralSchema(schema);
         } catch (IOException error) {
@@ -150,6 +256,12 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         return builder;
     }
 
+    private static void clearTargetTable(Client client) throws Exception {
+        ClientResponse resp = client.callProcedure("@AdHoc", "delete from target_p");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+    }
+
     private static void clearTables(Client client) throws Exception {
         ClientResponse resp = client.callProcedure("@AdHoc", "delete from source_p1");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -157,8 +269,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         resp = client.callProcedure("@AdHoc", "delete from source_p2");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-        resp = client.callProcedure("@AdHoc", "delete from target_p");
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        clearTargetTable(client);
     }
 
     private static void initializeTables(Client client) throws Exception {
@@ -311,43 +422,53 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "insert_p_source_p_nonsensical_cast", partitioningValue);
     }
 
-    public void testPartitionedTableWithSelectJoin() throws Exception
+    public void testInsertIntoComplexSelect() throws Exception
     {
         final Client client = getClient();
         initializeTables(client);
 
-        // source_p1 contains 0..9
-        // source_p2 contains 5..14
-
+        String[] procs = new String[] {
+                "insert_select_with_join",
+                "insert_select_join_replicated",
+                "insert_select_subquery",
+                "insert_select_subquery_inner_filter",
+                "insert_select_subquery_join",
+                "insert_select_join_two_subqueries",
+                "insert_select_nested_subqueries"
+                };
         final long partitioningValue = 7;
-        ClientResponse resp = client.callProcedure("InsertIntoSelectWithJoin", partitioningValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        assertEquals(4, resp.getResults()[0].asScalarLong());
 
-        String selectSp1 = "select * from source_p1 where bi = ? order by bi, ii";
-        String selectSp2 = "select * from source_p2 where bi = ? order by bi, ii";
-        String selectTarget = "select * from target_p order by bi, ii";
+        for (int i = 0; i < procs.length; ++i) {
+            clearTargetTable(client);
 
-        resp = client.callProcedure("@AdHoc", selectTarget);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable targetRows = resp.getResults()[0];
+            // insert rows with stored procedure
+            ClientResponse resp = client.callProcedure(procs[i], partitioningValue);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            VoltTable insertResult = resp.getResults()[0];
+            insertResult.advanceRow();
 
-        resp = client.callProcedure("@AdHoc", selectSp1, partitioningValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable sp1Rows = resp.getResults()[0];
+            // make sure we actually inserted something
+            assertTrue(insertResult.getLong(0) > 0);
 
-        resp = client.callProcedure("@AdHoc", selectSp2, partitioningValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable sp2Rows = resp.getResults()[0];
+            // fetch the rows we just inserted
+            resp = client.callProcedure("get_all_target_rows");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            VoltTable actualRows = resp.getResults()[0];
 
-        while(targetRows.advanceRow()) {
-                assertTrue(sp1Rows.advanceRow());
-                assertTrue(sp2Rows.advanceRow());
+            resp = client.callProcedure("verify_" + procs[i], partitioningValue);
+            // Fetch the rows we expect to have inserted
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            VoltTable expectedRows = resp.getResults()[0];
 
-                assertEquals(sp1Rows.getLong(0), targetRows.getLong(0));
-                assertEquals(sp1Rows.getString(1), targetRows.getString(1));
-                assertEquals(sp2Rows.getLong(2), targetRows.getLong(2));
-                assertEquals(sp2Rows.getLong(3), targetRows.getLong(3));
+            while(expectedRows.advanceRow()) {
+                assertTrue(actualRows.advanceRow());
+
+                assertEquals(expectedRows.getLong(0), actualRows.getLong(0));
+                assertEquals(expectedRows.getString(1), actualRows.getString(1));
+                assertEquals(expectedRows.getLong(2), actualRows.getLong(2));
+                assertEquals(expectedRows.getLong(3), actualRows.getLong(3));
+            }
+            assertFalse(actualRows.advanceRow());
         }
     }
 
@@ -444,6 +565,17 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             assertEquals(sourceRows.getLong(3), targetRows.getLong(3));
         }
         assertFalse(targetRows.advanceRow());
+    }
+
+    public void testViolateConstraint() throws Exception {
+        final Client client = getClient();
+        initializeTables(client);
+        final long partitioningValue = 5;
+
+        verifyProcFails(client, "CONSTRAINT VIOLATION", "insert_select_violate_constraint", partitioningValue);
+
+        // the insert statement violated a constraint so there should still be no data in the table
+        validateTableOfLongs(client , "select count(*) from target_p", new long[][] {{0}});
     }
 
     public void testInsertWrongPartitionFails() throws Exception {
