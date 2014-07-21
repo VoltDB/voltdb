@@ -1511,9 +1511,11 @@ public class PlanAssembler {
         if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
                 ! candidate.isSubQuery()) {
             // scan on sub-query does not support index, early exit here
+            // In future, support sub-query edge cases.
             return candidate;
         }
 
+        // For join node, find outer sequential scan plan node
         if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
             assert(candidate.getChildCount() == 2);
             return findSeqScanCandidateForGroupBy(candidate.getChild(1));
@@ -1539,11 +1541,6 @@ public class PlanAssembler {
             return false;
         }
 
-        // TODO (xin): support join later
-        if (m_parsedSelect.m_tableAliasList.size() > 1) {
-            return false;
-        }
-
         AbstractPlanNode sourceSeqScan = findSeqScanCandidateForGroupBy(candidate);
         if (sourceSeqScan == null) {
             return false;
@@ -1554,7 +1551,8 @@ public class PlanAssembler {
         if (sourceSeqScan.getParentCount() > 0) {
             parent = sourceSeqScan.getParent(0);
         }
-        AbstractPlanNode indexAccess = indexAccessForGroupByExprs(sourceSeqScan, gbInfo);
+        AbstractPlanNode indexAccess = indexAccessForGroupByExprs(
+                (SeqScanPlanNode)sourceSeqScan, gbInfo);
 
         if (indexAccess.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
             // does not find proper index to replace sequential scan
@@ -1776,32 +1774,17 @@ public class PlanAssembler {
     }
 
     // Turn sequential scan to index scan for group by if possible
-    private AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root,
+    private AbstractPlanNode indexAccessForGroupByExprs(SeqScanPlanNode root,
             IndexGroupByInfo gbInfo) {
-
         assert(root.getPlanNodeType() == PlanNodeType.SEQSCAN);
-        // Can't use index access to optimize a multi-table-based GROUP BY
-        String fromTableAlias = null;
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
 
-        for (ParsedColInfo col : groupBys) {
-            List<AbstractExpression> baseTVEs = col.expression.findBaseTVEs();
-            for (AbstractExpression baseTVE : baseTVEs) {
-                String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
-                assert(nextTableAlias != null);
-                if (fromTableAlias == null) {
-                    fromTableAlias = nextTableAlias;
-                } else if ( ! fromTableAlias.equals(nextTableAlias)) {
-                    return root;
-                }
-            }
-        }
+        String fromTableAlias = root.getTargetTableAlias();
         assert(fromTableAlias != null);
-        // TODO(xin): ENG-6591 - Add multiple table group by support
 
-        Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
+        Table targetTable = m_catalogDb.getTables().get(root.getTargetTableName());
         if (targetTable == null) {
-            // This case sounds impossible
+            // sub-query edge case will not be handled now
             return root;
         }
         assert(targetTable != null);
@@ -1816,8 +1799,9 @@ public class PlanAssembler {
                 continue;
             }
             List<Integer> coveredGroupByColumns = new ArrayList<>();
+            calculateGroupbyColumnsCovered(index, fromTableAlias, coveredGroupByColumns,
+                    allBindings);
 
-            processGroupbyColumnsCovered(index, fromTableAlias, coveredGroupByColumns, allBindings);
             if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
                 maxCoveredGroupByColumns = coveredGroupByColumns;
                 pickedupInde = index;
@@ -1832,7 +1816,7 @@ public class PlanAssembler {
         }
 
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
-                (SeqScanPlanNode)root, null, pickedupInde, SortDirectionType.INVALID);
+                root, null, pickedupInde, SortDirectionType.INVALID);
         indexScanNode.setForGroupingOnly();
         indexScanNode.setBindings(allBindings);
 
@@ -1841,7 +1825,7 @@ public class PlanAssembler {
         return indexScanNode;
     }
 
-    private void processGroupbyColumnsCovered(Index index, String fromTableAlias,
+    private void calculateGroupbyColumnsCovered(Index index, String fromTableAlias,
             List<Integer> coveredGroupByColumns, List<AbstractExpression> allBindings) {
         ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
         String exprsjson = index.getExpressionsjson();
@@ -1855,17 +1839,16 @@ public class PlanAssembler {
                 int ithCovered = 0;
                 boolean foundPrefixedColumn = false;
                 for (; ithCovered < groupBys.size(); ithCovered++) {
-                    AbstractExpression expr = groupBys.get(ithCovered).expression;
-                    if ( ! (expr instanceof TupleValueExpression)) {
-                        return;
+                    AbstractExpression gbExpr = groupBys.get(ithCovered).expression;
+                    if ( ! (gbExpr instanceof TupleValueExpression)) {
+                        continue;
                     }
-                    TupleValueExpression grouptve = (TupleValueExpression)expr;
-                    if ( ! fromTableAlias.equals(grouptve.getTableAlias())) {
-                        return;
+                    TupleValueExpression gbTVE = (TupleValueExpression)gbExpr;
+                    // TVE column index has not been resolved currently
+                    if ( ! fromTableAlias.equals(gbTVE.getTableAlias())) {
+                        continue;
                     }
-                    String gbColName = grouptve.getColumnName();
-
-                    if (gbColName.equals(indexColumnName)) {
+                    if (indexColumnName.equals(gbTVE.getColumnName())) {
                         foundPrefixedColumn = true;
                         break;
                     }
@@ -1901,8 +1884,8 @@ public class PlanAssembler {
                 int ithCovered = 0;
                 List<AbstractExpression> binding = null;
                 for (; ithCovered < groupBys.size(); ithCovered++) {
-                    AbstractExpression expr = groupBys.get(ithCovered).expression;
-                    binding = expr.bindingToIndexedExpression(indexExpr);
+                    AbstractExpression gbExpr = groupBys.get(ithCovered).expression;
+                    binding = gbExpr.bindingToIndexedExpression(indexExpr);
                     if (binding != null) {
                         break;
                     }

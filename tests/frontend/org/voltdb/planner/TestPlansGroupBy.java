@@ -383,6 +383,36 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkGroupByOnlyPlan(true, P_AGG, true);
     }
 
+    private void checkPartialAggregate(boolean twoFragments) {
+        AbstractPlanNode apn;
+        if (twoFragments) {
+            assertEquals(2, pns.size());
+            apn = pns.get(1).getChild(0);
+        } else {
+            assertEquals(1, pns.size());
+            apn = pns.get(0).getChild(0);
+        }
+
+        assertTrue(apn.toExplainPlanString().toLowerCase().contains("partial"));
+    }
+
+    public void testPartialSerialAggregateOnJoin() {
+        String sql;
+        sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY G.G_D1, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+    }
+
+
     // check group by query with limit
     // Query has group by from partition column and limit, does not have order by
     private void checkGroupByOnlyPlanWithLimit(boolean twoFragments, boolean isHashAggregator,
@@ -1355,24 +1385,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
                         p instanceof AbstractJoinPlanNode);
             }
         }
-
-    }
-
-
-    public void testPartialSerialAggregate() {
-        String sql;
-        // Has index on F_D1, serial aggregate on F_D1 and hash aggregate on F_D2
-        sql = "SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2";
-        pns = compileToFragments(sql);
-        printExplainPlan(pns);
-
-//        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
-//            "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
-//            "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
-//            "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
-//        pns = compileToFragments(sql);
-//        printExplainPlan(pns);
-
 
     }
 }

@@ -352,7 +352,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (getPlanNodeType() == PlanNodeType.AGGREGATE) {
             aggType = "Serial";
         } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
-            aggType = "Partial serial";
+            aggType = "Partial";
         }
 
         sb.append(aggType + " AGGREGATION ops: ");
