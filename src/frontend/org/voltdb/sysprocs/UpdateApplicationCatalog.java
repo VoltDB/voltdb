@@ -42,6 +42,8 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -79,6 +81,35 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             // the actual work on the *next* round-trip below
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
+
+            // We know the ZK bytes are okay because the run() method wrote them before sending
+            // out fragments
+            CatalogAndIds catalogStuff = null;
+            try {
+                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.bytes);
+                JarLoader testjarloader = testjar.getLoader();
+                for (String classname : testjarloader.getClassNames()) {
+                    try {
+                        Class.forName(classname, true, testjarloader);
+                    }
+                    // LinkageError catches most of the various class loading errors we'd
+                    // care about here.
+                    catch (LinkageError | ClassNotFoundException e) {
+                        String cause = e.getMessage();
+                        if (cause == null && e.getCause() != null) {
+                            cause = e.getCause().getMessage();
+                        }
+                        String msg = "Error loading class: " + classname + " from catalog: " +
+                            e.getClass().getCanonicalName() + ", " + cause;
+                        log.warn(msg);
+                        throw new VoltAbortException(e);
+                    }
+                }
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+
             return new DependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
@@ -157,7 +188,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         throw new RuntimeException("Should not reach this code");
     }
 
-    private final VoltTable[] performCatalogUpdateWork(
+    private final void performCatalogVerifyWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
             byte requiresSnapshotIsolation)
@@ -182,6 +213,14 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         executeSysProcPlanFragments(pfs, DEP_updateCatalogSyncAggregate);
+    }
+
+    private final VoltTable[] performCatalogUpdateWork(
+            String catalogDiffCommands,
+            int expectedCatalogVersion,
+            byte requiresSnapshotIsolation)
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
         // Now do the real work
         pfs[0] = new SynthesizedPlanFragment();
@@ -275,6 +314,33 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         if (deploymentString != null) {
             zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1,
                     new ZKUtil.StatCallback(), null);
+        }
+
+        try {
+            performCatalogVerifyWork(
+                    catalogDiffCommands,
+                    expectedCatalogVersion,
+                    requiresSnapshotIsolation);
+        }
+        catch (VoltAbortException vae) {
+            // If there is a cluster failure before this point, we will re-run
+            // the transaction with the same input args and the new state,
+            // which we will recognize as a restart and do the right thing.
+            log.debug("Catalog update cannot be applied.  Rolling back ZK state");
+            CatalogUtil.setCatalogToZK(
+                    zk,
+                    catalogStuff.version,
+                    catalogStuff.txnId,
+                    catalogStuff.uniqueId,
+                    catalogStuff.catalogHash,
+                    catalogStuff.deploymentHash,
+                    catalogStuff.bytes);
+            throw vae;
+            // If there is a cluster failure after this point, we will re-run
+            // the transaction with the same input args and the old state,
+            // which will look like a new UAC transaction.  If there is no
+            // cluster failure, we leave the ZK state consistent with the
+            // catalog state which we entered here with.
         }
 
         performCatalogUpdateWork(

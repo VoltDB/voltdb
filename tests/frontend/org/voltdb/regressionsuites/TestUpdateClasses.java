@@ -478,4 +478,108 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testInnerClasses() throws Exception {
+        System.out.println("\n\n-----\n testInnerClasses \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- Don't care");
+        builder.setUseAdhocSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            // Something sane ought to work
+            ClientResponse resp;
+            InMemoryJarfile boom = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                System.out.println(((ClientResponseImpl)resp).toJSONString());
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Loading proc with inner classes should succeed");
+            }
+
+            // Error in non-visible inner class static initializer?
+            boolean threw = false;
+            boom = new InMemoryJarfile();
+            comp = new VoltCompiler();
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadInnerClassesTestProc.class);
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                System.out.println(((ClientResponseImpl)resp).toJSONString());
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Bad inner class should have failed", threw);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testBadInitializerClasses() throws Exception {
+        System.out.println("\n\n-----\n testBadInitializerClasses \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- Don't care");
+        builder.setUseAdhocSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+            InMemoryJarfile boom = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.testBadInitializerProc.class);
+            boolean threw = false;
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                System.out.println(((ClientResponseImpl)resp).toJSONString());
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Bad class jar should have thrown", threw);
+
+            threw = false;
+            boom = new InMemoryJarfile();
+            comp = new VoltCompiler();
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadClassLoadClass.class);
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                System.out.println(((ClientResponseImpl)resp).toJSONString());
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Bad class jar should have thrown", threw);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
