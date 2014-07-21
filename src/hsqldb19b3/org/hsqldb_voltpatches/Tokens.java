@@ -1438,6 +1438,9 @@ public class Tokens {
     static final int        DAYOFYEAR               = 616;
     // a VoltDB extension to make WEEK public
     public static final int WEEK                    = 617;
+    /* disable 1 line ...
+    static final int WEEK                           = 617;
+    ... disable 1 line */
     // end of extension
     static final int        OCTETLENGTH             = 618;
     static final int        BITLENGTH               = 619;

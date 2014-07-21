@@ -292,12 +292,20 @@ public class FunctionSQL extends Expression {
             case FUNC_EXTRACT :
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
+                	// A VoltDB extension to support more selectors
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
+                    /* disable 1 line ...
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
+                    ... disable 1 line */
+                    // end of extension
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
-                    Tokens.DAY_NAME, Tokens.MONTH_NAME, Tokens.WEEKDAY,
-                    Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR, Tokens.WEEK,
+                    Tokens.DAY_NAME, Tokens.MONTH_NAME,
+                    Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
+                    // a VoltDB extension to support WEEK, WEEKDAY
+                    Tokens.WEEKDAY, Tokens.WEEK,
+                    // end of extension
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
                 };
@@ -2094,7 +2102,6 @@ public class FunctionSQL extends Expression {
                 volt_alias = "day_of_year";
                 break;
             case Tokens.WEEKDAY :
-            	//keywordConstant = Tokens.WEEKDAY;
             	volt_alias = "weekday";
             	break;
             case Tokens.DAY_OF_WEEK :

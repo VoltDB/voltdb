@@ -930,10 +930,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
 
-        if (!isHSQL()) {
-            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 1";
-            validateTableOfLongs(client, sql, new long[][]{{6}});
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        int EXPECTED_WEEKDAY = 6;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
@@ -992,10 +996,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
 
-        if (!isHSQL()) {
-            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 2";
-            validateTableOfLongs(client, sql, new long[][]{{3}});
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 3;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
@@ -1052,10 +1060,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
 
-        if (!isHSQL()) {
-            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 3";
-            validateTableOfLongs(client, sql, new long[][]{{4}});
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 4;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1113,10 +1125,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_WEEK, result);
 
-        if (!isHSQL()) {
-            String sql = "select EXTRACT(WEEKDAY FROM PAST) from P1 where ID = 4";
-            validateTableOfLongs(client, sql, new long[][]{{0}});
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 0;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -3489,7 +3505,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
                 "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_MONTH FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), " +
                 "EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST), " +
-                "EXTRACT(WEEK FROM PAST) from P1 where ID = ?");
+                "EXTRACT(WEEK FROM PAST), EXTRACT(WEEKDAY FROM PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
