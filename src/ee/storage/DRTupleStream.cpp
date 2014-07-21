@@ -87,6 +87,10 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         extendBufferChain(tupleMaxLength);
     }
 
+    //Set start sp handle if necessary
+    m_currBlock->startSpHandle(std::min(m_currBlock->startSpHandle(), spHandle));
+    m_currBlock->lastSpHandle(spHandle);
+
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
     io.writeByte(DR_VERSION);
@@ -161,6 +165,10 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
+
+     //Set start sp handle if necessary
+     m_currBlock->startSpHandle(std::min(m_currBlock->startSpHandle(), spHandle));
+
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
@@ -184,6 +192,11 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      if (m_currBlock->remaining() < END_RECORD_SIZE) {
          extendBufferChain(END_RECORD_SIZE);
      }
+
+     //Set last committed SP handle, may need to be reset on rollback
+     m_currBlock->lastSpHandle(spHandle);
+     m_currBlock->lastCommittedSpHandle(spHandle);
+
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);

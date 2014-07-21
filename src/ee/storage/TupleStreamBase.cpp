@@ -238,6 +238,7 @@ void TupleStreamBase::rollbackTo(size_t mark)
         if (m_currBlock == NULL) {
             extendBufferChain(m_defaultCapacity);
         }
+        m_currBlock->lastSpHandle(m_committedSpHandle);
     }
 }
 

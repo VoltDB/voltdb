@@ -21,8 +21,10 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.licensetool.LicenseApi;
@@ -52,6 +54,8 @@ public class PartitionDRGateway {
             return conversion.get(ordinal);
         }
     }
+
+    public static final Map<Integer, PartitionDRGateway> gateways = new NonBlockingHashMap<Integer, PartitionDRGateway>();
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -84,14 +88,18 @@ public class PartitionDRGateway {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
+        gateways.put(partitionId,  pdrg);
+
         return pdrg;
     }
+
+    public static final boolean USING_DR_V2 = Boolean.getBoolean("USE_DR_V2");
 
     private static PartitionDRGateway tryToLoadProVersion()
     {
         try {
             Class<?> pdrgiClass = null;
-            if (Boolean.getBoolean("USE_DR_V2")) {
+            if (USING_DR_V2) {
                 pdrgiClass = Class.forName("org.voltdb.dr2.PartitionDRGatewayImpl");
             } else {
                 pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
@@ -114,6 +122,11 @@ public class PartitionDRGateway {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
+    public void onBinaryDR(int partitionId, long startSpHandle, long lastSpHandle, long lastCommittedSpHandle, ByteBuffer buf) {
+        final BBContainer cont = DBBPool.wrapBB(buf);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+    }
     public void tick(long txnId) {}
 
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
@@ -123,7 +136,7 @@ public class PartitionDRGateway {
         }
     };
 
-    private static final ThreadLocal<AtomicLong> lastCommittedSpHandle = new ThreadLocal<AtomicLong>() {
+    private static final ThreadLocal<AtomicLong> lastCommittedSpHandleTL = new ThreadLocal<AtomicLong>() {
         @Override
         protected AtomicLong initialValue() {
             return new AtomicLong(0);
@@ -132,7 +145,12 @@ public class PartitionDRGateway {
 
     private static final boolean logDebug = false;
 
-    public static synchronized void pushDRBuffer(int partitionId, ByteBuffer buf) {
+    public static synchronized void pushDRBuffer(
+            int partitionId,
+            long startSpHandle,
+            long lastSpHandle,
+            long lastCommittedSpHandle,
+            ByteBuffer buf) {
         if (logDebug) {
             System.out.println("Received DR buffer size " + buf.remaining());
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
@@ -195,13 +213,13 @@ public class PartitionDRGateway {
                     //End txn
                     final long spHandle = buf.getLong();
                     if (haveOpenTransaction.get() == -1 ) {
-                        System.out.println("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandle.get().get());
+                        System.out.println("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
     //                    checksum = buf.getInt();
     //                    break;
                         System.exit(-1);
                     }
                     haveOpenTransaction.set(-1);
-                    lastCommittedSpHandle.get().set(spHandle);
+                    lastCommittedSpHandleTL.get().set(spHandle);
                     checksum = buf.getInt();
                     System.out.println("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
                     break;
@@ -214,8 +232,11 @@ public class PartitionDRGateway {
                 }
             }
         }
-        final BBContainer cont = DBBPool.wrapBB(buf);
-        DBBPool.registerUnsafeMemory(cont.address());
-        cont.discard();
+
+        final PartitionDRGateway pdrg = gateways.get(partitionId);
+        if (pdrg == null) {
+            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+        }
+        pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, lastCommittedSpHandle, buf);
     }
 }

@@ -628,7 +628,7 @@ public class CoreUtils {
             public <T> Future<T> submit(Callable<T> task) {
                 Preconditions.checkNotNull(task);
                 FutureTask<T> retval = new FutureTask<T>(task);
-                retval.run();
+                taskQueue.offer(retval);
                 return retval;
             }
 
@@ -636,7 +636,7 @@ public class CoreUtils {
             public <T> Future<T> submit(Runnable task, T result) {
                 Preconditions.checkNotNull(task);
                 FutureTask<T> retval = new FutureTask<T>(task, result);
-                retval.run();
+                taskQueue.offer(retval);
                 return retval;
             }
 
