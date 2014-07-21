@@ -852,7 +852,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         else {
             String nodePlan = explainPlanForNode(indent);
-            sb.append(indent + nodePlan + "\n");
+            if (m_skipInitalIndentationForExplain) {
+                sb.append(" " + nodePlan + "\n");
+            } else {
+                sb.append(indent + nodePlan + "\n");
+            }
         }
 
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
@@ -861,14 +865,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
                 continue;
             }
-            String inlineIndent = indent;
-            if (m_parentInlinedForExplain) {
-                // 7 white spaces to cover "INLINE "
-                inlineIndent += "       ";
-            }
-            inlineNode.setParentInlinedForExplain(true);
-            sb.append(inlineIndent + "inline");
-            inlineNode.explainPlan_recurse(sb, indent);
+            inlineNode.setSkipInitalIndentationForExplain(true);
+
+            sb.append(indent + extraIndent + "inline");
+            inlineNode.explainPlan_recurse(sb, indent + extraIndent);
             sb.append("\n");
         }
 
@@ -879,9 +879,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    private boolean m_parentInlinedForExplain = false;
-    public void setParentInlinedForExplain(boolean parentInlined) {
-        m_parentInlinedForExplain = parentInlined;
+    private boolean m_skipInitalIndentationForExplain = false;
+    public void setSkipInitalIndentationForExplain(boolean skip) {
+        m_skipInitalIndentationForExplain = skip;
     }
 
     protected abstract String explainPlanForNode(String indent);
