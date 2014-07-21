@@ -350,22 +350,29 @@ public class VoltProjectBuilder {
         for (final GroupInfo info : groups) {
             final boolean added = m_groups.add(info);
             StringBuffer sb = new StringBuffer();
-            sb.append("CREATE ROLE " + info.name + " WITH ");
-            if(info.adhoc)
-            {
-                sb.append("adhoc, ");
-            }
-            if(info.defaultproc)
-            {
-                sb.append("defaultproc, ");
-            }
-            if(info.sysproc)
-            {
-                sb.append("sysproc, ");
-            }
+            sb.append("CREATE ROLE " + info.name);
 
-            int length = sb.length();
-            sb.replace(length - 2, length, ";");
+            if(info.adhoc || info.defaultproc || info.sysproc)
+            {
+                sb.append(" WITH ");
+                if(info.adhoc)
+                {
+                    sb.append("adhoc,");
+                }
+                if(info.defaultproc)
+                {
+                    sb.append("defaultproc,");
+                }
+                if(info.sysproc)
+                {
+                    sb.append("sysproc,");
+                }
+                sb.replace(sb.length() - 1, sb.length(), ";");
+            }
+            else
+            {
+                sb.append(";");
+            }
 
             try {
                 addLiteralSchema(sb.toString());
@@ -485,13 +492,18 @@ public class VoltProjectBuilder {
 
             if(procedure.partitionInfo != null)
             {
-                String[] token = procedure.partitionInfo.split(":")[0].split("\\.");
-                sb.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + ";");
+                String[] parameter = procedure.partitionInfo.split(":");
+                String[] token = parameter[0].split("\\.");
+                String position = "";
+                if(Integer.parseInt(parameter[1].trim()) > 0)
+                {
+                    position = " PARAMETER " + parameter[1];
+                }
+                sb.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
             }
         }
 
         try {
-            System.out.println(sb.toString());
             addLiteralSchema(sb.toString());
         } catch (IOException e) {
             e.printStackTrace();
