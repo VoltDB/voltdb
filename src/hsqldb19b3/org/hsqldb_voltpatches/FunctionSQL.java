@@ -297,15 +297,15 @@ public class FunctionSQL extends Expression {
                     /* disable 1 line ...
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
                     ... disable 1 line */
-                    // end of extension
+                    // End of VoltDB extension
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
                     Tokens.DAY_NAME, Tokens.MONTH_NAME,
                     Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
-                    // a VoltDB extension to support WEEK, WEEKDAY
+                    // A VoltDB extension to support WEEK, WEEKDAY
                     Tokens.WEEKDAY, Tokens.WEEK,
-                    // end of extension
+                    // End of VoltDB extension
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
                 };
