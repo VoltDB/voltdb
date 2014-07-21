@@ -311,6 +311,310 @@ public class TestFunctionsForJSON extends RegressionSuite {
         validateTableOfLongs(result, new long[][]{{3}});
     }
 
+    /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
+    public void testSET_FIELDFunction() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "tag", "three");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("IdFieldProc", "tag", "four");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
+        cr = client.callProcedure("UpdateSetFieldProc", "tag", "\"four\"", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "tag", "three");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "tag", "four");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+    }
+
+    /** Used to test ENG-6621, part 2 (dotted path notation). */
+    public void testSET_FIELDFunctionWithDotNotation() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "inner.veggies", "good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.veggies", "bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "inner.second.third.meats", "yum");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.third.meats", "yuck");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+
+        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.veggies", "\"bad for you\"", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.second.fruits", "\"semi-bad for you\"", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.second.third.meats", "\"yuck\"", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "inner.veggies", "good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.veggies", "bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.third.meats", "yum");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2}});
+        cr = client.callProcedure("IdFieldProc", "inner.second.third.meats", "yuck");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+    }
+
+    /** Used to test ENG-6620, part 3 (array index notation). */
+    public void testSET_FIELDFunctionWithIndexNotation() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "arr3d[0]", 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[0]", -1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][0]", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][0]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][1]", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][1]", -3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+
+        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[0]", "-1", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][0]", "-2", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][0]", "-2", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][1]", "-3", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "arr3d[0]", 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[0]", -1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][0]", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][0]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][1]", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][1]", -3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+    }
+
+    /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined). */
+    public void testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "inner.arr[0]", 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[0]", -1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[1]", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[1]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].veggies", "good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].veggies", "bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "-3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+
+        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.arr[0]", "-1", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.arr[1]", "-2", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[2].veggies", "\"bad for you\"", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[2].dairy", "-3", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("IdFieldProc", "inner.arr[0]", 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[0]", -1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[1]", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "inner.arr[1]", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].veggies", "good for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].veggies", "bad for you");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "-3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+    }
+
     public void testARRAY_ELEMENTFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
@@ -650,6 +954,9 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 ";\n" +
                 "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE UpdateSetFieldProc AS\n" +
+                "   UPDATE JS1 SET DOC = SET_FIELD(DOC, ?, ?) WHERE ID = ?\n" +
                 ";\n" +
 
                 "CREATE TABLE JSBAD (\n" +
