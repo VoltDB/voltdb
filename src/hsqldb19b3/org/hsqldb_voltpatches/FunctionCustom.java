@@ -363,6 +363,11 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
+            	// A VoltDB extension to let CONCAT support more than 2 parameters
+            	// this line should be never called because volt check FunctionForVoltDB first
+            	voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+            	break;
+            	// End of VoltDB extension
             case FUNC_LEFT :
                 parseList = doubleParamList;
                 break;
