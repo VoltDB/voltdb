@@ -439,11 +439,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
            RETURN RESULTS TO STORED PROCEDURE
             INDEX SCAN of "F" using its primary key index (for optimized grouping only)
-            inline Serial AGGREGATION ops
-                   inline LIMIT 5
+             inline Serial AGGREGATION ops
+              inline LIMIT 5
         */
-        String expectedStr = " inline Serial AGGREGATION ops\n" +
-                             "        inline LIMIT 5";
+        String expectedStr = "  inline Serial AGGREGATION ops\n" +
+                             "   inline LIMIT 5";
         AbstractPlanNode.disableVerboseExplainForDebugging();
         AbstractExpression.disableVerboseExplainForDebugging();
 
