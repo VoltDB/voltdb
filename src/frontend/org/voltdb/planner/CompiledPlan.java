@@ -71,7 +71,7 @@ public class CompiledPlan {
     private VoltType[] m_parameterTypes = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
-    public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
+    private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
 
     /**
      * If true, divide the number of tuples changed
@@ -270,6 +270,19 @@ public class CompiledPlan {
             }
         }
         return m_parameterTypes;
+    }
+
+    public boolean extractParamValues(ParameterizationInfo paramzInfo) throws Exception {
+        VoltType[] paramTypes = parameterTypes();
+        if (paramTypes.length > MAX_PARAM_COUNT) {
+            return false;
+        }
+        m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
+        return true;
+    }
+
+    public ParameterSet extractedParamValues() {
+        return m_extractedParamValues;
     }
 
 }

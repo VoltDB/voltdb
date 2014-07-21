@@ -387,19 +387,32 @@ public class RegressionSuite extends TestCase {
     }
 
     static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        verifyProcFails(client, expectedMsg, "@AdHoc", stmt);
+    }
+
+    static public void verifyProcFails(Client client, String expectedMsg, String storedProc, Object... args) throws IOException {
+
+        String what;
+        if (storedProc.compareTo("@AdHoc") == 0) {
+            what = "the statement \"" + args[0] + "\"";
+        }
+        else {
+            what = "the stored procedure \"" + storedProc + "\"";
+        }
+
         try {
-            client.callProcedure("@AdHoc", stmt);
+            client.callProcedure(storedProc, args);
         }
         catch (ProcCallException pce) {
             String msg = pce.getMessage();
-            String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
+            String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
                     expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
             assertTrue(diagnostic, msg.contains(expectedMsg));
             return;
         }
 
-        String diagnostic = "Expected the statement \"" + stmt + "\" to throw an exception containing the message \"" +
-                expectedMsg + ", but instead it threw nothing.";
+        String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                expectedMsg + "\", but instead it threw nothing.";
         fail(diagnostic);
     }
 
