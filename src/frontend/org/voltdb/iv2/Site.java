@@ -754,9 +754,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
             String tableName, VoltTable data,
-            boolean returnUniqueViolations, boolean undo) throws VoltAbortException
+            boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
         if (cluster == null) {
@@ -771,19 +771,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
+        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
     }
 
     @Override
-    public byte[] loadTable(long spHandle, int tableId,
-            VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, int tableId,
+            VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
-        return m_ee.loadTable(tableId, data,
+        return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 returnUniqueViolations,
+                shouldDRStream,
                 undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
     }
 
@@ -1078,6 +1079,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            long txnId,
                                             long spHandle,
                                             long uniqueId,
                                             boolean readOnly)
@@ -1088,6 +1090,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
+                txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
@@ -1188,7 +1191,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        ByteBuffer paramBuffer = ByteBuffer.allocate(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
         paramBuffer.putInt(tableIds.length);
         for (long tableId : tableIds) {
             paramBuffer.putLong(tableId);
@@ -1196,7 +1199,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
-        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer.array()));
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer));
         long mispartitionedRows[] = new long[tableIds.length];
         for (int ii = 0; ii < tableIds.length; ii++) {
             mispartitionedRows[ii] = resultBuffer.getLong();
@@ -1217,5 +1220,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         m_initiatorMailbox.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    @Override
+    public void applyBinaryLog(byte log[]) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
+        paramBuffer.putInt(log.length);
+        paramBuffer.put(log);
+        m_ee.executeTask( TaskType.APPLY_BINARY_LOG, paramBuffer);
     }
 }

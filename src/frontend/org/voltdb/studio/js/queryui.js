@@ -178,8 +178,8 @@ function QueryUI(queryTab) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }
+                        parameterBank.push(param);
                     }
-                    parameterBank.push(param);
                 }
             }
             return parameterBank;

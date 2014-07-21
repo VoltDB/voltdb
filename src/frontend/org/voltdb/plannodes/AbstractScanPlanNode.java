@@ -83,11 +83,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
             } else {
                 assert(m_tableScan instanceof StmtSubqueryScan);
-                StmtSubqueryScan subScan = (StmtSubqueryScan) m_tableScan;
-                List<StmtTargetTableScan> tableScans = subScan.getAllTargetTables();
-                for (StmtTargetTableScan tb: tableScans) {
-                    tablesRead.put(tb.getTableName(), tb);
-                }
+                getChild(0).getTablesAndIndexes(tablesRead, indexes);
             }
         }
     }

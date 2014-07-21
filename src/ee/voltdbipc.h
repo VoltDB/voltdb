@@ -85,6 +85,8 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
      * @param LoggerId ID of the logger that received this statement
