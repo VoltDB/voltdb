@@ -431,6 +431,31 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_PKEY FROM F GROUP BY F_PKEY LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
+        // Explain plan for the above query
+        /*
+           RETURN RESULTS TO STORED PROCEDURE
+            LIMIT 5
+             RECEIVE FROM ALL PARTITIONS
+
+           RETURN RESULTS TO STORED PROCEDURE
+            INDEX SCAN of "F" using its primary key index (for optimized grouping only)
+            inline Serial AGGREGATION ops
+                   inline LIMIT 5
+        */
+        String expectedStr = " inline Serial AGGREGATION ops\n" +
+                             "        inline LIMIT 5";
+        AbstractPlanNode.disableVerboseExplainForDebugging();
+        AbstractExpression.disableVerboseExplainForDebugging();
+
+        String explainPlan = "";
+        for (AbstractPlanNode apn: pns) {
+            explainPlan += apn.toExplainPlanString();
+        }
+        assertTrue(explainPlan.contains(expectedStr));
+
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
+
         pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
