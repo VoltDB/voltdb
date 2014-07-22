@@ -47,7 +47,6 @@ import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
@@ -138,7 +137,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (expr == null) {
             return newId;
         }
-        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
+        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
         for (AbstractExpression subquery : subqueries) {
             assert(subquery instanceof SubqueryExpression);
             CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();

@@ -78,7 +78,7 @@ hashRangeFactory(PlannerDomValue obj) {
 
 /** Parse JSON parameters to create a subquery expression */
 static AbstractExpression*
-subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
+subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
     int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
     std::vector<int> paramIdxs;
     if (obj.hasNonNullKey("PARAM_IDX")) {
@@ -105,7 +105,7 @@ subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* arg
             otherParamIdxs.push_back(paramIdx);
         }
     }
-    return new SubqueryExpression(subqueryId, paramIdxs, otherParamIdxs, args);
+    return new SubqueryExpression(subqueryType, subqueryId, paramIdxs, otherParamIdxs, args);
 }
 
 /** Function static helper templated functions to vivify an optimal
@@ -194,9 +194,6 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
     TupleValueExpression *r_tuple =
       dynamic_cast<TupleValueExpression*>(rc);
 
-    SubqueryExpression *r_subquery =
-      dynamic_cast<SubqueryExpression*>(rc);
-
     // this will inline getValue(), hooray!
     if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
         return getMoreSpecialized<ConstantValueExpression, ConstantValueExpression>(et, l_const, r_const);
@@ -206,8 +203,6 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
         return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
-    } else if (r_subquery != NULL) { // IN (SELECT ...)
-        return new InSubqueryExpression(lc, rc);
     }
 
     //okay, still getTypedValue is beneficial.
@@ -245,10 +240,6 @@ operatorFactory(ExpressionType et,
 
      case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
          ret = new OperatorIsNullExpression(lc);
-         break;
-
-     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
-         ret = new ExistsSubqueryExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
@@ -438,7 +429,6 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_MOD):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
-    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
         ret = operatorFactory(et, lc, rc);
     break;
 
@@ -527,8 +517,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
 
     // Subquery
-    case (EXPRESSION_TYPE_SUBQUERY):
-        ret = subqueryFactory(obj, args);
+    case (EXPRESSION_TYPE_IN_SUBQUERY):
+    case (EXPRESSION_TYPE_EXISTS_SUBQUERY):
+        ret = subqueryFactory(et, obj, args);
         break;
 
         // must handle all known expressions in this factory

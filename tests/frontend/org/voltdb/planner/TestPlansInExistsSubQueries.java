@@ -44,7 +44,6 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 
 public class TestPlansInExistsSubQueries extends PlannerTestCase {
-
     public void testExistsWithUserParams() {
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
         pn = pn.getChild(0);
@@ -58,12 +57,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
         assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
         AbstractExpression re = e.getRight();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, re.getExpressionType());
-        assertEquals(ExpressionType.SUBQUERY, re.getLeft().getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) re.getLeft();
-        assertEquals(1, subExpr.getArgs().size());
-        assertEquals(1, subExpr.getParameterIdxList().size());
-        assertEquals(Integer.valueOf(1), subExpr.getParameterIdxList().get(0));
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, re.getExpressionType());
+        assertEquals(1, re.getArgs().size());
+        assertEquals(1, ((SubqueryExpression) re).getParameterIdxList().size());
+        assertEquals(Integer.valueOf(1), ((SubqueryExpression) re).getParameterIdxList().get(0));
     }
 
     public void testParamTveInOutputSchema() {
@@ -86,9 +83,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
         // Check param indexes
         AbstractExpression e = spl.getPredicate();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, e.getExpressionType());
-        assertEquals(ExpressionType.SUBQUERY, e.getLeft().getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) e;
         assertEquals(1, subExpr.getArgs().size());
         assertEquals(1, subExpr.getParameterIdxList().size());
         assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
@@ -107,15 +103,13 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractExpression e = spl.getPredicate();
         assertEquals(ExpressionType.CONJUNCTION_OR, e.getExpressionType());
         AbstractExpression l = e.getLeft();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, l.getExpressionType());
-        AbstractExpression s = l.getLeft();
-        assertEquals(ExpressionType.SUBQUERY, s.getExpressionType());
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, l.getExpressionType());
         AbstractExpression r = e.getRight();
         assertEquals(ExpressionType.CONJUNCTION_AND, r.getExpressionType());
         l = r.getLeft();
-        assertEquals(ExpressionType.COMPARE_IN, l.getExpressionType());
+        assertEquals(ExpressionType.IN_SUBQUERY, l.getExpressionType());
         r = r.getRight();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, r.getExpressionType());
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, r.getExpressionType());
     }
 
     public void testInToExistWithOffset() {
@@ -125,7 +119,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
         // Check param indexes
         AbstractExpression e = spl.getPredicate();
-        assertEquals(ExpressionType.COMPARE_IN, e.getExpressionType());
+        assertEquals(ExpressionType.IN_SUBQUERY, e.getExpressionType());
     }
 
     public void testInToExistsComplex() {
@@ -134,12 +128,13 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
       assertTrue(pn instanceof AbstractScanPlanNode);
       AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
       AbstractExpression e = spn.getPredicate();
-      SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
+      assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+      SubqueryExpression subExpr = (SubqueryExpression) e;
       assertEquals(3, subExpr.getArgs().size());
       assertEquals(3, subExpr.getParameterIdxList().size());
     }
 
-    public void testNotExistsW() {
+    public void testNotExists() {
         AbstractPlanNode pn = compile("select r2.c from r2 where not exists (select c from r1 where r1.c = r2.c)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
@@ -147,9 +142,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
         assertEquals(ExpressionType.OPERATOR_NOT, e.getExpressionType());
         AbstractExpression le = e.getLeft();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, le.getExpressionType());
-        assertEquals(ExpressionType.SUBQUERY, le.getLeft().getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) le.getLeft();
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, le.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) le;
         assertEquals(1, subExpr.getArgs().size());
         assertEquals(1, subExpr.getParameterIdxList().size());
         assertEquals(Integer.valueOf(0), subExpr.getParameterIdxList().get(0));
@@ -164,7 +158,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
         assertTrue(pred != null);
-        assertTrue(ExpressionType.OPERATOR_EXISTS == pred.getExpressionType());
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, pred.getExpressionType());
     }
 
     public void testInAggeregated() {
@@ -174,8 +168,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         pn = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractExpression e = ((AbstractScanPlanNode)pn).getPredicate();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, e.getExpressionType());
-        SubqueryExpression subExpr = (SubqueryExpression) e.getLeft();
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+        SubqueryExpression subExpr = (SubqueryExpression) e;
         AbstractPlanNode sn = subExpr.getSubqueryNode();
         assertTrue(sn instanceof ProjectionPlanNode);
         sn = sn.getChild(0);
@@ -199,12 +193,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         SchemaColumn aggColumn = ns.getColumns().get(1);
         assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
         AbstractExpression having = aggpn.getPostPredicate();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
-        assertEquals(ExpressionType.SUBQUERY, having.getLeft().getExpressionType());
-        AbstractExpression se = having.getLeft();
-        assertEquals(1, se.getArgs().size());
-        assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
-        TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, having.getExpressionType());
+        assertEquals(1, having.getArgs().size());
+        assertTrue(having.getArgs().get(0) instanceof TupleValueExpression);
+        TupleValueExpression argTve = (TupleValueExpression) having.getArgs().get(0);
         assertEquals(1, argTve.getColumnIndex());
         assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
 
@@ -216,9 +208,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression p = ((SeqScanPlanNode)pn).getPredicate();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, p.getExpressionType());
-        AbstractExpression subquery = p.getLeft();
-        assertEquals(ExpressionType.SUBQUERY, subquery.getExpressionType());
+        assertEquals(ExpressionType.EXISTS_SUBQUERY, p.getExpressionType());
+        AbstractExpression subquery = (SubqueryExpression)p;
         pn = ((SubqueryExpression)subquery).getSubqueryNode();
         pn = pn.getChild(0);
         assertTrue(pn instanceof LimitPlanNode);

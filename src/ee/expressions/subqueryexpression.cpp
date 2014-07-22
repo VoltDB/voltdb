@@ -30,21 +30,23 @@
 
 namespace voltdb {
 
-SubqueryExpression::SubqueryExpression(int subqueryId,
+SubqueryExpression::SubqueryExpression(
+        ExpressionType subqueryType,
+        int subqueryId,
         std::vector<int> paramIdxs,
         std::vector<int> otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams) :
-            AbstractExpression(EXPRESSION_TYPE_SUBQUERY),
+            AbstractExpression(subqueryType),
             m_subqueryId(subqueryId),
             m_paramIdxs(paramIdxs),
             m_otherParamIdxs(otherParamIdxs),
             m_tveParams(tveParams),
-            m_parameterContainer(NULL),
-            m_parentType(EXPRESSION_TYPE_INVALID) {
+            m_parameterContainer(NULL) {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
         m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
         assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
             (m_tveParams.get() != NULL && m_paramIdxs.size() == m_tveParams->size()));
+        assert(subqueryType == EXPRESSION_TYPE_IN_SUBQUERY || subqueryType == EXPRESSION_TYPE_EXISTS_SUBQUERY);
     }
 
     SubqueryExpression::~SubqueryExpression() {
@@ -59,7 +61,6 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
     NValue
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
-        assert(m_parentType == EXPRESSION_TYPE_OPERATOR_EXISTS || m_parentType == EXPRESSION_TYPE_COMPARE_IN);
         // Get the subquery context with the last evaluation result and parameters used to obtain that result
         SubqueryContext* context = ExecutorContext::getExecutorContext()->getSubqueryContext(m_subqueryId);
         bool hasPriorResult = context != NULL;
@@ -118,16 +119,26 @@ SubqueryExpression::SubqueryExpression(int subqueryId,
 
         NValue retval = NValue::getFalse();
 
+        // The outer_expr IN (SELECT inner_expr ...) evaluates as follows:
+        // There is an exact match outer_expr = inner_expr => TRUE
+        // There no match and the subquery produces a row where inner_expr is NULL => NULL
+        // There no match and the subquery produces only non- NULL rows or empty => FASLE
+        // The outer_expr is NULL and the subquery is empty => FASLE
+        // The outer_expr is NULL and the subquery produces any row => NULL
+
+        // The EXISTS (SELECT inner_expr ...) evaluates as follows:
+        // The subquery produces a row => TRUE
+        // The subquery produces an empty result set => FALSE
         Table* outputTable = executionStack->back()->getPlanNode()->getOutputTable();
         assert(outputTable != NULL);
         // Check the first tuple if it's NULL tuple or not
         TableIterator& it = outputTable->iterator();
         TableTuple tuple(outputTable->schema());
         if (it.next(tuple)) {
-                if (m_parentType == EXPRESSION_TYPE_COMPARE_IN) {
+                if (m_type == EXPRESSION_TYPE_IN_SUBQUERY) {
                 // This subquery is part of the IN expression, its top plan node will be a
                 // special purpose seqscan node which inserts a tuple with all columns set to NULL
-                // if one of the tuples from the IN list is NULL, so we can try any (the first one) index.
+                // to indicate NULL result, so we can try any (the first one) index.
                 if (tuple.isNull(0)) {
                     retval.setNull();
                 } else {

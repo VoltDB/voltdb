@@ -31,7 +31,8 @@ class NValue;
 
 class SubqueryExpression : public AbstractExpression {
     public:
-    SubqueryExpression(int subqueryId,
+    SubqueryExpression(ExpressionType subqueryType,
+        int subqueryId,
         std::vector<int> paramIdxs,
         std::vector<int> otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams);
@@ -39,8 +40,6 @@ class SubqueryExpression : public AbstractExpression {
     ~SubqueryExpression();
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
-
-    void setParentExpressionType(ExpressionType parentType);
 
     std::string debugInfo(const std::string &spacer) const;
 
@@ -57,13 +56,8 @@ class SubqueryExpression : public AbstractExpression {
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
     // The pointer to the global parameters
     NValueArray* m_parameterContainer;
-    // The parent expression type - either EXISTS or IN
-    ExpressionType m_parentType;
 
 };
 
-inline void SubqueryExpression::setParentExpressionType(ExpressionType parentType) {
-    m_parentType = parentType;
-}
 }
 #endif

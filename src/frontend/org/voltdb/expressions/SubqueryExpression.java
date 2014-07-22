@@ -63,7 +63,11 @@ public class SubqueryExpression extends AbstractExpression {
      * @param subquey The parsed statement
      */
     public SubqueryExpression(StmtSubqueryScan subquery) {
-        super(ExpressionType.SUBQUERY);
+        this(ExpressionType.SUBQUERY, subquery);
+    }
+
+    public SubqueryExpression(ExpressionType subqueryType, StmtSubqueryScan subquery) {
+        super(subqueryType);
         assert(subquery != null);
         m_subquery = subquery;
         assert(m_subquery.getSubquery() != null);
@@ -126,6 +130,7 @@ public class SubqueryExpression extends AbstractExpression {
     @Override
     public Object clone() {
         SubqueryExpression clone = new SubqueryExpression(m_subquery);
+        clone.setExpressionType(m_type);
         // The parameter TVE map must be cloned explicitly because the original TVEs
         // from the statement are already replaced with the corresponding PVEs
         clone.m_args = new ArrayList<AbstractExpression>();

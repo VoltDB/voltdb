@@ -328,7 +328,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( EXISTS (SELECT...) )
-        List<AbstractExpression> existsExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.OPERATOR_EXISTS);
+        List<AbstractExpression> existsExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.EXISTS_SUBQUERY);
         ParsedResultAccumulator existsSubqueryResult = null;
         if ( ! existsExprs.isEmpty() ) {
             existsSubqueryResult = getBestCostPlanForExpressionSubQueries(existsExprs);
@@ -339,7 +339,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN (SELECT...) )
-        List<AbstractExpression> inExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.COMPARE_IN);
+        List<AbstractExpression> inExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY);
         ParsedResultAccumulator inSubqueryResult = null;
         if ( ! inExprs.isEmpty() ) {
             inSubqueryResult = getBestCostPlanForExpressionSubQueries(inExprs);
@@ -466,20 +466,11 @@ public class PlanAssembler {
         boolean hasSignificantOffsetOrLimit = false;
 
         for (AbstractExpression expr : subqueryExprs) {
-            AbstractExpression childExpr = null;
-            if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
-                childExpr = expr.getLeft();
-            } else if (ExpressionType.COMPARE_IN  == expr.getExpressionType()) {
-                childExpr = expr.getRight();
-            } else {
-                // shouldn't get there
-                assert(false);
-            }
-            if (!(childExpr instanceof SubqueryExpression)) {
+            if (!(expr instanceof SubqueryExpression)) {
                 // it can be IN (values)
                 continue;
             }
-            SubqueryExpression subqueryExpr = (SubqueryExpression) childExpr;
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
             AbstractParsedStmt subquery = subqueryExpr.getSubquery();
             assert(subquery != null);
 
@@ -503,9 +494,9 @@ public class PlanAssembler {
                 return null;
             }
             // For IN Expressions only
-            if (ExpressionType.COMPARE_IN  == expr.getExpressionType()) {
+            if (ExpressionType.IN_SUBQUERY  == expr.getExpressionType()) {
                 // Add an artificial SeqScan on top of the subquery plan
-                addScanToInSubquery(subqueryExpr, expr.getLeft());
+                addScanToInSubquery(subqueryExpr);
             }
         }
         // need to reset plan id for the entire SQL
@@ -525,10 +516,12 @@ public class PlanAssembler {
      * @param subqueryExpr The subquery Expression
      * @param inColumnsExpr - PVE for each column from the IN list combined by the AND expression
      */
-    private void addScanToInSubquery(SubqueryExpression subqueryExpr, AbstractExpression inColumnsExpr) {
+    private void addScanToInSubquery(SubqueryExpression subqueryExpr) {
         // Get the top node from the subquery best plan
         AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
         assert(subqueryNode != null);
+        AbstractExpression inColumnsExpr = subqueryExpr.getLeft();
+        assert(inColumnsExpr != null);
         SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getTable().getTableName(), inColumnsExpr);
         // Add the new node to the top
         inScanNode.addAndLinkChild(subqueryNode);

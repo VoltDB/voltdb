@@ -32,7 +32,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.SubqueryExpression;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -262,8 +261,8 @@ public class PlanNodeTree implements JSONString {
         if (predicate == null) {
             return;
         }
-        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfType(
-                ExpressionType.SUBQUERY);
+        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
+                SubqueryExpression.class);
         for (AbstractExpression expr : subquerysExprs) {
             assert(expr instanceof SubqueryExpression);
             SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
@@ -318,7 +317,8 @@ public class PlanNodeTree implements JSONString {
         if (expr == null) {
             return;
         }
-        List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
+        List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfClass(
+                SubqueryExpression.class);
         for(AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof SubqueryExpression);
             SubqueryExpression subqueryExpr = (SubqueryExpression) nextexpr;

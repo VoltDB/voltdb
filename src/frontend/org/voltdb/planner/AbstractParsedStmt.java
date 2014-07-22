@@ -34,7 +34,6 @@ import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
-import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -557,13 +556,26 @@ public abstract class AbstractParsedStmt {
         }
         if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof SubqueryExpression) ||
                 exprType == ExpressionType.OPERATOR_EXISTS) {
+            // Compact the expression hierarchy by removing parent and setting
+            // the subquery type (IN/EXISTS) to the child - SubqueryExpression
+            AbstractExpression subqueryExpr = null;
+            if (ExpressionType.COMPARE_IN == exprType) {
+                subqueryExpr = expr.getRight();
+                subqueryExpr.setLeft(expr.getLeft());
+                subqueryExpr.setExpressionType(ExpressionType.IN_SUBQUERY);
+            } else {
+                subqueryExpr = expr.getLeft();
+                subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
+            }
+            assert(subqueryExpr != null);
+
             // weed of IN (values) expression
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
-            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
-            expr = optimizeSubqueryExpression(expr);
+            subqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(subqueryExpr);
+            expr = optimizeSubqueryExpression(subqueryExpr);
         }
         return expr;
     }
@@ -583,12 +595,12 @@ public abstract class AbstractParsedStmt {
             expr.setRight(optimizedRight);
         }
         AbstractExpression retval = expr;
-        if (ExpressionType.COMPARE_IN == retval.getExpressionType()) {
+        if (ExpressionType.IN_SUBQUERY == retval.getExpressionType()) {
             retval = optimizeInExpression(retval);
             // Do not return here because the original IN expressions
             // is converted to EXISTS and can be optimized farther.
         }
-        if (ExpressionType.OPERATOR_EXISTS == retval.getExpressionType()) {
+        if (ExpressionType.EXISTS_SUBQUERY == retval.getExpressionType()) {
             retval = optimizeExistsExpression(retval);
         }
         return retval;
@@ -631,11 +643,10 @@ public abstract class AbstractParsedStmt {
      * @return existsExpr
      */
     private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
-        assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
+        assert(ExpressionType.EXISTS_SUBQUERY == existsExpr.getExpressionType());
+        assert(existsExpr instanceof  SubqueryExpression);
 
-        assert(existsExpr.getLeft() != null);
-        assert(existsExpr.getLeft() instanceof  SubqueryExpression);
-        SubqueryExpression subqueryExpr = (SubqueryExpression) existsExpr.getLeft();
+        SubqueryExpression subqueryExpr = (SubqueryExpression) existsExpr;
         AbstractParsedStmt subquery = subqueryExpr.getSubquery();
         if (subquery instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
@@ -651,24 +662,20 @@ public abstract class AbstractParsedStmt {
      * @return existsExpr
      */
     private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
-        assert(ExpressionType.COMPARE_IN == inExpr.getExpressionType());
-
+        assert(ExpressionType.IN_SUBQUERY == inExpr.getExpressionType());
+        assert(inExpr instanceof SubqueryExpression);
         assert(inExpr.getLeft() != null);
+
         AbstractExpression inColumns = inExpr.getLeft();
-
-        assert(inExpr.getRight() != null);
-        if (!(inExpr.getRight() instanceof  SubqueryExpression)) {
-            // it can be a IN (values)
-            return inExpr;
-        }
-        SubqueryExpression subqueryExpr = (SubqueryExpression) inExpr.getRight();
-
+        SubqueryExpression subqueryExpr = (SubqueryExpression) inExpr;
         AbstractParsedStmt subquery = subqueryExpr.getSubquery();
         if (canConvertInToExistsExpression(subquery)) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
             ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
             subqueryExpr.moveUpTVE();
-            return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, subqueryExpr, null);
+            subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
+            subqueryExpr.setLeft(null);
+            return subqueryExpr;
         } else {
             // Need to replace TVE from the IN list with the corresponding PVE
             // to be passed as parameters to the subquery similar to the correlated TVE

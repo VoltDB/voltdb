@@ -262,7 +262,6 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_CAST                   = 7, // explicitly cast left as right (right is integer in ValueType enum)
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
-    EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // EXISTS ()
 
     // -----------------------------
     // Comparison Operators
@@ -320,9 +319,10 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_ALTERNATIVE                     = 301,
 
     // -----------------------------
-    // Subquery
+    // Subquery IN/EXISTS
     // -----------------------------
-    EXPRESSION_TYPE_SUBQUERY                        = 400,
+    EXPRESSION_TYPE_IN_SUBQUERY                        = 401,
+    EXPRESSION_TYPE_EXISTS_SUBQUERY                    = 402,
 
 };
 

@@ -500,9 +500,6 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
     }
-    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
-        return "OPERATOR_EXISTS";
-    }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
     }
@@ -581,8 +578,11 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
-    case EXPRESSION_TYPE_SUBQUERY: {
-        return "SUBQUERY";
+    case EXPRESSION_TYPE_IN_SUBQUERY: {
+        return "IN_SUBQUERY";
+    }
+    case EXPRESSION_TYPE_EXISTS_SUBQUERY: {
+        return "EXISTS_SUBQUERY";
     }
     }
     return "INVALID";
@@ -662,8 +662,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
-    } else if (str == "SUBQUERY") {
-        return EXPRESSION_TYPE_SUBQUERY;
+    } else if (str == "IN_SUBQUERY") {
+        return EXPRESSION_TYPE_IN_SUBQUERY;
+    } else if (str == "EXISTS_SUBQUERY") {
+        return EXPRESSION_TYPE_EXISTS_SUBQUERY;
     }
 
     return EXPRESSION_TYPE_INVALID;

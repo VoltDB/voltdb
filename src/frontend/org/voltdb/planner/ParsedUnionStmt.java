@@ -23,9 +23,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
-import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -177,22 +175,19 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * Also the ALL qualifier is dropped because IN/EXISTS expressions only
      * need just one tuple in the results set
      *
-     * @param inExistsExpr - IN/EXISTS expression with a possible SET OP subquery
+     * @param subqueryExpr - IN/EXISTS expression with a possible SET OP subquery
      * @return simplified expression
      */
-    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression inExistsExpr) {
-        ExpressionType subqueryExprType = inExistsExpr.getExpressionType();
-        AbstractExpression subqueryExpr = (ExpressionType.COMPARE_IN == subqueryExprType) ?
-                inExistsExpr.getRight() : inExistsExpr.getLeft();
+    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression subqueryExpr) {
         assert (subqueryExpr instanceof SubqueryExpression);
         AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubquery();
         if (!(subquery instanceof ParsedUnionStmt)) {
-            return inExistsExpr;
+            return subqueryExpr;
         }
         ParsedUnionStmt setOpStmt = (ParsedUnionStmt) subquery;
         if (UnionType.EXCEPT == setOpStmt.m_unionType || UnionType.EXCEPT_ALL == setOpStmt.m_unionType) {
             setOpStmt.m_unionType = UnionType.EXCEPT;
-            return inExistsExpr;
+            return subqueryExpr;
         }
         if (UnionType.UNION_ALL == setOpStmt.m_unionType) {
             setOpStmt.m_unionType = UnionType.UNION;
@@ -210,10 +205,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             // add table to the query cache
             StmtTableScan tableCache = parentStmt.addTableToStmtCache(tableName, tableName, child);
             assert(tableCache instanceof StmtSubqueryScan);
-            SubqueryExpression childSubquery = new SubqueryExpression((StmtSubqueryScan)tableCache);
-            AbstractExpression childSubqueryExpr = (ExpressionType.COMPARE_IN == subqueryExprType) ?
-                    new ComparisonExpression(subqueryExprType, inExistsExpr.getLeft(), childSubquery) :
-                        new OperatorExpression(subqueryExprType, childSubquery, null);
+            AbstractExpression childSubqueryExpr =
+                    new SubqueryExpression(subqueryExpr.getExpressionType(), (StmtSubqueryScan)tableCache);
+            if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
+                childSubqueryExpr.setLeft(subqueryExpr.getLeft());
+            }
             // Recurse
             childSubqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(childSubqueryExpr);
             if (retval == null) {
