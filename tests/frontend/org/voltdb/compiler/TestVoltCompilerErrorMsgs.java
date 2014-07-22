@@ -127,9 +127,11 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
     }
 
     public void testErrorOnInsertIntoSelect() throws Exception {
-        // procedure must be marked as single-partition.
-        ddlErrorTest("only supported for single-partition stored procedures",
-                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah;");
+
+        // This should fail.
+        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+                "create procedure MyInsert as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
 
         // limit with no order by implies non-deterministic content, so we won't compile the statement.
         ddlErrorTest("DML statement manipulates data in content non-deterministic way",
@@ -148,10 +150,26 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 "create procedure MyInsert as insert into partitioned_blah (sval) select sval from indexed_blah where sval = ?;",
                 "partition procedure MyInsert on table partitioned_blah column sval;");
 
+        // insert into replicated is fine for MP stored procedure
+        ddlNonErrorTest("INSERT",
+                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah where sval = ?;");
+
+        // ...but should fail for SP stored procedure
+        ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
+                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah where sval = ?;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // ...and insert into replicated table should fail if the select accesses any partitioned tables
+        ddlErrorTest("Subquery in INSERT INTO ... SELECT statement may not access partitioned data " +
+                "for insertion into replicated table BLAH.",
+                "create procedure MyInsert as insert into blah (sval) select sval from partitioned_blah where sval = ?;");
+
+        // UNION is still unsupported
         ddlErrorTest("not supported for UNION or other set operations",
                 "create procedure MyInsert as insert into blah (sval) " +
                     "select sval from indexed_blah where sval = ? union select sval from indexed_blah where sval = ?;");
 
+        // query expression/target column degree mismatch
         ddlErrorTest("number of target columns does not match that of query expression",
                 "create procedure MyInsert as insert into partitioned_blah (sval) select sval, sval || '!' from indexed_blah where sval = ?;",
                 "partition procedure MyInsert on table partitioned_blah column sval;");

@@ -17,7 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -28,6 +30,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 
 /**
  *
@@ -46,7 +49,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     /**
      * The SELECT statement for INSERT INTO ... SELECT.
      */
-    private ParsedSelectStmt m_subselect;
+    private StmtSubqueryScan m_subquery = null;
+
+
 
     /**
     * Class constructor
@@ -73,7 +78,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 parseTargetColumns(node, table, m_columns);
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                m_subselect = (ParsedSelectStmt)parseSubquery(node);
+                m_subquery = new StmtSubqueryScan (parseSubquery(node), "__VOLT_INSERT_SUBQUERY__");
             }
             else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
@@ -95,9 +100,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             retval += "\n";
         }
 
-        if (m_subselect != null) {
+        if (getSubselect() != null) {
             retval += "SUBSELECT:\n";
-            retval += m_subselect.toString();
+            retval += getSubselect().toString();
         }
         return retval;
     }
@@ -153,10 +158,22 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
+    @Override
+    public List<StmtSubqueryScan> getSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_subquery != null) {
+            subqueries.add(m_subquery);
+        }
+
+        return subqueries;
+    }
+
     public AbstractExpression getExpressionForPartitioning(Column column) {
         AbstractExpression expr = null;
-        if (m_subselect != null) {
-            // Currently insert into select is only supported for the SP/SP case.
+        if (getSubselect() != null) {
+            // This method is used by statement partitioning to help infer single partition statements.
+            // Caller expects a constant or parameter to be returned.
             return null;
         }
         else {
@@ -171,10 +188,24 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     }
 
     /**
-     * @return the m_subselect
+     * @return the subquery for the insert stmt if there is one, null otherwise
      */
-    public ParsedSelectStmt getSubselect() {
-        return m_subselect;
+    private ParsedSelectStmt getSubselect() {
+        if (m_subquery != null) {
+            return (ParsedSelectStmt)(m_subquery.getSubqueryStmt());
+        }
+        else {
+            return null;
+        }
     }
 
+    public StmtSubqueryScan getSubquery() {
+        return m_subquery;
+    }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        assert(getSubselect() != null);
+        return getSubselect().isOrderDeterministicInSpiteOfUnorderedSubqueries();
+    }
 }

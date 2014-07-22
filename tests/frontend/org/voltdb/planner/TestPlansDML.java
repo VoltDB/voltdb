@@ -117,6 +117,34 @@ public class TestPlansDML extends PlannerTestCase {
         }
     }
 
+    public void testInsertIntoSelectPlan() {
+        System.out.println("\n\n\nRUNNING testInsertIntoSelectPlan\n\n");
+
+        // This should be inferred as single-partition
+        pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2 WHERE A = ?");
+
+        // One fragment means a single-partition plan
+        assertEquals(1, pns.size());
+
+        // But this should be multi-partition
+        pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2");
+        assertEquals(2, pns.size());
+
+        // Single-partition
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT P2.A, P3.F " +
+                "FROM P2 INNER JOIN P3 ON P2.A = P3.A " +
+                "WHERE P3.A = ?");
+        assertEquals(1, pns.size());
+
+        // Multi-partition
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT P2.A, P3.F " +
+                "FROM P2 INNER JOIN P3 ON P2.A = P3.A ");
+        assertEquals(2, pns.size());
+
+    }
+
     private void checkTruncateFlag() {
         assertTrue(pns.size() == 2);
 
