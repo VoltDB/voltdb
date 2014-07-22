@@ -236,9 +236,9 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testMultiPartLimitPushdown() {
         List<AbstractPlanNode> pns;
-        // Now we don't push down limit when meeting aggregate nodes.
+        // push down the limit because of the order by
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkLimitPushedDown(pns, false);
+        checkLimitPushedDown(pns, true);
 
         // T1 is partitioned on PKEY column
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");

@@ -162,11 +162,11 @@ public class TestPlansLimit extends PlannerTestCase {
 
     public void testInlineLimitWithOrderBy() {
         List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
-        AbstractPlanNode p;
 
         // no push down for aggregate nodes
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, false);
+        checkInlineLimitWithOrderby(pns, true);
+        printExplainPlan(pns);
 
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");
@@ -189,7 +189,6 @@ public class TestPlansLimit extends PlannerTestCase {
         AbstractPlanNode p;
 
         p = pns.get(0).getChild(0);
-        printExplainPlan(pns);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof OrderByPlanNode);
@@ -200,6 +199,9 @@ public class TestPlansLimit extends PlannerTestCase {
             p = pns.get(1).getChild(0);
             assertTrue(p instanceof OrderByPlanNode);
             assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        } else if (pns.size() == 2) {
+            p = pns.get(1).getChild(0);
+            assertFalse(p.toExplainPlanString().toLowerCase().contains("limit"));
         }
     }
 
