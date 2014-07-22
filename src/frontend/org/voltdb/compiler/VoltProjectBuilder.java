@@ -701,14 +701,11 @@ public class VoltProjectBuilder {
         m_voltRootPath = deploymentVoltRoot;
 
         // Add the DDL in the transformer to the schema files before compilation
-        if(!transformed)
-        {
-            transformed = true;
-            try {
-                addLiteralSchema(transformer.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            addLiteralSchema(transformer.toString());
+            transformer = new StringBuffer();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
         final String projectPath = null;
