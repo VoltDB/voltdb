@@ -633,10 +633,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // DR overflow directory
             File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
+            boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
                     if (useDRV2) {
                         ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     } else {
@@ -645,28 +645,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
-
-                    if (useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
-                        Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.AgentReceiver");
-                        Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
-                                String.class,
-                                HostMessenger.class,
-                                Cartographer.class,
-                                CatalogContext.class,
-                                boolean.class);
-                        // TODO: Do this a real way, not with a property
-                        String masterHost = System.getProperty("DR_MASTER_HOST");
-                        if (masterHost == null) {
-                            VoltDB.crashLocalVoltDB("Cannot start as replica without specifying a master cluster");
-                        }
-                        m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
-                                masterHost,
-                                m_messenger,
-                                m_cartographer,
-                                m_catalogContext,
-                                true);
-                        m_globalServiceElector.registerService(m_replicaDRGateway);
-                    }
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -801,6 +779,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_config.m_timestampTestingSalt);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
+            // Configure replica-side DR if relevant
+            if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                try {
+                    Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.AgentReceiver");
+                    Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            String.class,
+                            ClientInterface.class,
+                            Cartographer.class,
+                            boolean.class);
+                    // TODO: Do this a real way, not with a property
+                    String masterHost = System.getProperty("DR_MASTER_HOST");
+                    if (masterHost == null) {
+                        VoltDB.crashLocalVoltDB("Cannot start as replica without specifying a master cluster");
+                    }
+                    m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
+                            masterHost,
+                            m_clientInterface,
+                            m_cartographer,
+                            true);
+                    m_globalServiceElector.registerService(m_replicaDRGateway);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
+                }
             }
 
             // Create the statistics manager and register it to JMX registry
