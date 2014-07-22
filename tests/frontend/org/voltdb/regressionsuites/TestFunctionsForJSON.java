@@ -56,19 +56,22 @@ public class TestFunctionsForJSON extends RegressionSuite {
         final String jstemplate = "{\n" +
                 "    \"id\": %d,\n" +
                 "    \"bool\": true,\n" +
+                "    \"numeric\": 1.2,\n" +
                 "    \"inner\": {\n" +
                 "        \"veggies\": \"good for you\",\n" +
                 "        \"贾鑫Vo\": \"wakarimasen\",\n" +
                 "        \"second\": {\n" +
-                "            \"fruits\": \"semi-good for you\",\n" +
+                "            \"fruits\": 1,\n" +
                 "            \"third\": {\n" +
                 "                \"meats\": \"yum\",\n" +
-                "                \"dairy\": \"%d\"\n" +
+                "                \"dairy\": \"%d\",\n" +
+                "                \"numeric\": 2.3\n" +
                 "            }\n" +
                 "        },\n" +
                 "        \"arr\": [\n" +
                 "            0,\n" +
-                "            %d\n" +
+                "            %d,\n" +
+                "            3.4\n" +
                 "        ]\n" +
                 "    },\n" +
                 "    \"arr\": [\n" +
@@ -79,17 +82,21 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "    \"arr3d\": [\n" +
                 "        0,\n" +
                 "        [\n" +
-                "            1,\n" +
+                "            \"one\",\n" +
                 "            [\n" +
                 "                2,\n" +
-                "                %d\n" +
+                "                %d,\n" +
+                "                4.5\n" +
                 "            ]\n" +
                 "        ],\n" +
                 "        {\n" +
                 "            \"veggies\": \"good for you\",\n" +
-                "            \"dairy\": \"%d\"\n" +
+                "            \"dairy\": \"%d\",\n" +
+                "            \"numeric\": 5.6\n" +
                 "        }\n" +
                 "    ],\n" +
+                "    \"dot.char\": \"foo.bar\",\n" +
+                "    \"bracket][[] [ ] chars\": \"[foo]\",\n" +
                 "    \"tag\": \"%s\"\n" +
                 "}";
 
@@ -229,7 +236,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
 
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-good for you");
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
@@ -243,6 +250,17 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1}});
+
+        // Test \ escape for dot in element name, not used for sub-path
+        cr = client.callProcedure("IdFieldProc", "dot\\.char", "foo.bar");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("IdFieldProc", "dot.char", "foo.bar");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
     }
 
     /** Used to test ENG-6620, part 2 (array index notation). */
@@ -267,7 +285,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
 
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", 1);
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "one");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
@@ -281,6 +299,17 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{3}});
+
+        // Test \ escape for brackets in element name, not used for array index
+        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("IdFieldProc", "bracket]]  ] chars", "[foo]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
     }
 
     /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined). */
@@ -309,6 +338,38 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{3}});
+    }
+
+    public void testFIELDFunctionWithNumericData() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        cr = client.callProcedure("NumericFieldProc", "numeric", "1.2", "1.20");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+
+        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
@@ -361,11 +422,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-good for you");
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-bad for you");
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", -1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
@@ -377,6 +438,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "dot\\.char", "foo.bar");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "dot\\.char", "bar.foo");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
 
         // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
         cr = client.callProcedure("UpdateSetFieldProc", "inner.veggies", "\"bad for you\"", 1);
@@ -384,12 +453,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
 
-        cr = client.callProcedure("UpdateSetFieldProc", "inner.second.fruits", "\"semi-bad for you\"", 2);
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.second.fruits", -1, 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
 
         cr = client.callProcedure("UpdateSetFieldProc", "inner.second.third.meats", "\"yuck\"", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Test \ escape for dot in element name, not used for sub-path
+        cr = client.callProcedure("UpdateSetFieldProc", "dot\\.char", "\"bar.foo\"", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
@@ -403,11 +478,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1}});
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-good for you");
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{3}});
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", "semi-bad for you");
+        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", -1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{2}});
@@ -419,6 +494,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("IdFieldProc", "dot\\.char", "foo.bar");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "dot\\.char", "bar.foo");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
     }
 
     /** Used to test ENG-6620, part 3 (array index notation). */
@@ -437,11 +520,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", 1);
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "one");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", -2);
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "two");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
@@ -461,6 +544,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[bar]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
 
         // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
         cr = client.callProcedure("UpdateSetFieldProc", "arr3d[0]", "-1", 1);
@@ -468,17 +559,23 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
 
-        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][0]", "-2", 2);
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][0]", "\"two\"", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
 
-        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][0]", "-2", 2);
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][0]", -2, 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
 
-        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][1]", "-3", 3);
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][1]", -3, 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Test \ escape for brackets in element name, not used for array index
+        cr = client.callProcedure("UpdateSetFieldProc", "bracket]\\[\\[] \\[ ] chars", "\"[bar]\"", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateRowOfLongs(result, new long[]{1});
@@ -492,11 +589,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1}});
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", 1);
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "one");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{3}});
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", -2);
+        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "two");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{2}});
@@ -516,6 +613,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[bar]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
     }
 
     /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined). */
@@ -610,6 +715,125 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
         cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "-3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+    }
+
+    // Test the SET_FIELD function with numeric, floating-point data, including
+    // with dotted path and/or array index notation
+    public void testSET_FIELDFunctionWithNumericData() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("NumericFieldProc", "numeric", "1.2", "1.20");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "numeric", "-1.2", "-1.20");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "-4.5", "-4.50");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{});
+
+        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        cr = client.callProcedure("UpdateSetFieldProc", "numeric", "-1.2", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.second.third.numeric", "-2.3", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[1][1][2]", "-4.5", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "inner.arr[2]", "-3.4", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        cr = client.callProcedure("UpdateSetFieldProc", "arr3d[2].numeric", "-5.6", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateRowOfLongs(result, new long[]{1});
+
+        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
+        cr = client.callProcedure("NumericFieldProc", "numeric", "1.2", "1.20");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2},{3}});
+        cr = client.callProcedure("NumericFieldProc", "numeric", "-1.2", "-1.20");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1}});
+        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "-4.5", "-4.50");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{3}});
+        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{3}});
+        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{2}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableOfLongs(result, new long[][]{{1},{2}});
+        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{3}});
@@ -930,6 +1154,9 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NumericFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IN (?, ?) ORDER BY ID\n" +
                 ";\n" +
                 "CREATE PROCEDURE InnerFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
