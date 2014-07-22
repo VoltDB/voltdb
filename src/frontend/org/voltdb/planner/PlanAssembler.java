@@ -1921,7 +1921,7 @@ public class PlanAssembler {
             // TODO: We might want to optimize/push down "limit" for some cases
             if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode) &&
-                !(receiveNode instanceof AggregatePlanNode) ) {
+                ! isValidAggregateNodeForLimitPushdown(receiveNode) ) {
                 return null;
             }
 
@@ -1940,19 +1940,6 @@ public class PlanAssembler {
                 }
             }
 
-            if (receiveNode instanceof AggregatePlanNode && receiveNode.getParentCount() > 0) {
-                AbstractPlanNode parent = receiveNode.getParent(0);
-                if (parent instanceof OrderByPlanNode == false &&
-                   ! (parent instanceof ProjectionPlanNode && parent.getParentCount() > 0 &&
-                           parent.getParent(0) instanceof OrderByPlanNode) ) {
-                    // Xin really want inline project with aggregation
-
-                    // When aggregate without order by and does not group by partition column,
-                    // Limit should not be pushed down.
-                    return null;
-                }
-            }
-
             // Traverse...
             if (receiveNode.getChildCount() == 0) {
                 return null;
@@ -1963,6 +1950,36 @@ public class PlanAssembler {
             receiveNode = receiveNode.getChild(0);
         }
         return receiveNode.getChild(0);
+    }
+
+    private static boolean isValidAggregateNodeForLimitPushdown(AbstractPlanNode receiveNode) {
+        if (receiveNode instanceof AggregatePlanNode == false) {
+            return false;
+        }
+        if (receiveNode.getParentCount() == 0) {
+            return false;
+        }
+
+        // Limitation: can only push past coordinating aggregation nodes
+        if (!((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
+            return false;
+        }
+
+        AbstractPlanNode parent = receiveNode.getParent(0);
+        if (parent instanceof OrderByPlanNode) {
+            return true;
+        }
+        if ( parent instanceof ProjectionPlanNode &&
+             parent.getParentCount() > 0 &&
+             parent.getParent(0) instanceof OrderByPlanNode) {
+            // Xin really wants inline project with aggregation
+
+            return true;
+        }
+
+        // When aggregate without order by and does not group by partition column,
+        // Limit should not be pushed down.
+        return false;
     }
 
     /**
