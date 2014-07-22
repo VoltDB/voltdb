@@ -394,12 +394,12 @@ public class StmtSubqueryScan extends StmtTableScan {
      * @param root the complete plan node.
      * @return the plan without the send/receive pair.
      */
-    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
+    static public AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
         assert(root != null);
         return removeCoordinatorSendReceivePairRecursive(root, root);
     }
 
-    private AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
+    static public AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
             AbstractPlanNode current) {
         if (current instanceof ReceivePlanNode) {
             assert(current.getChildCount() == 1);

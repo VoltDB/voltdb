@@ -117,4 +117,6 @@ public class StmtTargetTableScan extends StmtTableScan {
     public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
     }
+
+
 }

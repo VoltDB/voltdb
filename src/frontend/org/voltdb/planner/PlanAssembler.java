@@ -39,9 +39,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -242,8 +240,6 @@ public class PlanAssembler {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-
-                // End of the recursion. Nothing to simplify
                 simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
@@ -328,10 +324,11 @@ public class PlanAssembler {
      * Generate the best cost plan for the current SQL statement context.
      *
      * @param parsedStmt Current SQL statement to generate plan for
+     * @param coordinateResult include (as required) or exclude (unconditionally) the plan nodes that
+     * propagate the results of a select statement to a coordinator site, making a multi-fragment plan.
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
-
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean coordinateResult) {
         // Get the best plans for the sub-queries first
         List<StmtSubqueryScan> subqueryNodes = new ArrayList<StmtSubqueryScan>();
         ParsedResultAccumulator subQueryResult = null;
@@ -393,6 +390,15 @@ public class PlanAssembler {
             // the final best parent plan
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
+        // Remove the coordinator send/receive pair from the plan for a subselect.
+        // It may be added later by the caller for the whole plan.
+        //TODO: refactor getNextPlan to prevent generating them in the first place.
+        // But be careful -- this could create (or close?) loopholes in how some
+        // micro-optimizations apply (to the partial plan vs. the coordinated plan),
+        // especially the determinism rewrites.
+        if ( ! coordinateResult) {
+            retval.rootPlanGraph = StmtSubqueryScan.removeCoordinatorSendReceivePair(retval.rootPlanGraph);
+        }
         return retval;
     }
 
@@ -450,13 +456,14 @@ public class PlanAssembler {
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
             retval = getNextSelectPlan();
+        } else if (m_parsedInsert != null) {
+            nextStmt = m_parsedInsert;
+            retval = getNextInsertPlan();
         } else {
+            //TODO: push CompiledPlan construction into getNextUpdatePlan/getNextDeletePlan
+            //
             retval = new CompiledPlan();
-            retval.readOnly = false;
-            if (m_parsedInsert != null) {
-                nextStmt = m_parsedInsert;
-                retval.rootPlanGraph = getNextInsertPlan();
-            } else if (m_parsedUpdate != null) {
+            if (m_parsedUpdate != null) {
                 nextStmt = m_parsedUpdate;
                 retval.rootPlanGraph = getNextUpdatePlan();
                 // note that for replicated tables, multi-fragment plans
@@ -471,6 +478,7 @@ public class PlanAssembler {
                         "setupForNewPlans not called or not successfull.");
             }
             assert (nextStmt.m_tableList.size() == 1);
+            retval.readOnly = false;
             if (nextStmt.m_tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
             }
@@ -515,7 +523,7 @@ public class PlanAssembler {
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, true);
             partitioning = assembler.getPartition();
 
             // make sure we got a winner
@@ -611,7 +619,7 @@ public class PlanAssembler {
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, selector);
-        CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
+        CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery, true);
         // make sure we got a winner
         if (compiledPlan == null) {
             if (m_recentErrorMsg == null) {
@@ -988,56 +996,6 @@ public class PlanAssembler {
         return expr;
     }
 
-    private AbstractExpression defaultValueToExpr(Column column) {
-        AbstractExpression expr = null;
-
-        boolean isConstantValue = true;
-        if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
-
-            boolean isFunctionFormat = true;
-            String timeValue = column.getDefaultvalue();
-            try {
-                Long.parseLong(timeValue);
-                isFunctionFormat = false;
-            } catch (NumberFormatException  e) {}
-            if (isFunctionFormat) {
-                try {
-                    java.sql.Timestamp.valueOf(timeValue);
-                    isFunctionFormat = false;
-                } catch (IllegalArgumentException e) {}
-            }
-
-            if (isFunctionFormat) {
-                String name = timeValue.split(":")[0];
-                int id = Integer.parseInt(timeValue.split(":")[1]);
-
-                FunctionExpression funcExpr = new FunctionExpression();
-                funcExpr.setAttributes(name, name , id);
-
-                funcExpr.setValueType(VoltType.TIMESTAMP);
-                funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
-
-                expr = funcExpr;
-                isConstantValue = false;
-            }
-        }
-        if (isConstantValue) {
-            // Not Default sql function.
-            ConstantValueExpression const_expr = new ConstantValueExpression();
-            expr = const_expr;
-            if (column.getDefaulttype() != 0) {
-                const_expr.setValue(column.getDefaultvalue());
-                const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
-            }
-            else {
-                const_expr.setValue(null);
-                const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
-            }
-        }
-
-        assert(expr != null);
-        return expr;
-    }
 
     /**
      * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
@@ -1045,7 +1003,7 @@ public class PlanAssembler {
      *
      * @return The next plan for a given insert statement.
      */
-    private AbstractPlanNode getNextInsertPlan() {
+    private CompiledPlan getNextInsertPlan() {
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
         if (m_bestAndOnlyPlanWasGenerated)
@@ -1055,22 +1013,38 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
+
+        ParsedSelectStmt subselect = m_parsedInsert.getSubselect();
+        if (subselect != null) {
+            if (!m_partitioning.wasSpecifiedAsSingle()) {
+                // for now, insert-into-select is only supported for the SP/SP case.
+                throw new PlanningErrorException("INSERT INTO ... SELECT is only supported for single-partition stored procedures.");
+            }
+
+            // setupForNewPlans ensures that we're not writing to a replicated table in a SP SP.
+            assert (!targetTable.getIsreplicated());
+
+        }
+
+        CompiledPlan retval = new CompiledPlan();
+        retval.readOnly = false;
+
+
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
 
         for (Column col : targetTableColumns) {
             boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
-            if (needsValue && !m_parsedInsert.columns.containsKey(col)) {
+            if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
+                // This check could be done during parsing?
                 throw new PlanningErrorException("Column " + col.getName()
                         + " has no default and is not nullable.");
             }
 
             // hint that this statement can be executed SP.
-            if (col.equals(m_partitioning.getPartitionColForDML())) {
-                AbstractExpression expr = m_parsedInsert.columns.get(col);
-                if (expr == null) {
-                    expr = defaultValueToExpr(col);
-                }
-
+            if (col.equals(m_partitioning.getPartitionColForDML()) && subselect == null) {
+                // When AdHoc insert-into-select is supported, we'll need to be able to infer
+                // partitioning of the sub-select
+                AbstractExpression expr = m_parsedInsert.getExpressionForPartitioning(col);
                 String fullColumnName = targetTable.getTypeName() + "." + col.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
@@ -1081,36 +1055,42 @@ public class PlanAssembler {
         insertNode.setTargetTableName(targetTable.getTypeName());
 
         // The child of the insert node produces rows containing values
-        // from the VALUES clause.
-        // Right now it can only be a materialize node,
-        // but in the future it could be an arbitrary sub-plan produced from a sub-query.
-        MaterializePlanNode matNode = new MaterializePlanNode();
-        NodeSchema matSchema = new NodeSchema();
-        int[] fieldMap = new int[m_parsedInsert.columns.size()];
+        // from one of
+        //   - A VALUES clause.  In this case the child node is a MaterializeNode
+        //   - a SELECT statement as in "INSERT INTO ... SELECT ...".  In this case
+        //       the child node is the root of an arbitrary subplan.
+
+        NodeSchema matSchema = null;
+        if (subselect == null) {
+            matSchema = new NodeSchema();
+        }
+
+        int[] fieldMap = new int[m_parsedInsert.m_columns.size()];
         int i = 0;
 
         // The insert statement's set of columns are contained in a LinkedHashMap,
         // meaning that we'll iterate over the columns here in the order that the user
         // specified them in the original SQL.
-        for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.columns.entrySet()) {
+        for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.m_columns.entrySet()) {
             Column col = e.getKey();
-
-            AbstractExpression valExpr = e.getValue();
             fieldMap[i] = col.getIndex();
 
-            valExpr.setInBytes(col.getInbytes());
+            if (matSchema != null) {
+                AbstractExpression valExpr = e.getValue();
+                valExpr.setInBytes(col.getInbytes());
 
-            // Patch over any mismatched expressions with an explicit cast.
-            // Most impossible-to-cast type combinations should have already been caught by the
-            // parser, but there are also runtime checks in the casting code
-            // -- such as for out of range values.
-            valExpr = castExprIfNeeded(valExpr, col);
+                // Patch over any mismatched expressions with an explicit cast.
+                // Most impossible-to-cast type combinations should have already been caught by the
+                // parser, but there are also runtime checks in the casting code
+                // -- such as for out of range values.
+                valExpr = castExprIfNeeded(valExpr, col);
 
-            matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                    "VOLT_TEMP_TABLE",
-                    col.getTypeName(),
-                    col.getTypeName(),
-                    valExpr));
+                matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                        "VOLT_TEMP_TABLE",
+                        col.getTypeName(),
+                        col.getTypeName(),
+                        valExpr));
+            }
 
             i++;
         }
@@ -1119,20 +1099,36 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
-        matNode.setOutputSchema(matSchema);
-        // connect the insert and the materialize nodes together
-        insertNode.addAndLinkChild(matNode);
+        if (matSchema != null) {
+            MaterializePlanNode matNode = new MaterializePlanNode();
+            matNode.setOutputSchema(matSchema);
+            // connect the insert and the materialize nodes together
+            insertNode.addAndLinkChild(matNode);
+
+            retval.statementGuaranteesDeterminism(false, true);
+        } else {
+            retval = getBestCostPlan(subselect, false);
+            retval.readOnly = false;
+
+            boolean orderIsDeterministic = m_parsedInsert.getSubselect().isOrderDeterministic();
+            boolean hasLimitOrOffset = m_parsedInsert.getSubselect().hasLimitOrOffset();
+            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+            insertNode.addAndLinkChild(retval.rootPlanGraph);
+        }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            return insertNode;
+            retval.rootPlanGraph = insertNode;
+            return retval;
         }
 
         insertNode.setMultiPartition(true);
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
         // add a count or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        return retval;
     }
 
     /**
@@ -1143,7 +1139,6 @@ public class PlanAssembler {
      * @param isReplicated Whether or not the target table is a replicated table.
      * @return
      */
-
     private static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
     {
         AbstractPlanNode sumOrLimitNode;
@@ -1332,7 +1327,7 @@ public class PlanAssembler {
             // ensure the order of the data on each partition.
             distributedPlan = handleOrderBy(distributedPlan);
 
-            if (distributedPlan instanceof OrderByPlanNode) {
+            if (isInlineLimitPlanNodePossible(distributedPlan)) {
                 // Inline the distributed limit.
                 distributedPlan.addInlinePlanNode(distLimit);
                 sendNode.addAndLinkChild(distributedPlan);
@@ -1342,27 +1337,27 @@ public class PlanAssembler {
                 sendNode.addAndLinkChild(distLimit);
             }
         }
-
-        // In future, inline LIMIT for aggregate node, join, Receive
+        // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
         // Switch if has Complex aggregations
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
-            if (child instanceof OrderByPlanNode) {
+            if (isInlineLimitPlanNodePossible(child)) {
                 child.addInlinePlanNode(topLimit);
             } else {
-                // In future, inline LIMIT for aggregate node
                 root.clearChildren();
                 child.clearParents();
                 topLimit.addAndLinkChild(child);
                 root.addAndLinkChild(topLimit);
             }
         } else {
-            if (root instanceof OrderByPlanNode) {
+            if (isInlineLimitPlanNodePossible(root)) {
                 root.addInlinePlanNode(topLimit);
             } else if (root instanceof ProjectionPlanNode &&
-                    root.getChild(0) instanceof OrderByPlanNode) {
+                    isInlineLimitPlanNodePossible(root.getChild(0)) ) {
+                // In future, inlined this projection node for OrderBy and Aggregate
+                // Then we could delete this ELSE IF block.
                 root.getChild(0).addInlinePlanNode(topLimit);
             } else {
                 topLimit.addAndLinkChild(root);
@@ -1370,6 +1365,20 @@ public class PlanAssembler {
             }
         }
         return root;
+    }
+
+    /**
+     * Inline limit plan node can be applied with ORDER BY node and serial aggregation node
+     * @param pn
+     * @return
+     */
+    static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
+        if (pn instanceof OrderByPlanNode ||
+                pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
+        {
+            return true;
+        }
+        return false;
     }
 
 

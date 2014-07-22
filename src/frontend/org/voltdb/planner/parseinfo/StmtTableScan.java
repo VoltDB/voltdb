@@ -83,5 +83,4 @@ public abstract class StmtTableScan {
             m_scanColumnsList.add(scol);
         }
     }
-
 }
