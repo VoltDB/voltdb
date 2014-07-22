@@ -68,7 +68,6 @@ public class InlineAggregation extends MicroOptimization {
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
 
         // Assuming all AggregatePlanNode has not been inlined before this microoptimization
-        assert(aggplan.getChildCount() == 1);
         AbstractPlanNode child = aggplan.getChild(0);
 
         // EE Currently support: seqscan + indexscan

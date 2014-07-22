@@ -435,6 +435,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return false;
     }
 
+    public boolean replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
+        if (oldChildIdx < 0 || oldChildIdx >= getChildCount()) {
+            return false;
+        }
+
+        AbstractPlanNode oldChild = m_children.get(oldChildIdx);
+        oldChild.m_parents.clear();
+        setAndLinkChild(oldChildIdx, newChild);
+        return true;
+    }
+
 
     /**
      * Gets the children.

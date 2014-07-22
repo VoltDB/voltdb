@@ -1444,21 +1444,19 @@ public class PlanAssembler {
     }
 
     class IndexGroupByInfo {
-        boolean m_multPartition = false;
-        boolean m_isIndexScanPlanRoot = false;
-        boolean m_needHashAgg = false;
+        boolean m_multiPartition = false;
 
         List<Integer> m_coveredGroupByColumns;
-        boolean m_serialAgg = false;
+        boolean m_canBeFullySerialized = false;
 
         AbstractPlanNode m_indexAccess = null;
 
         public boolean isChangedToSerialAggregate() {
-            return m_serialAgg && m_indexAccess != null;
+            return m_canBeFullySerialized && m_indexAccess != null;
         }
 
         public boolean isChangedToPartialAggregate() {
-            return !m_serialAgg && m_indexAccess != null;
+            return !m_canBeFullySerialized && m_indexAccess != null;
         }
 
         public boolean needHashAggregator(AbstractPlanNode root) {
@@ -1472,7 +1470,7 @@ public class PlanAssembler {
                 return false;
             }
 
-            if (isChangedToSerialAggregate() && ! m_multPartition) {
+            if (isChangedToSerialAggregate() && ! m_multiPartition) {
                 return false;
             }
 
@@ -1513,7 +1511,7 @@ public class PlanAssembler {
         // For join node, find outer sequential scan plan node
         if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
             assert(candidate.getChildCount() == 2);
-            return findSeqScanCandidateForGroupBy(candidate.getChild(1));
+            return findSeqScanCandidateForGroupBy(candidate.getChild(0));
         }
 
         if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
@@ -1529,7 +1527,8 @@ public class PlanAssembler {
      * down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node.
      * @param candidate
      * @param gbInfo
-     * @return whether planner can switch to index scan or not from sequential scan
+     * @return whether planner can switch to index scan or not from sequential scan,
+     * and when the index scan has no parent plan node.
      */
     private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
         if (! m_parsedSelect.isGrouped()) {
@@ -1555,15 +1554,16 @@ public class PlanAssembler {
         }
 
         gbInfo.m_indexAccess = indexAccess;
-        if (parent == null) {
-            gbInfo.m_isIndexScanPlanRoot = true;
-        } else {
+        if (parent != null) {
             // have a parent and would like to replace the sequential scan to index scan
             indexAccess.clearParents();
-            parent.clearChildren();
-            parent.addAndLinkChild(indexAccess);
+            // For two children join node, index 0 is its outer side
+            parent.replaceChild(0, indexAccess);
+
+            return false;
         }
 
+        // parent is null and switched to index scan from sequential scan
         return true;
     }
 
@@ -1582,10 +1582,10 @@ public class PlanAssembler {
 
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                gbInfo.m_multPartition = true;
+                gbInfo.m_multiPartition = true;
                 switchToIndexScanForGroupBy(candidate, gbInfo);
 
-            } else if (switchToIndexScanForGroupBy(root, gbInfo) && gbInfo.m_isIndexScanPlanRoot) {
+            } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
             boolean needHashAgg = gbInfo.needHashAggregator(root);
@@ -1771,57 +1771,61 @@ public class PlanAssembler {
     // Turn sequential scan to index scan for group by if possible
     private AbstractPlanNode indexAccessForGroupByExprs(SeqScanPlanNode root,
             IndexGroupByInfo gbInfo) {
-        assert(root.getPlanNodeType() == PlanNodeType.SEQSCAN);
+        if (root.isSubQuery()) {
+            // sub-query edge case will not be handled now
+            return root;
+        }
 
         String fromTableAlias = root.getTargetTableAlias();
         assert(fromTableAlias != null);
 
         ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
         Table targetTable = m_catalogDb.getTables().get(root.getTargetTableName());
-        if (targetTable == null) {
-            // sub-query edge case will not be handled now
-            return root;
-        }
         assert(targetTable != null);
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
         List<Integer> maxCoveredGroupByColumns = new ArrayList<>();
         ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
-        Index pickedupInde = null;
+        Index pickedUpIndex = null;
         boolean foundAllGroupByCoveredIndex = false;
+
         for (Index index : allIndexes) {
-            if ( ! IndexType.isScannable(index.getType()) || foundAllGroupByCoveredIndex) {
+            if ( ! IndexType.isScannable(index.getType())) {
                 continue;
             }
-            List<Integer> coveredGroupByColumns = new ArrayList<>();
-            calculateGroupbyColumnsCovered(index, fromTableAlias, coveredGroupByColumns,
-                    allBindings);
+            ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+            List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
+                    index, fromTableAlias, bindings);
 
             if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
                 maxCoveredGroupByColumns = coveredGroupByColumns;
-                pickedupInde = index;
+                pickedUpIndex = index;
+                allBindings = bindings;
+
                 if (maxCoveredGroupByColumns.size() == groupBys.size()) {
                     foundAllGroupByCoveredIndex = true;
                     break;
                 }
             }
         }
-        if (pickedupInde == null) {
+        if (pickedUpIndex == null) {
             return root;
         }
 
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
-                root, null, pickedupInde, SortDirectionType.INVALID);
+                root, null, pickedUpIndex, SortDirectionType.INVALID);
         indexScanNode.setForGroupingOnly();
         indexScanNode.setBindings(allBindings);
 
         gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
-        gbInfo.m_serialAgg = foundAllGroupByCoveredIndex;
+        gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;
         return indexScanNode;
     }
 
-    private void calculateGroupbyColumnsCovered(Index index, String fromTableAlias,
-            List<Integer> coveredGroupByColumns, List<AbstractExpression> allBindings) {
+    private List<Integer> calculateGroupbyColumnsCovered(Index index, String fromTableAlias,
+            List<AbstractExpression> bindings) {
+        List<Integer> coveredGroupByColumns = new ArrayList<>();
+
         ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
@@ -1849,14 +1853,14 @@ public class PlanAssembler {
                     }
                 }
                 if (! foundPrefixedColumn) {
-                    // no prefix match any more or covered all group by columns already
+                    // no prefix match any more
                     break;
                 }
                 coveredGroupByColumns.add(ithCovered);
 
                 if (coveredGroupByColumns.size() == groupBys.size()) {
                     // covered all group by columns already
-                    return;
+                    break;
                 }
             }
 
@@ -1869,7 +1873,7 @@ public class PlanAssembler {
             } catch (JSONException e) {
                 e.printStackTrace();
                 // This case sounds impossible
-                return;
+                return coveredGroupByColumns;
             }
 
             for (int j = 0; j < indexedExprs.size(); j++) {
@@ -1889,16 +1893,17 @@ public class PlanAssembler {
                     // no prefix match any more or covered all group by columns already
                     break;
                 }
-                allBindings.addAll(binding);
+                bindings.addAll(binding);
                 coveredGroupByColumns.add(ithCovered);
 
                 if (coveredGroupByColumns.size() == groupBys.size()) {
                     // covered all group by columns already
-                    return;
+                    break;
                 }
             }
 
         }
+        return coveredGroupByColumns;
     }
 
     /**

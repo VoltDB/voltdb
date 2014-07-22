@@ -22,7 +22,7 @@ import java.util.List;
 import org.voltdb.types.PlanNodeType;
 
 /**
- * Plan node representing an Aggregate with a Hash based implementation of grouping.
+ * Plan node representing an Aggregate with a Partial Serial based implementation of grouping.
  *
  */
 public class PartialAggregatePlanNode extends AggregatePlanNode {

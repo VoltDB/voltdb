@@ -317,8 +317,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         stringer.endArray();
 
-        if (! m_groupByExpressions.isEmpty())
-        {
+        if (! m_groupByExpressions.isEmpty()) {
             stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
             for (int i = 0; i < m_groupByExpressions.size(); i++) {
                 stringer.object();
@@ -353,6 +352,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             aggType = "Serial";
         } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
             aggType = "Partial";
+        } else {
+            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         }
 
         sb.append(aggType + " AGGREGATION ops: ");
