@@ -375,11 +375,16 @@ public abstract class DTIType extends Type {
 
             case Tokens.SECONDS_MIDNIGHT :
                 return SECONDS_MIDNIGHT;
-            // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+            // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function and EXTRACT(WEEK from ...)
             case Tokens.WEEKDAY :
-            	// Maybe we should return something else, since WEEKDAY is different from day_of_week
-            	// But it works now...
+            	// map WEEKDAY to DAY_OF_WEEK for hsql, and note that
+            	// 1. it makes hsql support WEEKDAY keyword and handle WEEKDAY the same as DAY_OF_WEEK
+            	// 2. VoltDB discards this return value and continues as long as no exception
+            	//    see FunctionSQL.voltAnnotateFunctionXML for the VoltDB's behaviour
             	return DAY_OF_WEEK;
+            case Tokens.WEEK :
+            	// map WEEK to WEEK_OF_YEAR
+            	return WEEK_OF_YEAR;
             // End of VoltDB extension
 
             default :

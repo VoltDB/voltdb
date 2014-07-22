@@ -172,7 +172,7 @@ public class FunctionCustom extends FunctionSQL {
         // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
         customRegularFuncMap.put(Tokens.WEEKOFYEAR, FUNC_EXTRACT);
         customRegularFuncMap.put(Tokens.WEEKDAY, FUNC_EXTRACT);
-        // end of extension
+        // End of VoltDB extension
 
         //
         customRegularFuncMap.put(Tokens.IDENTITY, FUNC_IDENTITY);
