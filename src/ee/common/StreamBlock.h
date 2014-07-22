@@ -33,13 +33,13 @@ namespace voltdb
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
-              m_uso(uso)
+              m_uso(uso), m_lastBeginTxnOffset(0)
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
-              m_uso(other->m_uso)
+              m_uso(other->m_uso), m_lastBeginTxnOffset(other->m_lastBeginTxnOffset)
         {
         }
 
@@ -83,6 +83,10 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
+        size_t lastBeginTxnOffset() const {
+        	return m_lastBeginTxnOffset;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
@@ -105,10 +109,23 @@ namespace voltdb
             }
         }
 
+        void recordLastBeginTxnOffset() {
+            m_lastBeginTxnOffset = m_offset;
+        }
+
+        void clearLastBeginTxnOffset() {
+            m_lastBeginTxnOffset = 0;
+        }
+
+        char* mutableLastBeginTxnDataPtr() {
+        	return m_data + m_lastBeginTxnOffset;
+        }
+
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
+        size_t m_lastBeginTxnOffset;  // keep record of begin txn to avoid txn span multiple buffers
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

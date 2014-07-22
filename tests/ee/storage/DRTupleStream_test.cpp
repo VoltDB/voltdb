@@ -56,7 +56,7 @@ const int MAGIC_BEGIN_SIZE = 22;
 const int MAGIC_END_SIZE = MAGIC_TRANSACTION_SIZE - MAGIC_BEGIN_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // 1k buffer
-const int BUFFER_SIZE = 983;
+const int BUFFER_SIZE = 950;//983;
 const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
 
 class DRTupleStreamTest : public Test {
@@ -192,6 +192,33 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
+}
+
+/**
+ * Test the really basic operation order
+ */
+TEST_F(DRTupleStreamTest, TxnSpanBuffer)
+{
+    for (int i = 1; i < 50; i++)
+    {
+        appendTuple(i-1, i);
+    }
+    m_wrapper.periodicFlush(-1, 49);
+
+
+    // get the first buffer flushed
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
+
+    // now get the second
+    ASSERT_FALSE(m_topend.blocks.empty());
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
 }
 
 /**
@@ -485,6 +512,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
+    std::cout << "result->offset=" << results->offset() << " mark=" << mark << std::endl;
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) + MAGIC_TRANSACTION_SIZE);
 }
 

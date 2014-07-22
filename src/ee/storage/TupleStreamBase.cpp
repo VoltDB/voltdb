@@ -261,10 +261,23 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
+    char *buffer = new char[m_defaultCapacity];
+	if (!buffer) {
+		throwFatalException("Failed to claim managed buffer for Export.");
+	}
+
+	bool txnSpanBuffer = false;
+
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
-            m_currBlock = NULL;
+            if (m_currBlock->remaining() < minLength &&
+                    m_currBlock->lastBeginTxnOffset() > 0 &&
+                    m_currBlock->lastBeginTxnOffset() != m_currBlock->offset()) {
+                txnSpanBuffer = true;
+                size_t partialTxnLength = m_currBlock->offset() - m_currBlock->lastBeginTxnOffset();
+                m_uso -= partialTxnLength;
+            }
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -274,12 +287,20 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         }
     }
 
-    char *buffer = new char[m_defaultCapacity];
-    if (!buffer) {
-        throwFatalException("Failed to claim managed buffer for Export.");
+    StreamBlock* tmp = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+
+    if (txnSpanBuffer) {
+        size_t partialTxnLength = m_currBlock->offset() - m_currBlock->lastBeginTxnOffset();
+        ::memcpy(tmp->mutableDataPtr(), m_currBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        tmp->consumed(partialTxnLength);
+        ::memset(m_currBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
+        m_currBlock->truncateTo(m_uso);
+        m_currBlock->clearLastBeginTxnOffset();
+        m_currBlock = NULL;
+        m_uso += partialTxnLength;
     }
 
-    m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    m_currBlock = tmp;
 
     pushPendingBlocks();
 }
