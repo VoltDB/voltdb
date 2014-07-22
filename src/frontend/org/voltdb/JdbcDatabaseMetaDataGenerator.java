@@ -688,7 +688,7 @@ public class JdbcDatabaseMetaDataGenerator
         for (String classname : m_jarfile.getLoader().getClassNames()) {
             try {
                 Class<?> clazz = m_jarfile.getLoader().loadClass(classname);
-                boolean isProc = (clazz.newInstance() instanceof VoltProcedure);
+                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz);
                 boolean isActive = false;
                 if (isProc) {
                     for (Procedure proc : m_database.getProcedures()) {
