@@ -118,7 +118,7 @@ namespace voltdb
         }
 
         char* mutableLastBeginTxnDataPtr() {
-        	return m_data + m_lastBeginTxnOffset;
+            return m_data + m_lastBeginTxnOffset;
         }
 
         char *m_data;

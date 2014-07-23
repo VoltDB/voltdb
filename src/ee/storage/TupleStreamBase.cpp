@@ -261,11 +261,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
-    char *buffer = new char[m_defaultCapacity];
-	if (!buffer) {
-		throwFatalException("Failed to claim managed buffer for Export.");
-	}
-
 	bool spanBuffer = false;
 	StreamBlock* oldBlock = m_currBlock;
 
@@ -289,6 +284,11 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
             oldBlock->lastBeginTxnOffset() != oldBlock->offset()) {
         m_uso -= oldBlock->offset() - oldBlock->lastBeginTxnOffset();
         spanBuffer = true;
+    }
+
+    char *buffer = new char[m_defaultCapacity];
+    if (!buffer) {
+        throwFatalException("Failed to claim managed buffer for Export.");
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);

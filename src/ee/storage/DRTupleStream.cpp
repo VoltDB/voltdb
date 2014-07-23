@@ -161,7 +161,7 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
      m_currBlock->recordLastBeginTxnOffset();
 
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
-    	 extendBufferChain(BEGIN_RECORD_SIZE);
+         extendBufferChain(BEGIN_RECORD_SIZE);
      }
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());

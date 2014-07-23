@@ -56,7 +56,7 @@ const int MAGIC_BEGIN_SIZE = 22;
 const int MAGIC_END_SIZE = MAGIC_TRANSACTION_SIZE - MAGIC_BEGIN_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // 1k buffer
-const int BUFFER_SIZE = 950;//983;
+const int BUFFER_SIZE = 950;
 const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
 
 class DRTupleStreamTest : public Test {
@@ -545,7 +545,6 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
             mark = appendTuple(10, 11);
         }
     }
-
     m_wrapper.rollbackTo(mark);
     m_wrapper.periodicFlush(-1, 11);
 
