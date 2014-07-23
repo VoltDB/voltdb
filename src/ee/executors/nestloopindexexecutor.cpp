@@ -85,7 +85,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     //
     // We need exactly one input table and a target table
     //
-    assert(node->getInputTables().size() == 1);
+    assert(node->getInputTableCount() == 1);
 
     int schema_size = static_cast<int>(node->getOutputSchema().size());
     // Create output table based on output schema from the plan
@@ -123,17 +123,16 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
 
-    assert(node->getInputTables().size() == 1);
-    outer_table = node->getInputTables()[0];
-    assert(outer_table);
+    assert(node->getInputTableCount() == 1);
+    assert(node->getInputTable());
 
-    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+    PersistentTable* inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
     //
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
     //
-    index = inner_table->index(inline_node->getTargetIndexName());
+    TableIndex* index = inner_table->index(inline_node->getTargetIndexName());
     if (index == NULL) {
         VOLT_ERROR("Failed to retreive index '%s' from inner table '%s' for"
                    " internal PlanNode '%s'",
@@ -157,11 +156,15 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-void NestLoopIndexExecutor::updateTargetTableAndIndex() {
-    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
+{
+    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    assert(node);
+
+    PersistentTable* inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
 
-    index = inner_table->index(inline_node->getTargetIndexName());
+    TableIndex* index = inner_table->index(inline_node->getTargetIndexName());
     assert(index);
 
     // NULL tuple for outer join
@@ -174,14 +177,6 @@ void NestLoopIndexExecutor::updateTargetTableAndIndex() {
     index_values = TableTuple(index->getKeySchema());
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
     index_values.setAllNulls();
-}
-
-bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
-{
-    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
-    assert(node);
-
-    updateTargetTableAndIndex();
 
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert(output_table);
@@ -191,9 +186,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert(inner_table);
 
     //outer_table is the input table that have tuples to be iterated
-    assert(node->getInputTables().size() == 1);
-    assert (outer_table == node->getInputTables()[0]);
-    assert (outer_table);
+    assert(node->getInputTableCount() == 1);
+    Table* outer_table = node->getInputTable();
+    assert(outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug().c_str(), inner_table->debug().c_str());
 

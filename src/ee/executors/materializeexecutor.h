@@ -69,7 +69,6 @@ class MaterializeExecutor : public AbstractExecutor {
     {
         node = NULL;
         output_table = NULL;
-        input_table = NULL;
         expression_array = NULL;
         this->engine = engine;
     }
@@ -82,7 +81,6 @@ class MaterializeExecutor : public AbstractExecutor {
   private:
     MaterializePlanNode* node;
     TempTable* output_table;
-    Table* input_table;
     int m_columnCount;
 
     boost::shared_array<int> all_param_array_ptr;

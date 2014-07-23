@@ -96,7 +96,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     output_table = dynamic_cast<TempTable*>(node->getOutputTable()); //output table should be temptable
 
     if (!node->isInline()) {
-        input_table = node->getInputTables()[0];
+        Table* input_table = node->getInputTable();
         tuple = TableTuple(input_table->schema());
     }
     return true;
@@ -111,7 +111,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
                                 // called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert (output_table);
-    assert (input_table == node->getInputTables()[0]);
+    Table* input_table = m_abstractNode->getInputTable();
     assert (input_table);
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());

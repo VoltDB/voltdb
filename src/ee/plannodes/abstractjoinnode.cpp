@@ -47,48 +47,15 @@
 
 #include "expressions/abstractexpression.h"
 
-#include <stdexcept>
 #include <sstream>
 
 using namespace std;
-using namespace voltdb;
 
-AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
+namespace voltdb {
 
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
+AbstractJoinPlanNode::AbstractJoinPlanNode() { }
 
-AbstractJoinPlanNode::~AbstractJoinPlanNode()
-{
-    delete m_preJoinPredicate;
-    delete m_joinPredicate;
-    delete m_wherePredicate;
-}
-
-JoinType AbstractJoinPlanNode::getJoinType() const
-{
-    return m_joinType;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
-{
-    return m_preJoinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
-{
-    return m_joinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
-{
-    return m_wherePredicate;
-}
+AbstractJoinPlanNode::~AbstractJoinPlanNode() { }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 {
@@ -117,19 +84,9 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
-    loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
-    loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+    m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
+    m_joinPredicate.reset(loadExpressionFromJSONObject("JOIN_PREDICATE", obj));
+    m_wherePredicate.reset(loadExpressionFromJSONObject("WHERE_PREDICATE", obj));
 }
 
-
-void
-AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate)
-{
-    if (obj.hasNonNullKey(predicateType)) {
-        predicate = AbstractExpression::buildExpressionTree(obj.valueForKey(predicateType));
-    }
-    else {
-        predicate = NULL;
-    }
-}
+} // namespace voltdb

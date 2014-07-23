@@ -496,7 +496,7 @@ void AggregateHashExecutor::p_execute_init(const NValueArray& params,
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
@@ -578,7 +578,7 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
 void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * inputSchema) {
     executeAggBase(params);
-    assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
+    assert(m_prePredicate == NULL || m_abstractNode->getInputTable()->activeTupleCount() <= 1);
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
 
     m_noInputRows = true;
@@ -601,7 +601,7 @@ void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();

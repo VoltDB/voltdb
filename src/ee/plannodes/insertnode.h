@@ -52,36 +52,30 @@
 
 namespace voltdb {
 
+class VoltDBEngine;
+
 /**
  *
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
-    public:
-        InsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_multiPartition(false), m_fieldMap() {
-            // Do nothing
-        }
+public:
+    InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
+    PlanNodeType getPlanNodeType() const;
 
-        InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() {
-            // Do nothing
-        }
+    bool isMultiPartition() { return m_multiPartition; }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INSERT); }
+    void initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple);
 
-        bool isMultiPartition() { return m_multiPartition; }
+    const std::vector<int>& getFieldMap() const { return m_fieldMap; }
 
-        void initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple);
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        const std::vector<int>& getFieldMap() const {
-            return m_fieldMap;
-        }
-
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-
-        bool m_multiPartition;
-        std::vector<int> m_fieldMap;
+private:
+    bool m_multiPartition;
+    std::vector<int> m_fieldMap;
 };
 
-}
+} // namespace voltdb
 
 #endif
