@@ -142,7 +142,6 @@ struct AggregateRow
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
  */
-
 class AggregateExecutorBase : public AbstractExecutor
 {
 public:
@@ -243,14 +242,17 @@ class AggregateHashExecutor : public AggregateExecutorBase
 public:
     AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node), m_inputSchema(NULL) { }
-    ~AggregateHashExecutor() { }
+
+    // empty destructor defined in .cpp file because of it is called virtually (not inline)
+    // same reason for serial and partial
+    ~AggregateHashExecutor();
 
     void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
     void p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
 private:
-    void initHashGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
+    void initHashGroupByKeyTuple(const TableTuple& nxtTuple);
 
     virtual bool p_execute(const NValueArray& params);
     HashAggregateMapType m_hash;
@@ -269,7 +271,7 @@ class AggregateSerialExecutor : public AggregateExecutorBase
 public:
     AggregateSerialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
-    ~AggregateSerialExecutor() { }
+    ~AggregateSerialExecutor();
 
     void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
@@ -297,7 +299,7 @@ class AggregatePartialExecutor : public AggregateExecutorBase
 public:
     AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
-    ~AggregatePartialExecutor() {};
+    ~AggregatePartialExecutor();
 
     void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
 
@@ -309,8 +311,7 @@ private:
     virtual bool p_execute(const NValueArray& params);
 
     void getNextGroupByValues(const TableTuple& nextTuple);
-    void initPartialHashGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple,
-            const TableTuple& nxtTuple);
+    void initPartialHashGroupByKeyTuple(const TableTuple& nxtTuple);
 
     std::vector<NValue> m_inProgressGroupByValues;
     std::vector<NValue> m_nextGroupByValues;

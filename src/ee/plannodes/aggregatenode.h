@@ -72,7 +72,7 @@ public:
     const std::vector<int>& getAggregateOutputColumns() const
     { return m_aggregateOutputColumns; }
 
-    const std::vector<int>& getPartialSerialAggregateOutputColumns() const
+    const std::vector<int>& getPartialGroupByColumns() const
     { return m_partialGroupByColumns; }
 
     const std::vector<AbstractExpression*>& getAggregateInputExpressions() const

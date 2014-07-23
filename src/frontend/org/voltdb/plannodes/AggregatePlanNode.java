@@ -61,7 +61,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
 
-    protected List<Integer> m_partialGroupByColumns = new ArrayList<Integer>();
+    // This list is only used for the special case of instances of PartialAggregatePlanNode.
+    protected List<Integer> m_partialGroupByColumns = null;
 
     // True if this aggregate node is the coordinator summary aggregator
     // for an aggregator that was pushed down. Must know to correctly
@@ -326,7 +327,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.endArray();
 
-            if (! m_partialGroupByColumns.isEmpty()) {
+            if (m_partialGroupByColumns != null && ! m_partialGroupByColumns.isEmpty()) {
                 stringer.key(Members.PARTIAL_GROUPBY_COLUMNS.name()).array();
                 for (Integer ith: m_partialGroupByColumns) {
                     stringer.value(ith.longValue());
