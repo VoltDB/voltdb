@@ -350,6 +350,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
+            assert(AggregatePlanNode.getInlineAggregationNode(this) == null);
+
             // output columns
             // if there was an inline projection we will have copied these already
             // otherwise we need to iterate through the output schema TVEs

@@ -90,6 +90,15 @@ AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
     return m_wherePredicate;
 }
 
+const std::vector<SchemaColumn*>& AbstractJoinPlanNode::getOutputSchemaPreAgg() const {
+    return m_outputSchemaPreAgg;
+}
+
+const TupleSchema* AbstractJoinPlanNode::getTupleSchemaPreAgg() const
+{
+    return m_tupleSchemaPreAgg;
+}
+
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
@@ -120,6 +129,18 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
     loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
     loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
     loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+    }
+
+    m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(
+            getOutputSchemaPreAgg(), true);
 }
 
 
@@ -133,3 +154,4 @@ AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, con
         predicate = NULL;
     }
 }
+

@@ -137,7 +137,8 @@ public:
      * permit null values in the output columns.
      *TODO: -- This is always passed true, so deprecate it?
      */
-    TupleSchema* generateTupleSchema(bool allowNulls=true) const;
+    static TupleSchema* generateTupleSchema(
+            const std::vector<SchemaColumn*>& outputSchema, bool allowNulls=true);
 
     /**
      * Convenience method:
