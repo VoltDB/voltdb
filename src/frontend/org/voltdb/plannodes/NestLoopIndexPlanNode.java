@@ -103,6 +103,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(inline_scan.getEndExpression(), outer_schema, index_schema);
         resolvePredicate(inline_scan.getInitialExpression(), outer_schema, index_schema);
         resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, index_schema);
+        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, index_schema);
 
         // resolve other predicates
         resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
@@ -146,6 +147,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
         m_outputSchema = new_output_schema;
         m_hasSignificantOutputSchema = true;
+        m_outputSchemaPreInlineAgg = m_outputSchema;
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {

@@ -158,12 +158,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     int inner_cols = inner_table->columnCount();
     TableTuple outer_tuple(node->getInputTables()[0]->schema());
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
-    TableTuple &join_tuple = output_table->tempTuple();
     TableTuple null_tuple = m_null_tuple;
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
+
+    TableTuple join_tuple;
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
 
     if (m_aggExec != NULL) {
@@ -174,6 +175,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         char* storage = reinterpret_cast<char*>(
                 m_memoryPool.allocateZeroes(aggInputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         join_tuple = TableTuple (storage, aggInputSchema);
+    } else {
+        join_tuple = output_table->tempTuple();
     }
 
     bool earlyReturned = false;
@@ -257,6 +260,10 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         }
 
     } // END OUTER WHILE LOOP
+
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_finish();
+    }
 
     m_memoryPool.purge();
     cleanupInputTempTable(inner_table);

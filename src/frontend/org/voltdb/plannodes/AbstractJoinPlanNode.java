@@ -223,6 +223,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
         m_outputSchema = new_output_schema;
         m_hasSignificantOutputSchema = true;
+        m_outputSchemaPreInlineAgg = m_outputSchema;
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
@@ -288,15 +289,19 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
+
     /**
-     * @param predicate the predicate to set
+     *
+     * @param expression
+     * @param outer_schema
+     * @param inner_schema
      */
-    protected static void resolvePredicate(AbstractExpression predicate,
+    protected static void resolvePredicate(AbstractExpression expression,
             NodeSchema outer_schema, NodeSchema inner_schema)
     {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(predicate);
+                ExpressionUtil.getTupleValueExpressions(expression);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
@@ -313,6 +318,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
             tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
+        }
+    }
+
+    protected static void resolvePredicate(List<AbstractExpression> expressions,
+            NodeSchema outer_schema, NodeSchema inner_schema)
+    {
+        for (AbstractExpression expr : expressions) {
+            resolvePredicate(expr, outer_schema, inner_schema);
         }
     }
 

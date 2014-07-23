@@ -272,10 +272,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
-    TableTuple &join_tuple = m_outputTable->tempTuple();
+    TableTuple join_tuple;
 
     ProgressMonitorProxy pmp(m_engine, this, m_innerTable);
     if (m_aggExec != NULL) {
+        VOLT_TRACE("Init inline aggregate...");
         m_aggExec->setAggregateOutputTable(m_outputTable);
         const TupleSchema * aggInputSchema = m_node->getTupleSchemaPreAgg();
         m_aggExec->p_execute_init(params, &pmp, aggInputSchema);
@@ -283,6 +284,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         char* storage = reinterpret_cast<char*>(
                 m_memoryPool.allocateZeroes(aggInputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         join_tuple = TableTuple (storage, aggInputSchema);
+    } else {
+        join_tuple = m_outputTable->tempTuple();
     }
 
     bool earlyReturned = false;
@@ -566,6 +569,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             }
         }
     } // END OUTER WHILE LOOP
+
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_finish();
+    }
 
     VOLT_TRACE ("result table:\n %s", m_outputTable->debug().c_str());
     VOLT_TRACE("Finished NestLoopIndex");
