@@ -539,7 +539,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
-inline void AggregateHashExecutor::initHashGroupByKeyTuple(const TableTuple& nxtTuple)
+void AggregateHashExecutor::initHashGroupByKeyTuple(const TableTuple& nxtTuple)
 {
     TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
     if (nextGroupByKeyTuple.isNullTuple()) {
@@ -553,7 +553,7 @@ inline void AggregateHashExecutor::initHashGroupByKeyTuple(const TableTuple& nxt
     }
 }
 
-inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     m_pmp->countdownProgress();
     initHashGroupByKeyTuple(nextTuple);
     AggregateRow* aggregateRow;
@@ -660,7 +660,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
-inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // Use the first input tuple to "prime" the system.
     if (m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -807,7 +807,7 @@ inline void AggregatePartialExecutor::initPartialHashGroupByKeyTuple(const Table
     }
 }
 
-inline void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     getNextGroupByValues(nextTuple);
 
     BOOST_FOREACH(int ii, m_partialSerialGroupByColumns) {
@@ -860,6 +860,7 @@ inline void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTupl
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
 }
+// TODO: The last half of the above function with HASH aggregation
 
 void AggregatePartialExecutor::p_execute_finish()
 {
