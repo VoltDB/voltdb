@@ -266,18 +266,13 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 		throwFatalException("Failed to claim managed buffer for Export.");
 	}
 
-	bool txnSpanBuffer = false;
+	bool spanBuffer = false;
+	StreamBlock* oldBlock = m_currBlock;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
-            if (m_currBlock->remaining() < minLength &&
-                    m_currBlock->lastBeginTxnOffset() > 0 &&
-                    m_currBlock->lastBeginTxnOffset() != m_currBlock->offset()) {
-                txnSpanBuffer = true;
-                size_t partialTxnLength = m_currBlock->offset() - m_currBlock->lastBeginTxnOffset();
-                m_uso -= partialTxnLength;
-            }
+            m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
         // conclusion easier.
@@ -287,20 +282,26 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         }
     }
 
-    StreamBlock* tmp = new StreamBlock(buffer, m_defaultCapacity, m_uso);
-
-    if (txnSpanBuffer) {
-        size_t partialTxnLength = m_currBlock->offset() - m_currBlock->lastBeginTxnOffset();
-        ::memcpy(tmp->mutableDataPtr(), m_currBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
-        tmp->consumed(partialTxnLength);
-        ::memset(m_currBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
-        m_currBlock->truncateTo(m_uso);
-        m_currBlock->clearLastBeginTxnOffset();
-        m_currBlock = NULL;
-        m_uso += partialTxnLength;
+    // If partial transaction is going to span multiple buffer, move it to next buffer.
+    // But before that, make sure uso is continuous between two buffers
+    if (oldBlock && oldBlock->remaining() < minLength &&
+            oldBlock->lastBeginTxnOffset() > 0 &&
+            oldBlock->lastBeginTxnOffset() != oldBlock->offset()) {
+        m_uso -= oldBlock->offset() - oldBlock->lastBeginTxnOffset();
+        spanBuffer = true;
     }
 
-    m_currBlock = tmp;
+    m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+
+    if (spanBuffer) {
+        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastBeginTxnOffset();
+        ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        m_currBlock->consumed(partialTxnLength);
+        ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
+        oldBlock->truncateTo(m_uso);
+        oldBlock->clearLastBeginTxnOffset();
+        m_uso += partialTxnLength;
+    }
 
     pushPendingBlocks();
 }

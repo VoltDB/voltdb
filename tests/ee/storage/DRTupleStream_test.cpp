@@ -197,33 +197,6 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
 /**
  * Test the really basic operation order
  */
-TEST_F(DRTupleStreamTest, TxnSpanBuffer)
-{
-    for (int i = 1; i < 50; i++)
-    {
-        appendTuple(i-1, i);
-    }
-    m_wrapper.periodicFlush(-1, 49);
-
-
-    // get the first buffer flushed
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
-
-    // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 12));
-}
-
-/**
- * Test the really basic operation order
- */
 TEST_F(DRTupleStreamTest, BasicOps)
 {
     for (int i = 1; i < 10; i++)
@@ -383,6 +356,71 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
 }
 
 /**
+ * A simple test to verify transaction do not span two buffers
+ */
+TEST_F(DRTupleStreamTest, TxnDontSpanBuffer)
+{
+    for (int i = 1; i <= 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+
+    int tuples_to_fill = 10;
+    for (int i = 0; i < tuples_to_fill; i++)
+    {
+        appendTuple(10, 11);
+    }
+    m_wrapper.periodicFlush(-1, 11);
+
+    // get the first buffer flushed
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+
+    // now get the second
+    ASSERT_FALSE(m_topend.blocks.empty());
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * tuples_to_fill + MAGIC_TRANSACTION_SIZE);
+}
+
+/**
+ * Verify that transaction bigger than the buffer size do span multiple buffers
+ */
+TEST_F(DRTupleStreamTest, LargeTxnSpanBuffer)
+{
+    for (int i = 1; i <= 10; i++)
+    {
+        appendTuple(i-1, i);
+    }
+
+    int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    for (int i = 0; i < tuples_to_fill; i++)
+    {
+        appendTuple(10, 11);
+    }
+    m_wrapper.periodicFlush(-1, 11);
+
+    // get the first buffer flushed
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+
+    // now get the second
+    ASSERT_FALSE(m_topend.blocks.empty());
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+    std::cout << "results->uso()=" << results->uso() << " expected=" << MAGIC_TUPLE_SIZE * (tuples_to_fill - 1) + MAGIC_BEGIN_SIZE << std::endl;
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * (tuples_to_fill - 1) + MAGIC_BEGIN_SIZE);
+}
+
+/**
  * Fill a buffer with a single TXN, close it with the first tuple in
  * the next buffer, and then roll back that tuple, and verify that our
  * committed buffer is still there.
@@ -495,6 +533,8 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     }
 
     // now, fill a couple of buffers with tuples from a single transaction
+    // Tuples in txnid 11 will be splited into a new buffer to make sure txnid 11
+    // not span two buffers.
     size_t mark = 0;
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     for (int i = 0; i < (tuples_to_fill + 10) * 2; i++)
@@ -505,6 +545,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
             mark = appendTuple(10, 11);
         }
     }
+
     m_wrapper.rollbackTo(mark);
     m_wrapper.periodicFlush(-1, 11);
 
@@ -512,8 +553,8 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    std::cout << "result->offset=" << results->offset() << " mark=" << mark << std::endl;
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) + MAGIC_TRANSACTION_SIZE);
+    // Txnid 11 move to a new buffer, so current buffer only contains txn 1~10
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
 
 int main() {
