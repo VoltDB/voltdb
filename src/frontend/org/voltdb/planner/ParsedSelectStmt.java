@@ -1001,16 +1001,27 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         selectStmt.displayColumns.add(col);
         selectStmt.placeTVEsinColumns();
 
-        // Iterate over the aggregate columns and delete all columns that are not
-        // part of the HAVING or GROUP BY expressions (used to be in the original display schema
-        Iterator<ParsedColInfo> aggColumnIt = selectStmt.aggResultColumns.iterator();
-        while (aggColumnIt.hasNext()) {
-            ParsedColInfo aggrColumn = aggColumnIt.next();
-            boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
-                    !groupByColumnNamesSet.contains(aggrColumn.alias);
-            if (canDropColumn) {
-                aggColumnIt.remove();
+        // If HAVING clause is missing we can drop GROUP BY and ORDER BY
+        if (selectStmt.having == null) {
+            selectStmt.aggResultColumns.clear();
+            selectStmt.orderColumns.clear();
+            selectStmt.groupByColumns.clear();
+        } else {
+            // Iterate over the aggregate columns and delete all columns that are not
+            // part of the HAVING or GROUP BY expressions (used to be in the original display schema
+            Iterator<ParsedColInfo> aggColumnIt = selectStmt.aggResultColumns.iterator();
+            while (aggColumnIt.hasNext()) {
+                ParsedColInfo aggrColumn = aggColumnIt.next();
+                boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
+                        !groupByColumnNamesSet.contains(aggrColumn.alias);
+                if (canDropColumn) {
+                    aggColumnIt.remove();
+                }
             }
+        }
+        if (selectStmt.aggResultColumns.isEmpty()) {
+            selectStmt.hasAggregateExpression = false;
+            selectStmt.hasAverage = false;
         }
         selectStmt.needComplexAggregation();
 
@@ -1019,6 +1030,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Add LIMIT 1
         selectStmt.limit = 1;
+
     }
 
     /**

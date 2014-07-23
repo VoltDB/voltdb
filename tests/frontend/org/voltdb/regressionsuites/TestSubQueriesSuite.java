@@ -344,6 +344,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
          System.out.println(vt.toString());
          validateTableOfLongs(vt, new long[][] {{5}});
 
+         // subquery with group by but no having
+         vt = client.callProcedure("@AdHoc",
+                 "select id from " + tb + " TBA where exists " +
+                         " (select max(dept) from R1 where TBA.id = R1.id group by dept )").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
+
      }
 
  }
