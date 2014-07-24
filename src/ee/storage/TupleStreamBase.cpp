@@ -280,9 +280,13 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     // If partial transaction is going to span multiple buffer, move it to next buffer.
     // But before that, make sure uso is continuous between two buffers
     if (oldBlock && oldBlock->remaining() < minLength &&
-            oldBlock->lastBeginTxnOffset() > 0 &&
-            oldBlock->lastBeginTxnOffset() != oldBlock->offset()) {
-        m_uso -= oldBlock->offset() - oldBlock->lastBeginTxnOffset();
+            oldBlock->hasDRBeginTxn() &&
+            oldBlock->lastDRBeginTxnOffset() != oldBlock->offset()) {
+        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength >= m_defaultCapacity) {
+            throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+        }
+        m_uso -= partialTxnLength;
         spanBuffer = true;
     }
 
@@ -294,8 +298,9 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
 
     if (spanBuffer) {
-        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastBeginTxnOffset();
+        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);
         ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
         oldBlock->truncateTo(m_uso);

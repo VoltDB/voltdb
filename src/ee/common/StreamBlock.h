@@ -33,13 +33,14 @@ namespace voltdb
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
-              m_uso(uso), m_lastBeginTxnOffset(0)
+              m_uso(uso), m_lastDRBeginTxnOffset(0), m_hasDRBeginTxn(false)
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
-              m_uso(other->m_uso), m_lastBeginTxnOffset(other->m_lastBeginTxnOffset)
+              m_uso(other->m_uso), m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
+              m_hasDRBeginTxn(other->m_hasDRBeginTxn)
         {
         }
 
@@ -83,8 +84,8 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
-        size_t lastBeginTxnOffset() const {
-        	return m_lastBeginTxnOffset;
+        size_t lastDRBeginTxnOffset() const {
+            return m_lastDRBeginTxnOffset;
         }
 
     private:
@@ -110,22 +111,29 @@ namespace voltdb
         }
 
         void recordLastBeginTxnOffset() {
-            m_lastBeginTxnOffset = m_offset;
+            m_lastDRBeginTxnOffset = m_offset;
+            m_hasDRBeginTxn = true;
         }
 
         void clearLastBeginTxnOffset() {
-            m_lastBeginTxnOffset = 0;
+            m_lastDRBeginTxnOffset = 0;
+            m_hasDRBeginTxn =false;
+        }
+
+        bool hasDRBeginTxn() {
+            return m_hasDRBeginTxn;
         }
 
         char* mutableLastBeginTxnDataPtr() {
-            return m_data + m_lastBeginTxnOffset;
+            return m_data + m_lastDRBeginTxnOffset;
         }
 
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
-        size_t m_lastBeginTxnOffset;  // keep record of begin txn to avoid txn span multiple buffers
+        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
+        bool m_hasDRBeginTxn;    // only used for DR Buffer
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;
