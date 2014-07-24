@@ -72,7 +72,9 @@ public class InlineAggregation extends MicroOptimization {
 
         // EE Currently support: seqscan + indexscan
         if (child.getPlanNodeType() != PlanNodeType.SEQSCAN &&
-            child.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
+            child.getPlanNodeType() != PlanNodeType.INDEXSCAN &&
+            child.getPlanNodeType() != PlanNodeType.NESTLOOP &&
+            child.getPlanNodeType() != PlanNodeType.NESTLOOPINDEX) {
             return plan;
         }
 

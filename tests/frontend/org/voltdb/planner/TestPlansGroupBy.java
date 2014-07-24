@@ -786,19 +786,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true, false);
+        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true, true);
 
 
         sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, true);
 
         sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
                 "group by v_p1.v_b1;";
-        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true, true);
 
         sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, true);
     }
 
     public void testMVBasedQuery_EdgeCases() {
@@ -1018,7 +1018,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (int i = 0; i < joinType.length; i++) {
             String newsql = sql.replace("@joinType", joinType[i]);
             pns = compileToFragments(newsql);
-            System.out.println("Query:" + newsql);
+            System.err.println("Query:" + newsql);
             // No join node under receive node.
             checkMVReaggregateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                     numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false, false);
@@ -1343,12 +1343,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
             }
             assertTrue(p instanceof AbstractScanPlanNode);
         } else {
-            assertTrue(p instanceof AggregatePlanNode);
-            AggregatePlanNode topAggNode = (AggregatePlanNode) p;
-
+            AggregatePlanNode topAggNode = null;
+            if (p instanceof AbstractJoinPlanNode) {
+                // Inline aggregation with join
+                topAggNode = AggregatePlanNode.getInlineAggregationNode(p);
+            } else {
+                assertTrue(p instanceof AggregatePlanNode);
+                topAggNode = (AggregatePlanNode) p;
+                p = p.getChild(0);
+            }
             assertEquals(numGroupbyOfTopAggNode, topAggNode.getGroupByExpressionsSize());
             assertEquals(numAggsOfTopAggNode, topAggNode.getAggregateTypesSize());
-            p = p.getChild(0);
 
             if (needFix) {
                 p = receiveNode.getParent(0);
@@ -1370,8 +1375,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             if (aggPushdown) {
                 assertTrue(!needFix);
                 if (aggInline) {
-                    assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                            p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+                    assertNotNull(AggregatePlanNode.getInlineAggregationNode(p));
                 } else {
                     assertTrue(p instanceof AggregatePlanNode);
                     p = p.getChild(0);
