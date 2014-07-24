@@ -745,7 +745,7 @@ public class TestCatalogUtil extends TestCase {
     public void testProcedureReadWriteAccess() {
 
         assertFalse(checkTableInProcedure("InsertStock", "STOCK", true));
-        assertFalse(checkTableInProcedure("InsertStock", "slev", false));
+        assertFalse(checkTableInProcedure("InsertStock", "NEW_ORDER", false));
 
         assertTrue(checkTableInProcedure("SelectAll", "HISTORY", true));
         assertTrue(checkTableInProcedure("SelectAll", "NEW_ORDER", true));
@@ -762,7 +762,6 @@ public class TestCatalogUtil extends TestCase {
 
         assertFalse(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", true));
         assertTrue(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", false));
-
     }
     //Utility method
     private boolean checkTableInProcedure(String procedureName, String tableName, boolean read){
@@ -779,10 +778,10 @@ public class TestCatalogUtil extends TestCase {
 
         boolean containsTable = false;
         for(Table t: tables) {
-           if(t.getTypeName().equals(tableName)) {
-                containsTable = true;
-                break;
-           }
+          if(t.getTypeName().equals(tableName)) {
+             containsTable = true;
+             break;
+          }
         }
         return containsTable;
     }

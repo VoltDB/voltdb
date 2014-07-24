@@ -586,8 +586,7 @@ public class VoltProjectBuilder {
                        new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
             return compiler.getCatalog();
-             }
-        else {
+        } else {
             return null;
         }
     }
