@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.List;
+import java.util.SortedSet;
 
 import junit.framework.TestCase;
 
@@ -741,35 +742,48 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(cluster.getUseadhocschema());
     }
 
-    public void testProcedureReadWriteAccess(){
+    public void testProcedureReadWriteAccess() {
 
-         ProcedureAnnotation annotation1 = (ProcedureAnnotation) catalog_db
-                .getProcedures().get("InsertStock").getAnnotation();
-        assertFalse(annotation1.tablesRead.contains("STOCK"));
-        assertFalse(annotation1.tablesUpdated.isEmpty());
+        assertFalse(checkTableInProcedure("InsertStock", "STOCK", true));
+        assertFalse(checkTableInProcedure("InsertStock", "slev", false));
 
-        ProcedureAnnotation annotation2 = (ProcedureAnnotation) catalog_db
-                .getProcedures().get("SelectAll").getAnnotation();
-        assertTrue(annotation2.tablesRead.toString().contains("HISTORY"));
-        assertTrue(annotation2.tablesRead.toString().contains("ITEM"));
-        assertTrue(annotation2.tablesUpdated.isEmpty());
+        assertTrue(checkTableInProcedure("SelectAll", "HISTORY", true));
+        assertTrue(checkTableInProcedure("SelectAll", "NEW_ORDER", true));
+        assertFalse(checkTableInProcedure("SelectAll", "HISTORY", false));
 
-        ProcedureAnnotation annotation3 = (ProcedureAnnotation) catalog_db
-                .getProcedures().get("neworder").getAnnotation();
-        assertTrue(annotation3.tablesRead.toString().contains("WAREHOUSE"));
-        assertFalse(annotation3.tablesRead.toString().contains("ORDERS"));
-        assertFalse(annotation3.tablesUpdated.toString().contains("WAREHOUSE"));
+        assertTrue(checkTableInProcedure("neworder", "WAREHOUSE", true));
+        assertFalse(checkTableInProcedure("neworder", "ORDERS", true));
+        assertFalse(checkTableInProcedure("neworder", "WAREHOUSE", false));
 
-        ProcedureAnnotation annotation4 = (ProcedureAnnotation) catalog_db
-                .getProcedures().get("paymentByCustomerIdW").getAnnotation();
-        assertFalse(annotation4.tablesRead.toString().contains("WAREHOUSE"));
-        assertFalse(annotation4.tablesRead.toString().contains("HISTORY"));
-        assertTrue(annotation4.tablesUpdated.toString().contains("WAREHOUSE"));
-        assertTrue(annotation4.tablesUpdated.toString().contains("HISTORY"));
+        assertFalse(checkTableInProcedure("paymentByCustomerIdW", "WAREHOUSE", true));
+        assertFalse(checkTableInProcedure("paymentByCustomerIdW", "HISTORY", true));
+        assertTrue(checkTableInProcedure("paymentByCustomerIdW", "WAREHOUSE", false));
+        assertTrue(checkTableInProcedure("paymentByCustomerIdW", "HISTORY", false));
 
-        ProcedureAnnotation annotation5 = (ProcedureAnnotation) catalog_db
-                .getProcedures().get("ResetWarehouse").getAnnotation();
-        assertFalse(annotation5.tablesRead.toString().contains("ORDER_LINE"));
-        assertTrue(annotation5.tablesUpdated.toString().contains("ORDER_LINE"));
+        assertFalse(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", true));
+        assertTrue(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", false));
+
+    }
+    //Utility method
+    private boolean checkTableInProcedure(String procedureName, String tableName, boolean read){
+
+        ProcedureAnnotation annotation = (ProcedureAnnotation) catalog_db
+                .getProcedures().get(procedureName).getAnnotation();
+
+        SortedSet<Table> tables = null;
+        if(read){
+            tables = annotation.tablesRead;
+        } else {
+            tables = annotation.tablesUpdated;
+        }
+
+        boolean containsTable = false;
+        for(Table t: tables) {
+           if(t.getTypeName().equals(tableName)) {
+                containsTable = true;
+                break;
+           }
+        }
+        return containsTable;
     }
 }
