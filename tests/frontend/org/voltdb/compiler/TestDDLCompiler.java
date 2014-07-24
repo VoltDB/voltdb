@@ -35,7 +35,12 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.TableAnnotation;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -416,6 +421,16 @@ public class TestDDLCompiler extends TestCase {
 
             // cleanup after the test
             jarOut.delete();
+        }
+    }
+
+    public void testNullAnnotation() throws IOException {
+
+        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
+        Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
+
+        for(Table t : catalog_db.getTables()) {
+            assertNotNull(((TableAnnotation)t.getAnnotation()).ddl);
         }
     }
 }
