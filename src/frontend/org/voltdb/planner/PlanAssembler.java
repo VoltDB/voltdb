@@ -1893,7 +1893,7 @@ public class PlanAssembler {
      * Check if we can push the limit node down.
      *
      * @param root
-     * @return If we can push it down, the receive node is returned. Otherwise,
+     * @return If we can push it down, the send plan node is returned. Otherwise,
      *         it returns null.
      */
     protected AbstractPlanNode checkLimitPushDownViability(AbstractPlanNode root) {
@@ -1914,6 +1914,9 @@ public class PlanAssembler {
         //
         // Return null if the plan is single-partition or if its "coordinator" part contains a push-blocking node type.
 
+        List<ParsedColInfo> orderBys = m_parsedSelect.orderByColumns();
+        boolean orderByCoversAllGroupBy = m_parsedSelect.groupByIsAnOrderByPermutation();
+
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
             // Limitation: can only push past some nodes (see above comment)
@@ -1921,22 +1924,15 @@ public class PlanAssembler {
             // TODO: We might want to optimize/push down "limit" for some cases
             if (!(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode) &&
-                ! isValidAggregateNodeForLimitPushdown(receiveNode) ) {
+                ! isValidAggregateNodeForLimitPushdown(receiveNode, orderBys, orderByCoversAllGroupBy) ) {
                 return null;
             }
 
             if (receiveNode instanceof OrderByPlanNode) {
-                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
-                    AbstractExpression rootExpr = col.expression;
-                    // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-                    // However, if group by partition key, limit can still push down if ordered by aggregate values.
-                    ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
-                    for (AbstractExpression tve: tves) {
-                        if  (((TupleValueExpression) tve).hasAggregate() &&
-                                !m_parsedSelect.hasPartitionColumnInGroupby()) {
-                            return null;
-                        }
-                    }
+                // if group by partition key, limit can still push down if ordered by aggregate values.
+                if (! m_parsedSelect.hasPartitionColumnInGroupby() &&
+                        isOrderByAggregationValue(m_parsedSelect.orderByColumns())) {
+                    return null;
                 }
             }
 
@@ -1952,34 +1948,59 @@ public class PlanAssembler {
         return receiveNode.getChild(0);
     }
 
-    private static boolean isValidAggregateNodeForLimitPushdown(AbstractPlanNode receiveNode) {
-        if (receiveNode instanceof AggregatePlanNode == false) {
+    private static boolean isOrderByAggregationValue(List<ParsedColInfo> orderBys) {
+        for (ParsedSelectStmt.ParsedColInfo col : orderBys) {
+            AbstractExpression rootExpr = col.expression;
+            // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
+            ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+            for (AbstractExpression tve: tves) {
+                if  (((TupleValueExpression) tve).hasAggregate()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isValidAggregateNodeForLimitPushdown(AbstractPlanNode aggregateNode,
+            List<ParsedColInfo> orderBys, boolean orderByCoversAllGroupBy) {
+        if (aggregateNode instanceof AggregatePlanNode == false) {
             return false;
         }
-        if (receiveNode.getParentCount() == 0) {
+        if (aggregateNode.getParentCount() == 0) {
             return false;
         }
 
         // Limitation: can only push past coordinating aggregation nodes
-        if (!((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
+        if (!((AggregatePlanNode)aggregateNode).m_isCoordinatingAggregator) {
             return false;
         }
 
-        AbstractPlanNode parent = receiveNode.getParent(0);
+        AbstractPlanNode parent = aggregateNode.getParent(0);
+        AbstractPlanNode orderByNode = null;
         if (parent instanceof OrderByPlanNode) {
-            return true;
-        }
-        if ( parent instanceof ProjectionPlanNode &&
+            orderByNode = parent;
+        } else if ( parent instanceof ProjectionPlanNode &&
              parent.getParentCount() > 0 &&
              parent.getParent(0) instanceof OrderByPlanNode) {
             // Xin really wants inline project with aggregation
 
-            return true;
+            orderByNode = parent.getParent(0);
         }
 
-        // When aggregate without order by and does not group by partition column,
-        // Limit should not be pushed down.
-        return false;
+        if (orderByNode == null) {
+            // When aggregate without order by and group by columns does not contain partition column,
+            // Limit should not be pushed down.
+            // Remember, when group by partition column, there will not be top aggregate plan node.
+            return false;
+        }
+
+        if (! orderByCoversAllGroupBy || isOrderByAggregationValue(orderBys)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -166,8 +166,6 @@ public class TestPlansLimit extends PlannerTestCase {
         // no push down for aggregate nodes
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
         checkInlineLimitWithOrderby(pns, true);
-        printExplainPlan(pns);
-
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");
         checkInlineLimitWithOrderby(pns, true);

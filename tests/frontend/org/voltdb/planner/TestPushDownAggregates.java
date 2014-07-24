@@ -240,6 +240,12 @@ public class TestPushDownAggregates extends PlannerTestCase {
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
         checkLimitPushedDown(pns, true);
 
+        // order by does not cover all group by columns
+        pns = compileToFragments("select B3, C3, count(*) as tag from T3 group by B3, C3 order by B3 limit 1");
+        printExplainPlan(pns);
+        checkLimitPushedDown(pns, false);
+
+
         // T1 is partitioned on PKEY column
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
         checkLimitPushedDown(pns, false);
@@ -288,6 +294,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
                 "group by A3, B4 order by tag desc limit 10");
         checkLimitPushedDown(pns, true);
+
     }
 
     private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {

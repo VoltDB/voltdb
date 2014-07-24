@@ -579,11 +579,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
-        // inline limit with order by
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        p = p.getChild(0);
-
         assertTrue(p instanceof AbstractScanPlanNode);
     }
 
