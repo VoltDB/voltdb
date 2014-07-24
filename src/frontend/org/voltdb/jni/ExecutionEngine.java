@@ -55,7 +55,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     static VoltLogger log = new VoltLogger("HOST");
 
     public static enum TaskType {
-        VALIDATE_PARTITIONING(0);
+        VALIDATE_PARTITIONING(0),
+        APPLY_BINARY_LOG(1);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -455,6 +456,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            long txnId,
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
@@ -469,7 +471,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_logDuration = 1000;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -486,6 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
                                                             Object[] parameterSets,
+                                                            long txnId,
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
@@ -497,8 +500,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public long getThreadLocalPoolAllocations();
 
     abstract public byte[] loadTable(
-        int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations,
+        int tableId, VoltTable table, long txnId, long spHandle,
+        long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -599,7 +602,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, byte task[]);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+
+    public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -691,8 +696,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
      * @param undoToken The undo token to release
      */
-    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
+    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+            long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -706,6 +712,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
+            long txnId,
             long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
 
     /**

@@ -110,7 +110,9 @@ namespace voltdb
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
 
-        friend class TupleStreamWrapper;
+        friend class TupleStreamBase;
+        friend class ExportTupleStream;
+        friend class DRTupleStream;
     };
 }
 

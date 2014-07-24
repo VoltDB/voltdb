@@ -44,6 +44,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
+        builder.setUseAdhocSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -159,6 +160,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 "constraint pk_tree2 primary key (PKCOL1, PKCOL2)" +
                 ");\n"
                 );
+        builder.setUseAdhocSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -177,6 +179,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table FOO drop column DROPME;");
             }
             catch (ProcCallException pce) {
+                pce.printStackTrace();
                 fail("Should be able to drop a bare column.");
             }
             assertFalse(doesColumnExist("FOO", "DROPME"));
@@ -330,6 +333,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
+        builder.setUseAdhocSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -463,6 +467,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("FOO", "ID");
         builder.addPartitionInfo("EMPTYFOO", "ID");
+        builder.setUseAdhocSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

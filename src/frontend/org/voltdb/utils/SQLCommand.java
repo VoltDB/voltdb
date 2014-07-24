@@ -236,8 +236,9 @@ public class SQLCommand
 
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListTablesToken = Pattern.compile("^\\s*(list tables);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show) proc|(?:list|show) procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show) tables);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show) classes);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
@@ -259,6 +260,10 @@ public class SQLCommand
         "INSERT",
         "LIST PROCEDURES",
         "LIST TABLES",
+        "LIST CLASSES",
+        "SHOW PROCEDURES",
+        "SHOW TABLES",
+        "SHOW CLASSES",
         "QUIT",
         "RECALL",
         "SELECT",
@@ -391,6 +396,48 @@ public class SQLCommand
                     System.out.print("\n");
                 }
             }
+            // SHOW CLASSES
+            else if (ListClassesToken.matcher(line).matches()) {
+                if (interactive) {
+                    List<String> list = new LinkedList<String>(Classlist.keySet());
+                    Collections.sort(list);
+                    int padding = 0;
+                    for(String classname : list)
+                        if (padding < classname.length()) padding = classname.length();
+                    padding++;
+                    String format = "%1$-" + padding + "s";
+                    for(int i = 0;i<3;i++)
+                    {
+                        int j = 0;
+                        for(String classname : list)
+                        {
+                            List<Boolean> stuff = Classlist.get(classname);
+                            // Print non-active procs first
+                            if (i == 0 && !(stuff.get(0) && !stuff.get(1)))
+                                continue;
+                            // Print active procs second
+                            else if (i == 1 && !(stuff.get(0) && stuff.get(1)))
+                                continue;
+                            // Print other classes last
+                            else if (i == 2 && stuff.get(0))
+                                continue;
+                            if (j == 0)
+                            {
+                                if (i == 0)
+                                    System.out.println("\n--- Potential Procedure Classes ----------------------------");
+                                else if (i == 1)
+                                    System.out.println("\n--- Active Procedure Classes  ------------------------------");
+                                else
+                                    System.out.println("\n--- Non-Procedure Classes ----------------------------------");
+                            }
+                            System.out.printf(format, classname);
+                            System.out.print("\n");
+                            j++;
+                        }
+                    }
+                    System.out.print("\n");
+                }
+            }
             // GO commands - ONLY in interactive mode, close batch and parse for execution
             else if (GoToken.matcher(line).matches())
             {
@@ -514,8 +561,12 @@ public class SQLCommand
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
+
+    private static long m_startTime;
     private static void executeQuery(String query) throws Exception
     {
+        m_startTime = System.nanoTime();
+
         if (ExecuteCall.matcher(query).find())
         {
             query = ExecuteCall.matcher(query).replaceFirst("");
@@ -665,15 +716,11 @@ public class SQLCommand
                     else if (paramType.equals("sysinfoselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!SysInfoSelectors.contains(p))
-                            throw new Exception("Invalid SysInfo Selector: " + param);
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("metadataselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!MetaDataSelectors.contains(p))
-                            throw new Exception("Invalid Meta-Data Selector: " + param);
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
@@ -701,7 +748,7 @@ public class SQLCommand
                 // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                 Procedures.clear();
                 loadSystemProcedures();
-                loadStoredProcedures(Procedures);
+                loadStoredProcedures(Procedures, Classlist);
             }
             else
             {
@@ -732,7 +779,7 @@ public class SQLCommand
             if (SQLLexer.extractDDLToken(query) != null) {
                 Procedures.clear();
                 loadSystemProcedures();
-                loadStoredProcedures(Procedures);
+                loadStoredProcedures(Procedures, Classlist);
             }
         }
         return;
@@ -765,6 +812,8 @@ public class SQLCommand
     {
         if (response.getStatus() != ClientResponse.SUCCESS)
             throw new Exception("Execution Error: " + response.getStatusString());
+
+        long elapsedTime = System.nanoTime() - m_startTime;
         for (VoltTable t : response.getResults()) {
             long rowCount;
             if (!isUpdateResult(t)) {
@@ -776,19 +825,18 @@ public class SQLCommand
                 rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
-                System.out.printf("\n\n(%d row(s) affected)\n", rowCount);
+                System.out.printf("\n\n(Returned %d rows in %.2fs)\n",
+                        rowCount, elapsedTime / 1000000000.0);
             }
         }
     }
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
-    private static final List<String> MetaDataSelectors =
-        Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
-                      "PROCEDURES", "PROCEDURECOLUMNS");
     private static Map<String,Map<Integer, List<String>>> Procedures =
             Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
+    private static Map<String, List<Boolean>> Classlist =
+        Collections.synchronizedMap(new HashMap<String, List<Boolean>>());
     private static void loadSystemProcedures()
     {
         Procedures.put("@Pause",
@@ -839,6 +887,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@ApplyBinaryLogSP",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -958,30 +1008,30 @@ public class SQLCommand
         return tables;
     }
 
-    private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures)
+    private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures,
+            Map<String, List<Boolean>> classlist)
     {
         VoltTable procs = null;
         VoltTable params = null;
+        VoltTable classes = null;
         try
         {
             procs = VoltDB.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];
             params = VoltDB.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];
+            classes = VoltDB.callProcedure("@SystemCatalog", "CLASSES").getResults()[0];
         }
         catch (NoConnectionsException e)
         {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return;
         }
         catch (IOException e)
         {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return;
         }
         catch (ProcCallException e)
         {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return;
         }
@@ -1017,6 +1067,19 @@ public class SQLCommand
 
             }
             procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
+        }
+        classlist.clear();
+        while (classes.advanceRow())
+        {
+            String classname = classes.getString("CLASS_NAME");
+            boolean isProc = (classes.getLong("VOLT_PROCEDURE") == 1L);
+            boolean isActive = (classes.getLong("ACTIVE_PROC") == 1L);
+            if (!classlist.containsKey(classname)) {
+                List<Boolean> stuff = Collections.synchronizedList(new ArrayList<Boolean>());
+                stuff.add(isProc);
+                stuff.add(isActive);
+                classlist.put(classname, stuff);
+            }
         }
 
         // Retrieve the parameter types.  Note we have to do some special checking
@@ -1162,7 +1225,7 @@ public class SQLCommand
             VoltDB = getClient(config, servers, port);
 
             // Load user stored procs
-            loadStoredProcedures(Procedures);
+            loadStoredProcedures(Procedures, Classlist);
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;

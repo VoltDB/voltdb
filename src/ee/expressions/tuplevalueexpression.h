@@ -54,9 +54,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
-
 class TupleValueExpression : public AbstractExpression {
   public:
     TupleValueExpression(const int tableIdx, const int valueIdx)

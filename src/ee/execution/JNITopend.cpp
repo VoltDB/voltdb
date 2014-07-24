@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "common/debuglog.h"
+#include "common/StreamBlock.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -156,12 +157,38 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
+    if (m_partitionDRGatewayClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_partitionDRGatewayClass != NULL);
+        throw std::exception();
+    }
+
+    m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
+    if (m_partitionDRGatewayClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_partitionDRGatewayClass != NULL);
+        throw std::exception();
+    }
+
+    m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "pushDRBuffer",
+            "(ILjava/nio/ByteBuffer;)V");
+    if (m_pushDRBufferMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_pushDRBufferMID != NULL);
+        throw std::exception();
+    }
+
     if (m_nextDependencyMID == 0 ||
         m_crashVoltDBMID == 0 ||
         m_pushExportBufferMID == 0 ||
         m_getQueuedExportBytesMID == 0 ||
         m_exportManagerClass == 0 ||
-        m_fallbackToEEAllocatedBufferMID == 0)
+        m_fallbackToEEAllocatedBufferMID == 0 ||
+        m_partitionDRGatewayClass == 0 ||
+        m_pushDRBufferMID == 0)
     {
         throw std::exception();
     }
@@ -212,7 +239,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // Add the dependency buffer info to the stack object
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
-        ReferenceSerializeInput serialize_in(bytes, length);
+        ReferenceSerializeInputBE serialize_in(bytes, length);
         destination->loadTuplesFrom(serialize_in, stringPool);
         return 1;
     }
@@ -393,6 +420,23 @@ void JNITopend::pushExportBuffer(
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();
+    }
+}
+
+void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+    if (block != NULL) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        //std::cout << "Block is length " << block->rawLength() << std::endl;
+        m_jniEnv->CallStaticVoidMethod(
+                m_partitionDRGatewayClass,
+                m_pushDRBufferMID,
+                partitionId,
+                buffer);
+        m_jniEnv->DeleteLocalRef(buffer);
     }
 }
 }

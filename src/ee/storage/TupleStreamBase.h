@@ -15,32 +15,35 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TUPLESTREAMWRAPPER_H_
-#define TUPLESTREAMWRAPPER_H_
-
-#include "StreamBlock.h"
+#ifndef TUPLESTREAMBASE_H_
+#define TUPLESTREAMBASE_H_
 
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
+#include "common/StreamBlock.h"
 #include "common/Topend.h"
 #include <deque>
 #include <cassert>
 namespace voltdb {
 
 class Topend;
+
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
-const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA;
+//I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care
+//It just reports the size of used bytes and not the size of the allocation
+//Add a 4k page at the end for bytes beyond the 2 meg row limit due to null mask and length prefix and so on
+//Necessary for very large rows
+const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
 
-class TupleStreamWrapper {
+class TupleStreamBase {
 public:
-    enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, int64_t siteId);
+    TupleStreamBase();
 
-    ~TupleStreamWrapper() {
+    virtual ~TupleStreamBase() {
         cleanupManagedBuffers();
     }
 
@@ -57,57 +60,24 @@ public:
      */
     void setDefaultCapacity(size_t capacity);
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
-
-    /** Read the total bytes used over the life of the stream */
-    size_t bytesUsed() {
-        return m_uso;
-    }
-
-    /** Set the total number of bytes used (for rejoin/recover) */
-    void setBytesUsed(size_t count) {
-        assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, count);
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                                m_generation, m_partitionId, m_signature, sb, false, false);
-        delete sb;
-        m_uso = count;
-        //Extend the buffer chain to replace any existing stream blocks with a new one
-        //with the correct USO
-        extendBufferChain(0);
-    }
-
-    int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity- MAGIC_HEADER_SPACE_FOR_JAVA)) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
-    }
+    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
     /** truncate stream back to mark */
-    void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark);
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedSpHandle,
-                       int64_t spHandle,
-                       int64_t seqNo,
-                       int64_t uniqueId,
-                       int64_t timestamp,
-                       TableTuple &tuple,
-                       TupleStreamWrapper::Type type);
-
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
+    void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    /** Send committed data to the top end */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, bool sync = false);
+    virtual void beginTransaction(int64_t txnId, int64_t spHandle) {}
+    virtual void endTransaction(int64_t spHandle) {}
 
-    // cached catalog values
-    const CatalogId m_partitionId;
-    const int64_t m_siteId;
+    /** Send committed data to the top end */
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
@@ -135,9 +105,6 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
-
-    std::string m_signature;
-    int64_t m_generation;
 };
 
 }

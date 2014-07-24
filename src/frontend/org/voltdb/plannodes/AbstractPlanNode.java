@@ -851,8 +851,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             extraIndent = "";
         }
         else {
+            if ( ! m_skipInitalIndentationForExplain) {
+                sb.append(indent);
+            }
             String nodePlan = explainPlanForNode(indent);
-            sb.append(indent + nodePlan + "\n");
+            sb.append(nodePlan + "\n");
         }
 
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
@@ -861,9 +864,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
                 continue;
             }
-            sb.append(indent + "inline ");
-            sb.append(inlineNode.explainPlanForNode(indent));
-            sb.append("\n");
+            inlineNode.setSkipInitalIndentationForExplain(true);
+
+            sb.append(indent + extraIndent + "inline ");
+            inlineNode.explainPlan_recurse(sb, indent + extraIndent);
         }
 
         for (AbstractPlanNode node : m_children) {
@@ -871,6 +875,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             assert(m_isInline == false);
             node.explainPlan_recurse(sb, indent + extraIndent);
         }
+    }
+
+    private boolean m_skipInitalIndentationForExplain = false;
+    public void setSkipInitalIndentationForExplain(boolean skip) {
+        m_skipInitalIndentationForExplain = skip;
     }
 
     protected abstract String explainPlanForNode(String indent);

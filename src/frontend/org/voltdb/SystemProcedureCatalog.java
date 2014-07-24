@@ -129,7 +129,7 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
-    static {                                                                                            // SP     RO     Every  Param ParamType Pro  (DR: kill, skip, replica-ok, durable?)
+    static {                                                                                            // SP     RO     Every  Param ParamType       Pro  (DR: kill, skip, replica-ok) durable?)
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0, VoltType.INVALID,   false, false, false, true, true));
         builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0, VoltType.VARBINARY, false, false, false, true, true));
@@ -150,12 +150,13 @@ public class SystemProcedureCatalog {
         builder.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, 0, VoltType.INVALID,   true,  true,  true,  false, true));
-        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0, VoltType.INVALID,   false,  false, false, false, true));
+        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0, VoltType.INVALID,   false, false, false, false, true));
         builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, 0, VoltType.INVALID,   false, false, false, false, true));
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0, VoltType.VARBINARY, false, false, false, false, true));
         builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@ValidatePartitioning",    new Config("org.voltdb.sysprocs.ValidatePartitioning",     false, false, false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0, VoltType.INVALID,   true,  false, true,  true, false));
+        builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true, false, false, 0, VoltType.VARBINARY, true,  false, true,  true, true));
         listing = builder.build();
     }
 }

@@ -54,6 +54,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -69,6 +70,7 @@ import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -280,6 +282,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticTargetThroughput = null;
     private Integer m_elasticTargetPauseTime = null;
 
+    private boolean m_useAdhocSchema = false;
+
     public VoltProjectBuilder setElasticTargetThroughput(int target) {
         m_elasticTargetThroughput = target;
         return this;
@@ -292,6 +296,11 @@ public class VoltProjectBuilder {
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
         m_deadHostTimeout = deadHostTimeout;
+    }
+
+    public void setUseAdhocSchema(boolean useIt)
+    {
+        m_useAdhocSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -549,14 +558,14 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, null);
+        return compile(jarPath, 1, 1, 0, null) != null;
     }
 
     public boolean compile(final String jarPath,
             final int sitesPerHost,
             final int replication) {
         return compile(jarPath, sitesPerHost, 1,
-                replication, null);
+                replication, null) != null;
     }
 
     public boolean compile(final String jarPath,
@@ -564,18 +573,22 @@ public class VoltProjectBuilder {
             final int hostCount,
             final int replication) {
         return compile(jarPath, sitesPerHost, hostCount,
-                replication, null);
+                replication, null) != null;
     }
 
-    public boolean compile(final String jarPath,
+    public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
             final int replication,
             final String voltRoot) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, voltRoot,
+        if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false),
-                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix);
+                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
+            return compiler.getCatalog();
+        } else {
+            return null;
+        }
     }
 
     public boolean compile(
@@ -949,6 +962,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
+        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();

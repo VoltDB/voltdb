@@ -273,6 +273,24 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
+    public void testUpdateSchemaModificationIsBlacklisted() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateSchemaModificationIsBlacklisted \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml");
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("May not dynamically modify"));
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -373,6 +391,18 @@ public class TestUpdateDeployment extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+
+        // A deployment change that changes the schema change mechanism
+        config = new LocalCluster("catalogupdate-cluster-change_schema_update.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setUseAdhocSchema(true);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml"));
 
         return builder;
     }

@@ -105,11 +105,37 @@ CREATE TABLE forDroppedProcedure
 );
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
-CREATE TABLE export_skinny_partitioned_table
+-- export tables
+CREATE TABLE partitioned_export
 (
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
 );
+PARTITION TABLE partitioned_export ON COLUMN cid;
+EXPORT TABLE partitioned_export;
+
+CREATE TABLE replicated_export
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+);
+EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
@@ -142,8 +168,6 @@ CREATE TABLE cploadmp
 , rowid  BIGINT NOT NULL
 );
 
-PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
-EXPORT TABLE export_skinny_partitioned_table;
 CREATE TABLE trur
 (
   p          bigint             NOT NULL

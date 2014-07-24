@@ -364,6 +364,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             // -- maybe we can find some better way to describe the TVEs, here.
             sb.append(" HAVING " + m_postPredicate.explain("VOLT_TEMP_TABLE"));
         }
+
         return sb.toString();
     }
 

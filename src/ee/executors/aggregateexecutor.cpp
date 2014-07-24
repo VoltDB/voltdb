@@ -51,6 +51,7 @@
 #include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
+#include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
@@ -359,10 +360,8 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
-    // FIXME(xin):
-    // Group by columns are just pass throught columns, why not right?
-    // m_passThroughColumns.size() == m_groupByExpressions.size() is not true, any case?
-
+    // m_passThroughColumns.size() == m_groupByExpressions.size() is not true,
+    // Because group by unique column may be able to select other columns
     m_prePredicate = node->getPrePredicate();
     m_postPredicate = node->getPostPredicate();
 
@@ -386,10 +385,21 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 
 inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
 {
-    m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
+
+    //
+    // OPTIMIZATION: NESTED LIMIT for serial aggregation
+    //
+    m_limit = -1;
+    m_offset = -1;
+    m_tupleSkipped = 0;
+    m_earlyReturn = false;
+    LimitPlanNode* inlineLimitNode = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    if (inlineLimitNode) {
+        inlineLimitNode->getLimitAndOffsetByReference(params, m_limit, m_offset);
+    }
 }
 
 inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &nextGroupByKeyStorage,
@@ -429,6 +439,19 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 
     bool inserted = false;
     if (m_postPredicate == NULL || m_postPredicate->eval(&tempTuple, NULL).isTrue()) {
+        if (m_limit >= 0) {
+            // If there is an inlined limit for serial aggregate and
+            // it is possible for LIMIT 0.
+            if (m_offset > 0 && m_tupleSkipped < m_offset) {
+                m_tupleSkipped++;
+                return false;
+            }
+            if (m_tmpOutputTable->tempTableTupleCount() == m_limit) {
+                m_earlyReturn = true;
+                return false;
+            }
+        }
+
         m_tmpOutputTable->insertTupleNonVirtual(tempTuple);
         inserted = true;
     }
@@ -487,6 +510,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
+        assert(m_earlyReturn == false); // hash aggregation can not early return for limit
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
     AggregateHashExecutor::p_execute_finish();
@@ -541,6 +565,7 @@ void AggregateHashExecutor::p_execute_finish() {
     nextGroupByKeyTuple.move(NULL);
 
     m_hash.clear();
+    m_memoryPool.purge();
 }
 
 inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
@@ -588,6 +613,9 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
         AggregateSerialExecutor::p_execute_tuple(nextTuple);
+        if (m_earlyReturn) {
+            return true;
+        }
     }
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
@@ -640,23 +668,25 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
 
 void AggregateSerialExecutor::p_execute_finish()
 {
-    if (m_noInputRows || m_failPrePredicateOnFirstRow) {
-        VOLT_TRACE("finalizing after no input rows..");
-        // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
-        // Note the difference between these two cases:
-        //   SELECT SUM(A) FROM BBB,            when BBB has no tuple, produces one output row.
-        //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
-        if (m_groupByKeySchema->columnCount() == 0) {
-            VOLT_TRACE("no input row, but output an empty result row for the whole table.");
-            initAggInstances(m_aggregateRow);
+    if (!m_earlyReturn) {
+        if (m_noInputRows || m_failPrePredicateOnFirstRow) {
+            VOLT_TRACE("finalizing after no input rows..");
+            // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
+            // Note the difference between these two cases:
+            //   SELECT SUM(A) FROM BBB,            when BBB has no tuple, produces one output row.
+            //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
+            if (m_groupByKeySchema->columnCount() == 0) {
+                VOLT_TRACE("no input row, but output an empty result row for the whole table.");
+                initAggInstances(m_aggregateRow);
+                if (insertOutputTuple(m_aggregateRow)) {
+                    m_pmp->countdownProgress();
+                }
+            }
+        } else {
+            // There's one last group (or table) row in progress that needs to be output.
             if (insertOutputTuple(m_aggregateRow)) {
                 m_pmp->countdownProgress();
             }
-        }
-    } else {
-        // There's one last group (or table) row in progress that needs to be output.
-        if (insertOutputTuple(m_aggregateRow)) {
-            m_pmp->countdownProgress();
         }
     }
 
@@ -664,6 +694,8 @@ void AggregateSerialExecutor::p_execute_finish()
     delete m_aggregateRow;
     m_nextGroupByValues.clear();
     m_inProgressGroupByValues.clear();
+
+    m_memoryPool.purge();
 }
 
 }
