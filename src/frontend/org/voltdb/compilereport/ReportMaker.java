@@ -103,7 +103,7 @@ public class ReportMaker {
         sb.append(StringUtils.join(columnNames, ", "));
         sb.append("</td>");
 
-        // uniqueness column
+        // attribute column
         sb.append("<td>");
         if (index.getAssumeunique()) {
             tag(sb, "important", "AssumeUnique");
@@ -149,7 +149,7 @@ public class ReportMaker {
                   "<th>Index Name</th>" +
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
-                  "<th>Uniqueness</th>" +
+                  "<th>Attributes</th>" +
                   "</tr></thead>\n    <tbody>\n");
 
         for (Index index : table.getIndexes()) {
