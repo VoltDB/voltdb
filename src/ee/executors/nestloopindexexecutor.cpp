@@ -98,18 +98,8 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
-    int schema_size = static_cast<int>(m_node->getOutputSchema().size());
 
-    if (m_aggExec != NULL) {
-        schema_size = static_cast<int>(m_node->getOutputSchemaPreAgg().size());
-        for (int i = 0; i < schema_size; i++) {
-            m_outputExpressions.push_back(m_node->getOutputSchemaPreAgg()[i]->getExpression());
-        }
-    } else {
-        for (int i = 0; i < schema_size; i++) {
-            m_outputExpressions.push_back(m_node->getOutputSchema()[i]->getExpression());
-        }
-    }
+    m_outputExpressions = m_node->getOutputColumnExpression();
 
     //
     // Make sure that we actually have search keys
@@ -128,8 +118,8 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     // output must be a temp table
-    m_outputTable = dynamic_cast<TempTable*>(m_node->getOutputTable());
-    assert(m_outputTable);
+    m_tmpOutputTable = dynamic_cast<TempTable*>(m_node->getOutputTable());
+    assert(m_tmpOutputTable);
 
     assert(m_node->getInputTables().size() == 1);
     m_outerTable = m_node->getInputTables()[0];
@@ -191,8 +181,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     updateTargetTableAndIndex();
 
-    assert (m_outputTable == dynamic_cast<TempTable*>(m_node->getOutputTable()));
-    assert(m_outputTable);
+    assert (m_tmpOutputTable == dynamic_cast<TempTable*>(m_node->getOutputTable()));
+    assert(m_tmpOutputTable);
 
     // inner_table is the table that has the index to be used in this executor
     assert (m_innerTable == dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
@@ -276,16 +266,18 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     ProgressMonitorProxy pmp(m_engine, this, m_innerTable);
     if (m_aggExec != NULL) {
+        // TODO: refactor the inline aggregate executor initialization code into one function on base class
+
         VOLT_TRACE("Init inline aggregate...");
-        m_aggExec->setAggregateOutputTable(m_outputTable);
+        m_aggExec->setAggregateOutputTable(m_tmpOutputTable);
         const TupleSchema * aggInputSchema = m_node->getTupleSchemaPreAgg();
         m_aggExec->p_execute_init(params, &pmp, aggInputSchema);
 
         char* storage = reinterpret_cast<char*>(
                 m_memoryPool.allocateZeroes(aggInputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-        join_tuple = TableTuple (storage, aggInputSchema);
+        join_tuple = TableTuple(storage, aggInputSchema);
     } else {
-        join_tuple = m_outputTable->tempTuple();
+        join_tuple = m_tmpOutputTable->tempTuple();
     }
 
     bool earlyReturned = false;
@@ -514,9 +506,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                           m_outputExpressions[col_ctr]->eval(&outer_tuple, &inner_tuple));
                             }
                             VOLT_TRACE("join_tuple tuple: %s",
-                                       join_tuple.debug(m_outputTable->name()).c_str());
+                                       join_tuple.debug(m_tmpOutputTable->name()).c_str());
                             VOLT_TRACE("MATCH: %s",
-                                   join_tuple.debug(m_outputTable->name()).c_str());
+                                   join_tuple.debug(m_tmpOutputTable->name()).c_str());
 
                             if (m_aggExec != NULL) {
                                 m_aggExec->p_execute_tuple(join_tuple);
@@ -526,7 +518,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                     break;
                                 }
                             } else {
-                                m_outputTable->insertTupleNonVirtual(join_tuple);
+                                m_tmpOutputTable->insertTupleNonVirtual(join_tuple);
                                 pmp.countdownProgress();
                             }
 
@@ -563,7 +555,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         break;
                     }
                 } else {
-                    m_outputTable->insertTupleNonVirtual(join_tuple);
+                    m_tmpOutputTable->insertTupleNonVirtual(join_tuple);
                     pmp.countdownProgress();
                 }
             }
@@ -574,7 +566,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         m_aggExec->p_execute_finish();
     }
 
-    VOLT_TRACE ("result table:\n %s", m_outputTable->debug().c_str());
+    VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
     VOLT_TRACE("Finished NestLoopIndex");
 
     m_memoryPool.purge();

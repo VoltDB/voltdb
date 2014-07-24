@@ -943,7 +943,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().toLowerCase().contains("inline hash"));
-        System.err.println(vt.toString());
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1,3}, {2,2}});

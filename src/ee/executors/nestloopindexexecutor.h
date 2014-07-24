@@ -80,7 +80,6 @@ public:
     {
         m_node = NULL;
         m_indexNode = NULL;
-        m_outputTable = NULL;
         m_innerTable = NULL;
         m_index = NULL;
         m_outerTable = NULL;
@@ -99,7 +98,6 @@ public:
     NestLoopIndexPlanNode* m_node;
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    TempTable* m_outputTable;
     PersistentTable* m_innerTable;
     TableIndex *m_index;
     TableTuple m_indexValues;

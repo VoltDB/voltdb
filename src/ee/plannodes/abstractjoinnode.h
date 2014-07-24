@@ -68,7 +68,7 @@ public:
 
     AbstractExpression* getWherePredicate() const;
 
-    const std::vector<SchemaColumn*>& getOutputSchemaPreAgg() const;
+    std::vector<AbstractExpression*>& getOutputColumnExpression() const;
 
     const TupleSchema* getTupleSchemaPreAgg() const;
 

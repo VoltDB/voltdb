@@ -65,12 +65,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
 
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
-        if (aggNode != null) {
-            m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
-        } else {
-            m_outputSchema = m_outputSchemaPreInlineAgg;
-        }
+        generateRealOutputSchema();
     }
 
     @Override
@@ -87,8 +82,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null)
         {
-            // output schema of limit node has not been used, right ? --xin
-            limit.m_outputSchema = m_outputSchemaPreInlineAgg.clone();
+            // output schema of limit node has not been used
+            limit.m_outputSchema = m_outputSchemaPreInlineAgg;
             limit.m_hasSignificantOutputSchema = false;
         }
 
@@ -145,15 +140,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         {
             new_output_schema.addColumn(col);
         }
-        m_outputSchema = new_output_schema;
+        m_outputSchemaPreInlineAgg = new_output_schema;
         m_hasSignificantOutputSchema = true;
-        m_outputSchemaPreInlineAgg = m_outputSchema;
 
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
-        if (aggNode != null) {
-            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
-            m_outputSchema = aggNode.getOutputSchema().clone();
-        }
+        resolveRealOutputSchema();
     }
 
     @Override

@@ -869,7 +869,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             sb.append(nodePlan + "\n");
         }
 
-        // Scan -> LIMIT -> Proj -> Agg
+        // Agg < Proj < Limit < Scan
         // Order the inline nodes with integer in ascending order
         TreeMap<Integer, AbstractPlanNode> sort_inlineNodes =
                 new TreeMap<Integer, AbstractPlanNode>();
@@ -890,7 +890,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 sort_inlineNodes.put(ii++, inlineNode);
             }
         }
-        // ascending order of its integer key
+        // inline nodes with ascending order as their integer keys
         for (AbstractPlanNode inlineNode : sort_inlineNodes.values()) {
             // don't bother with inlined projections
             if (( ! m_verboseExplainForDebugging) &&

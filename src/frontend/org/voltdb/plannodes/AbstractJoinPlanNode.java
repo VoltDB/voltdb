@@ -158,6 +158,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
 
+        generateRealOutputSchema();
+    }
+
+    protected void generateRealOutputSchema() {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
@@ -221,14 +225,19 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         {
             new_output_schema.addColumn(col);
         }
-        m_outputSchema = new_output_schema;
+        m_outputSchemaPreInlineAgg = new_output_schema;
         m_hasSignificantOutputSchema = true;
-        m_outputSchemaPreInlineAgg = m_outputSchema;
 
+        resolveRealOutputSchema();
+    }
+
+    protected void resolveRealOutputSchema() {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
-            aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
+            aggNode.resolveColumnIndexesUsingSchema(m_outputSchemaPreInlineAgg);
             m_outputSchema = aggNode.getOutputSchema().clone();
+        } else {
+            m_outputSchema = m_outputSchemaPreInlineAgg;
         }
     }
 
@@ -286,6 +295,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             for( int i = 0; i < size; i++ ) {
                 m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }
+        } else {
+            m_outputSchemaPreInlineAgg = m_outputSchema;
         }
     }
 
