@@ -75,13 +75,15 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
 
+    Table* targetTable = m_node->getTargetTable();
+
     setDMLCountOutputTable(limits);
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
@@ -95,7 +97,25 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     m_multiPartition = m_node->isMultiPartition();
+
+    if (! m_targetSchema) {
+        m_targetSchema = TupleSchema::createTupleSchema(targetTable->schema());
+    }
+
+    // allocate memory for template tuple, set defaults for all columns
+    m_templateTuple.init(m_targetSchema);
+
+    TableTuple tuple = m_templateTuple;
+    m_node->initTemplateTuple(m_engine, tuple);
+
     return true;
+}
+
+InsertExecutor::~InsertExecutor() {
+    if (m_targetSchema) {
+        TupleSchema::freeTupleSchema(m_targetSchema);
+        m_targetSchema = NULL;
+    }
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -111,12 +131,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    // we need to use the schema of the target table here, not the input table
-    TableTuple &templateTuple = targetTable->tempTuple();
-
-    // initialize the template tuple with default values from the catalog
-    m_node->initTemplateTuple(m_engine, templateTuple);
-
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 
     // count the number of successful inserts
@@ -124,6 +138,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
+
+    TableTuple templateTuple = m_templateTuple;
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
