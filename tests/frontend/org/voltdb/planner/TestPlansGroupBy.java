@@ -258,7 +258,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             boolean isIndexScan) {
         AbstractPlanNode apn = pns.get(0).getChild(0);
         if (twoFragments) {
-            assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+            assertEquals(apn.getPlanNodeType(), PlanNodeType.HASHAGGREGATE);
             apn = pns.get(1).getChild(0);
         }
 
@@ -358,6 +358,100 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
         System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
         checkGroupByOnlyPlan(false, true, true);
+    }
+
+    // check group by query with limit
+    // Query has group by from partition column and limit, does not have order by
+    private void checkGroupByOnlyPlanWithLimit(boolean twoFragments, boolean isHashAggregator,
+            boolean isIndexScan, boolean inlineLimit) {
+        // 'inlineLimit' means LIMIT get pushed down for partition table and inlined with aggregate.
+
+        AbstractPlanNode apn = pns.get(0).getChild(0);
+        if (!inlineLimit || twoFragments) {
+            assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+            apn = apn.getChild(0);
+        }
+
+        // Group by partition column does not need top group by node.
+        if (twoFragments) {
+            apn = pns.get(1).getChild(0);
+            if (!inlineLimit) {
+                assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+                apn = apn.getChild(0);
+            }
+        }
+
+        // For a single table aggregate, it is inline always.
+        assertTrue(apn.getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
+        if (isHashAggregator) {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        } else {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
+            if (inlineLimit) {
+                AbstractPlanNode p = apn.getInlinePlanNode(PlanNodeType.AGGREGATE);
+                assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
+        }
+    }
+
+    // GROUP BY With LIMIT without ORDER BY
+    public void testGroupByWithLimit() {
+        // replicated table with serial aggregation and inlined limit
+        pns = compileToFragments("SELECT F_PKEY FROM RF GROUP BY F_PKEY LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, false, true, true);
+
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, false, true, true);
+
+        // partitioned table with serial aggregation and inlined limit
+        // group by columns contain the partition key is the only case allowed
+        pns = compileToFragments("SELECT F_PKEY FROM F GROUP BY F_PKEY LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
+
+        // Explain plan for the above query
+        /*
+           RETURN RESULTS TO STORED PROCEDURE
+            LIMIT 5
+             RECEIVE FROM ALL PARTITIONS
+
+           RETURN RESULTS TO STORED PROCEDURE
+            INDEX SCAN of "F" using its primary key index (for optimized grouping only)
+             inline Serial AGGREGATION ops
+              inline LIMIT 5
+        */
+        String expectedStr = "  inline Serial AGGREGATION ops\n" +
+                             "   inline LIMIT 5";
+        AbstractPlanNode.disableVerboseExplainForDebugging();
+        AbstractExpression.disableVerboseExplainForDebugging();
+
+        String explainPlan = "";
+        for (AbstractPlanNode apn: pns) {
+            explainPlan += apn.toExplainPlanString();
+        }
+        assertTrue(explainPlan.contains(expectedStr));
+
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
+
+        pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
+
+        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 GROUP BY A3, B3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
+
+        // In future, it may use the serial aggregate: ENG-6586
+        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, true, true, false);
+
+        //
+        // negative tests
+        //
+        pns = compileToFragments("SELECT F_VAL2 FROM RF GROUP BY F_VAL2 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, true, true, false);
+
+        // Limit should not be pushed down for case like:
+        // Group by non-partition without partition key and order by.
+        // ENG-6485
     }
 
     public void testEdgeComplexRelatedCases() {

@@ -99,16 +99,6 @@ public class SyncBenchmark {
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
 
-    // For retry connections
-    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -181,28 +171,6 @@ public class SyncBenchmark {
     }
 
     /**
-     * Provides a callback to be notified on node failure.
-     * This example only logs the event.
-     */
-    class StatusListener extends ClientStatusListenerExt {
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            if (benchmarkComplete.get() == false) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                // setup for retry
-                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        connectToOneServerWithRetry(server);
-                    }
-                });
-            }
-        }
-    }
-
-    /**
      * Constructor for benchmark instance.
      * Configures VoltDB client and prints configuration.
      *
@@ -211,7 +179,8 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);
 

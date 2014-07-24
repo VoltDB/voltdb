@@ -168,6 +168,10 @@ public:
     virtual void p_execute_tuple(const TableTuple& nextTuple) = 0;
     virtual void p_execute_finish() = 0;
 
+    bool p_execute_early_returned() const {
+        return m_earlyReturn;
+    }
+
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
@@ -206,6 +210,12 @@ protected:
 
     ProgressMonitorProxy* m_pmp;
     TableTuple m_passThroughTupleSource;
+
+    // used for serial aggregation and partial aggregation in future.
+    int m_limit;
+    int m_offset;
+    int m_tupleSkipped;
+    bool m_earlyReturn;
 };
 
 typedef boost::unordered_map<TableTuple,
@@ -267,6 +277,7 @@ protected:
     // State variables for iteration on input table
     bool m_noInputRows;
     bool m_failPrePredicateOnFirstRow;
+
 };
 
 }

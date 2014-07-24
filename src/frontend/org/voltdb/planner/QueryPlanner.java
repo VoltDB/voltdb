@@ -183,8 +183,7 @@ public class QueryPlanner {
         if (m_paramzInfo == null) {
             return null;
         }
-        Object[] paramArray = m_paramzInfo.extractedParamValues(parameterTypes);
-        return ParameterSet.fromArrayNoCopy(paramArray);
+        return m_paramzInfo.extractedParamValues(parameterTypes);
     }
 
     /**
@@ -208,11 +207,8 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
-                    VoltType[] paramTypes = plan.parameterTypes();
-                    if (paramTypes.length <= CompiledPlan.MAX_PARAM_COUNT) {
-                        Object[] params = m_paramzInfo.extractedParamValues(paramTypes);
-                        plan.extractedParamValues = ParameterSet.fromArrayNoCopy(params);
-                        m_wasParameterizedPlan = true;
+                    m_wasParameterizedPlan = plan.extractParamValues(m_paramzInfo);
+                    if (m_wasParameterizedPlan) {
                         return plan;
                     }
                 } else {
@@ -266,7 +262,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, true);
 
         // This processing of bestPlan outside/after getBestCostPlan
         // allows getBestCostPlan to be called both here and
@@ -275,7 +271,7 @@ public class QueryPlanner {
         // make sure we got a winner
         if (bestPlan == null) {
             if (m_debuggingStaticModeToRetryOnError) {
-                assembler.getBestCostPlan(parsedStmt);
+                assembler.getBestCostPlan(parsedStmt, true);
             }
             m_recentErrorMsg = assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
@@ -316,6 +312,11 @@ public class QueryPlanner {
         }
 
         if (receives.size() == 1) {
+        /*/ enable for debug ...
+        if (receives.size() > 1) {
+            System.out.println(plan.rootPlanGraph.toExplainPlanString());
+        }
+        // ... enable for debug */
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
