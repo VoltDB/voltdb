@@ -99,7 +99,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    m_outputExpressions = m_node->getOutputColumnExpression();
+    m_node->getOutputColumnExpressions(m_outputExpressions);
 
     //
     // Make sure that we actually have search keys

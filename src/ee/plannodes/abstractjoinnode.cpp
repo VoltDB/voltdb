@@ -90,9 +90,8 @@ AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
     return m_wherePredicate;
 }
 
-std::vector<AbstractExpression*>& AbstractJoinPlanNode::getOutputColumnExpression() const {
-    std::vector<AbstractExpression*> outputExpressions;
-
+void AbstractJoinPlanNode::getOutputColumnExpressions(
+        std::vector<AbstractExpression*>& outputExpressions) const {
     std::vector<SchemaColumn*> outputSchema;
     if (m_outputSchemaPreAgg.size() > 0) {
         outputSchema =  m_outputSchemaPreAgg;
@@ -104,8 +103,6 @@ std::vector<AbstractExpression*>& AbstractJoinPlanNode::getOutputColumnExpressio
     for (int i = 0; i < schemaSize; i++) {
         outputExpressions.push_back(outputSchema[i]->getExpression());
     }
-
-    return outputExpressions;
 }
 
 const TupleSchema* AbstractJoinPlanNode::getTupleSchemaPreAgg() const
