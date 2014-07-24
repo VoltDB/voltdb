@@ -733,17 +733,27 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     if (n == &NIL) return -1;
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
+    // TODO: this is just a dirty fix
+    m_root->key.fillLastSlot(0);
     int m = m_comper(key, m_root->key);
+    m_root->key.fillLastSlot((uint64_t)m_root->value);
     if (m == 0) {
         if (m_root->right != &NIL)
             ctr = getSubct(m_root->right);
         ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
+            p->key.fillLastSlot(0);
             if (m_comper(key, p->key) == 0) {
-                if (p->right != &NIL && m_comper(key, p->right->key) == 0)
-                    ct-= getSubct(p->right);
+                if (p->right != &NIL) {
+                    p->right->key.fillLastSlot(0);
+                    if (m_comper(key, p->right->key) == 0) {
+                        ct-= getSubct(p->right);
+                    }
+                    p->right->key.fillLastSlot((uint64_t)p->right->value);
+                }
                 ct--;
             }
+            p->key.fillLastSlot((uint64_t)p->value);
             p = p->parent;
         }
     } else if (m > 0) {
@@ -780,7 +790,9 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
     if (n == &NIL) return -1;
 
     iterator it;
-    it = upperBound(key);
+    Key temp(key);
+    temp.fillLastSlot(0xffffffffffffffff);
+    it = upperBound(temp);
     if (it.isEnd())
         return m_count;
     return rankAsc(it.key()) - 1;

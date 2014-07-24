@@ -267,6 +267,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (!hasRank) {
             return -1;
         }
+        KeyType tmpKey(searchKey);
+        if (isUpper)
+            std::cout<<"GET :"<< tmpKey.debug(TableIndex::m_keySchema)<< "isUpper:True"<<std::endl;
+        else
+            std::cout<<"GET :"<< tmpKey.debug(TableIndex::m_keySchema)<< "isUpper:False"<<std::endl;
         CompactingTreeMultiMapIndex::moveToKeyOrGreater(searchKey);
         if (m_keyIter.isEnd()) {
             return m_entries.size() + 1;
@@ -286,13 +291,18 @@ class CompactingTreeMultiMapIndex : public TableIndex
            return -1;
         }
         ++m_lookups;
-        const KeyType tmpKey(searchKey);
+        KeyType tmpKey(searchKey);
+        if (isUpper)
+            std::cout<<"LET : isUpper:True"<<std::endl;
+        else
+            std::cout<<"LET : isUpper:False"<<std::endl;
         MapIterator mapIter = m_entries.lowerBound(tmpKey);
         if (mapIter.isEnd()) {
             return m_entries.size();
         }
+        tmpKey.fillLastSlot(0xffffffffffffffff);
         int cmp = m_cmp(tmpKey, mapIter.key());
-        if (cmp != 0) {
+        if (cmp < 0) {
             mapIter.movePrev();
             if (mapIter.isEnd()) {
                 // we can not find a previous key
