@@ -1193,6 +1193,31 @@ public class TestSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkPrimaryKeyIndexScan(pn, "P2");
 
+
+        // Group by C, A instead of A, C
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C FROM P1 GROUP BY C, A) T1, P2 " +
+                "where T1.A = P2.A and T1.A = 3");
+        assertEquals(1, planNodes.size());
+
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
+
+        pn = nlpn.getChild(1);
+        checkPrimaryKeyIndexScan(pn, "P2");
+
     }
 
     public void testTableAggSubquery() {

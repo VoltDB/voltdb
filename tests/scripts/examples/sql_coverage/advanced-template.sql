@@ -85,8 +85,8 @@ SELECT 22,                           @optionalfn(@onefun(A._variable[#GB @column
 -- multiple column group by
 SELECT 23,               A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
 
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q30 FROM @fromtables A
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q31 FROM @fromtables A
+SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q24 FROM @fromtables A
+SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q25 FROM @fromtables A
 
 -- update
 -- compare two cols

@@ -404,10 +404,35 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments(sql);
         checkPartialAggregate(true);
 
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY RF.F_D2, G.G_D1";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+
+        // three table joins with aggregate
         sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, RF.F_D2, G.G_D1, F.F_D3";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY RF.F_D2, G.G_PKEY, F.F_D3, G.G_D1";
         pns = compileToFragments(sql);
         checkPartialAggregate(true);
     }
