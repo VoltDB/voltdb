@@ -46,6 +46,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
 
@@ -738,5 +739,37 @@ public class TestCatalogUtil extends TestCase {
         CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getUseadhocschema());
+    }
+
+    public void testProcedureReadWriteAccess(){
+
+         ProcedureAnnotation annotation1 = (ProcedureAnnotation) catalog_db
+                .getProcedures().get("InsertStock").getAnnotation();
+        assertFalse(annotation1.tablesRead.contains("STOCK"));
+        assertFalse(annotation1.tablesUpdated.isEmpty());
+
+        ProcedureAnnotation annotation2 = (ProcedureAnnotation) catalog_db
+                .getProcedures().get("SelectAll").getAnnotation();
+        assertTrue(annotation2.tablesRead.toString().contains("HISTORY"));
+        assertTrue(annotation2.tablesRead.toString().contains("ITEM"));
+        assertTrue(annotation2.tablesUpdated.isEmpty());
+
+        ProcedureAnnotation annotation3 = (ProcedureAnnotation) catalog_db
+                .getProcedures().get("neworder").getAnnotation();
+        assertTrue(annotation3.tablesRead.toString().contains("WAREHOUSE"));
+        assertFalse(annotation3.tablesRead.toString().contains("ORDERS"));
+        assertFalse(annotation3.tablesUpdated.toString().contains("WAREHOUSE"));
+
+        ProcedureAnnotation annotation4 = (ProcedureAnnotation) catalog_db
+                .getProcedures().get("paymentByCustomerIdW").getAnnotation();
+        assertFalse(annotation4.tablesRead.toString().contains("WAREHOUSE"));
+        assertFalse(annotation4.tablesRead.toString().contains("HISTORY"));
+        assertTrue(annotation4.tablesUpdated.toString().contains("WAREHOUSE"));
+        assertTrue(annotation4.tablesUpdated.toString().contains("HISTORY"));
+
+        ProcedureAnnotation annotation5 = (ProcedureAnnotation) catalog_db
+                .getProcedures().get("ResetWarehouse").getAnnotation();
+        assertFalse(annotation5.tablesRead.toString().contains("ORDER_LINE"));
+        assertTrue(annotation5.tablesUpdated.toString().contains("ORDER_LINE"));
     }
 }
