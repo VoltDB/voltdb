@@ -979,7 +979,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
 
         // (2) Single partition query, filter in inner sub-query.
@@ -1086,7 +1086,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
 
         // Add aggregate inside of subquery
@@ -1118,7 +1118,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
 
         // single partition filter inside subquery
@@ -1164,7 +1164,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         pn = nlpn.getChild(1);
         checkPrimaryKeyIndexScan(pn, "P2");
@@ -1188,7 +1188,7 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         pn = nlpn.getChild(1);
         checkPrimaryKeyIndexScan(pn, "P2");

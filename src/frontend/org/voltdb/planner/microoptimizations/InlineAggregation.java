@@ -61,26 +61,20 @@ public class InlineAggregation extends MicroOptimization {
     }
 
     AbstractPlanNode inlineAggregationApply(AbstractPlanNode plan) {
-
         // check for an aggregation of the right form
         if ((plan instanceof AggregatePlanNode) == false)
             return plan;
         assert(plan.getChildCount() == 1);
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
 
-        // EE Currently support: serial inline aggregate
-        if (aggplan.getPlanNodeType() != PlanNodeType.AGGREGATE &&
-            aggplan.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) {
-            return plan;
-        }
-
         // Assuming all AggregatePlanNode has not been inlined before this microoptimization
-        assert(aggplan.getChildCount() == 1);
         AbstractPlanNode child = aggplan.getChild(0);
 
         // EE Currently support: seqscan + indexscan
         if (child.getPlanNodeType() != PlanNodeType.SEQSCAN &&
-            child.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
+            child.getPlanNodeType() != PlanNodeType.INDEXSCAN &&
+            child.getPlanNodeType() != PlanNodeType.NESTLOOP &&
+            child.getPlanNodeType() != PlanNodeType.NESTLOOPINDEX) {
             return plan;
         }
 

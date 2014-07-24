@@ -669,6 +669,32 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         }
     }
 
+
+    public void testPartialAggregate() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING partial aggregate test.....");
+        String sql;
+        VoltTable vt;
+
+        Client client = this.getClient();
+        loadF(client, 0);
+
+        sql = "SELECT F_D1, F_D2, SUM(F_D3) FROM F GROUP BY F_D1, F_D2 ORDER BY 1, 2 LIMIT 5 OFFSET 3";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().toLowerCase().contains("partial"));
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0,30,1100}, {0,40,1300},
+            {1,1,520}, {1,11,720},{1,21,920} });
+
+        sql = "SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3 ORDER BY 1, 2 LIMIT 5 OFFSET 8";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().toLowerCase().contains("partial"));
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] {{0,80,10}, {0,90,10},
+                {1,1,10}, {1,11,10},{1,21,10} });
+    }
+
+
     //
     // Suite builder boilerplate
     //
