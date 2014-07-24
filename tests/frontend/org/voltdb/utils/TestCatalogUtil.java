@@ -763,7 +763,7 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", true));
         assertTrue(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", false));
     }
-    //Utility method
+
     private boolean checkTableInProcedure(String procedureName, String tableName, boolean read){
 
         ProcedureAnnotation annotation = (ProcedureAnnotation) catalog_db
@@ -778,10 +778,10 @@ public class TestCatalogUtil extends TestCase {
 
         boolean containsTable = false;
         for(Table t: tables) {
-          if(t.getTypeName().equals(tableName)) {
-             containsTable = true;
-             break;
-          }
+            if(t.getTypeName().equals(tableName)) {
+                containsTable = true;
+                break;
+            }
         }
         return containsTable;
     }
