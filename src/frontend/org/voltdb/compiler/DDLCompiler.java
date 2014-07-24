@@ -1393,8 +1393,12 @@ public class DDLCompiler {
         }
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
-        annotation.ddl = query;
 
+        if (query != null) {
+            annotation.ddl = query;
+        } else {
+            annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
+        }
         if (maxRowSize > MAX_ROW_SIZE) {
             throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
                     " but the maximum supported row size is " + MAX_ROW_SIZE);
