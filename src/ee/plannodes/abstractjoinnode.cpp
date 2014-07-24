@@ -98,7 +98,7 @@ void AbstractJoinPlanNode::getOutputColumnExpressions(
     } else {
         outputSchema = getOutputSchema();
     }
-    int schemaSize = outputSchema.size();
+    size_t schemaSize = outputSchema.size();
 
     for (int i = 0; i < schemaSize; i++) {
         outputExpressions.push_back(outputSchema[i]->getExpression());
