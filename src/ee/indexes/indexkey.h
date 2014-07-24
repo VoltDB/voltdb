@@ -342,6 +342,9 @@ struct IntsKey
         }
     }
 
+    // do nothing, but only for template works
+    void fillLastSlot(uint64_t v) {};
+
     // actual location of data
     uint64_t data[keySize];
 };
@@ -452,6 +455,11 @@ struct GenericKey
             keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
         }
     }
+
+    // do nothing, but only for template works
+    void fillLastSlot(uint64_t v) {};
+    // do nothing
+    std::string debug(const voltdb::TupleSchema *keySchema) const {return std::string();}
 
     // actual location of data, extends past the end.
     char data[keySize];
@@ -721,6 +729,11 @@ struct TupleKey
         return (*m_indexedExprs)[indexColumn]->eval(&tuple, NULL);
     }
 
+    // do nothing, but only for template works
+    void fillLastSlot(uint64_t v) {};
+    // do nothing
+    std::string debug(const voltdb::TupleSchema *keySchema) const {return std::string();}
+
 private:
     // TableIndex owns these vectors which are used to extract key values from a persistent tuple
     // - both are NULL for an ephemeral key
@@ -758,6 +771,78 @@ struct TupleKeyComparator
     }
 private:
     const TupleSchema *m_keySchema;
+};
+
+// only used for hash index
+template <std::size_t keySize> struct IntsPointerEqualityChecker;
+//
+template <std::size_t keySize> struct IntsPointerComparator;
+template <std::size_t keySize> struct IntsPointerHasher;
+
+// some case base class is easier using keySize+1
+template <std::size_t keySize>
+struct IntsPointerKey : public IntsKey<keySize + 1> {
+    typedef IntsPointerEqualityChecker<keySize> KeyEqualityChecker;
+    typedef IntsPointerComparator<keySize> KeyComparator;
+    typedef IntsPointerHasher<keySize> KeyHasher;
+
+    static inline bool keyDependsOnTupleAddress() { return true; }
+
+    std::string debug(const voltdb::TupleSchema *keySchema) const {
+        std::ostringstream buffer;
+        buffer << IntsKey<keySize+1>::debug(keySchema) <<
+            IntsKey<keySize+1>::data[keySize]<< ",";
+        return std::string(buffer.str());
+    }
+
+    IntsPointerKey() {}
+
+    IntsPointerKey(const TableTuple *tuple) : IntsKey<keySize+1>(tuple) {
+        // the slot for the pointer is all zero
+    }
+
+    IntsPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
+                   const std::vector<AbstractExpression*> &indexed_expressions,
+                   const TupleSchema *keySchema)
+                   : IntsKey<keySize+1>(tuple, indices, indexed_expressions, keySchema) {
+        //TODO: use non-C-style casting
+        IntsKey<keySize+1>::data[keySize] = (uint64_t)(tuple->address());
+    }
+
+    void fillLastSlot(uint64_t v) {
+        IntsKey<keySize+1>::data[keySize] = v;
+    }
+};
+
+template <std::size_t keySize>
+struct IntsPointerComparator : public IntsComparator<keySize + 1> {
+    IntsPointerComparator(const TupleSchema *unused_keySchema)
+        : IntsComparator<keySize + 1>(unused_keySchema) {}
+
+    inline int operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
+        return IntsComparator<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(lhs),
+                                                       static_cast<const IntsKey<keySize+1> >(rhs));
+    }
+};
+
+// TODO: these two are only used for hash index, maybe can be removed
+template <std::size_t keySize>
+struct IntsPointerEqualityChecker : public IntsEqualityChecker<keySize + 1> {
+    IntsPointerEqualityChecker(const TupleSchema *keySchema)
+        : IntsEqualityChecker<keySize + 1>(keySchema) {}
+
+    inline bool operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
+        return IntsEqualityChecker<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(lhs),
+                                                            static_cast<const IntsKey<keySize+1> >(rhs));
+    }
+};
+
+template <std::size_t keySize>
+struct IntsPointerHasher : public IntsHasher<keySize + 1> {
+    IntsPointerHasher(const TupleSchema *unused_keySchema) : IntsHasher<keySize+1>(unused_keySchema) {}
+    inline size_t operator()(IntsPointerKey<keySize> const& p) const {
+        return IntsHasher<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(p));
+    }
 };
 
 }

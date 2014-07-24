@@ -125,9 +125,19 @@ class CompactingTreeMultiMapIndex : public TableIndex
     {
         ++m_lookups;
         m_forward = true;
-        MapRange iter_pair = m_entries.equalRange(KeyType(searchKey));
-        m_keyIter = iter_pair.first;
-        m_keyEndIter = iter_pair.second;
+
+        if (KeyType::keyDependsOnTupleAddress()) {
+            KeyType tempKey(searchKey);
+            m_keyIter = m_entries.lowerBound(tempKey);
+            tempKey.fillLastSlot(0xffffffffffffffff);
+            m_keyEndIter = m_entries.upperBound(tempKey);
+        }
+        else {
+            MapRange iter_pair = m_entries.equalRange(KeyType(searchKey));
+            m_keyIter = iter_pair.first;
+            m_keyEndIter = iter_pair.second;
+        }
+
         if (m_keyIter.equals(m_keyEndIter)) {
             m_match.move(NULL);
             return false;
@@ -147,7 +157,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
     {
         ++m_lookups;
         m_forward = true;
-        m_keyIter = m_entries.upperBound(KeyType(searchKey));
+        KeyType tempKey(searchKey);
+        if (KeyType::keyDependsOnTupleAddress()) {
+            tempKey.fillLastSlot(0xffffffffffffffff);
+        }
+        m_keyIter = m_entries.upperBound(tempKey);
         return m_keyIter.isEnd();
     }
 
@@ -318,11 +332,25 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     MapIterator findKey(const TableTuple *searchKey) {
         m_keyEndIter = MapIterator();
+        if (KeyType::keyDependsOnTupleAddress()) {
+            KeyType tempKey(searchKey);
+            MapIterator rv = m_entries.lowerBound(tempKey);
+            KeyType rvKey = rv.key();
+            tempKey.fillLastSlot(0xffffffffffffffff);
+            if (m_cmp(rvKey, tempKey) <= 0) {
+                return rv;
+            }
+            return MapIterator();
+        }
         return m_entries.find(KeyType(searchKey));
     }
 
     MapIterator findTuple(const TableTuple &originalTuple)
     {
+        if (KeyType::keyDependsOnTupleAddress()) {
+            return m_entries.find(setKeyFromTuple(&originalTuple));
+        }
+
         for (MapRange iter_pair = m_entries.equalRange(setKeyFromTuple(&originalTuple));
              ! iter_pair.first.equals(iter_pair.second);
              iter_pair.first.moveNext()) {

@@ -64,7 +64,7 @@ class TableIndexPicker
     template <class TKeyType>
     TableIndex *getInstanceForKeyType() const
     {
-           if (m_scheme.unique) {
+        if (m_scheme.unique) {
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {
@@ -83,6 +83,7 @@ class TableIndexPicker
         }
     }
 
+//TODO: refactor code here
     template <std::size_t KeySize>
     TableIndex *getInstanceIfKeyFits()
     {
@@ -92,7 +93,10 @@ class TableIndexPicker
         if (m_intsOnly) {
             // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
             // the number of 8-byte uint64's required to store KeySize packed bytes.
-            return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
+            if (m_scheme.unique || m_type!=BALANCED_TREE_INDEX) {
+                return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
+            }
+            return getInstanceForKeyType<IntsPointerKey<(KeySize-1)/8 + 1> >();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
