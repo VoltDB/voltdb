@@ -114,7 +114,7 @@ public class CatalogContext {
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentHash = deploymentHash;
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_jarfile);
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
 

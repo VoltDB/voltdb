@@ -106,9 +106,9 @@ public class ReportMaker {
         // uniqueness column
         sb.append("<td>");
         if (index.getAssumeunique()) {
-            tag(sb, "important", "AssumeUnique");
+            tag(sb, "success", "AssumeUnique");
         } else if (index.getUnique()) {
-            tag(sb, "important", "Unique");
+            tag(sb, "success", "Unique");
         } else {
             tag(sb, "info", "Nonunique");
         }
