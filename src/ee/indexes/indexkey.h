@@ -845,5 +845,8 @@ struct IntsPointerHasher : public IntsHasher<keySize + 1> {
     }
 };
 
+template <std::size_t keySize, typename V>
+void fillLastSlot(IntsPointerKey<keySize>& k, const V& v) { k.fillLastSlot((uint64_t)v); }
+
 }
 #endif // INDEXKEY_H
