@@ -582,4 +582,181 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    // Delete tests:
+    // single file match
+    // * match
+    // ** match
+    // comma-separated matches
+    // combine new jarfile with deleted stuff
+    // deleting inner classes
+    public void testDeleteClasses() throws Exception {
+        System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- Don't care");
+        builder.setUseAdhocSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        // This is maybe cheating a little bit?
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        for (Class<?> clazz : PROC_CLASSES) {
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, clazz);
+        }
+        for (Class<?> clazz : EXTRA_CLASSES) {
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, clazz);
+        }
+        for (Class<?> clazz : COLLIDING_CLASSES) {
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, clazz);
+        }
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+            // Make sure we're clean
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            assertEquals(0, resp.getResults()[0].getRowCount());
+
+            // Add the jarfile we built
+            resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            assertEquals(PROC_CLASSES.length + EXTRA_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+
+            // remove one class
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            resp = m_client.callProcedure("@UpdateClasses", null, PROC_CLASSES[0].getCanonicalName());
+            assertFalse(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+
+            // remove everything under fullddlfeatures
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+            resp = m_client.callProcedure("@UpdateClasses", null,
+                    "org.voltdb_testprocs.fullddlfeatures.*");
+            assertFalse(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertFalse(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+
+            // Remove everything left
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(EXTRA_CLASSES[0].getCanonicalName()));
+            resp = m_client.callProcedure("@UpdateClasses", null, "org.voltdb**");
+            assertFalse(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertFalse(findClassInSystemCatalog(EXTRA_CLASSES[0].getCanonicalName()));
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            assertEquals(0, resp.getResults()[0].getRowCount());
+
+            // put everything back
+            // Add the jarfile we built
+            resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            assertEquals(PROC_CLASSES.length + EXTRA_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+
+            // delete the common simple names from both packages simultaneously
+            resp = m_client.callProcedure("@UpdateClasses", null,
+                    "**testImportProc   , **testCreateProcFromClassProc");
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // should be the only thing left
+            assertEquals(1, resp.getResults()[0].getRowCount());
+            assertTrue(findClassInSystemCatalog(EXTRA_CLASSES[0].getCanonicalName()));
+
+            // make a jar without the extra
+            InMemoryJarfile jarfile2 = new InMemoryJarfile();
+            for (Class<?> clazz : PROC_CLASSES) {
+                VoltCompiler comp = new VoltCompiler();
+                comp.addClassToJar(jarfile2, clazz);
+            }
+            for (Class<?> clazz : COLLIDING_CLASSES) {
+                VoltCompiler comp = new VoltCompiler();
+                comp.addClassToJar(jarfile2, clazz);
+            }
+
+            // finally, delete what's left and put the new jar in simultaneously
+            resp = m_client.callProcedure("@UpdateClasses", jarfile2.getFullJarBytes(),
+                    "**updateclasses.*");
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // extra class should be gone, others installed
+            assertEquals(PROC_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+            assertFalse(findClassInSystemCatalog(EXTRA_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+
+            // now add a class with inner classes
+            InMemoryJarfile inner = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(inner, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+            resp = m_client.callProcedure("@UpdateClasses", inner.getFullJarBytes(), null);
+            // old stuff should have survived
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+            // Did we get the new class and inner classes too?
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc"));
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerNotPublic"));
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithConstructorArgs"));
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithEasyConstructor"));
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithNoConstructor"));
+
+            // now just delete the parent class
+            resp = m_client.callProcedure("@UpdateClasses", null,
+                    "org.voltdb_testprocs.updateclasses.InnerClassesTestProc");
+            // old stuff should have survived
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // Non-inner stuff should have survived
+            assertEquals(PROC_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+            // Inner classes and parent gone
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc"));
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerNotPublic"));
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithConstructorArgs"));
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithEasyConstructor"));
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerWithNoConstructor"));
+
+            // Empty string has no effect
+            resp = m_client.callProcedure("@UpdateClasses", null, "");
+            // old stuff should have survived
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // Non-inner stuff should have survived
+            assertEquals(PROC_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+
+            // pattern that matches nothing has no effect
+            resp = m_client.callProcedure("@UpdateClasses", null, "com.voltdb.*");
+            // old stuff should have survived
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // Non-inner stuff should have survived
+            assertEquals(PROC_CLASSES.length + COLLIDING_CLASSES.length,
+                    resp.getResults()[0].getRowCount());
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
+            assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
