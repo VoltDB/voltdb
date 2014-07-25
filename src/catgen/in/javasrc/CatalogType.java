@@ -23,7 +23,6 @@ package org.voltdb.catalog;
 
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  * The base class for all objects in the Catalog. CatalogType instances all
@@ -33,11 +32,65 @@ import java.util.Set;
  */
 public abstract class CatalogType implements Comparable<CatalogType> {
 
-    static class UnresolvedInfo {
-        String path;
+    class CatalogReference<T extends CatalogType> {
+
+        T m_value = null;
+        String m_unresolvedPath = null;
+
+        public void setUnresolved(String path) {
+            // if null: value will be set to null
+            m_value = null;
+            m_unresolvedPath = path;
+        }
+
+        public void set(T value) {
+            m_value = value;
+            m_unresolvedPath = null;
+        }
+
+        @SuppressWarnings("unchecked")
+        T resolve() {
+            if (m_unresolvedPath != null) {
+                m_value = (T) m_catalog.getItemForRef(m_unresolvedPath);
+                m_unresolvedPath = null;
+            }
+            return m_value;
+        }
+
+        public T get() {
+            return m_unresolvedPath == null ? m_value : resolve();
+        }
+
+        public String getPath() {
+            if (m_unresolvedPath != null) return m_unresolvedPath;
+            else if (m_value != null) return m_value.getPath();
+            else return null;
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#hashCode()
+         */
+        @Override
+        public int hashCode() {
+            // TODO Auto-generated method stub
+            return super.hashCode();
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#equals(java.lang.Object)
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof CatalogReference<?>) {
+                String myPath = getPath();
+                String otherPath = ((CatalogReference<?>) obj).getPath();
+                if (myPath == null) return otherPath == null;
+                return myPath.equals(otherPath);
+            }
+            return false;
+        }
     }
 
-    LinkedHashMap<String, Object> m_fields = new LinkedHashMap<String, Object>();
     LinkedHashMap<String, CatalogMap<? extends CatalogType>> m_childCollections
         = new LinkedHashMap<String, CatalogMap<? extends CatalogType>>();
 
@@ -124,31 +177,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * Get the set of field names of the fields of this CatalogType
      * @return The set of field names
      */
-    public Set<String> getFields() {
-        return m_fields.keySet();
-    }
+    public abstract String[] getFields();
 
     /**
      * Get the value of a field knowing only the name of the field
      * @param field The name of the field being requested
      * @return The field requested or null
      */
-    public Object getField(String field) {
-        Object ret = null;
-        if (m_fields.containsKey(field)) {
-            ret = m_fields.get(field);
-            if (ret instanceof UnresolvedInfo) {
-                return resolve(field, ((UnresolvedInfo) ret).path);
-            }
-        }
-        return ret;
-    }
-
-    CatalogType resolve(String field, String path) {
-        CatalogType retval = m_catalog.getItemForRef(path);
-        m_fields.put(field, retval);
-        return retval;
-    }
+    public abstract Object getField(String field);
 
     /**
      * This should only ever be called from CatalogMap.add(); it's my lazy hack
@@ -165,8 +201,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         catalog.registerGlobally(this);
     }
 
-    abstract void update();
-
     CatalogType addChild(String collectionName, String childName) {
         CatalogMap<? extends CatalogType> map = m_childCollections.get(collectionName);
         if (map == null)
@@ -181,68 +215,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return map.get(childName);
     }
 
-    void set(String field, String value) {
-        if ((field == null) || (value == null)) {
-            throw new CatalogException("Null value where it shouldn't be.");
-        }
-
-        if (m_fields.containsKey(field) == false)
-            throw new CatalogException("Unexpected field name '" + field + "' for " + this);
-        Object current = m_fields.get(field);
-
-        value = value.trim();
-
-        // handle refs
-        if (value.startsWith("/")) {
-            UnresolvedInfo uinfo = new UnresolvedInfo();
-            uinfo.path = value;
-            m_fields.put(field, uinfo);
-        }
-        // null refs
-        else if (value.startsWith("null")) {
-            m_fields.put(field, null);
-        }
-        // handle booleans
-        else if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
-            if ((current != null) && (current.getClass() != Boolean.class)) {
-                throw new CatalogException("Unexpected type for field '" + field + "'.");
-            }
-            m_fields.put(field, Boolean.parseBoolean(value));
-        }
-        // handle strings
-        else if ((value.startsWith("\"") && value.endsWith("\"")) ||
-            (value.startsWith("'") && value.endsWith("'"))) {
-            // ignoring null types here is sketch-city, but other options seem worse?
-            if ((current != null) && (current.getClass() != String.class)) {
-                throw new CatalogException("Unexpected type for field.");
-            }
-            value = value.substring(1, value.length() - 1);
-            m_fields.put(field, value);
-        }
-        // handle ints
-        else {
-            boolean isint = value.length() > 0;
-            for (int i = 0; i < value.length(); i++) {
-                if ((i == 0) && (value.length() > 1) && (value.charAt(i) == '-'))
-                    continue;
-                if (!Character.isDigit(value.charAt(i)))
-                    isint = false;
-            }
-            if (isint) {
-                if ((current != null) && (current.getClass() != Integer.class)) {
-                    throw new CatalogException("Unexpected type for field.");
-                }
-                int intValue = Integer.parseInt(value);
-                m_fields.put(field, intValue);
-            }
-            // error
-            else {
-                throw new CatalogException("Unexpected non-digit character in '" + value + "' for field '" + field + "'");
-            }
-        }
-
-        update();
-    }
+    abstract void set(String field, String value);
 
     void delete(String collectionName, String childName) {
         if ((collectionName == null) || (childName == null)) {
@@ -281,7 +254,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         sb.append("set ").append(path).append(" ");
         sb.append(field).append(" ");
-        Object value = m_fields.get(field);
+        Object value = getField(field);
         if (value == null) {
             if ((field.equals("partitioncolumn")) && (m_path.equals("/clusters[cluster]/databases[database]/procedures[delivery]")))
                 System.out.printf("null for field %s at path %s\n", field, getPath());
@@ -296,8 +269,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
             sb.append("\"").append(value).append("\"");
         else if (value instanceof CatalogType)
             sb.append(((CatalogType)value).getPath());
-        else if (value instanceof UnresolvedInfo)
-            sb.append(((UnresolvedInfo)value).path);
         else
             throw new CatalogException("Unsupported field type '" + value + "'");
         sb.append("\n");
@@ -305,7 +276,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
     void writeFieldCommands(StringBuilder sb) {
         int i = 0;
-        for (String field : m_fields.keySet()) {
+        for (String field : getFields()) {
             writeCommandForField(sb, field, i == 0);
             ++i;
         }
@@ -327,6 +298,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         return getPath().compareTo(o.getPath());
     }
 
+    abstract void copyFields(CatalogType obj);
+
     CatalogType deepCopy(Catalog catalog, CatalogType parent) {
 
         CatalogType copy = null;
@@ -342,24 +315,13 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         copy.setBaseValues(catalog, parent, m_path, m_typename);
         copy.m_relativeIndex = m_relativeIndex;
 
-        for (Entry<String, Object> e : m_fields.entrySet()) {
-            Object value = e.getValue();
-            if (value instanceof CatalogType) {
-                CatalogType type = (CatalogType) e.getValue();
-                UnresolvedInfo uinfo = new UnresolvedInfo();
-                uinfo.path = type.getPath();
-                value = uinfo;
-            }
-
-            copy.m_fields.put(e.getKey(), value);
-        }
+        copyFields(copy);
 
         for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
             CatalogMap<? extends CatalogType> mapCopy = copy.m_childCollections.get(e.getKey());
             mapCopy.copyFrom(e.getValue());
         }
 
-        copy.update();
         catalog.registerGlobally(copy);
 
         return copy;
@@ -372,48 +334,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     @Override
     public String toString() {
         return (this.getClass().getSimpleName() + "{" + m_typename + "}");
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        // this isn't really the convention for null handling
-        if ((obj == null) || (obj.getClass().equals(getClass()) == false))
-            return false;
-
-        // Do the identity check
-        if (obj == this)
-            return true;
-
-        // this is safe because of the class check
-        // it is also known that the childCollections var will be the same
-        //  from the class check
-        CatalogType other = (CatalogType)obj;
-
-        // are the fields the same value?
-        if (m_fields.size() != other.m_fields.size())
-            return false;
-        for (String field : m_fields.keySet()) {
-            if (m_fields.get(field) == null) {
-                if (other.m_fields.get(field) != null)
-                    return false;
-            }
-            else if (m_fields.get(field).equals(other.m_fields.get(field)) == false)
-                return false;
-        }
-
-        // are the children the same (deep compare)
-        for (String collectionName : m_childCollections.keySet()) {
-            CatalogMap<? extends CatalogType> myMap = m_childCollections.get(collectionName);
-            CatalogMap<? extends CatalogType> otherMap = m_childCollections.get(collectionName);
-
-            // if two types are the same class, this shouldn't happen
-            assert(otherMap != null);
-
-            if (myMap.equals(otherMap) == false)
-                return false;
-        }
-
-        return true;
     }
 
     @Override
@@ -431,13 +351,13 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * it's part of the same catalog.
      */
     public void validate() {
-        for (Entry<String, Object> e : m_fields.entrySet()) {
+        /*for (Entry<String, Object> e : m_fields.entrySet()) {
             Object value = e.getValue();
             if (value instanceof CatalogType) {
                 CatalogType ct = (CatalogType) value;
                 assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
             }
-        }
+        }*/
 
         for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
             for (CatalogType ct : e.getValue()) {

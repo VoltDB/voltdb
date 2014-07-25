@@ -180,17 +180,59 @@ public class Catalog extends CatalogType {
         copy.m_relativeIndex = 1;
         copy.m_clusters.copyFrom(m_clusters);
 
-
         return copy;
-    }
-
-    @Override
-    void update() {
-        // does nothing
     }
 
     /** GETTER: The set of the clusters in this catalog */
     public CatalogMap<Cluster> getClusters() {
         return m_clusters;
+    }
+
+    @Override
+    public String[] getFields() {
+        return new String[] {};
+    }
+
+    @Override
+    public Object getField(String field) {
+        switch (field) {
+        case "clusters":
+            return getClusters();
+        default:
+            throw new CatalogException("Unknown field");
+        }
+    }
+
+    @Override
+    void set(String field, String value) {
+        throw new CatalogException("No fields to set in Catalog base object.");
+    }
+
+    @Override
+    void copyFields(CatalogType obj) {
+        // no fields to copy
+        // also not used as Catalog overrides the calling method of CatalogType
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        // this isn't really the convention for null handling
+        if ((obj == null) || (obj.getClass().equals(getClass()) == false))
+            return false;
+
+        // Do the identity check
+        if (obj == this)
+            return true;
+
+        // this is safe because of the class check
+        // it is also known that the childCollections var will be the same
+        //  from the class check
+        Catalog other = (Catalog) obj;
+
+        // are the fields / children the same? (deep compare)
+        if ((m_clusters == null) != (other.m_clusters == null)) return false;
+        if ((m_clusters != null) && !m_clusters.equals(other.m_clusters)) return false;
+
+        return true;
     }
 }

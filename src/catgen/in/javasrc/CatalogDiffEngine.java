@@ -1011,7 +1011,7 @@ public class CatalogDiffEngine {
                 // note, this has to be pretty raw to avoid some smarts that wont work
                 // in this context. this may return an unresolved link which points nowhere,
                 // but that's good enough to know it's a view
-                if (table.m_fields.get("materializer") != null) {
+                if (table.getField("materializer") != null) {
                     return "View " + type.getTypeName();
                 }
 

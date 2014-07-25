@@ -104,7 +104,7 @@ def genjava( classes, prepath, postpath, package ):
             if ftype == "String":
                 write( interp( '    String m_$fname = new String();', locals() ) )
             elif field.type[-1] == '?':
-                pass # don't keep local cached vars for references
+                write( interp( '    Catalog.CatalogReference<$ftype> m_$fname = new CatalogReference<>();', locals() ) )
             else:
                 write( interp( '    $ftype m_$fname;', locals() ) )
         write( '' )
@@ -120,25 +120,30 @@ def genjava( classes, prepath, postpath, package ):
             if field.type[-1] == '*':
                 write( interp( '        m_$fname = new $ftype(catalog, this, path + "/" + "$fname", $realtype.class);', locals() ) )
                 write( interp( '        m_childCollections.put("$fname", m_$fname);', locals() ) )
-            elif field.type[-1] == '?':
-                write( interp( '        m_fields.put("$fname", null);', locals() ) )
-            else:
-                write( interp( '        m_fields.put("$fname", m_$fname);', locals() ) )
         write( '    }\n' )
 
-        # update
-        write ( '    void update() {' )
+        # getFields
+        write( '    public String[] getFields() {' )
+        write( '        return new String[] {' )
         for field in cls.fields:
-            ftype = javatypify( field.type )
-            fobjtype = javaobjectify( field.type )
+            if field.type[-1] != '*':
+                fname = field.name
+                write( interp( '            "$fname",', locals() ) )
+        write( '        };' )
+        write( '    };\n' )
+
+        #getField
+        write(             '    public Object getField(String field) {' )
+        write(             '        switch (field) {' )
+        for field in cls.fields:
             fname = field.name
-            realtype = field.type[:-1]
             methname = fname.capitalize()
-            if field.type[-1] == '?':
-                pass # don't keep local cached vars for references
-            elif field.type[-1] != '*':
-                write( interp( '        m_$fname = ($fobjtype) m_fields.get("$fname");', locals() ) )
-        write( '    }\n' )
+            write( interp( '        case "$fname":', locals() ) )
+            write( interp( '            return get$methname();', locals() ) )
+        write( interp(     '        default:', locals() ) )
+        write( interp(     '            throw new CatalogException("Unknown field");', locals() ) )
+        write(             '        }' )
+        write(             '    }\n' )
 
         # getter methods
         for field in cls.fields:
@@ -150,15 +155,7 @@ def genjava( classes, prepath, postpath, package ):
                 write('    /** GETTER:', field.comment, '*/')
             write( interp( '    public $ftype get$methname() {', locals() ) )
             if field.type[-1] == '?':
-                write( interp( '        Object o = getField("$fname");', locals() ) )
-                write( interp( '        if (o instanceof UnresolvedInfo) {', locals() ) )
-                write( interp( '            UnresolvedInfo ui = (UnresolvedInfo) o;', locals() ) )
-                write( interp( '            $ftype retval = ($ftype) m_catalog.getItemForRef(ui.path);', locals() ) )
-                write( interp( '            assert(retval != null);', locals() ) )
-                write( interp( '            m_fields.put("$fname", retval);', locals() ) )
-                write( interp( '            return retval;', locals() ) )
-                write( interp( '        }', locals() ) )
-                write( interp( '        return ($ftype) o;', locals() ) )
+                write( interp( '        return m_$fname.get();', locals() ) )
             else:
                 write( interp( '        return m_$fname;', locals() ) )
             write( '    }\n' )
@@ -175,10 +172,94 @@ def genjava( classes, prepath, postpath, package ):
                 write('    /** SETTER:', field.comment, '*/')
             write( interp( '    public void set$methname($ftype value) {', locals() ) )
             if field.type[-1] == '?':
-                write( interp( '        m_fields.put("$fname", value);', locals() ) )
+                write( interp( '        m_$fname.set(value);', locals() ) )
             else:
-                write( interp( '        m_$fname = value; m_fields.put("$fname", value);', locals() ) )
+                write( interp( '        m_$fname = value;', locals() ) )
             write( '    }\n' )
+
+        # set
+        write(                     '    @Override' )
+        write(                     '    void set(String field, String value) {' ) 
+        write(                     '        if ((field == null) || (value == null)) {' )
+        write(                     '            throw new CatalogException("Null value where it shouldn\'t be.");' )
+        write(                     '        }\n' )
+
+        write(                     '        value = value.trim();\n' )
+
+        write(                     '        if (value.startsWith("null")) value = null;\n' )
+
+        write(                     '        switch (field) {' )
+        for field in cls.fields:
+            if field.type[-1] == '*':
+                # skip child collections for set
+                continue
+            fname = field.name
+            ftype = javatypify( field.type )
+            write( interp(         '        case "$fname":', locals() ) )
+            if field.type[-1] == '?':
+                write(             '            assert((value == null) || value.startsWith("/"));' )
+                write( interp(     '            m_$fname.setUnresolved(value);', locals() ) )
+            elif ftype == "int":
+                write(             '            assert(value != null);' )
+                write( interp(     '            m_$fname = Integer.parseInt(value);', locals() ) )
+            elif ftype == "boolean":
+                write(             '            assert(value != null);' )
+                write( interp(     '            m_$fname = Boolean.parseBoolean(value);', locals() ) )
+            elif ftype == "String":
+                write(             '            if (value != null) {')
+                write(             '                assert(value.startsWith("\\"") && value.endsWith("\\""));' )
+                write(             '                value = value.substring(1, value.length() - 1);' )
+                write(             '            }' )
+                write( interp(     '            m_$fname = value;', locals() ) )
+            write(                 '            break;' )
+        write( interp(             '        default:', locals() ) )
+        write( interp(             '            throw new CatalogException("Unknown field");', locals() ) )
+        write(                     '        }' )
+        write(                     '    }\n' )
+
+        # copyFields
+        write(                     '    @Override' )
+        write(                     '    void copyFields(CatalogType obj) {' ) 
+        if len(cls.fields) > 0:
+            write(                 '        // this is safe from the caller' )
+            write( interp(         '        $clsname other = ($clsname) obj;\n', locals() ) )
+            for field in cls.fields:
+                ftype = javatypify( field.type )
+                fname = field.name
+                if ftype in ["int", "boolean", "String"]:
+                    write( interp( '        other.m_$fname = m_$fname;', locals() ) )
+                if field.type[-1] == '?':
+                    write( interp( '        other.m_$fname.setUnresolved(m_$fname.getPath());', locals() ) )
+        write(                     '    }\n' )
+
+        # equals
+        write(             '    public boolean equals(Object obj) {' )
+        write(             '        // this isn\'t really the convention for null handling' )
+        write(             '        if ((obj == null) || (obj.getClass().equals(getClass()) == false))' )
+        write(             '            return false;\n' )
+
+        write(             '        // Do the identity check' )
+        write(             '        if (obj == this)' )
+        write(             '            return true;\n' )
+
+        write(             '        // this is safe because of the class check' )
+        write(             '        // it is also known that the childCollections var will be the same' )
+        write(             '        //  from the class check' )
+        write( interp(     '        $clsname other = ($clsname) obj;\n', locals() ) )
+
+        write(             '        // are the fields / children the same? (deep compare)' )
+        for field in cls.fields:
+            ftype = javatypify( field.type )
+            fname = field.name
+            if ftype in ["int", "boolean"]:
+                write( interp( '        if (m_$fname != other.m_$fname) return false;', locals() ) )
+            else:
+                write( interp( '        if ((m_$fname == null) != (other.m_$fname == null)) return false;', locals() ) )
+                write( interp( '        if ((m_$fname != null) && !m_$fname.equals(other.m_$fname)) return false;', locals() ) )
+        write('')
+
+        write(             '        return true;' )
+        write(             '    }\n' )
 
         # wrap up
         write( '}' )
