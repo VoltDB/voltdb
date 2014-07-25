@@ -441,7 +441,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             else
             {
                 if (m_aggExec != NULL) {
-                    if (m_aggExec->p_execute_tuple(temp_tuple)) {
+                    if (m_aggExec->p_execute_tuple(tuple)) {
                         break;
                     }
                 } else {
