@@ -115,7 +115,7 @@ public class ReportMaker {
         IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
         if(annotation == null) {
             sb.append(" ");
-            tag(sb, "info", "Unused");
+            tag(sb, "important", "Unused");
         }
 
         sb.append("</td>");
