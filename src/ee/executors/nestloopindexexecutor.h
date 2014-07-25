@@ -107,7 +107,6 @@ public:
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
 
-    Pool m_memoryPool;
     AggregateExecutorBase* m_aggExec;
 
     //So valgrind doesn't report the data as lost.

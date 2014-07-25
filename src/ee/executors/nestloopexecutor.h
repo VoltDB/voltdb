@@ -70,7 +70,6 @@ class NestLoopExecutor : public AbstractExecutor {
 
         StandAloneTupleStorage m_null_tuple;
 
-        Pool m_memoryPool;
         AggregateExecutorBase* m_aggExec;
 };
 

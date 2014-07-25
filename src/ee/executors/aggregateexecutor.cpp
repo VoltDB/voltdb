@@ -502,15 +502,23 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
 
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
-void AggregateHashExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema)
+TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("hash aggregate executor init..");
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
     executeAggBase(params);
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
     m_inputSchema = schema;
+
+    char * storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
 }
 
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
@@ -523,10 +531,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
-    TableTuple nextTuple(inputSchema);
-
     ProgressMonitorProxy pmp(m_engine, this);
-    AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
+
+    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
@@ -553,7 +560,7 @@ void AggregateHashExecutor::initHashGroupByKeyTuple(const TableTuple& nxtTuple)
     }
 }
 
-void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     m_pmp->countdownProgress();
     initHashGroupByKeyTuple(nextTuple);
     AggregateRow* aggregateRow;
@@ -582,6 +589,11 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     }
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
 }
 
 void AggregateHashExecutor::p_execute_finish() {
@@ -611,8 +623,13 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
     }
 }
 
-void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema) {
+TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
+{
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
     executeAggBase(params);
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
@@ -632,6 +649,11 @@ void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
     char* storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple(storage, schema);
+
+    // for input tuple
+    storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
@@ -660,7 +682,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
-void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // Use the first input tuple to "prime" the system.
     if (m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -676,7 +698,7 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
             m_failPrePredicateOnFirstRow = true;
         }
         m_noInputRows = false;
-        return;
+        return false;
     }
 
     getNextGroupByValues(nextTuple);
@@ -700,6 +722,11 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
     // update the aggregation calculation.
     advanceAggs(m_aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
 }
 
 void AggregateSerialExecutor::p_execute_finish()
@@ -749,8 +776,13 @@ inline void AggregatePartialExecutor::getNextGroupByValues(const TableTuple& nex
     }
 }
 
-void AggregatePartialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema) {
+TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
+{
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
     executeAggBase(params);
 
     size_t numGroupby = m_groupByExpressions.size();
@@ -765,6 +797,10 @@ void AggregatePartialExecutor::p_execute_init(const NValueArray& params,
     m_inputSchema = schema;
 
     m_atTheFirstRow = true;
+
+    char * storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
 }
 
 bool AggregatePartialExecutor::p_execute(const NValueArray& params)
@@ -807,7 +843,7 @@ inline void AggregatePartialExecutor::initPartialHashGroupByKeyTuple(const Table
     }
 }
 
-void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+bool AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     getNextGroupByValues(nextTuple);
 
     BOOST_FOREACH(int ii, m_partialSerialGroupByColumns) {
@@ -859,8 +895,13 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
 }
-// TODO: The last half of the above function with HASH aggregation
+// TODO: Refactoring the last half of the above function with HASH aggregation
 
 void AggregatePartialExecutor::p_execute_finish()
 {

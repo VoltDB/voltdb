@@ -180,16 +180,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
+    TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine, this, targetTable);
-
     if (m_aggExec != NULL) {
-        m_aggExec->setAggregateOutputTable(m_outputTable);
-
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        m_aggExec->p_execute_init(params, &pmp, inputSchema);
+        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable);
+    } else {
+        temp_tuple = m_outputTable->tempTuple();
     }
 
     //
@@ -269,10 +269,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    if (earlyReturn) {
-        if (m_aggExec != NULL) {
-            m_aggExec->p_execute_finish();
-        }
+    if (earlyReturn && m_aggExec != NULL) {
+        m_aggExec->p_execute_finish();
         return true;
     }
 
@@ -419,13 +417,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
             if (m_projectionNode != NULL)
             {
-                TableTuple temp_tuple;
-                if (m_aggExec != NULL) {
-                    temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
-                } else {
-                    temp_tuple = m_outputTable->tempTuple();
-                }
-
                 if (m_projectionAllTupleArray != NULL) {
                     VOLT_TRACE("sweet, all tuples");
                     for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
@@ -438,9 +429,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
 
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(temp_tuple);
-                    if (m_aggExec->p_execute_early_returned()) {
-                        // Get enough rows for LIMIT
+                    if (m_aggExec->p_execute_tuple(temp_tuple)) {
                         break;
                     }
                 } else {
@@ -450,7 +439,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             else
             {
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(tuple);
+                    if (m_aggExec->p_execute_tuple(temp_tuple)) {
+                        break;
+                    }
                 } else {
                     //
                     // Straight Insert

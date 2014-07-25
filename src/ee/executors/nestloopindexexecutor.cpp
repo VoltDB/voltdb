@@ -263,19 +263,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     TableTuple join_tuple;
-
     ProgressMonitorProxy pmp(m_engine, this, m_innerTable);
     if (m_aggExec != NULL) {
-        // TODO: refactor the inline aggregate executor initialization code into one function on base class
-
         VOLT_TRACE("Init inline aggregate...");
-        m_aggExec->setAggregateOutputTable(m_tmpOutputTable);
         const TupleSchema * aggInputSchema = m_node->getTupleSchemaPreAgg();
-        m_aggExec->p_execute_init(params, &pmp, aggInputSchema);
-
-        char* storage = reinterpret_cast<char*>(
-                m_memoryPool.allocateZeroes(aggInputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-        join_tuple = TableTuple(storage, aggInputSchema);
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable);
     } else {
         join_tuple = m_tmpOutputTable->tempTuple();
     }
@@ -511,8 +503,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                    join_tuple.debug(m_tmpOutputTable->name()).c_str());
 
                             if (m_aggExec != NULL) {
-                                m_aggExec->p_execute_tuple(join_tuple);
-                                if (m_aggExec->p_execute_early_returned()) {
+                                if (m_aggExec->p_execute_tuple(join_tuple)) {
                                     // Get enough rows for LIMIT
                                     earlyReturned = true;
                                     break;
@@ -548,8 +539,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
 
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(join_tuple);
-                    if (m_aggExec->p_execute_early_returned()) {
+                    if (m_aggExec->p_execute_tuple(join_tuple)) {
                         // Get enough rows for LIMIT
                         earlyReturned = true;
                         break;
@@ -568,8 +558,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE ("result table:\n %s", m_tmpOutputTable->debug().c_str());
     VOLT_TRACE("Finished NestLoopIndex");
-
-    m_memoryPool.purge();
 
     cleanupInputTempTable(m_innerTable);
     cleanupInputTempTable(m_outerTable);
