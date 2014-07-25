@@ -261,8 +261,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
-	bool spanBuffer = false;
-	StreamBlock* oldBlock = m_currBlock;
+    bool spanBuffer = false;
+    StreamBlock* oldBlock = m_currBlock;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
