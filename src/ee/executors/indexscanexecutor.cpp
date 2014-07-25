@@ -195,7 +195,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // SEARCH KEY
     //
-    bool earlyReturn = false;
+    bool earlyReturnForSearchKeyOutOfRange = false;
 
     searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
@@ -226,7 +226,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
                         // gt or gte when key overflows returns nothing except inline agg
-                        earlyReturn = true;
+                        earlyReturnForSearchKeyOutOfRange = true;
                         break;
                     }
                     else {
@@ -243,7 +243,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
                         // lt or lte when key underflows returns nothing except inline agg
-                        earlyReturn = true;
+                        earlyReturnForSearchKeyOutOfRange = true;
                         break;
                     }
                     else {
@@ -262,15 +262,17 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
-                earlyReturn = true;
+                earlyReturnForSearchKeyOutOfRange = true;
                 break;
             }
             break;
         }
     }
 
-    if (earlyReturn && m_aggExec != NULL) {
-        m_aggExec->p_execute_finish();
+    if (earlyReturnForSearchKeyOutOfRange) {
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
+        }
         return true;
     }
 
