@@ -25,10 +25,6 @@ message Pause {
     optional int32 partitionId = 1;
 }
 
-message Connect {
-    optional int32 partitionId = 1;
-}
-
 message Subscribe {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
@@ -101,6 +97,5 @@ message CtrlEnvelope {
     optional Pause pause = 5;
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
-    optional Connect connect = 8;
-    optional Subscribe subscribe = 9;
+    optional Subscribe subscribe = 8;
 }
