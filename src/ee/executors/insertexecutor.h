@@ -71,12 +71,9 @@ public:
         m_multiPartition(false),
         m_isStreamed(false),
         m_templateTuple(),
-        m_targetSchema(NULL),
         m_engine(engine)
     {
     }
-
-    ~InsertExecutor();
 
     protected:
         bool p_init(AbstractPlanNode*,
@@ -93,7 +90,6 @@ public:
 
     private:
         StandAloneTupleStorage m_templateTuple;
-        TupleSchema* m_targetSchema;
 
     protected:
         /** reference to the engine/context to store the number of modified tuples */

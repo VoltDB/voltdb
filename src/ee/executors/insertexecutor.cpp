@@ -98,24 +98,13 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     m_multiPartition = m_node->isMultiPartition();
 
-    if (! m_targetSchema) {
-        m_targetSchema = TupleSchema::createTupleSchema(targetTable->schema());
-    }
-
     // allocate memory for template tuple, set defaults for all columns
-    m_templateTuple.init(m_targetSchema);
+    m_templateTuple.init(targetTable->schema());
 
-    TableTuple tuple = m_templateTuple;
+    TableTuple tuple = m_templateTuple.tuple();
     m_node->initTemplateTuple(m_engine, tuple);
 
     return true;
-}
-
-InsertExecutor::~InsertExecutor() {
-    if (m_targetSchema) {
-        TupleSchema::freeTupleSchema(m_targetSchema);
-        m_targetSchema = NULL;
-    }
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -139,7 +128,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
 
-    TableTuple templateTuple = m_templateTuple;
+    TableTuple templateTuple = m_templateTuple.tuple();
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable

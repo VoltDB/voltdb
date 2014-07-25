@@ -154,7 +154,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple outer_tuple(node->getInputTables()[0]->schema());
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
-    TableTuple null_tuple = m_null_tuple;
+    const TableTuple &null_tuple = m_null_tuple.tuple();
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;

@@ -164,13 +164,6 @@ void NestLoopIndexExecutor::updateTargetTableAndIndex() {
     index = inner_table->index(inline_node->getTargetIndexName());
     assert(index);
 
-    // NULL tuple for outer join
-    if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_out_table = inline_node->getOutputTable();
-        assert(inner_out_table);
-        m_null_tuple.init(inner_out_table->schema());
-    }
-
     index_values = TableTuple(index->getKeySchema());
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
     index_values.setAllNulls();
@@ -264,7 +257,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
-    TableTuple null_tuple = m_null_tuple;
+    const TableTuple &null_tuple = m_null_tuple.tuple();
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
@@ -517,7 +510,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
                 ++tuple_ctr;
-                join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
+                join_tuple.setNValues(num_of_outer_cols, m_null_tuple.tuple(), 0, num_of_inner_cols);
                 output_table->insertTupleNonVirtual(join_tuple);
                 pmp.countdownProgress();
             }
