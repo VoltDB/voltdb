@@ -788,7 +788,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                             String.class,
                             ClientInterface.class,
-                            Cartographer.class,
                             boolean.class);
                     // TODO: Do this a real way, not with a property
                     String masterHost = System.getProperty("DR_MASTER_HOST");
@@ -798,8 +797,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
                             masterHost,
                             m_clientInterface,
-                            m_cartographer,
                             true);
+                    m_replicaDRGateway.initializeReplicaCluster(m_cartographer);
                     m_globalServiceElector.registerService(m_replicaDRGateway);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
