@@ -78,6 +78,43 @@ TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
     return tuple;
 }
 
+std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char *data, int places) {
+    long limit = 1L << places;
+    std::clock_t start = std::clock();
+    for (long ii = 0; ii < limit; ii++) {
+        TableTuple tempTuple(data + (25 * ii), schema);
+        index->addEntry(&tempTuple);
+    }
+    std::clock_t end = std::clock();
+    return end - start;
+}
+
+std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char *data, int places) {
+    long limit = 1L << places;
+    long tmp = 1L << (places/2);
+    std::clock_t start = std::clock();
+    for (long ii = 0; ii < limit; ii++) {
+	long jj = ((ii % tmp) << (places/2)) + (ii / tmp);
+        TableTuple tempTuple(data + (25 * jj), schema);
+        index->addEntry(&tempTuple);
+    }
+    std::clock_t end = std::clock();
+    return end - start;
+}
+
+// delete num tuples
+std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
+    long gap = (1L << places) / num;
+    TableTuple deleteTuple(data, schema);
+    std::clock_t start = std::clock();
+    for (int ii = 0; ii < num; ii++) {
+	deleteTuple.move(data + (25 * gap * ii));
+	index->deleteEntry(&deleteTuple);
+    }
+    std::clock_t end = std::clock();
+    return end - start;
+}
+
 TEST_F(CompactingTreeMultiIndexTest, test1) {
     TableIndex *index = NULL;
     vector<int> columnIndices;
@@ -144,8 +181,6 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
     vector<int32_t> kcolumnLengths2;
     vector<bool> kcolumnAllowNull2;
 
-    std::clock_t duration;
-
     // tuple schema
     for(int i = 0; i < 3; i++) {
         columnTypes.push_back(VALUE_TYPE_BIGINT);
@@ -168,10 +203,6 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
     TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),
                             false, false, schema);
-    index = TableIndexFactory::getInstance(scheme);
-    indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme);
-    assert(index);
-    assert(indexWithoutPointer);
 
     // index using two columns
     columnIndices2.push_back(0);
@@ -188,138 +219,80 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
     TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
                             columnIndices2, TableIndex::simplyIndexColumns(),
                             false, false, schema);
-    indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
-    assert(indexWithoutPointer2);
 
-#define NUM 65535
+    std::cout<<std::endl;
+
+#define PLACES 18 
+#define NUM (1 << 18)
     // insert rows with duplicated key
     char data[NUM * 25] = {0};
-    for (int ii = 0; ii < NUM; ii++) {
+    for (long ii = 0; ii < NUM; ii++) {
         TableTuple tempTuple(data + (25 * ii), schema);
         tempTuple.setNValue(0, ValueFactory::getBigIntValue(12345));
         tempTuple.setNValue(1, ValueFactory::getBigIntValue(45678));
         tempTuple.setNValue(2, ValueFactory::getBigIntValue(rand()));
     }
 
-    std::clock_t start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        TableTuple tempTuple(data + (25 * ii), schema);
-        index->addEntry(&tempTuple);
+    for (int places = 4; places <= PLACES; places += 2 ) {
+	// build index
+	index = TableIndexFactory::getInstance(scheme);
+	indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme);
+	indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
+	assert(index);
+	assert(indexWithoutPointer);
+	assert(indexWithoutPointer2);
+
+	std::clock_t c1 = insertTuplesIntoIndex(index, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+	std::clock_t c2 = insertTuplesIntoIndex(indexWithoutPointer, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+	std::clock_t c3 = insertTuplesIntoIndex(indexWithoutPointer2, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+
+	c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+	c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+	c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+
+	// delete index
+	delete index;
+	delete indexWithoutPointer;
+	delete indexWithoutPointer2;
+	index = indexWithoutPointer = indexWithoutPointer2 = NULL;
     }
-    std::clock_t end = std::clock();
-    std::cout<<"test 1 insert IntsPointerKey<1> : "<< (end - start) <<std::endl;
+    
+    for (int places = 4; places <= PLACES; places += 2 ) {
+	// build index
+	index = TableIndexFactory::getInstance(scheme);
+	indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme);
+	indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
+	assert(index);
+	assert(indexWithoutPointer);
+	assert(indexWithoutPointer2);
 
-    start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        TableTuple tempTuple(data + (25 * ii), schema);
-        indexWithoutPointer->addEntry(&tempTuple);
+	std::clock_t c1 = insertTuplesIntoIndex2(index, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+	std::clock_t c2 = insertTuplesIntoIndex2(indexWithoutPointer, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+	std::clock_t c3 = insertTuplesIntoIndex2(indexWithoutPointer2, schema, data, places);
+	std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+
+	c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+	c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+	c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+	std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+
+	// delete index
+	delete index;
+	delete indexWithoutPointer;
+	delete indexWithoutPointer2;
+	index = indexWithoutPointer = indexWithoutPointer2 = NULL;
     }
-    end = std::clock();
-    std::cout<<"test 1 insert IntsKey<1>: "<< (end - start) <<std::endl;
 
-    start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        TableTuple tempTuple(data + (25 * ii), schema);
-        indexWithoutPointer2->addEntry(&tempTuple);
-    }
-    end = std::clock();
-    std::cout<<"test 1 insert IntsKey<2> : "<< (end - start) <<std::endl;
-
-    TableTuple deleteTuple1(data, schema);
-    TableTuple deleteTuple2(data + (25 * 1000), schema);
-    TableTuple deleteTuple3(data + (25 * (NUM - 1)), schema);
-
-    start = std::clock();
-    index->deleteEntry(&deleteTuple1);
-    index->deleteEntry(&deleteTuple2);
-    index->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    duration = end - start;
-    std::cout<<"test 1 delete IntsPointerKey<1> : "<< duration <<std::endl;
-
-    start = std::clock();
-    indexWithoutPointer->deleteEntry(&deleteTuple1);
-    indexWithoutPointer->deleteEntry(&deleteTuple2);
-    indexWithoutPointer->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    std::cout<<"test 1 delete IntsKey<1> : "<< (end - start) <<std::endl;
-    EXPECT_LT(duration, (end - start));
-
-    start = std::clock();
-    indexWithoutPointer2->deleteEntry(&deleteTuple1);
-    indexWithoutPointer2->deleteEntry(&deleteTuple2);
-    indexWithoutPointer2->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    std::cout<<"test 1 delete IntsKey<2> : "<< (end - start) <<std::endl;
-    EXPECT_LT(duration, (end - start));
-
-    delete index;
-    delete indexWithoutPointer;
-    delete indexWithoutPointer2;
-
-    index = indexWithoutPointer = indexWithoutPointer2 = NULL;
-
-    index = TableIndexFactory::getInstance(scheme);
-    indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme);
-    indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
-    assert(index);
-    assert(indexWithoutPointer);
-    assert(indexWithoutPointer2);
-
-    start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        int jj = ((ii % 256) << 8) + (ii / 256);
-        TableTuple tempTuple(data + (25 * jj), schema);
-        index->addEntry(&tempTuple);
-    }
-    end = std::clock();
-    std::cout<<"test 2 insert IntsPointerKey<1> : "<< (end - start) <<std::endl;
-
-    start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        int jj = ((ii % 256) << 8) + (ii / 256);
-        TableTuple tempTuple(data + (25 * jj), schema);
-        indexWithoutPointer->addEntry(&tempTuple);
-    }
-    end = std::clock();
-    std::cout<<"test 2 insert IntsKey<1> : "<< (end - start) <<std::endl;
-
-    start = std::clock();
-    for (int ii = 0; ii < NUM; ii++) {
-        int jj = ((ii % 256) << 8) + (ii / 256);
-        TableTuple tempTuple(data + (25 * jj), schema);
-        indexWithoutPointer2->addEntry(&tempTuple);
-    }
-    end = std::clock();
-    std::cout<<"test 2 insert IntsKey<2> : "<< (end - start) <<std::endl;
-
-    start = std::clock();
-    index->deleteEntry(&deleteTuple1);
-    index->deleteEntry(&deleteTuple2);
-    index->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    duration = end - start;
-    std::cout<<"test 1 delete IntsPointerKey<1> : "<< duration <<std::endl;
-
-    start = std::clock();
-    indexWithoutPointer->deleteEntry(&deleteTuple1);
-    indexWithoutPointer->deleteEntry(&deleteTuple2);
-    indexWithoutPointer->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    std::cout<<"test 2 delete IntsKey<1> : "<< (end - start) <<std::endl;
-    EXPECT_LT(duration, (end - start));
-
-    start = std::clock();
-    indexWithoutPointer2->deleteEntry(&deleteTuple1);
-    indexWithoutPointer2->deleteEntry(&deleteTuple2);
-    indexWithoutPointer2->deleteEntry(&deleteTuple3);
-    end = std::clock();
-    std::cout<<"test 2 delete IntsKey<2> : "<< (end - start) <<std::endl;
-    EXPECT_LT(duration, (end - start));
-
-    delete index;
-    delete indexWithoutPointer;
-    delete indexWithoutPointer2;
     TupleSchema::freeTupleSchema(schema);
     TupleSchema::freeTupleSchema(kschema);
     TupleSchema::freeTupleSchema(kschema2);
