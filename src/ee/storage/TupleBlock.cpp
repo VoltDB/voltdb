@@ -25,8 +25,8 @@ namespace voltdb {
 volatile int tupleBlocksAllocated = 0;
 
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
-#ifdef MEMCHECK
-        m_table(table),
+#ifdef USE_MMAP
+        m_tableAllocationSize(table->m_tableAllocationSize),
 #endif
         m_storage(NULL),
         m_references(0),
@@ -39,9 +39,6 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_bucket(bucket),
         m_bucketIndex(0)
 {
-#ifdef MEMCHECK
-    m_storage = new char[table->m_tableAllocationSize];
-#else
 #ifdef USE_MMAP
     m_storage = static_cast<char*>(::mmap( 0, table->m_tableAllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
     if (m_storage == MAP_FAILED) {
@@ -49,30 +46,20 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         throwFatalException("Failed mmap");
     }
 #else
-    //m_storage = static_cast<char*>(ThreadLocalPool::getExact(m_table->m_tableAllocationSize)->malloc());
     m_storage = new char[table->m_tableAllocationSize];
-#endif
 #endif
     tupleBlocksAllocated++;
 }
 
 TupleBlock::~TupleBlock() {
-    /*
-      tupleBlocksAllocated--;
-      std::cout << "Destructing tuple block " << static_cast<void*>(this)
-                << " with " << tupleBlocksAllocated << " left " << std::endl;
-    */
-#ifdef MEMCHECK
-    delete []m_storage;
-#else
 #ifdef USE_MMAP
-    if (::munmap( m_storage, m_table->m_tableAllocationSize) != 0) {
+    assert(m_tableAllocationSize - m_tupleLength * m_tuplesPerBlock == 0);
+    if (::munmap( m_storage, m_tableAllocationSize) != 0) {
         std::cout << strerror( errno ) << std::endl;
         throwFatalException("Failed munmap");
     }
 #else
     delete []m_storage;
-#endif
 #endif
 }
 

@@ -223,8 +223,8 @@ public:
         return m_bucket;
     }
 private:
-#ifdef MEMCHECK
-    Table* m_table;
+#ifdef USE_MMAP
+    size_t m_tableAllocationSize;
 #endif
     char*   m_storage;
     uint32_t m_references;
@@ -246,7 +246,6 @@ private:
 
     TBBucketPtr m_bucket;
     int m_bucketIndex;
-
 };
 
 /**
