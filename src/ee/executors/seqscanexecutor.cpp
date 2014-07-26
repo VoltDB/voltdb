@@ -100,21 +100,8 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
                              node->getTargetTable());
     }
 
-
-    // Inline aggregation can be serial and hash
-    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
-    if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline serial aggregation stuff...");
-        m_aggExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggExec);
-    } else {
-        AggregatePlanNode* agg_hash_node = dynamic_cast<AggregatePlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE));
-        if (agg_hash_node != NULL) {
-            VOLT_TRACE("init inline hash aggregation stuff...");
-            m_aggExec = dynamic_cast<AggregateHashExecutor*>(agg_hash_node->getExecutor());
-            assert(m_aggExec);
-        }
-    }
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(node);
 
     return true;
 }

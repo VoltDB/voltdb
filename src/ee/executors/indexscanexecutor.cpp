@@ -108,20 +108,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         }
     }
 
-    // Inline aggregation can be serial and hash
-    AggregatePlanNode* agg_serial_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE));
-    if (agg_serial_node != NULL) {
-        VOLT_TRACE("init inline serial aggregation stuff...");
-        m_aggExec = dynamic_cast<AggregateSerialExecutor*>(agg_serial_node->getExecutor());
-        assert(m_aggExec);
-    } else {
-        AggregatePlanNode* agg_hash_node = dynamic_cast<AggregatePlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE));
-        if (agg_hash_node != NULL) {
-            VOLT_TRACE("init inline hash aggregation stuff...");
-            m_aggExec = dynamic_cast<AggregateHashExecutor*>(agg_hash_node->getExecutor());
-            assert(m_aggExec);
-        }
-    }
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
 
     //
     // Make sure that we have search keys and that they're not null

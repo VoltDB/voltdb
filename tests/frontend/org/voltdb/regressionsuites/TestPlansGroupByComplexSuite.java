@@ -883,7 +883,26 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
     }
 
+    public void testAggregateOnJoin() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        VoltTable vt;
+        String sql;
+
+        sql = "SELECT r1.id, count(*) " +
+               " from r1, p2 where r1.id = p2.dept GROUP BY r1.id ORDER BY 1;";
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().toLowerCase().contains("inline hash"));
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1,3}, {2,2}});
+
+    }
+
     public void testHavingClause() throws IOException, ProcCallException {
+        System.out.println("test Having clause...");
         loadData();
 
         Client client = this.getClient();
@@ -954,7 +973,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
     // This test case will trigger temp table "delete as we go" feature on join node
     // Turn off this test cases because of valgrind timeout.
-    public void notestAggregateOnJoin() throws IOException, ProcCallException {
+    public void turnOfftestAggregateOnJoinForMemoryIssue() throws IOException, ProcCallException {
         Client client = this.getClient();
         ClientResponse cr;
         VoltTable vt;

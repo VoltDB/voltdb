@@ -54,6 +54,7 @@ namespace voltdb {
 
 class UndoLog;
 class ReadWriteSet;
+class AggregateExecutorBase;
 
 /**
  *
@@ -68,6 +69,9 @@ class NestLoopExecutor : public AbstractExecutor {
         bool p_execute(const NValueArray &params);
 
         StandAloneTupleStorage m_null_tuple;
+
+        Pool m_memoryPool;
+        AggregateExecutorBase* m_aggExec;
 };
 
 }

@@ -266,11 +266,10 @@ AbstractPlanNode::getOutputSchema() const
 }
 
 TupleSchema*
-AbstractPlanNode::generateTupleSchema(bool allowNulls) const
+AbstractPlanNode::generateTupleSchema(const vector<SchemaColumn*>& outputSchema, bool allowNulls)
 {
     // Get the effective output schema.
     // In general, this may require a search.
-    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
     int schema_size = static_cast<int>(outputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
