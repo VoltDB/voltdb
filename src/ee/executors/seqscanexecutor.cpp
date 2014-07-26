@@ -183,7 +183,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
-        TableTuple temp_tuple = NULL;
+        TableTuple temp_tuple;
         if (m_aggExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
