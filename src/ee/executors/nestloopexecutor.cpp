@@ -168,13 +168,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
 
     if (m_aggExec != NULL) {
-        m_aggExec->setAggregateOutputTable(output_table);
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
-        m_aggExec->p_execute_init(params, &pmp, aggInputSchema);
-
-        char* storage = reinterpret_cast<char*>(
-                m_memoryPool.allocateZeroes(aggInputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-        join_tuple = TableTuple (storage, aggInputSchema);
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, output_table);
     } else {
         join_tuple = output_table->tempTuple();
     }
@@ -214,8 +209,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                         // Matched! Complete the joined tuple with the inner column values.
                         join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                         if (m_aggExec != NULL) {
-                            m_aggExec->p_execute_tuple(join_tuple);
-                            if (m_aggExec->p_execute_early_returned()) {
+                            if (m_aggExec->p_execute_tuple(join_tuple)) {
                                 // Get enough rows for LIMIT
                                 earlyReturned = true;
                                 break;
@@ -243,8 +237,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 ++tuple_ctr;
                 join_tuple.setNValues(outer_cols, null_tuple, 0, inner_cols);
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(join_tuple);
-                    if (m_aggExec->p_execute_early_returned()) {
+                    if (m_aggExec->p_execute_tuple(join_tuple)) {
                         earlyReturned = true;
                     }
                 } else {
@@ -265,7 +258,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         m_aggExec->p_execute_finish();
     }
 
-    m_memoryPool.purge();
     cleanupInputTempTable(inner_table);
     cleanupInputTempTable(outer_table);
 

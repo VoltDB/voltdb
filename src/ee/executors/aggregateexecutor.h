@@ -151,32 +151,33 @@ public:
     { }
     ~AggregateExecutorBase()
     {
-        if (m_groupByKeySchema != NULL) {
-            TupleSchema::freeTupleSchema(m_groupByKeySchema);
-        }
-
-        if (m_groupByKeyPartialHashSchema != NULL) {
-            TupleSchema::freeTupleSchema(m_groupByKeyPartialHashSchema);
-        }
-    }
-    void executeAggBase(const NValueArray& params);
-
-    void setAggregateOutputTable(TempTable* newTempTable) {
-        // inlined aggregate will not allocate its own output table, but will use Scan's output table instead
-        m_tmpOutputTable = newTempTable;
+        // NULL safe operation
+        TupleSchema::freeTupleSchema(m_groupByKeySchema);
+        TupleSchema::freeTupleSchema(m_groupByKeyPartialHashSchema);
     }
 
-    virtual void p_execute_init(const NValueArray& params,
-            ProgressMonitorProxy* pmp, const TupleSchema * schema) = 0;
-    virtual void p_execute_tuple(const TableTuple& nextTuple) = 0;
+    /**
+     * Initiate the member variables for execute the aggregate.
+     * Inlined aggregate will not allocate its own output table,
+     * but will use other's output table instead.
+     */
+    virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+            const TupleSchema * schema, TempTable* newTempTable = NULL) = 0;
+
+    /**
+     * Return true when limit has been met. By default, return false.
+     */
+    virtual bool p_execute_tuple(const TableTuple& nextTuple) = 0;
+
+    /**
+     * Last method to insert the results to output table and clean up memory or variables.
+     */
     virtual void p_execute_finish() = 0;
-
-    bool p_execute_early_returned() const {
-        return m_earlyReturn;
-    }
 
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+
+    void executeAggBase(const NValueArray& params);
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
@@ -246,8 +247,9 @@ public:
     // same reason for serial and partial
     ~AggregateHashExecutor();
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
-    void p_execute_tuple(const TableTuple& nextTuple);
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
+    bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
 private:
@@ -272,9 +274,10 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregateSerialExecutor();
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
 
-    void p_execute_tuple(const TableTuple& nextTuple);
+    bool p_execute_tuple(const TableTuple& nextTuple);
 
     void p_execute_finish();
 
@@ -300,9 +303,10 @@ public:
         AggregateExecutorBase(engine, abstract_node) { }
     ~AggregatePartialExecutor();
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
 
-    void p_execute_tuple(const TableTuple& nextTuple);
+    bool p_execute_tuple(const TableTuple& nextTuple);
 
     void p_execute_finish();
 

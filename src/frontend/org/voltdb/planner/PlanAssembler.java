@@ -1785,7 +1785,7 @@ public class PlanAssembler {
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
         List<Integer> maxCoveredGroupByColumns = new ArrayList<>();
-        ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> maxCoveredBindings = null;
         Index pickedUpIndex = null;
         boolean foundAllGroupByCoveredIndex = false;
 
@@ -1800,7 +1800,7 @@ public class PlanAssembler {
             if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
                 maxCoveredGroupByColumns = coveredGroupByColumns;
                 pickedUpIndex = index;
-                allBindings = bindings;
+                maxCoveredBindings = bindings;
 
                 if (maxCoveredGroupByColumns.size() == groupBys.size()) {
                     foundAllGroupByCoveredIndex = true;
@@ -1815,7 +1815,7 @@ public class PlanAssembler {
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
                 root, null, pickedUpIndex, SortDirectionType.INVALID);
         indexScanNode.setForGroupingOnly();
-        indexScanNode.setBindings(allBindings);
+        indexScanNode.setBindings(maxCoveredBindings);
 
         gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
         gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;

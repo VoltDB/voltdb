@@ -180,22 +180,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
+    TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine, this, targetTable);
-
     if (m_aggExec != NULL) {
-        m_aggExec->setAggregateOutputTable(m_outputTable);
-
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        m_aggExec->p_execute_init(params, &pmp, inputSchema);
+        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable);
+    } else {
+        temp_tuple = m_outputTable->tempTuple();
     }
 
     //
     // SEARCH KEY
     //
-    bool earlyReturn = false;
+    bool earlyReturnForSearchKeyOutOfRange = false;
 
     searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
@@ -226,7 +226,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
                         // gt or gte when key overflows returns nothing except inline agg
-                        earlyReturn = true;
+                        earlyReturnForSearchKeyOutOfRange = true;
                         break;
                     }
                     else {
@@ -243,7 +243,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
                         // lt or lte when key underflows returns nothing except inline agg
-                        earlyReturn = true;
+                        earlyReturnForSearchKeyOutOfRange = true;
                         break;
                     }
                     else {
@@ -262,14 +262,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
-                earlyReturn = true;
+                earlyReturnForSearchKeyOutOfRange = true;
                 break;
             }
             break;
         }
     }
 
-    if (earlyReturn) {
+    if (earlyReturnForSearchKeyOutOfRange) {
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
         }
@@ -419,13 +419,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
             if (m_projectionNode != NULL)
             {
-                TableTuple temp_tuple;
-                if (m_aggExec != NULL) {
-                    temp_tuple = m_projectionNode->getOutputTable()->tempTuple();
-                } else {
-                    temp_tuple = m_outputTable->tempTuple();
-                }
-
                 if (m_projectionAllTupleArray != NULL) {
                     VOLT_TRACE("sweet, all tuples");
                     for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
@@ -438,9 +431,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
 
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(temp_tuple);
-                    if (m_aggExec->p_execute_early_returned()) {
-                        // Get enough rows for LIMIT
+                    if (m_aggExec->p_execute_tuple(temp_tuple)) {
                         break;
                     }
                 } else {
@@ -450,7 +441,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             else
             {
                 if (m_aggExec != NULL) {
-                    m_aggExec->p_execute_tuple(tuple);
+                    if (m_aggExec->p_execute_tuple(tuple)) {
+                        break;
+                    }
                 } else {
                     //
                     // Straight Insert
