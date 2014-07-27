@@ -84,7 +84,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 first = false;
                 promoteUnionParametersFromChild(childStmt);
             }
-            System.out.println("DEBUG: ParsedUnionStmt::parseTablesAndParams # params of " + childSQL.name + " child: " + childStmt.getParameters().length + "'" + childStmt.getParameters().toString() + "'");
             m_children.add(childStmt);
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);
