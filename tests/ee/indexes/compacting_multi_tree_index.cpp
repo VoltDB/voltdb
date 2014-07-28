@@ -249,8 +249,8 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
                                 false, false, schema2);
     // build index
     TableIndex *index = TableIndexFactory::getInstance(scheme);
-    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme1);
-    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
+    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1>, const void*>, false>(kschema, scheme1);
+    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2>, const void*>, false>(kschema2, scheme2);
     assert(index);
     assert(indexWithoutPointer);
     assert(indexWithoutPointer2);
@@ -311,8 +311,8 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
                                 false, false, schema2);
     // build index
     TableIndex *index = TableIndexFactory::getInstance(scheme);
-    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<IntsKey<1>, false>(kschema, scheme1);
-    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<IntsKey<2>, false>(kschema2, scheme2);
+    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1>, const void *>, false>(kschema, scheme1);
+    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2>, const void *>, false>(kschema2, scheme2);
     assert(index);
     assert(indexWithoutPointer);
     assert(indexWithoutPointer2);

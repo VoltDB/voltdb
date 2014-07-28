@@ -58,11 +58,12 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, bool hasRank>
+template<typename KeyValuePair, bool hasRank>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
+    typedef typename KeyValuePair::KeyType KeyType;
     typedef typename KeyType::KeyComparator KeyComparator;
-    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
+    typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;
     typedef std::pair<MapIterator, MapIterator> MapRange;
 

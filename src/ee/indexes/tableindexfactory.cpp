@@ -62,25 +62,32 @@ namespace voltdb {
 class TableIndexPicker
 {
     template <class TKeyType>
-    TableIndex *getInstanceForKeyType() const
+    TableIndex *getInstanceForPairType() const
     {
         if (m_scheme.unique) {
-            if (m_type != BALANCED_TREE_INDEX) {
-                return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
-            } else if (m_scheme.countable) {
+            if (m_scheme.countable) {
                 return new CompactingTreeUniqueIndex<TKeyType, true>(m_keySchema, m_scheme);
             } else {
                 return new CompactingTreeUniqueIndex<TKeyType, false>(m_keySchema, m_scheme);
             }
         } else {
-            if (m_type != BALANCED_TREE_INDEX) {
-                return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
-            } else if (m_scheme.countable) {
+            if (m_scheme.countable) {
                 return new CompactingTreeMultiMapIndex<TKeyType, true>(m_keySchema, m_scheme);
             } else {
                 return new CompactingTreeMultiMapIndex<TKeyType, false>(m_keySchema, m_scheme);
             }
         }
+    }
+
+
+    template <class TKeyType>
+    TableIndex *getInstanceForKeyType() const
+    {
+        assert(m_type != BALANCED_TREE_INDEX);
+        if (m_scheme.unique)
+                return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
+        else
+                return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
     }
 
 //TODO: refactor code here
@@ -93,10 +100,12 @@ class TableIndexPicker
         if (m_intsOnly) {
             // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
             // the number of 8-byte uint64's required to store KeySize packed bytes.
-            if (m_scheme.unique || m_type!=BALANCED_TREE_INDEX) {
+            if (m_type!=BALANCED_TREE_INDEX) {
                 return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
             }
-            return getInstanceForKeyType<IntsPointerKey<(KeySize-1)/8 + 1> >();
+            if (m_scheme.unique)
+                return getInstanceForPairType<NormalKeyValuePair<IntsKey<(KeySize-1)/8 + 1>, const void*> >();
+            return getInstanceForPairType<PointerKeyValuePair<IntsPointerKey, (KeySize-1)/8 + 1> >();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
@@ -111,9 +120,9 @@ class TableIndexPicker
         // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
         // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
-            return getInstanceForKeyType<GenericKey<KeySize> >();
+            return getInstanceForPairType<NormalKeyValuePair<GenericKey<KeySize>, const void *> >();
         }
-        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
+        return getInstanceForPairType<NormalKeyValuePair<GenericPersistentKey<KeySize>, const void *> >();
     }
 
     template <int ColCount>
@@ -187,15 +196,15 @@ public:
 
         if (m_scheme.unique) {
             if (m_scheme.countable) {
-                return new CompactingTreeUniqueIndex<TupleKey, true >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey, const void *>, true >(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeUniqueIndex<TupleKey, false >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey, const void *>, false>(m_keySchema, m_scheme);
             }
         }
         if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<TupleKey, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey, const void *>, true >(m_keySchema, m_scheme);
         } else {
-            return new CompactingTreeMultiMapIndex<TupleKey, false >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey, const void *>, false>(m_keySchema, m_scheme);
         }
     }
 
