@@ -262,11 +262,12 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     bool spanBuffer = false;
-    StreamBlock* oldBlock = m_currBlock;
+    StreamBlock* oldBlock = NULL;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
+            oldBlock = m_currBlock;
             m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
