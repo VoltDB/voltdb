@@ -46,9 +46,12 @@
 #include "abstractjoinnode.h"
 
 #include "expressions/abstractexpression.h"
+#include "common/TupleSchema.h"
 
 #include <stdexcept>
 #include <sstream>
+
+#include "boost/foreach.hpp"
 
 using namespace std;
 using namespace voltdb;
@@ -68,6 +71,12 @@ AbstractJoinPlanNode::~AbstractJoinPlanNode()
     delete m_preJoinPredicate;
     delete m_joinPredicate;
     delete m_wherePredicate;
+
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
+    }
+
+    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
 }
 
 JoinType AbstractJoinPlanNode::getJoinType() const
@@ -107,7 +116,7 @@ void AbstractJoinPlanNode::getOutputColumnExpressions(
 
 const TupleSchema* AbstractJoinPlanNode::getTupleSchemaPreAgg() const
 {
-    return m_tupleSchemaPreAgg;
+    return const_cast<const TupleSchema*>(m_tupleSchemaPreAgg);
 }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const

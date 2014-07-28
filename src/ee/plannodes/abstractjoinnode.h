@@ -101,7 +101,7 @@ protected:
     // output schema pre inline aggregation
     std::vector<SchemaColumn*> m_outputSchemaPreAgg;
 
-    const TupleSchema* m_tupleSchemaPreAgg;
+    TupleSchema* m_tupleSchemaPreAgg;
 };
 
 }
