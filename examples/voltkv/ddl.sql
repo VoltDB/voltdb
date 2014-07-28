@@ -6,7 +6,3 @@ CREATE TABLE store
 );
 
 PARTITION TABLE store ON COLUMN key;
-
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Remove;
-PARTITION PROCEDURE Remove ON TABLE store COLUMN key;
