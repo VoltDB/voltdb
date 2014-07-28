@@ -389,6 +389,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_HASHAGGREGATE: {
         return "HASHAGGREGATE";
     }
+    case PLAN_NODE_TYPE_PARTIALAGGREGATE: {
+        return "PARTIALAGGREGATE";
+    }
     case PLAN_NODE_TYPE_UNION: {
         return "UNION";
     }
@@ -447,6 +450,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
         return PLAN_NODE_TYPE_HASHAGGREGATE;
+    } else if (str == "PARTIALAGGREGATE") {
+        return PLAN_NODE_TYPE_PARTIALAGGREGATE;
     } else if (str == "UNION") {
         return PLAN_NODE_TYPE_UNION;
     } else if (str == "ORDERBY") {
