@@ -77,8 +77,9 @@ protected:
     static const char BLACK = 1;
 
     struct TreeNode {
-        Key key;
-        Data value;
+        //Key key;
+        //Data value;
+        std::pair<Key, Data> kv;
         TreeNode *parent;
         TreeNode *left;
         TreeNode *right;
@@ -111,9 +112,9 @@ public:
     public:
         iterator() : m_map(NULL), m_node(NULL) {}
         iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
-        Key &key() const { return m_node->key; }
-        Data &value() const { return m_node->value; }
-        void setValue(const Data &value) { m_node->value = value; }
+        Key &key() const { return m_node->kv.first; }
+        Data &value() const { return m_node->kv.second; }
+        void setValue(const Data &value) { m_node->kv.second = value; }
         void moveNext() { m_node = m_map->successor(m_node); }
         void movePrev() { m_node = m_map->predecessor(m_node); }
         bool isEnd() const { return ((!m_map) || (m_node == &(m_map->NIL))); }
@@ -211,6 +212,7 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 CompactingMap<Key, Data, Compare, hasRank>::~CompactingMap() {
     iterator iter = begin();
     while (!iter.isEnd()) {
+        // TODO: how to deconstruct this? Will pair deconstructor automatically release these two?
         iter.key().~Key();
         iter.value().~Data();
         iter.moveNext();
@@ -240,7 +242,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         TreeNode *x = m_root;
         while (x != &NIL) {
             y = x;
-            int cmp = m_comper(value.first, x->key);
+            int cmp = m_comper(value.first, x->kv.first);
             if (cmp < 0)
                 x = x->left;
             else if (m_unique) {
@@ -266,8 +268,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->key = value.first;
-        z->value = value.second;
+        z->kv = value;
         z->left = z->right = &NIL;
         z->parent = y;
         z->color = RED;
@@ -276,7 +277,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
 
         // stitch it in
         if (y == &NIL) m_root = z;
-        else if (m_comper(z->key, y->key) < 0) y->left = z;
+        else if (m_comper(z->kv.first, y->kv.first) < 0) y->left = z;
         else y->right = z;
 
         // rotate tree to balance if needed
@@ -288,8 +289,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->key = value.first;
-        z->value = value.second;
+        z->kv = value;
         z->left = z->right = &NIL;
         z->parent = &NIL;
         z->color = BLACK;
@@ -309,7 +309,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::iterator CompactingMap<Key,
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->key, key);
+        int cmp = m_comper(x->kv.first, key);
         if (cmp < 0) {
             x = x->right;
         }
@@ -326,7 +326,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::iterator CompactingMap<Key,
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->key, key);
+        int cmp = m_comper(x->kv.first, key);
         if (cmp <= 0) {
             x = x->right;
         }
@@ -376,8 +376,9 @@ void CompactingMap<Key, Data, Compare, hasRank>::erase(TreeNode *z) {
     }
 
     if (y != z) {
-        z->key = y->key;
-        z->value = y->value;
+        // z->key = y->key;
+        // z->value = y->value;
+        z->kv = y->kv;
         delnode = y;
     }
     if (hasRank) {
@@ -401,7 +402,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key
     TreeNode *x = m_root;
     TreeNode *retval = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->key, key);
+        int cmp = m_comper(x->kv.first, key);
         if (cmp < 0) {
             x = x->right;
         }
@@ -625,8 +626,9 @@ void CompactingMap<Key, Data, Compare, hasRank>::fragmentFixup(TreeNode *X) {
     X->left = last->left;
     X->right = last->right;
     X->color = last->color;
-    X->key = last->key;
-    X->value = last->value;
+    //X->key = last->key;
+    //X->value = last->value;
+    X->kv = last->kv;
     if (hasRank)
         X->subct = last->subct;
 
@@ -737,26 +739,26 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
     // TODO: this is just a dirty fix
-    fillLastSlot(m_root->key, 0);
-    int m = m_comper(key, m_root->key);
-    fillLastSlot(m_root->key, m_root->value);
+    fillLastSlot(m_root->kv.first, 0);
+    int m = m_comper(key, m_root->kv.first);
+    fillLastSlot(m_root->kv.first, m_root->kv.second);
     if (m == 0) {
         if (m_root->right != &NIL)
             ctr = getSubct(m_root->right);
         ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
-            fillLastSlot(p->key, 0);
-            if (m_comper(key, p->key) == 0) {
+            fillLastSlot(p->kv.first, 0);
+            if (m_comper(key, p->kv.first) == 0) {
                 if (p->right != &NIL) {
-                    fillLastSlot(p->right->key, 0);
-                    if (m_comper(key, p->right->key) == 0) {
+                    fillLastSlot(p->right->kv.first, 0);
+                    if (m_comper(key, p->right->kv.first) == 0) {
                         ct-= getSubct(p->right);
                     }
-                    fillLastSlot(p->right->key, p->right->value);
+                    fillLastSlot(p->right->kv.first, p->right->kv.second);
                 }
                 ct--;
             }
-            fillLastSlot(p->key, p->value);
+            fillLastSlot(p->kv.first, p->kv.second);
             p = p->parent;
         }
     } else if (m > 0) {
@@ -962,8 +964,8 @@ int CompactingMap<Key, Data, Compare, hasRank>::verify(const TreeNode *n) const 
     }
 
     // check for strict ordering
-    if ((n->left != &NIL) && (m_comper(n->key, n->left->key) < 0)) return -1;
-    if ((n->right != &NIL) && (m_comper(n->key, n->right->key) > 0)) return -1;
+    if ((n->left != &NIL) && (m_comper(n->kv.first, n->left->kv.first) < 0)) return -1;
+    if ((n->right != &NIL) && (m_comper(n->kv.first, n->right->kv.first) > 0)) return -1;
 
     // recursive step (compare black height)
     int leftBH = verify(n->left);
