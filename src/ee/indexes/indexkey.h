@@ -809,8 +809,10 @@ struct IntsPointerKey : public IntsKey<keySize + 1> {
         IntsKey<keySize+1>::data[keySize] = (uint64_t)(tuple->address());
     }
 
-    void fillLastSlot(uint64_t v) {
+    uint64_t fillLastSlot(uint64_t v) {
+        uint64_t rv = IntsKey<keySize+1>::data[keySize];
         IntsKey<keySize+1>::data[keySize] = v;
+        return rv;
     }
 };
 
@@ -845,8 +847,37 @@ struct IntsPointerHasher : public IntsHasher<keySize + 1> {
     }
 };
 
+// overload template
 template <std::size_t keySize, typename V>
 void fillLastSlot(IntsPointerKey<keySize>& k, const V& v) { k.fillLastSlot((uint64_t)v); }
+
+template <template <typename> class IntsPointerKey, const void *, std::size_t keySize> 
+class KeyValuePair {
+public:
+    //typedef IntsPointerKey Key;
+    typedef template <keySize> class IntsPointerKey Key;
+    typedef const void * Data;
+
+    // the caller has to make sure the key has already contained the value
+    // the signatures are to be consist with the general template
+    KeyValuePair(Key &key, Data &value) : k(key) {}
+    KeyValuePair(std::pair<Key, Data> &p) : k(p.first) {}
+
+    Key& getKey() { return k; }
+    Data& getValue() { return (Data)k.data[keySize]; }
+    void setKey(Key &key) { k = key; }
+    void setValue(Data &value) { k.fillLastSlot((uint64_t)value); }
+
+    // set the last slot to the new value, and return the old value 
+    uint64_t fillLastSlot(const Data &value) {
+        //uint64_t rv = k.data[keySize];
+        return k.fillLastSlot((uint64_t)value);
+        //return rv;
+    }
+
+private:
+    Key k;
+};
 
 }
 #endif // INDEXKEY_H
