@@ -1138,8 +1138,10 @@ public abstract class CatalogUtil {
             return;
         }
 
-        // TODO: The database name is not available in deployment.xml (it is defined in project.xml). However, it must
-        // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
+        // The database name is not available in deployment.xml (it is defined
+        // in project.xml). However, it must always be named "database", so
+        // I've temporarily hardcoded it here until a more robust solution is
+        // available.
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
@@ -1256,12 +1258,15 @@ public abstract class CatalogUtil {
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes)
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
-            ByteBuffer.allocate(catalogBytes.length +
+            ByteBuffer.allocate(
+                    4 +  // catalog bytes length
+                    catalogBytes.length +
+                    4 +  // deployment bytes length
+                    deploymentBytes.length +
                     4 +  // catalog version
                     8 +  // txnID
                     8 +  // unique ID
@@ -1271,9 +1276,12 @@ public abstract class CatalogUtil {
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.put(deploymentHash);
+        versionAndBytes.put(makeCatalogOrDeploymentHash(catalogBytes));
+        versionAndBytes.put(makeCatalogOrDeploymentHash(deploymentBytes));
+        versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.putInt(deploymentBytes.length);
+        versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
     }
 
@@ -1281,12 +1289,12 @@ public abstract class CatalogUtil {
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes) throws KeeperException, InterruptedException
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, catalogBytes, deploymentHash);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
@@ -1295,12 +1303,12 @@ public abstract class CatalogUtil {
             int catalogVersion,
             long txnId,
             long uniqueId,
-            byte[] catalogHash,
-            byte[] deploymentHash,
-            byte[] catalogBytes) throws KeeperException, InterruptedException
+            byte[] catalogBytes,
+            byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, deploymentHash, catalogBytes);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
@@ -1308,22 +1316,36 @@ public abstract class CatalogUtil {
         public final long txnId;
         public final long uniqueId;
         public final int version;
-        public final byte[] catalogHash;
-        public final byte[] deploymentHash;
-        public final byte[] bytes;
+        private final byte[] catalogHash;
+        private final byte[] deploymentHash;
+        public final byte[] catalogBytes;
+        public final byte[] deploymentBytes;
 
-        public CatalogAndIds(long txnId,
+        private CatalogAndIds(long txnId,
                 long uniqueId,
                 int catalogVersion,
                 byte[] catalogHash,
                 byte[] deploymentHash,
-                byte[] catalogBytes) {
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
             this.catalogHash = catalogHash;
             this.deploymentHash = deploymentHash;
-            this.bytes = catalogBytes;
+            this.catalogBytes = catalogBytes;
+            this.deploymentBytes = deploymentBytes;
+        }
+
+        public byte[] getCatalogHash()
+        {
+            return catalogHash.clone();
+        }
+
+        public byte[] getDeploymentHash()
+        {
+            return deploymentHash.clone();
         }
 
         @Override
@@ -1346,11 +1368,15 @@ public abstract class CatalogUtil {
         versionAndBytes.get(catalogHash);
         byte[] deploymentHash = new byte[20]; // sha-1 hash size
         versionAndBytes.get(deploymentHash);
-        byte[] catalogBytes = new byte[versionAndBytes.remaining()];
+        int catalogLength = versionAndBytes.getInt();
+        byte[] catalogBytes = new byte[catalogLength];
         versionAndBytes.get(catalogBytes);
+        int deploymentLength = versionAndBytes.getInt();
+        byte[] deploymentBytes = new byte[deploymentLength];
+        versionAndBytes.get(deploymentBytes);
         versionAndBytes = null;
         return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes);
+                deploymentHash, catalogBytes, deploymentBytes);
     }
 
     /**
@@ -1538,7 +1564,6 @@ public abstract class CatalogUtil {
             try {
                 indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }

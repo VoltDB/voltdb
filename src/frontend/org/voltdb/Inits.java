@@ -307,17 +307,18 @@ public class Inits {
                     long catalogTxnId;
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
-                    byte[] catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
+                    // Need to get the deployment bytes from ZK
+                    CatalogAndIds catalogStuff =
+                        CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
+                    byte[] deploymentBytes = catalogStuff.deploymentBytes;
 
                     // publish the catalog bytes to ZK
-                    CatalogUtil.uploadCatalogToZK(
+                    CatalogUtil.setCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
-                            catalogHash,
                             catalogBytes,
-                            // The deployment hash was generated for the starter catalog, reuse it
-                            m_rvdb.m_catalogContext.deploymentHash);
+                            deploymentBytes);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -349,13 +350,13 @@ public class Inits {
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
                 }
-            } while (catalogStuff == null);
+            } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
             String serializedCatalog = null;
-            byte[] catalogJarBytes = catalogStuff.bytes;
+            byte[] catalogJarBytes = catalogStuff.catalogBytes;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes);
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
                 serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();

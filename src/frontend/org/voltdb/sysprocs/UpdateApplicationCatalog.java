@@ -25,7 +25,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
@@ -87,7 +86,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             CatalogAndIds catalogStuff = null;
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.bytes);
+                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
                 JarLoader testjarloader = testjar.getLoader();
                 for (String classname : testjarloader.getClassNames()) {
                     try {
@@ -142,31 +141,31 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 Pair<CatalogContext, CatalogSpecificPlanner> p =
                 VoltDB.instance().catalogUpdate(
                         commands,
-                        catalogStuff.bytes,
-                        catalogStuff.catalogHash,
+                        catalogStuff.catalogBytes,
+                        catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
                         getVoltPrivateRealTransactionIdDontUseMe(),
                         getUniqueId(),
-                        catalogStuff.deploymentHash);
+                        catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
                 log.info(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                         CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                        Encoder.hexEncode(catalogStuff.catalogHash).substring(0, 10),
-                        Encoder.hexEncode(catalogStuff.deploymentHash).substring(0, 10),
+                        Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
+                        Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
                         replayInfo));
             }
             // if seen before by this code, then check to see if this is a restart
             else if ((context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                     (Arrays.equals(context.getCatalogHash(), catalogStuff.catalogHash) &&
-                      Arrays.equals(context.getDeploymentHash(), catalogStuff.deploymentHash))))
+                     (Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                      Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash()))))
             {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.catalogHash),
-                            Encoder.hexEncode(catalogStuff.deploymentHash)));
+                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
+                            Encoder.hexEncode(catalogStuff.getDeploymentHash())));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
@@ -283,8 +282,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // restart?
         else {
             if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                (Arrays.equals(catalogStuff.catalogHash, catalogHash) &&
-                 Arrays.equals(catalogStuff.deploymentHash, deploymentHash)))
+                (Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                 Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)))
             {
                 log.debug("Restarting catalog update: " + catalogStuff.toString());
             }
@@ -300,6 +299,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             }
         }
 
+        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
         // update the global version. only one site per node will accomplish this.
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
@@ -308,13 +308,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 expectedCatalogVersion + 1,
                 getVoltPrivateRealTransactionIdDontUseMe(),
                 getUniqueId(),
-                catalogHash,
-                deploymentHash,
-                catalogBytes);
-        if (deploymentString != null) {
-            zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1,
-                    new ZKUtil.StatCallback(), null);
-        }
+                catalogBytes,
+                deploymentBytes);
 
         try {
             performCatalogVerifyWork(
@@ -332,9 +327,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     catalogStuff.version,
                     catalogStuff.txnId,
                     catalogStuff.uniqueId,
-                    catalogStuff.catalogHash,
-                    catalogStuff.deploymentHash,
-                    catalogStuff.bytes);
+                    catalogStuff.catalogBytes,
+                    catalogStuff.deploymentBytes);
             throw vae;
             // If there is a cluster failure after this point, we will re-run
             // the transaction with the same input args and the old state,

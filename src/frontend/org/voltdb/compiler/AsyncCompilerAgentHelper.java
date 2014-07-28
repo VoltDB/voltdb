@@ -24,11 +24,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -96,11 +96,6 @@ public class AsyncCompilerAgentHelper
         retval.catalogBytes = newCatalogBytes;
         retval.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(newCatalogBytes);
 
-        // UpdateApplicationCatalog uses the original null value to decide whether or not
-        // to update the global ZK version of the deployment bytes, so just push that
-        // along for now.
-        retval.deploymentString = work.deploymentString;
-
         // get the diff between catalogs
         try {
             // try to get the new catalog from the params
@@ -120,8 +115,9 @@ public class AsyncCompilerAgentHelper
             // work.deploymentString could be null if it wasn't provided to UpdateApplicationCatalog
             if (deploymentString == null) {
                 // Go get the deployment string from ZK.  Hope it's there and up-to-date.  Yeehaw!
-                byte[] deploymentBytes =
-                    VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null);
+                CatalogAndIds catalogStuff =
+                    CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                byte[] deploymentBytes = catalogStuff.deploymentBytes;
                 if (deploymentBytes != null) {
                     deploymentString = new String(deploymentBytes, "UTF-8");
                 }
@@ -138,6 +134,7 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
 
+            retval.deploymentString = deploymentString;
             retval.deploymentHash =
                 CatalogUtil.makeCatalogOrDeploymentHash(deploymentString.getBytes("UTF-8"));
 

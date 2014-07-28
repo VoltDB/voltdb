@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -114,6 +113,7 @@ import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -1058,7 +1058,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     deploymentFile.delete();
                 }
                 FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
-                fileOutputStream.write(getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null));
+                CatalogAndIds catalogStuff =
+                    CatalogUtil.getCatalogFromZK(getHostMessenger().getZK());
+                fileOutputStream.write(catalogStuff.deploymentBytes);
                 fileOutputStream.close();
             } catch (Exception e) {
                 hostLog.error("Failed to log deployment file: " + e.getMessage());
@@ -1200,15 +1202,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
-    //Get deployment bytes from ZooKeeper.
-    byte[] getDeploymentBytesFromZk(ZooKeeper zk) {
-        try {
-            return zk.getData(VoltZK.deploymentBytes, false, null);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -1225,26 +1218,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             try {
                 if (deploymentBytes != null) {
-                    zk.create(VoltZK.deploymentBytes, deploymentBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    CatalogUtil.uploadCatalogToZK(zk,
+                            // Fill in innocuous values for non-deployment stuff
+                            0,
+                            0L,
+                            0L,
+                            new byte[] {},  // spin loop in Inits.LoadCatalog.run() needs
+                                            // this to be of zero length until we have a real catalog.
+                            deploymentBytes);
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {
-                    deploymentBytes = getDeploymentBytesFromZk(zk);
+                    CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                    deploymentBytes = catalogStuff.deploymentBytes;
                 }
             } catch (KeeperException.NodeExistsException e) {
-                byte deploymentBytesTemp[] = getDeploymentBytesFromZk(zk);
+                CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
                 if (deploymentBytesTemp != null) {
-                    //Check crc if its a supplied deployment on command line.
+                    //Check hash if its a supplied deployment on command line.
                     //We will ignore the supplied or default deployment anyways.
-                    // TODO: Someday change this to use the SHA-1 hash
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
-                        PureJavaCrc32 crc = new PureJavaCrc32();
-                        crc.update(deploymentBytes);
-                        final long checksumHere = crc.getValue();
-                        crc.reset();
-                        crc.update(deploymentBytesTemp);
-                        if (checksumHere != crc.getValue()) {
-                            hostLog.warn("The locally provided deployment configuration did not match the "
-                                    + "configuration information found in the cluster.");
+                        byte[] deploymentHashHere =
+                            CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+                        if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
+                        {
+                            hostLog.warn("The locally provided deployment configuration did not " +
+                                    " match the configuration information found in the cluster.");
                         } else {
                             hostLog.info("Deployment configuration pulled from other cluster node.");
                         }
