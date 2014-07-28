@@ -442,7 +442,7 @@ public class SnapshotUtil {
 
         final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
         if (f.exists()) {
-            throw new IOException(".complete file was already existed: " + f);
+            throw new IOException(f.getName() + " was already existed.");
         }
         return new Runnable() {
             @Override
