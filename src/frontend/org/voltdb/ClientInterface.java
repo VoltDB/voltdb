@@ -482,11 +482,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         success = true;
                                     }
                                 } catch (IOException e) {
-                                    try {
-                                        socket.close();
-                                    } catch (IOException e1) {
-                                        //Don't care connection is already lost anyways
-                                    }
                                     if (m_running) {
                                         if (timeoutRef.get() != null) {
                                             hostLog.warn(timeoutRef.get());
@@ -497,6 +492,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                     }
                                 } finally {
                                     if (!success) {
+                                        try {
+                                            socket.close();
+                                        } catch (IOException e1) {
+                                            //Don't care connection is already lost anyways
+                                        }
                                         m_numConnections.decrementAndGet();
                                     }
                                 }
@@ -595,6 +595,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                               "): wire protocol violation (timeout reading message length).");
                 //Send negative response
@@ -607,6 +608,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             final int messageLength = lengthBuffer.getInt();
             if (messageLength < 0) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
@@ -616,6 +618,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
+                timeoutFuture.cancel(false);
                   authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                                "): wire protocol violation (message length " + messageLength + " is too large).");
                   //Send negative response
@@ -640,6 +643,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the whole message. Client isn't going to get anymore time.
             if (message.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
@@ -662,6 +666,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final String service = fds.readString();
             final String username = fds.readString();
             final byte password[] = new byte[20];
+            //We should be left with SHA-1 bytes only.
+            if (message.remaining() != 20) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
+                        + "): user " + username + " failed authentication.");
+                //Send negative response
+                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                return null;
+            }
             message.get(password);
 
             CatalogContext context = m_catalogContext.get();
@@ -1841,7 +1855,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
-        final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
+        StoredProcedureInvocation task = null;
+        try {
+            task = fds.readObject(StoredProcedureInvocation.class);
+        } catch (Exception ex) {
+            return new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], ex.getMessage(), ccxn.connectionId());
+        }
         ClientResponseImpl error = null;
 
         // Check for admin mode restrictions before proceeding any further

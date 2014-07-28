@@ -29,20 +29,18 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestClientPort extends TestCase {
+public class TestClientPortListener extends TestCase {
 
     PortListener ncprocess;
     PipeToFile pf;
     int rport;
 
-    public TestClientPort(String name) {
+    public TestClientPortListener(String name) {
         super(name);
     }
 

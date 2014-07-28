@@ -166,6 +166,9 @@ public class FastDeserializer implements DataInput {
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("String length is negative " + len);
         }
+        if (len > buffer.remaining()) {
+            throw new IOException("String length is bigger than total buffer " + len);
+        }
 
         // now assume not null
         final byte[] strbytes = new byte[len];
@@ -200,6 +203,9 @@ public class FastDeserializer implements DataInput {
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("String length is negative " + len);
         }
+        if (len > buffer.remaining()) {
+            throw new IOException("String length is bigger than total buffer " + len);
+        }
 
         // now assume not null
         final byte[] strbytes = new byte[len];
@@ -233,6 +239,9 @@ public class FastDeserializer implements DataInput {
 
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("Varbinary length is negative " + len);
+        }
+        if (len > buffer.remaining()) {
+            throw new IOException("Varbinary length is bigger than total buffer " + len);
         }
 
         // now assume not null

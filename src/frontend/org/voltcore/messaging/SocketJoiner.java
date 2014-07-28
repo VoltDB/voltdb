@@ -36,16 +36,18 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+
+import com.google.common.base.Charsets;
 
 /**
  * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
@@ -263,6 +265,42 @@ public class SocketJoiner {
         }
     }
 
+    /**
+     * Read a length prefixed JSON message
+     */
+    private JSONObject readJSONObjFromWire(SocketChannel sc, String remoteAddressForErrorMsg) throws IOException, JSONException {
+        // length prefix
+        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+        while (lengthBuffer.remaining() > 0) {
+            int read = sc.read(lengthBuffer);
+            if (read == -1) {
+                throw new EOFException(remoteAddressForErrorMsg);
+            }
+        }
+        lengthBuffer.flip();
+        int length = lengthBuffer.getInt();
+
+        // don't allow for a crazy unallocatable json payload
+        if (length > 16 * 1024) {
+            throw new IOException(
+                    "Length prefix on wire for expected JSON string is greater than 16K max.");
+        }
+
+        // content
+        ByteBuffer messageBytes = ByteBuffer.allocate(length);
+        while (messageBytes.hasRemaining()) {
+            int read = sc.read(messageBytes);
+            if (read == -1) {
+                throw new EOFException(remoteAddressForErrorMsg);
+            }
+        }
+        messageBytes.flip();
+
+        JSONObject jsObj = new JSONObject(new String(messageBytes.array(), Charsets.UTF_8));
+        return jsObj;
+    }
+
+
     /*
      * Pull all ready to accept sockets
      */
@@ -283,29 +321,7 @@ public class SocketJoiner {
                 sc.write(currentTime);
             }
 
-            /*
-             * Read a length prefixed JSON message
-             */
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-
-            while (lengthBuffer.remaining() > 0) {
-                int read = sc.read(lengthBuffer);
-                if (read == -1) {
-                    throw new EOFException(remoteAddress);
-                }
-            }
-            lengthBuffer.flip();
-
-            ByteBuffer messageBytes = ByteBuffer.allocate(lengthBuffer.getInt());
-            while (messageBytes.hasRemaining()) {
-                int read = sc.read(messageBytes);
-                if (read == -1) {
-                    throw new EOFException(remoteAddress);
-                }
-            }
-            messageBytes.flip();
-
-            JSONObject jsObj = new JSONObject(new String(messageBytes.array(), "UTF-8"));
+            JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
 
             /*
              * The type of connection, it can be a new request to join the cluster
@@ -416,6 +432,8 @@ public class SocketJoiner {
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
 
+            final String remoteAddress = socket.socket().getRemoteSocketAddress().toString();
+
             ByteBuffer currentTime = ByteBuffer.allocate(8);
             while (currentTime.hasRemaining()) {
                 socket.read(currentTime);
@@ -452,24 +470,7 @@ public class SocketJoiner {
 
             // send the local hostid out
             LOG.debug("Non-Primary requesting its Host ID");
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                int read = socket.read(lengthBuffer);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            lengthBuffer.flip();
-
-            ByteBuffer responseBuffer = ByteBuffer.allocate(lengthBuffer.getInt());
-            while (responseBuffer.hasRemaining()) {
-                int read = socket.read(responseBuffer);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            String jsonString = new String(responseBuffer.array(), "UTF-8");
-            JSONObject jsonObj = new JSONObject(jsonString);
+            JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
 
             /*
              * Get the generated host id, and the interface we connected on
