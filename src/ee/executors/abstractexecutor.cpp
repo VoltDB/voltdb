@@ -142,7 +142,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
  */
 void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
     assert(limits);
-    TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(
+            m_abstractNode->getOutputSchema(), true);
     int column_count = (int)m_abstractNode->getOutputSchema().size();
     std::vector<std::string> column_names(column_count);
     assert(column_count >= 1);

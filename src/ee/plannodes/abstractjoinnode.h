@@ -68,6 +68,10 @@ public:
 
     AbstractExpression* getWherePredicate() const;
 
+    void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
+
+    const TupleSchema* getTupleSchemaPreAgg() const;
+
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
@@ -93,6 +97,11 @@ protected:
 
     // Currently either inner or left outer.
     JoinType m_joinType;
+
+    // output schema pre inline aggregation
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    TupleSchema* m_tupleSchemaPreAgg;
 };
 
 }
