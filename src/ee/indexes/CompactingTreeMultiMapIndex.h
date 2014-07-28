@@ -92,6 +92,8 @@ class CompactingTreeMultiMapIndex : public TableIndex
     {
         assert(originalTuple.address() != destinationTuple.address());
 
+        // TODO: when we make sure the KeyType in this type index always depends on
+        // address, we can remove all the condition like this
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
             if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
@@ -268,11 +270,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (!hasRank) {
             return -1;
         }
-        KeyType tmpKey(searchKey);
-        if (isUpper)
-            std::cout<<"GET :"<< tmpKey.debug(TableIndex::m_keySchema)<< "isUpper:True"<<std::endl;
-        else
-            std::cout<<"GET :"<< tmpKey.debug(TableIndex::m_keySchema)<< "isUpper:False"<<std::endl;
         CompactingTreeMultiMapIndex::moveToKeyOrGreater(searchKey);
         if (m_keyIter.isEnd()) {
             return m_entries.size() + 1;
@@ -293,10 +290,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
         }
         ++m_lookups;
         KeyType tmpKey(searchKey);
-        if (isUpper)
-            std::cout<<"LET : isUpper:True"<<std::endl;
-        else
-            std::cout<<"LET : isUpper:False"<<std::endl;
         MapIterator mapIter = m_entries.lowerBound(tmpKey);
         if (mapIter.isEnd()) {
             return m_entries.size();

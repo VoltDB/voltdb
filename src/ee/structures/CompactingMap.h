@@ -37,7 +37,6 @@ typedef u_int32_t NodeCount;
 
 namespace voltdb {
 
-// TODO: if we use the KeyValuePair class, this template func is no longer necessary.
 //  We can define some member function like fillLastSlot() to achieve the same goal.
 template <typename T, typename V>
 void fillLastSlot(T& t, const V& v) {}
@@ -763,7 +762,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     if (n == &NIL) return -1;
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
-    // TODO: this is just a dirty fix
+    // fix xin's code by set and unset key before each comparision
     uint64_t lv1 = m_root->kv.fillLastSlot(0);
     int m = m_comper(key, m_root->kv.getKey());
     m_root->kv.fillLastSlot(lv1);

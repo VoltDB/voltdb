@@ -84,10 +84,12 @@ class TableIndexPicker
     TableIndex *getInstanceForKeyType() const
     {
         assert(m_type != BALANCED_TREE_INDEX);
-        if (m_scheme.unique)
-                return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
-        else
-                return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
+        if (m_scheme.unique) {
+            return new CompactingHashUniqueIndex<TKeyType>(m_keySchema, m_scheme);
+        }
+        else {
+            return new CompactingHashMultiMapIndex<TKeyType>(m_keySchema, m_scheme);
+        }
     }
 
 //TODO: refactor code here

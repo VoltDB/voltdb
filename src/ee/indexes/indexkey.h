@@ -342,9 +342,6 @@ struct IntsKey
         }
     }
 
-    // do nothing, but only for template works
-    void fillLastSlot(uint64_t v) {};
-
     // actual location of data
     uint64_t data[keySize];
 };
@@ -455,11 +452,6 @@ struct GenericKey
             keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
         }
     }
-
-    // do nothing, but only for template works
-    void fillLastSlot(uint64_t v) {};
-    // do nothing
-    std::string debug(const voltdb::TupleSchema *keySchema) const {return std::string();}
 
     // actual location of data, extends past the end.
     char data[keySize];
@@ -729,11 +721,6 @@ struct TupleKey
         return (*m_indexedExprs)[indexColumn]->eval(&tuple, NULL);
     }
 
-    // do nothing, but only for template works
-    void fillLastSlot(uint64_t v) {};
-    // do nothing
-    std::string debug(const voltdb::TupleSchema *keySchema) const {return std::string();}
-
 private:
     // TableIndex owns these vectors which are used to extract key values from a persistent tuple
     // - both are NULL for an ephemeral key
@@ -773,18 +760,13 @@ private:
     const TupleSchema *m_keySchema;
 };
 
-// only used for hash index
-template <std::size_t keySize> struct IntsPointerEqualityChecker;
-//
+// Tree index only uses comparator
 template <std::size_t keySize> struct IntsPointerComparator;
-template <std::size_t keySize> struct IntsPointerHasher;
 
 // some case base class is easier using keySize+1
 template <std::size_t keySize>
 struct IntsPointerKey : public IntsKey<keySize + 1> {
-    typedef IntsPointerEqualityChecker<keySize> KeyEqualityChecker;
     typedef IntsPointerComparator<keySize> KeyComparator;
-    typedef IntsPointerHasher<keySize> KeyHasher;
 
     static inline bool keyDependsOnTupleAddress() { return true; }
 
@@ -822,26 +804,6 @@ struct IntsPointerComparator : public IntsComparator<keySize + 1> {
     inline int operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
         return IntsComparator<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(lhs),
                                                        static_cast<const IntsKey<keySize+1> >(rhs));
-    }
-};
-
-// TODO: these two are only used for hash index, maybe can be removed
-template <std::size_t keySize>
-struct IntsPointerEqualityChecker : public IntsEqualityChecker<keySize + 1> {
-    IntsPointerEqualityChecker(const TupleSchema *keySchema)
-        : IntsEqualityChecker<keySize + 1>(keySchema) {}
-
-    inline bool operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
-        return IntsEqualityChecker<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(lhs),
-                                                            static_cast<const IntsKey<keySize+1> >(rhs));
-    }
-};
-
-template <std::size_t keySize>
-struct IntsPointerHasher : public IntsHasher<keySize + 1> {
-    IntsPointerHasher(const TupleSchema *unused_keySchema) : IntsHasher<keySize+1>(unused_keySchema) {}
-    inline size_t operator()(IntsPointerKey<keySize> const& p) const {
-        return IntsHasher<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(p));
     }
 };
 
