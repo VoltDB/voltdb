@@ -644,11 +644,10 @@ public class ParameterSet implements JSONString {
         }
         else {
             VoltType nextType = null;
-            byte etype = in.readByte();
             try {
-                nextType = VoltType.get(etype);
+                nextType = VoltType.get(nextTypeByte);
             } catch (AssertionError ae) {
-                throw new RuntimeException("ParameterSet doesn't support type " + etype);
+                throw new RuntimeException("ParameterSet doesn't support type " + nextTypeByte);
             }
             switch (nextType) {
                 case NULL:

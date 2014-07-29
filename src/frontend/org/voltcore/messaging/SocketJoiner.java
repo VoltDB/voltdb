@@ -285,6 +285,10 @@ public class SocketJoiner {
             throw new IOException(
                     "Length prefix on wire for expected JSON string is greater than 16K max.");
         }
+        if (length < 2) {
+            throw new IOException(
+                    "Length prefix on wire for expected JSON string is less than minimum size of a valid JSON document.");
+        }
 
         // content
         ByteBuffer messageBytes = ByteBuffer.allocate(length);
