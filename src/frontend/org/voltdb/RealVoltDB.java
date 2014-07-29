@@ -783,19 +783,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Configure replica-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                String drMasterHost = m_catalogContext.cluster.getDrmasterhost();
+                if (drMasterHost == null || drMasterHost.isEmpty()) {
+                    VoltDB.crashLocalVoltDB("Cannot start as replica without an enabled DR data connection.");
+                }
                 try {
                     Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.AgentReceiver");
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                             String.class,
                             ClientInterface.class,
                             boolean.class);
-                    // TODO: Do this a real way, not with a property
-                    String masterHost = System.getProperty("DR_MASTER_HOST");
-                    if (masterHost == null) {
-                        VoltDB.crashLocalVoltDB("Cannot start as replica without specifying a master cluster");
-                    }
                     m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
-                            masterHost,
+                            drMasterHost,
                             m_clientInterface,
                             true);
                     m_replicaDRGateway.initializeReplicaCluster(m_cartographer);
@@ -2077,6 +2076,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // the MPI statistics.
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+            }
+
+            // 6. If we are a DR replica, we may care about a
+            // deployment update
+            if (m_replicaDRGateway != null) {
+                m_replicaDRGateway.updateCatalog(m_catalogContext);
             }
 
             new ConfigLogging().logCatalogAndDeployment();

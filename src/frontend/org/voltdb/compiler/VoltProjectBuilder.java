@@ -57,7 +57,9 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -282,6 +284,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticTargetPauseTime = null;
 
     private boolean m_useAdhocSchema = false;
+
+    private String m_drMasterHost;
 
     public VoltProjectBuilder setElasticTargetThroughput(int target) {
         m_elasticTargetThroughput = target;
@@ -541,6 +545,10 @@ public class VoltProjectBuilder {
     public void setMaxTempTableMemory(int max)
     {
         m_maxTempTableMemory = max;
+    }
+
+    public void setDRMasterHost(String drMasterHost) {
+        m_drMasterHost = drMasterHost;
     }
 
     /**
@@ -1123,6 +1131,15 @@ public class VoltProjectBuilder {
                 configProperties.add(prop);
             }
             export.setConfiguration(exportConfig);
+        }
+
+        if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+            DrType dr = factory.createDrType();
+            deployment.setDr(dr);
+            ConnectionType conn = factory.createConnectionType();
+            dr.setConnection(conn);
+            conn.setEnabled(true);
+            conn.setSource(m_drMasterHost);
         }
 
         // Have some yummy boilerplate!

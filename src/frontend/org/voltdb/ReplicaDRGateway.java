@@ -26,6 +26,8 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract void initializeReplicaCluster(Cartographer cartographer);
 
+    public abstract void updateCatalog(CatalogContext catalog);
+
     public abstract void shutdown();
 
 }

@@ -48,6 +48,7 @@
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
                   type="systemSettingsType" />
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
+      <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
     </xs:all>
   </xs:complexType>
 
@@ -309,5 +310,28 @@
         <xs:enumeration value="kerberos"/>
     </xs:restriction>
   </xs:simpleType>
-
+  
+  <!-- DR -->
+  <xs:complexType name="drType">
+    <xs:sequence>
+        <!-- Currently, only one DR data source is allowed -->
+        <xs:element name="connection" type="connectionType" minOccurs="1" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" default=""/>
+    <xs:attribute name="id" type="xs:int" default="0"/>
+  </xs:complexType>
+  
+  <xs:complexType name="connectionType">
+    <xs:attribute name="source" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- Only the most basic validation that this could possibly be a hostname -->
+          <xs:minLength value="1"/>
+          <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
+    <xs:attribute name="group" type="xs:string" default="" />
+  </xs:complexType>
 </xs:schema>
