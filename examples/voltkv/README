@@ -46,6 +46,11 @@ For more on benchmarking and tips on application tuning, make sure you visit the
  - http://voltdb.com/search/node/benchmark
  - http://voltdb.com/search/node/tuning
 
+Calling stored procedures
+-------------------------
+
+Clients can make query calls to the server which uses inbuilt stored procedure calls. A Get query uses inbuilt STORE.select procedure call and a Put query (insert or update) uses inbuilt STORE.upsert procedure call.
+
 run.sh actions described
 ---------------------
 

@@ -57,6 +57,7 @@ namespace voltdb {
 
 class NestLoopIndexPlanNode;
 class IndexScanPlanNode;
+class AggregateExecutorBase;
 class PersistentTable;
 class Table;
 class TempTable;
@@ -75,14 +76,13 @@ class NestLoopIndexExecutor : public AbstractExecutor
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node),
-        index_values_backing_store(NULL)
+        m_index_values_backing_store(NULL)
     {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
+        m_node = NULL;
+        m_indexNode = NULL;
+        m_innerTable = NULL;
+        m_index = NULL;
+        m_outerTable = NULL;
         m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
     }
 
@@ -90,26 +90,27 @@ public:
 
     void updateTargetTableAndIndex();
 
-protected:
+ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    NestLoopIndexPlanNode* node;
-    IndexScanPlanNode* inline_node;
+    NestLoopIndexPlanNode* m_node;
+    IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    TempTable* output_table;
-    PersistentTable* inner_table;
-    TableIndex *index;
-    TableTuple index_values;
-    Table* outer_table;
-    JoinType join_type;
+    PersistentTable* m_innerTable;
+    TableIndex *m_index;
+    TableTuple m_indexValues;
+    Table* m_outerTable;
+    JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
 
+    AggregateExecutorBase* m_aggExec;
+
     //So valgrind doesn't report the data as lost.
-    char *index_values_backing_store;
+    char *m_index_values_backing_store;
 };
 
 }

@@ -288,6 +288,10 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             }
             return matches.toArray(new String[0]);
         }
+
+        public Set<String> getClassNames() {
+            return m_classNames;
+        }
     }
 
     public JarLoader getLoader() {

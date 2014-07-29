@@ -254,12 +254,209 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     // Group by with index
-    private void checkGroupByOnlyPlan(boolean twoFragments, boolean isHashAggregator,
-            boolean isIndexScan) {
+    private void checkGroupByOnlyPlan(boolean twoFragments, PlanNodeType type, boolean isIndexScan) {
         AbstractPlanNode apn = pns.get(0).getChild(0);
         if (twoFragments) {
-            assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+            assertEquals(apn.getPlanNodeType(), PlanNodeType.HASHAGGREGATE);
             apn = pns.get(1).getChild(0);
+        }
+
+        // For a single table aggregate, it is inline always.
+        assertTrue(apn.getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
+
+        if (type == PlanNodeType.HASHAGGREGATE) {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        } else if (type == PlanNodeType.AGGREGATE) {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        } else if (type == PlanNodeType.PARTIALAGGREGATE) {
+            assertNotNull(apn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
+        }
+    }
+
+    PlanNodeType H_AGG = PlanNodeType.HASHAGGREGATE;
+    PlanNodeType S_AGG = PlanNodeType.AGGREGATE;
+    PlanNodeType P_AGG = PlanNodeType.PARTIALAGGREGATE;
+
+    public void testGroupByOnly() {
+        System.out.println("Starting testGroupByOnly");
+
+        /**
+         * Serial Aggregate cases
+         */
+        // Replicated Table
+
+        // only GROUP BY cols in SELECT clause
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // SELECT cols in GROUP BY and other aggregate cols
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // aggregate cols are part of keys of used index
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // expr index, full indexed case
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // function index, prefix indexed case
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // order of GROUP BY cols is different of them in index definition
+        // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
+        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
+        checkGroupByOnlyPlan(false, S_AGG, true);
+
+        // Partitioned Table
+        pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
+        // index scan for group by only, no need using hash aggregate
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
+        checkGroupByOnlyPlan(true, S_AGG, true);
+
+
+        /**
+         * Hash Aggregate cases
+         */
+        // unoptimized case (only use second col of the index), but will be replaced in
+        // SeqScanToIndexScan optimization for deterministic reason
+        // use EXPR_RF_TREE1 not EXPR_RF_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        checkGroupByOnlyPlan(false, H_AGG, true);
+
+        // unoptimized case: index is not scannable
+        pns = compileToFragments("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3");
+        checkGroupByOnlyPlan(false, H_AGG, true);
+
+        // unoptimized case: F_D2 is not prefix indexable
+        pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
+        checkGroupByOnlyPlan(false, H_AGG, true);
+
+        // unoptimized case (only uses second col of the index), will not be replaced in
+        // SeqScanToIndexScan for determinism because of non-deterministic receive.
+        // Use primary key index
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
+        checkGroupByOnlyPlan(true, H_AGG, true);
+
+        // unoptimized case (only uses second col of the index), will be replaced in
+        // SeqScanToIndexScan for determinism.
+        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
+        checkGroupByOnlyPlan(false, H_AGG, true);
+
+        /**
+         * Partial Aggregate cases
+         */
+        // unoptimized case: no prefix index found for (F_D1, F_D2)
+        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
+        checkGroupByOnlyPlan(false, P_AGG, true);
+
+        pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3");
+        checkGroupByOnlyPlan(false, P_AGG, true);
+
+        // partition table
+        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2");
+        checkGroupByOnlyPlan(true, P_AGG, true);
+
+        pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3");
+        checkGroupByOnlyPlan(true, P_AGG, true);
+    }
+
+    private void checkPartialAggregate(boolean twoFragments) {
+        AbstractPlanNode apn;
+        if (twoFragments) {
+            assertEquals(2, pns.size());
+            apn = pns.get(1).getChild(0);
+        } else {
+            assertEquals(1, pns.size());
+            apn = pns.get(0).getChild(0);
+        }
+
+        assertTrue(apn.toExplainPlanString().toLowerCase().contains("partial"));
+    }
+
+    public void testPartialSerialAggregateOnJoin() {
+        String sql;
+        sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY G.G_D1, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY RF.F_D2, G.G_D1";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+
+        // three table joins with aggregate
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, RF.F_D2, G.G_D1, F.F_D3";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+        // With different group by key ordered
+        sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
+                "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
+                "GROUP BY RF.F_D2, G.G_PKEY, F.F_D3, G.G_D1";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+    }
+
+
+    // check group by query with limit
+    // Query has group by from partition column and limit, does not have order by
+    private void checkGroupByOnlyPlanWithLimit(boolean twoFragments, boolean isHashAggregator,
+            boolean isIndexScan, boolean inlineLimit) {
+        // 'inlineLimit' means LIMIT get pushed down for partition table and inlined with aggregate.
+
+        AbstractPlanNode apn = pns.get(0).getChild(0);
+        if (!inlineLimit || twoFragments) {
+            assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+            apn = apn.getChild(0);
+        }
+
+        // Group by partition column does not need top group by node.
+        if (twoFragments) {
+            apn = pns.get(1).getChild(0);
+            if (!inlineLimit) {
+                assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+                apn = apn.getChild(0);
+            }
         }
 
         // For a single table aggregate, it is inline always.
@@ -268,96 +465,71 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
         } else {
             assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
+            if (inlineLimit) {
+                AbstractPlanNode p = apn.getInlinePlanNode(PlanNodeType.AGGREGATE);
+                assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
         }
     }
 
-    public void testGroupByOnly() {
-        System.out.println("Starting testGroupByOnly");
-        // Replicated Table
+    // GROUP BY With LIMIT without ORDER BY
+    public void testGroupByWithLimit() {
+        // replicated table with serial aggregation and inlined limit
+        pns = compileToFragments("SELECT F_PKEY FROM RF GROUP BY F_PKEY LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, false, true, true);
 
-        // only GROUP BY cols in SELECT clause
-        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(false, false, true);
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, false, true, true);
 
-        // SELECT cols in GROUP BY and other aggregate cols
-        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(false, false, true);
+        // partitioned table with serial aggregation and inlined limit
+        // group by columns contain the partition key is the only case allowed
+        pns = compileToFragments("SELECT F_PKEY FROM F GROUP BY F_PKEY LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
-        // aggregate cols are part of keys of used index
-        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(false, false, true);
+        // Explain plan for the above query
+        /*
+           RETURN RESULTS TO STORED PROCEDURE
+            LIMIT 5
+             RECEIVE FROM ALL PARTITIONS
 
-        // expr index, full indexed case
-        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(false, false, true);
+           RETURN RESULTS TO STORED PROCEDURE
+            INDEX SCAN of "F" using its primary key index (for optimized grouping only)
+             inline Serial AGGREGATION ops
+              inline LIMIT 5
+        */
+        String expectedStr = "  inline Serial AGGREGATION ops\n" +
+                             "   inline LIMIT 5";
+        AbstractPlanNode.disableVerboseExplainForDebugging();
+        AbstractExpression.disableVerboseExplainForDebugging();
 
-        // function index, prefix indexed case
-        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(false, false, true);
+        String explainPlan = "";
+        for (AbstractPlanNode apn: pns) {
+            explainPlan += apn.toExplainPlanString();
+        }
+        assertTrue(explainPlan.contains(expectedStr));
 
-        // order of GROUP BY cols is different of them in index definition
-        // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
-        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(false, false, true);
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
 
-        pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
-        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan(false, false, true);
-        System.out.println("Finishing testGroupByOnly");
+        pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
-        // unoptimized case (only use second col of the index), but will be replaced in
-        // SeqScanToIndexScan optimization for deterministic reason
-        // use EXPR_RF_TREE1 not EXPR_RF_TREE2
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(false, true, true);
+        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 GROUP BY A3, B3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, false, true, true);
 
-        // unoptimized case: index is not scannable
-        pns = compileToFragments("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3");
-        checkGroupByOnlyPlan(false, true, true);
+        // In future, it may use the serial aggregate: ENG-6586
+        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(true, true, true, false);
 
-        // unoptimized case: F_D2 is not prefix indexable
-        pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
-        checkGroupByOnlyPlan(false, true, true);
+        //
+        // negative tests
+        //
+        pns = compileToFragments("SELECT F_VAL2 FROM RF GROUP BY F_VAL2 LIMIT 5");
+        checkGroupByOnlyPlanWithLimit(false, true, true, false);
 
-        // unoptimized case: no prefix index found for (F_D1, F_D2)
-        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
-        checkGroupByOnlyPlan(false, true, true);
-
-        // Partitioned Table
-        pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
-        // index scan for group by only, no need using hash aggregate
-        checkGroupByOnlyPlan(true, false, true);
-
-        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
-        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
-        //*/ debug */ System.out.println("DEBUG: " + pns.get(1).toExplainPlanString());
-        checkGroupByOnlyPlan(true, false, true);
-
-        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(true, false, true);
-
-        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(true, false, true);
-
-        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(true, false, true);
-
-        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(true, false, true);
-
-        // unoptimized case (only uses second col of the index), will not be replaced in
-        // SeqScanToIndexScan for determinism because of non-deterministic receive.
-        // Use primary key index
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(true, true, true);
-
-        // unoptimized case (only uses second col of the index), will be replaced in
-        // SeqScanToIndexScan for determinism.
-        // use EXPR_F_TREE1 not EXPR_F_TREE2
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
-        //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
-        System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
-        checkGroupByOnlyPlan(false, true, true);
+        // Limit should not be pushed down for case like:
+        // Group by non-partition without partition key and order by.
+        // ENG-6485
     }
 
     public void testEdgeComplexRelatedCases() {
@@ -449,6 +621,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
+        // inline limit with order by
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        p = p.getChild(0);
         // inline aggregate
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
@@ -639,19 +815,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true, false);
+        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true, true);
 
 
         sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, true);
 
         sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
                 "group by v_p1.v_b1;";
-        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true, true);
 
         sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, false);
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true, true);
     }
 
     public void testMVBasedQuery_EdgeCases() {
@@ -871,7 +1047,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (int i = 0; i < joinType.length; i++) {
             String newsql = sql.replace("@joinType", joinType[i]);
             pns = compileToFragments(newsql);
-            System.out.println("Query:" + newsql);
+            System.err.println("Query:" + newsql);
             // No join node under receive node.
             checkMVReaggregateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                     numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false, false);
@@ -1196,12 +1372,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
             }
             assertTrue(p instanceof AbstractScanPlanNode);
         } else {
-            assertTrue(p instanceof AggregatePlanNode);
-            AggregatePlanNode topAggNode = (AggregatePlanNode) p;
-
+            AggregatePlanNode topAggNode = null;
+            if (p instanceof AbstractJoinPlanNode) {
+                // Inline aggregation with join
+                topAggNode = AggregatePlanNode.getInlineAggregationNode(p);
+            } else {
+                assertTrue(p instanceof AggregatePlanNode);
+                topAggNode = (AggregatePlanNode) p;
+                p = p.getChild(0);
+            }
             assertEquals(numGroupbyOfTopAggNode, topAggNode.getGroupByExpressionsSize());
             assertEquals(numAggsOfTopAggNode, topAggNode.getAggregateTypesSize());
-            p = p.getChild(0);
 
             if (needFix) {
                 p = receiveNode.getParent(0);
@@ -1223,8 +1404,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             if (aggPushdown) {
                 assertTrue(!needFix);
                 if (aggInline) {
-                    assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                            p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+                    assertNotNull(AggregatePlanNode.getInlineAggregationNode(p));
                 } else {
                     assertTrue(p instanceof AggregatePlanNode);
                     p = p.getChild(0);
