@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +41,7 @@ import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -81,7 +81,6 @@ public class VoltProjectBuilder {
 
     final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
     private StringBuffer transformer = new StringBuffer();
-    private boolean transformed = false;
 
     public static final class ProcedureInfo {
         private final String groups[];
@@ -119,12 +118,10 @@ public class VoltProjectBuilder {
             this.groups = groups;
             this.cls = null;
             this.name = name;
-            if(sql.endsWith(";"))
-            {
+            if (sql.endsWith(";")) {
                 this.sql = sql;
             }
-            else
-            {
+            else {
                 this.sql = sql + ";";
             }
             this.partitionInfo = partitionInfo;
@@ -220,13 +217,8 @@ public class VoltProjectBuilder {
         }
     }
 
-    final ArrayList<String> m_exportTables = new ArrayList<String>();
-
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
-    final LinkedHashSet<GroupInfo> m_groups = new LinkedHashSet<GroupInfo>();
-    final LinkedHashSet<ProcedureInfo> m_procedures = new LinkedHashSet<ProcedureInfo>();
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
-    final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
     String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
@@ -346,8 +338,6 @@ public class VoltProjectBuilder {
 
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
-            final boolean added = m_groups.add(info);
-
             transformer.append("CREATE ROLE " + info.name);
             if(info.adhoc || info.defaultproc || info.sysproc)
             {
@@ -369,10 +359,6 @@ public class VoltProjectBuilder {
             else
             {
                 transformer.append(";");
-            }
-
-            if (!added) {
-                assert(added);
             }
         }
     }
@@ -451,14 +437,13 @@ public class VoltProjectBuilder {
         final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
-            assert(m_procedures.contains(procedure) == false);
             newProcs.add(procedure);
         }
 
         // add the procs
         for (final ProcedureInfo procedure : procedures) {
-            m_procedures.add(procedure);
 
+            // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
             if(procedure.groups.length != 0)
             {
@@ -516,9 +501,6 @@ public class VoltProjectBuilder {
     }
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
-        assert(m_partitionInfos.containsKey(tableName) == false);
-        m_partitionInfos.put(tableName, partitionColumnName);
-
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
     }
 
@@ -584,7 +566,6 @@ public class VoltProjectBuilder {
 
     public void setTableAsExportOnly(String name) {
         assert(name != null);
-        m_exportTables.add(name);
         transformer.append("Export TABLE " + name + ";");
     }
 
@@ -708,7 +689,6 @@ public class VoltProjectBuilder {
             e.printStackTrace();
         }
 
-        final String projectPath = null;
         int index = 0;
         String[] schemaPath = new String[m_schemas.size()];
         Iterator<String> ite = m_schemas.iterator();
@@ -722,7 +702,14 @@ public class VoltProjectBuilder {
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
-        boolean success = compiler.compileWithProjectXML(projectPath, jarPath, schemaPath);
+
+        boolean success = false;
+        try {
+            success = compiler.compileFromDDL(jarPath, schemaPath);
+        } catch (VoltCompilerException e1) {
+            e1.printStackTrace();
+        }
+
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
