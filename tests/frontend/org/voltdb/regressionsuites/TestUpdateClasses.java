@@ -109,6 +109,40 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             }
             assertTrue(threw);
 
+            // First, some tests of incorrect parameters
+            // only 1 param
+            threw = false;
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes());
+            }
+            catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("UpdateClasses system procedure requires exactly two parameters"));
+                threw = true;
+            }
+            assertTrue(threw);
+
+            // wrong jarfile param type
+            threw = false;
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", 10L, null);
+            }
+            catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("UpdateClasses system procedure takes the jarfile bytes as a byte array"));
+                threw = true;
+            }
+            assertTrue(threw);
+
+            // wrong delete string param type
+            threw = false;
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), 10L);
+            }
+            catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("UpdateClasses system procedure takes the list of classes"));
+                threw = true;
+            }
+            assertTrue(threw);
+
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             System.out.println(((ClientResponseImpl)resp).toJSONString());
 

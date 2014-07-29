@@ -1239,9 +1239,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicy(new ParameterDeserializationPolicy(true));
         registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
 
+        // NOTE: These "policies" are really parameter correctness checks, not permissions
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
+        registerPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
