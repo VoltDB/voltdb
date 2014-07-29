@@ -67,73 +67,77 @@ using namespace voltdb;
 class CompactingTreeMultiIndexTest : public Test {
 public:
     CompactingTreeMultiIndexTest() {}
+    TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
+        TableTuple *tuple = new TableTuple(schema);
+        char *data = new char[tuple->tupleLength()];
+        memset(data, 0, tuple->tupleLength());
+        tuple->move(data);
+
+        tuple->setNValue(idx, ValueFactory::getBigIntValue(value));
+        return tuple;
+    }
+
+    char* initTuples(TupleSchema *schema, int places) {
+        long num = 1L << places;
+        char *data = new char[25 * num];
+        if (data == NULL)
+            return NULL;
+        memset(data, 0, 25 * num);
+        for (long ii = 0; ii < num; ii++) {
+            TableTuple tempTuple(data + (25 * ii), schema);
+            tempTuple.setNValue(0, ValueFactory::getBigIntValue(12345));
+            tempTuple.setNValue(1, ValueFactory::getBigIntValue(45688));
+            tempTuple.setNValue(2, ValueFactory::getBigIntValue(rand()));
+        }
+        return data;
+    }
+
+    std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char *data, int places) {
+        long limit = 1L << places;
+        TableTuple tempTuple(data, schema);
+        std::clock_t start = std::clock();
+        for (long ii = 0; ii < limit; ii++) {
+            tempTuple.move(data + (25 * ii));
+            index->addEntry(&tempTuple);
+        }
+        std::clock_t end = std::clock();
+        return end - start;
+    }
+
+    std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char *data, int places) {
+        long limit = 1L << places;
+        long tmp = 1L << (places/2);
+        TableTuple tempTuple(data, schema);
+        std::clock_t start = std::clock();
+        for (long ii = 0; ii < limit; ii++) {
+            long jj = ((ii % tmp) << (places/2)) + (ii / tmp);
+            tempTuple.move(data + (25 * jj));
+            index->addEntry(&tempTuple);
+        }
+        std::clock_t end = std::clock();
+        return end - start;
+    }
+
+    // delete num tuples
+    std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
+        long gap = (1L << places) / num;
+        TableTuple deleteTuple(data, schema);
+        std::clock_t start = std::clock();
+        for (int ii = 0; ii < num; ii++) {
+            deleteTuple.move(data + (25 * gap * ii));
+            index->deleteEntry(&deleteTuple);
+        }
+        std::clock_t end = std::clock();
+        // check correctness of delete
+        for (int ii = 0; ii < num; ii++) {
+            deleteTuple.move(data + (25 * gap * ii));
+            EXPECT_FALSE(index->exists(&deleteTuple));
+        }
+        return end - start;
+    }
 };
 
-static TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
-    TableTuple *tuple = new TableTuple(schema);
-    char *data = new char[tuple->tupleLength()];
-    memset(data, 0, tuple->tupleLength());
-    tuple->move(data);
-
-    tuple->setNValue(idx, ValueFactory::getBigIntValue(value));
-    return tuple;
-}
-
-static char* initTuples(TupleSchema *schema, int places) {
-    long num = 1L << places;
-    char *data = new char[25 * num];
-    if (data == NULL)
-        return NULL;
-    memset(data, 0, 25 * num);
-    for (long ii = 0; ii < num; ii++) {
-        TableTuple tempTuple(data + (25 * ii), schema);
-        tempTuple.setNValue(0, ValueFactory::getBigIntValue(12345));
-        tempTuple.setNValue(1, ValueFactory::getBigIntValue(45688));
-        tempTuple.setNValue(2, ValueFactory::getBigIntValue(rand()));
-    }
-    return data;
-}
-
-static std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char *data, int places) {
-    long limit = 1L << places;
-    TableTuple tempTuple(data, schema);
-    std::clock_t start = std::clock();
-    for (long ii = 0; ii < limit; ii++) {
-    tempTuple.move(data + (25 * ii));
-        index->addEntry(&tempTuple);
-    }
-    std::clock_t end = std::clock();
-    return end - start;
-}
-
-static std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char *data, int places) {
-    long limit = 1L << places;
-    long tmp = 1L << (places/2);
-    TableTuple tempTuple(data, schema);
-    std::clock_t start = std::clock();
-    for (long ii = 0; ii < limit; ii++) {
-    long jj = ((ii % tmp) << (places/2)) + (ii / tmp);
-        tempTuple.move(data + (25 * jj));
-        index->addEntry(&tempTuple);
-    }
-    std::clock_t end = std::clock();
-    return end - start;
-}
-
-// delete num tuples
-static std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
-    long gap = (1L << places) / num;
-    TableTuple deleteTuple(data, schema);
-    std::clock_t start = std::clock();
-    for (int ii = 0; ii < num; ii++) {
-    deleteTuple.move(data + (25 * gap * ii));
-    index->deleteEntry(&deleteTuple);
-    }
-    std::clock_t end = std::clock();
-    return end - start;
-}
-
-TEST_F(CompactingTreeMultiIndexTest, test1) {
+TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     TableIndex *index = NULL;
     vector<int> columnIndices;
     vector<ValueType> columnTypes;
@@ -181,7 +185,8 @@ TEST_F(CompactingTreeMultiIndexTest, test1) {
     delete tuple4;
 }
 
-TEST_F(CompactingTreeMultiIndexTest, test2) {
+// create three types of index and test their performace of delete
+TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
@@ -232,12 +237,18 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
                                                                      columnLengths,
                                                                      columnAllowNull);
-        TupleSchema *kschema = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                                     kcolumnLengths,
-                                                                     kcolumnAllowNull);
+        TupleSchema *kschema1 = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
+                                                                      kcolumnLengths,
+                                                                      kcolumnAllowNull);
         TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
                                                                       kcolumnLengths2,
                                                                       kcolumnAllowNull2);
+        assert(schema);
+        assert(schema1);
+        assert(schema2);
+        assert(kschema1);
+        assert(kschema2);
+
         TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                                 columnIndices, TableIndex::simplyIndexColumns(),
                                 false, false, schema);
@@ -250,7 +261,7 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         // build index
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         TableIndex *indexWithoutPointer =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema, scheme1);
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema1, scheme1);
         TableIndex *indexWithoutPointer2 =
             new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
         assert(index);
@@ -294,12 +305,18 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
                                                                      columnLengths,
                                                                      columnAllowNull);
-        TupleSchema *kschema = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                                     kcolumnLengths,
-                                                                     kcolumnAllowNull);
+        TupleSchema *kschema1 = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
+                                                                      kcolumnLengths,
+                                                                      kcolumnAllowNull);
         TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
                                                                       kcolumnLengths2,
                                                                       kcolumnAllowNull2);
+        assert(schema);
+        assert(schema1);
+        assert(schema2);
+        assert(kschema1);
+        assert(kschema2);
+
         TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                                 columnIndices, TableIndex::simplyIndexColumns(),
                                 false, false, schema);
@@ -312,7 +329,7 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         // build index
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         TableIndex *indexWithoutPointer =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema, scheme1);
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema1, scheme1);
         TableIndex *indexWithoutPointer2 =
             new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
         assert(index);

@@ -763,6 +763,7 @@ private:
 // Tree index only uses comparator
 template <std::size_t keySize> struct IntsPointerComparator;
 
+// TODO: use pointer instead of one element of uint64_t array
 // some case base class is easier using keySize+1
 template <std::size_t keySize>
 struct IntsPointerKey : public IntsKey<keySize + 1> {
@@ -787,7 +788,6 @@ struct IntsPointerKey : public IntsKey<keySize + 1> {
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
                    : IntsKey<keySize+1>(tuple, indices, indexed_expressions, keySchema) {
-        //TODO: use non-C-style casting
         IntsKey<keySize+1>::data[keySize] = (uint64_t)(tuple->address());
     }
 
@@ -829,6 +829,7 @@ public:
 
     first_type& getKey() { return k; }
     const first_type& getKey() const { return k; }
+    // TODO: this is bad, and change it to use a member func
     second_type& getValue() { return (second_type&)k.getLastSlot(); }
     void setKey(first_type &key) { k = key; }
     void setValue(const second_type &value) { k.fillLastSlot((uint64_t)value); }
