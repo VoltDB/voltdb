@@ -327,28 +327,19 @@ public class PlanAssembler {
             }
         }
 
-        // Get the best plans for the expression subqueries ( EXISTS (SELECT...) )
-        List<AbstractExpression> existsExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.EXISTS_SUBQUERY);
-        ParsedResultAccumulator existsSubqueryResult = null;
-        if ( ! existsExprs.isEmpty() ) {
-            existsSubqueryResult = getBestCostPlanForExpressionSubQueries(existsExprs);
-            if (existsSubqueryResult == null) {
+        // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.EXISTS_SUBQUERY);
+        subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
+        ParsedResultAccumulator exprSubqueryResult = null;
+        if ( ! subqueryExprs.isEmpty() ) {
+            exprSubqueryResult = getBestCostPlanForExpressionSubQueries(subqueryExprs);
+            if (exprSubqueryResult == null) {
                 // There was at least one sub-query and we should have a compiled plan for it
                 return null;
             }
         }
 
-        // Get the best plans for the expression subqueries ( IN (SELECT...) )
-        List<AbstractExpression> inExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY);
-        ParsedResultAccumulator inSubqueryResult = null;
-        if ( ! inExprs.isEmpty() ) {
-            inSubqueryResult = getBestCostPlanForExpressionSubQueries(inExprs);
-            if (inSubqueryResult == null) {
-                // There was at least one sub-query and we should have a compiled plan for it
-                return null;
-            }
-        }
-        boolean hasSubquery = fromSubqueryResult != null || existsSubqueryResult != null || inSubqueryResult != null;
+        boolean hasSubquery = fromSubqueryResult != null || exprSubqueryResult != null;
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -374,11 +365,8 @@ public class PlanAssembler {
                 // Calculate the combined state of determinism for the parent and child statements
                 boolean orderIsDeterministic = (fromSubqueryResult != null) ?
                         fromSubqueryResult.m_orderIsDeterministic : true;
-                if (existsSubqueryResult != null) {
-                    orderIsDeterministic &= existsSubqueryResult.m_orderIsDeterministic;
-                }
-                if (inSubqueryResult != null) {
-                    orderIsDeterministic &= inSubqueryResult.m_orderIsDeterministic;
+                if (exprSubqueryResult != null) {
+                    orderIsDeterministic &= exprSubqueryResult.m_orderIsDeterministic;
                 }
                 if (orderIsDeterministic == true) {
                     orderIsDeterministic = retval.isOrderDeterministic();
@@ -400,11 +388,8 @@ public class PlanAssembler {
                 }
                 boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
                         fromSubqueryResult.m_hasLimitOrOffset : false;
-                if (existsSubqueryResult != null) {
-                    hasLimitOrOffset &= existsSubqueryResult.m_hasLimitOrOffset;
-                }
-                if (inSubqueryResult != null) {
-                    hasLimitOrOffset &= inSubqueryResult.m_hasLimitOrOffset;
+                if (exprSubqueryResult != null) {
+                    hasLimitOrOffset &= exprSubqueryResult.m_hasLimitOrOffset;
                 }
                 retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
             }
