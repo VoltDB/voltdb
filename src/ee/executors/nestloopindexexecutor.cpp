@@ -162,13 +162,6 @@ inline void NestLoopIndexExecutor::updateTargetTableAndIndex() {
     m_index = m_innerTable->index(m_indexNode->getTargetIndexName());
     assert(m_index);
 
-    // NULL tuple for outer join
-    if (m_node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_out_table = m_indexNode->getOutputTable();
-        assert(inner_out_table);
-        m_null_tuple.init(inner_out_table->schema());
-    }
-
     m_indexValues = TableTuple(m_index->getKeySchema());
     m_indexValues.move( m_index_values_backing_store - TUPLE_HEADER_SIZE);
     m_indexValues.setAllNulls();
@@ -259,7 +252,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     int num_of_outer_cols = m_outerTable->columnCount();
     assert (outer_tuple.sizeInValues() == m_outerTable->columnCount());
     assert (inner_tuple.sizeInValues() == m_innerTable->columnCount());
-    TableTuple null_tuple = m_null_tuple;
+    const TableTuple &null_tuple = m_null_tuple.tuple();
     int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     TableTuple join_tuple;
@@ -536,7 +529,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
                 ++tuple_ctr;
-                join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
+                join_tuple.setNValues(num_of_outer_cols, m_null_tuple.tuple(), 0, num_of_inner_cols);
 
                 if (m_aggExec != NULL) {
                     if (m_aggExec->p_execute_tuple(join_tuple)) {
