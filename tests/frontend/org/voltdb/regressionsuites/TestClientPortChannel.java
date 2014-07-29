@@ -26,9 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import junit.framework.TestCase;
-import org.voltdb.BackendTarget;
 
+import junit.framework.TestCase;
+
+import org.voltdb.BackendTarget;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -329,9 +330,9 @@ public class TestClientPortChannel extends TestCase {
         };
         iarr = ByteBuffer.allocate(4).putInt(-200).array();
         for (int i = 0; i < 4; i++) {
-            neg1_length[i + 1] = iarr[i];
+            neg2_length[i + 1] = iarr[i];
         }
-        verifyInvocation(neg1_length, channel, (byte) -3);
+        verifyInvocation(neg2_length, channel, (byte) -3);
 
         //Procedure name length too long
         System.out.println("Testing Ping invocation with looooong procname length.");
@@ -363,15 +364,6 @@ public class TestClientPortChannel extends TestCase {
             0, 0, 0, 5,
             '@', 'P', 'i', 'n', 'g', //proc string length and name
             0, 0 //Client Data
-        };
-        verifyInvocation(bad_cl_data, channel, (byte) -3);
-        //too big cient data
-        System.out.println("Testing good Ping invocation with big client data");
-        byte big_cl_data[] = {0, //Version
-            0, 0, 0, 5,
-            '@', 'P', 'i', 'n', 'g', //proc string length and name
-            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
-            0, 0, 0, 0, 0, 0
         };
         verifyInvocation(bad_cl_data, channel, (byte) -3);
         System.out.println("Testing good Ping invocation Again");

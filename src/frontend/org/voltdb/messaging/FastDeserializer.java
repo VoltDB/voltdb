@@ -157,7 +157,6 @@ public class FastDeserializer implements DataInput {
         // check for null string
         if (len == NULL_STRING_INDICATOR)
             return null;
-        assert len >= 0;
 
         if (len > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Serializable strings cannot be longer then "
@@ -198,7 +197,6 @@ public class FastDeserializer implements DataInput {
         // check for null string
         if (len == NULL_STRING_INDICATOR)
             return null;
-        assert len >= 0;
 
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("String length is negative " + len);
@@ -235,7 +233,6 @@ public class FastDeserializer implements DataInput {
         // check for null string
         if (len == NULL_STRING_INDICATOR)
             return null;
-        assert len >= 0;
 
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("Varbinary length is negative " + len);
