@@ -42,6 +42,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -63,6 +64,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public class MockVoltDB implements VoltDBInterface
 {
+    private static final VoltLogger logger = new VoltLogger("MockVoltDB");
     private Catalog m_catalog;
     private CatalogContext m_context;
     final String m_clusterName = "cluster";
@@ -376,17 +378,22 @@ public class MockVoltDB implements VoltDBInterface
                             !initCompleted) {
                         int nodeId = VoltZK.getHostIDFromChildName(child);
                         if (nodeId == m_hostMessenger.getHostId()) {
-                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must CREATE first");
+                            VoltDB.crashLocalVoltDB("This node was started with start action " + startAction +
+                                    " during cluster creation. All nodes should be started with matching "
+                                    + "create or recover actions when bring up a cluster. Join and Rejoin "
+                                    + "are for adding nodes to an already running cluster.");
                         } else {
-                            System.err.println("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
+                            logger.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
                         }
                     }
                 }
             }
         } catch (KeeperException e) {
-            System.err.println("Failed to validate the start actions:" + e.getMessage());
+            logger.error("Failed to validate the start actions:" + e.getMessage());
         } catch (InterruptedException e) {
-            System.err.println("Interrupted during start action validation:" + e.getMessage());
+            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
         }
     }
 

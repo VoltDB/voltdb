@@ -1007,9 +1007,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             !initCompleted) {
                         int nodeId = VoltZK.getHostIDFromChildName(child);
                         if (nodeId == m_messenger.getHostId()) {
-                            VoltDB.crashLocalVoltDB(startAction + " a node during start process is not allowed, must CREATE first");
+                            VoltDB.crashLocalVoltDB("This node was started with start action " + startAction + " during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
                         } else {
-                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " but it is not allowed at create time");
+                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
                         }
                     }
                 }
@@ -1017,7 +1021,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } catch (KeeperException e) {
             hostLog.error("Failed to validate the start actions", e);
         } catch (InterruptedException e) {
-            hostLog.error("Interrupted during start action validation", e);
+            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
         }
     }
 
