@@ -794,6 +794,8 @@ struct IntsPointerKey : public IntsKey<keySize + 1> {
     void fillLastSlot(uint64_t v) {
         IntsKey<keySize+1>::data[keySize] = v;
     }
+
+    uint64_t& getLastSlot() { return IntsKey<keySize+1>::data[keySize]; }
 };
 
 template <std::size_t keySize>
@@ -811,33 +813,35 @@ struct IntsPointerComparator : public IntsComparator<keySize + 1> {
 template <std::size_t keySize, typename V>
 void fillLastSlot(IntsPointerKey<keySize>& k, const V& v) { k.fillLastSlot((uint64_t)v); }
 
-template < template <std::size_t> class PointerKey, std::size_t keySize>
+template < typename PointerKeyType, typename DataType = const void *>
 class PointerKeyValuePair {
 public:
-    typedef PointerKey<keySize> KeyType;
-    typedef const void * DataType;
+    // in order to be consistent with std::pair
+    typedef PointerKeyType first_type;
+    typedef DataType second_type;
 
     // the caller has to make sure the key has already contained the value
     // the signatures are to be consist with the general template
     PointerKeyValuePair() {}
-    PointerKeyValuePair(KeyType &key, DataType &value) : k(key) {}
-    PointerKeyValuePair(std::pair<KeyType, DataType> &p) : k(p.first) {}
+    PointerKeyValuePair(first_type &key, second_type &value) : k(key) {}
+    PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
+    PointerKeyValuePair(std::pair<first_type, second_type> &p) : k(p.first) {}
 
-    KeyType& getKey() { return k; }
-    const KeyType& getKey() const { return k; }
-    DataType& getValue() { return (DataType&)k.data[keySize]; }
-    void setKey(KeyType &key) { k = key; }
-    void setValue(const DataType &value) { k.fillLastSlot((uint64_t)value); }
+    first_type& getKey() { return k; }
+    const first_type& getKey() const { return k; }
+    second_type& getValue() { return (second_type&)k.getLastSlot(); }
+    void setKey(first_type &key) { k = key; }
+    void setValue(const second_type &value) { k.fillLastSlot((uint64_t)value); }
 
     // set the last slot to the new value, and return the old value
     uint64_t fillLastSlot(uint64_t value) {
-        uint64_t rv = k.data[keySize];
+        uint64_t rv = k.getLastSlot();
         k.fillLastSlot(value);
         return rv;
     }
 
 private:
-    KeyType k;
+    first_type k;
 };
 
 }

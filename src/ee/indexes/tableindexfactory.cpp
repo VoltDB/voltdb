@@ -106,8 +106,8 @@ class TableIndexPicker
                 return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
             }
             if (m_scheme.unique)
-                return getInstanceForPairType<NormalKeyValuePair<IntsKey<(KeySize-1)/8 + 1>, const void*> >();
-            return getInstanceForPairType<PointerKeyValuePair<IntsPointerKey, (KeySize-1)/8 + 1> >();
+                return getInstanceForPairType<NormalKeyValuePair<IntsKey<(KeySize-1)/8 + 1> > >();
+            return getInstanceForPairType<PointerKeyValuePair<IntsPointerKey<(KeySize-1)/8 + 1> > >();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
@@ -122,9 +122,9 @@ class TableIndexPicker
         // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
         // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
-            return getInstanceForPairType<NormalKeyValuePair<GenericKey<KeySize>, const void *> >();
+            return getInstanceForPairType<NormalKeyValuePair<GenericKey<KeySize> > >();
         }
-        return getInstanceForPairType<NormalKeyValuePair<GenericPersistentKey<KeySize>, const void *> >();
+        return getInstanceForPairType<NormalKeyValuePair<GenericPersistentKey<KeySize> > >();
     }
 
     template <int ColCount>
@@ -198,15 +198,15 @@ public:
 
         if (m_scheme.unique) {
             if (m_scheme.countable) {
-                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey, const void *>, true >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey, const void *>, false>(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
             }
         }
         if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey, const void *>, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
         } else {
-            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey, const void *>, false>(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
         }
     }
 

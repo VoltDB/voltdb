@@ -61,7 +61,7 @@ namespace voltdb {
 template<typename KeyValuePair, bool hasRank>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
-    typedef typename KeyValuePair::KeyType KeyType;
+    typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyType::KeyComparator KeyComparator;
     typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;

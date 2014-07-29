@@ -69,7 +69,7 @@ public:
     CompactingTreeMultiIndexTest() {}
 };
 
-TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
+static TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
     TableTuple *tuple = new TableTuple(schema);
     char *data = new char[tuple->tupleLength()];
     memset(data, 0, tuple->tupleLength());
@@ -79,7 +79,7 @@ TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
     return tuple;
 }
 
-char* initTuples(TupleSchema *schema, int places) {
+static char* initTuples(TupleSchema *schema, int places) {
     long num = 1L << places;
     char *data = new char[25 * num];
     if (data == NULL)
@@ -94,7 +94,7 @@ char* initTuples(TupleSchema *schema, int places) {
     return data;
 }
 
-std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char *data, int places) {
+static std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char *data, int places) {
     long limit = 1L << places;
     TableTuple tempTuple(data, schema);
     std::clock_t start = std::clock();
@@ -106,7 +106,7 @@ std::clock_t insertTuplesIntoIndex(TableIndex *index, TupleSchema *schema, char 
     return end - start;
 }
 
-std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char *data, int places) {
+static std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char *data, int places) {
     long limit = 1L << places;
     long tmp = 1L << (places/2);
     TableTuple tempTuple(data, schema);
@@ -121,7 +121,7 @@ std::clock_t insertTuplesIntoIndex2(TableIndex *index, TupleSchema *schema, char
 }
 
 // delete num tuples
-std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
+static std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
     long gap = (1L << places) / num;
     TableTuple deleteTuple(data, schema);
     std::clock_t start = std::clock();
@@ -224,20 +224,20 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
 #define PLACES 16
     for (int places = PLACES; places >= 4; places -= 2 ) {
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                    columnLengths,
+                                                                    columnAllowNull);
         TupleSchema *schema1 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                     columnLengths,
+                                                                     columnAllowNull);
         TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                     columnLengths,
+                                                                     columnAllowNull);
         TupleSchema *kschema = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                             kcolumnLengths,
-                                                             kcolumnAllowNull);
+                                                                     kcolumnLengths,
+                                                                     kcolumnAllowNull);
         TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
-                                                             kcolumnLengths2,
-                                                             kcolumnAllowNull2);
+                                                                      kcolumnLengths2,
+                                                                      kcolumnAllowNull2);
         TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                                 columnIndices, TableIndex::simplyIndexColumns(),
                                 false, false, schema);
@@ -247,59 +247,59 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
                                 columnIndices2, TableIndex::simplyIndexColumns(),
                                 false, false, schema2);
-    // build index
-    TableIndex *index = TableIndexFactory::getInstance(scheme);
-    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1>, const void*>, false>(kschema, scheme1);
-    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2>, const void*>, false>(kschema2, scheme2);
-    assert(index);
-    assert(indexWithoutPointer);
-    assert(indexWithoutPointer2);
+        // build index
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        TableIndex *indexWithoutPointer =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema, scheme1);
+        TableIndex *indexWithoutPointer2 =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
+        assert(index);
+        assert(indexWithoutPointer);
+        assert(indexWithoutPointer2);
 
         char *data = initTuples(schema, places);
         EXPECT_NE(data, NULL);
 
-    std::clock_t c1 = insertTuplesIntoIndex(index, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-    std::clock_t c2 = insertTuplesIntoIndex(indexWithoutPointer, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-    std::clock_t c3 = insertTuplesIntoIndex(indexWithoutPointer2, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::clock_t c1 = insertTuplesIntoIndex(index, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::clock_t c2 = insertTuplesIntoIndex(indexWithoutPointer, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::clock_t c3 = insertTuplesIntoIndex(indexWithoutPointer2, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
-    c1 = deleteTuplesFromIndex(index, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-    c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-    c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
         delete data;
 
-    // delete index
-    delete index;
-    delete indexWithoutPointer;
-    delete indexWithoutPointer2;
+        // delete index
+        delete index;
+        delete indexWithoutPointer;
+        delete indexWithoutPointer2;
         TupleSchema::freeTupleSchema(schema);
         TupleSchema::freeTupleSchema(schema1);
         TupleSchema::freeTupleSchema(schema2);
-        TupleSchema::freeTupleSchema(kschema);
-        TupleSchema::freeTupleSchema(kschema2);
     }
 
     for (int places = PLACES; places >= 4; places -= 2 ) {
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                    columnLengths,
+                                                                    columnAllowNull);
         TupleSchema *schema1 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                     columnLengths,
+                                                                     columnAllowNull);
         TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                            columnLengths,
-                                                            columnAllowNull);
+                                                                     columnLengths,
+                                                                     columnAllowNull);
         TupleSchema *kschema = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                             kcolumnLengths,
-                                                             kcolumnAllowNull);
+                                                                     kcolumnLengths,
+                                                                     kcolumnAllowNull);
         TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
-                                                             kcolumnLengths2,
-                                                             kcolumnAllowNull2);
+                                                                      kcolumnLengths2,
+                                                                      kcolumnAllowNull2);
         TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
                                 columnIndices, TableIndex::simplyIndexColumns(),
                                 false, false, schema);
@@ -309,41 +309,41 @@ TEST_F(CompactingTreeMultiIndexTest, test2) {
         TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
                                 columnIndices2, TableIndex::simplyIndexColumns(),
                                 false, false, schema2);
-    // build index
-    TableIndex *index = TableIndexFactory::getInstance(scheme);
-    TableIndex *indexWithoutPointer = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1>, const void *>, false>(kschema, scheme1);
-    TableIndex *indexWithoutPointer2 = new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2>, const void *>, false>(kschema2, scheme2);
-    assert(index);
-    assert(indexWithoutPointer);
-    assert(indexWithoutPointer2);
+        // build index
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        TableIndex *indexWithoutPointer =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema, scheme1);
+        TableIndex *indexWithoutPointer2 =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
+        assert(index);
+        assert(indexWithoutPointer);
+        assert(indexWithoutPointer2);
 
         char *data = initTuples(schema, places);
         EXPECT_NE(data, NULL);
 
-    std::clock_t c1 = insertTuplesIntoIndex2(index, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-    std::clock_t c2 = insertTuplesIntoIndex2(indexWithoutPointer, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-    std::clock_t c3 = insertTuplesIntoIndex2(indexWithoutPointer2, schema, data, places);
-    std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::clock_t c1 = insertTuplesIntoIndex2(index, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::clock_t c2 = insertTuplesIntoIndex2(indexWithoutPointer, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::clock_t c3 = insertTuplesIntoIndex2(indexWithoutPointer2, schema, data, places);
+        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
-    c1 = deleteTuplesFromIndex(index, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-    c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-    c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 8);
-    std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
         delete data;
 
-    // delete index
-    delete index;
-    delete indexWithoutPointer;
-    delete indexWithoutPointer2;
+        // delete index
+        delete index;
+        delete indexWithoutPointer;
+        delete indexWithoutPointer2;
         TupleSchema::freeTupleSchema(schema);
         TupleSchema::freeTupleSchema(schema1);
         TupleSchema::freeTupleSchema(schema2);
-        TupleSchema::freeTupleSchema(kschema);
-        TupleSchema::freeTupleSchema(kschema2);
     }
 }
 

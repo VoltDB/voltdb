@@ -41,31 +41,26 @@ namespace voltdb {
 template <typename T, typename V>
 void fillLastSlot(T& t, const V& v) {}
 
-template <typename Key, typename Data>
-class NormalKeyValuePair {
+template <typename Key, typename Data = const void *>
+class NormalKeyValuePair : public std::pair<Key, Data> {
 public:
-    typedef Key KeyType;
-    typedef Data DataType;
-
     NormalKeyValuePair() {}
-    NormalKeyValuePair(KeyType &key, DataType &value) : k(key), v(value) {}
-    NormalKeyValuePair(std::pair<KeyType, DataType> &p) : k(p.first), v(p.second) {}
+    NormalKeyValuePair(Key &key, Data &value) : std::pair<Key, Data>(key, value) {}
+    NormalKeyValuePair(const Key &key, const Data &value) : std::pair<Key, Data>(key, value) {}
+    NormalKeyValuePair(std::pair<Key, Data> &p) : std::pair<Key, Data>(p) {}
+
     // TODO: how to deconstruct this class?
 
-    KeyType& getKey() { return k; }
-    const KeyType& getKey() const { return k; }
-    DataType& getValue() { return v; }
-    void setKey(KeyType &key) { k = key; }
-    void setValue(const DataType &value) { v = value; }
+    Key& getKey() { return std::pair<Key, Data>::first; }
+    const Key& getKey() const { return std::pair<Key, Data>::first; }
+    Data& getValue() { return std::pair<Key, Data>::second; }
+    void setKey(Key &key) { std::pair<Key, Data>::first = key; }
+    void setValue(const Data &value) { std::pair<Key, Data>::second = value; }
 
     // This function doesn't modify the class. The caller has to understand
     // the meaning of the return value.
     // TODO: use the template fillLastSlot func above, and remove this
     uint64_t fillLastSlot(uint64_t value) { return 0; }
-
-private:
-    KeyType k;
-    DataType v;
 };
 
 /**
@@ -100,6 +95,8 @@ private:
 
 template<typename KeyValuePair, typename Compare, bool hasRank=false>
 class CompactingMap {
+    typedef typename KeyValuePair::first_type Key;
+    typedef typename KeyValuePair::second_type Data;
 protected:
     static const char RED = 0;
     static const char BLACK = 1;
@@ -111,6 +108,11 @@ protected:
         TreeNode *right;
         char color;
         NodeCount subct;
+
+        Key &key() { return kv.getKey(); };
+        const Key &key() const { return kv.getKey(); };
+        Data &value() { return kv.getValue(); };
+        void setValue(const Data &value) { kv.setValue(value); }
     };
 
     int64_t m_count;
@@ -128,20 +130,19 @@ protected:
     Compare m_comper;
 
 public:
-    typedef typename KeyValuePair::KeyType Key;
-    typedef typename KeyValuePair::DataType Data;
-
     class iterator {
         friend class CompactingMap<KeyValuePair, Compare, hasRank>;
     protected:
         const CompactingMap *m_map;
         TreeNode *m_node;
         iterator(const CompactingMap *m, TreeNode* x) : m_map(m), m_node(x) {}
+        KeyValuePair &pair() { return m_node->kv; }
     public:
         iterator() : m_map(NULL), m_node(NULL) {}
         iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
-        Key &key() const { return m_node->kv.getKey(); }
-        Data &value() const { return m_node->kv.getValue(); }
+        Key &key() { return m_node->key(); }
+        const Key &key() const { return m_node->key(); }
+        Data &value() const { return m_node->value(); }
         void setValue(const Data &value) { m_node->kv.setValue(value); }
         void moveNext() { m_node = m_map->successor(m_node); }
         void movePrev() { m_node = m_map->predecessor(m_node); }
@@ -155,9 +156,9 @@ public:
     CompactingMap(bool unique, Compare comper);
     ~CompactingMap();
 
-    bool insert(std::pair<Key, Data> value);
+    bool insert(std::pair<Key, Data> value) { return insert(value.first, value.second); };
     // A syntactically convenient analog to CompactingHashTable's insert function
-    bool insert(const Key &key, const Data &data) { return insert(std::pair<Key, Data>(key, data)); }
+    bool insert(const Key &key, const Data &data);
     bool erase(const Key &key);
     bool erase(iterator &iter);
     iterator find(const Key &key) { return iterator(this, lookup(key)); }
@@ -241,8 +242,9 @@ CompactingMap<KeyValuePair, Compare, hasRank>::~CompactingMap() {
     iterator iter = begin();
     while (!iter.isEnd()) {
         // TODO: how to deconstruct this? Will pair deconstructor automatically release these two?
-        iter.key().~Key();
-        iter.value().~Data();
+        //iter.key().~Key();
+        //iter.value().~Data();
+        iter.pair().~KeyValuePair();
         iter.moveNext();
     }
 }
@@ -263,14 +265,14 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(iterator &iter) {
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
-bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(std::pair<Key, Data> value) {
+bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data &value) {
     if (m_root != &NIL) {
         // find a place to put the new node
         TreeNode *y = &NIL;
         TreeNode *x = m_root;
         while (x != &NIL) {
             y = x;
-            int cmp = m_comper(value.first, x->kv.getKey());
+            int cmp = m_comper(key, x->key());
             if (cmp < 0)
                 x = x->left;
             else if (m_unique) {
@@ -296,7 +298,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(std::pair<Key, Data> 
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->kv = KeyValuePair(value);
+        z->kv = KeyValuePair(key, value);
         z->left = z->right = &NIL;
         z->parent = y;
         z->color = RED;
@@ -305,7 +307,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(std::pair<Key, Data> 
 
         // stitch it in
         if (y == &NIL) m_root = z;
-        else if (m_comper(z->kv.getKey(), y->kv.getKey()) < 0) y->left = z;
+        else if (m_comper(z->key(), y->key()) < 0) y->left = z;
         else y->right = z;
 
         // rotate tree to balance if needed
@@ -317,7 +319,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(std::pair<Key, Data> 
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->kv = KeyValuePair(value);
+        z->kv = KeyValuePair(key, value);
         z->left = z->right = &NIL;
         z->parent = &NIL;
         z->color = BLACK;
@@ -337,7 +339,7 @@ typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator CompactingMap<K
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->kv.getKey(), key);
+        int cmp = m_comper(x->key(), key);
         if (cmp < 0) {
             x = x->right;
         }
@@ -354,7 +356,7 @@ typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator CompactingMap<K
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->kv.getKey(), key);
+        int cmp = m_comper(x->key(), key);
         if (cmp <= 0) {
             x = x->right;
         }
@@ -428,7 +430,7 @@ typename CompactingMap<KeyValuePair, Compare, hasRank>::TreeNode *CompactingMap<
     TreeNode *x = m_root;
     TreeNode *retval = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->kv.getKey(), key);
+        int cmp = m_comper(x->key(), key);
         if (cmp < 0) {
             x = x->right;
         }
@@ -764,7 +766,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     int64_t ct = 0,ctr = 0, ctl = 0;
     // fix xin's code by set and unset key before each comparision
     uint64_t lv1 = m_root->kv.fillLastSlot(0);
-    int m = m_comper(key, m_root->kv.getKey());
+    int m = m_comper(key, m_root->key());
     m_root->kv.fillLastSlot(lv1);
     if (m == 0) {
         if (m_root->right != &NIL)
@@ -772,10 +774,10 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
         ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
             lv1 = p->kv.fillLastSlot(0);
-            if (m_comper(key, p->kv.getKey()) == 0) {
+            if (m_comper(key, p->key()) == 0) {
                 if (p->right != &NIL) {
                     uint64_t lv2 = p->right->kv.fillLastSlot(0);
-                    if (m_comper(key, p->right->kv.getKey()) == 0) {
+                    if (m_comper(key, p->right->key()) == 0) {
                         ct-= getSubct(p->right);
                     }
                     p->right->kv.fillLastSlot(lv2);
@@ -988,8 +990,8 @@ int CompactingMap<KeyValuePair, Compare, hasRank>::verify(const TreeNode *n) con
     }
 
     // check for strict ordering
-    if ((n->left != &NIL) && (m_comper(n->kv.getKey(), n->left->kv.getKey()) < 0)) return -1;
-    if ((n->right != &NIL) && (m_comper(n->kv.getKey(), n->right->kv.getKey()) > 0)) return -1;
+    if ((n->left != &NIL) && (m_comper(n->key(), n->left->key()) < 0)) return -1;
+    if ((n->right != &NIL) && (m_comper(n->key(), n->right->key()) > 0)) return -1;
 
     // recursive step (compare black height)
     int leftBH = verify(n->left);
