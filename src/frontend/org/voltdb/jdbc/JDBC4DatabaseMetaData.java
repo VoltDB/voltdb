@@ -754,7 +754,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
-        return "CHAR,CHAR_LENGTH,CONCAT,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
+        return "CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
                 "REPEAT,REPLACE,RIGHT,SPACE,SUBSTRING,TRIM,UPPER";
     }
 
@@ -880,7 +880,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getTimeDateFunctions() throws SQLException
     {
         checkClosed();
-        return "";
+        return "CURRENT_TIMESTAMP,DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,EXTRACT,FROM_UNIXTIME,HOUR" +
+               "MINUT,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR"+
+               "WEEKDAY,YEAR";
     }
 
     // Retrieves a description of all the data types supported by this database.
