@@ -23,6 +23,11 @@
 
 package org.voltdb.canonicalddl;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -86,12 +91,67 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         return compiler.getCanonicalDDL();
     }
 
+    public void sqlcmd() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+
+        final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
+        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
+        boolean success;
+
+        // Use VoltProjectBuilder to write catalog and deployment.xml
+        builder.setUseAdhocSchema(true);
+        builder.addLiteralSchema("--nothing");
+        success = builder.compile(pathToCatalog);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        startSystem(config);
+
+        File f = new File("ddl.sql");
+//        f.deleteOnExit();
+        FileOutputStream fos = new FileOutputStream(f);
+//        System.out.println(firstCanonicalDDL);
+        fos.write(firstCanonicalDDL.getBytes());
+
+        ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
+        pb.redirectInput(f);
+        Process process = pb.start();
+//        Process process = Runtime.getRuntime().exec("bin/sqlcmd < ddl.sql");
+        InputStream is = process.getInputStream();
+        InputStreamReader isr = new InputStreamReader(is);
+        BufferedReader br = new BufferedReader(isr);
+
+        String line;
+        StringBuffer sb = new StringBuffer();
+        while((line = br.readLine()) != null)
+        {
+            sb.append(line);
+            System.out.println(line);
+        }
+        System.out.println(sb.toString());
+        System.out.println("=======================================");
+
+        System.out.println(new VoltCompiler().getCanonicalDDL());
+        teardownSystem();
+    }
+
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
         firstCanonicalDDL = getFirstCanonicalDDL();
-        secondCanonicalDDL = getSecondCanonicalDDL();
 
-        assertEquals(firstCanonicalDDL, secondCanonicalDDL);
+
+//        secondCanonicalDDL = getSecondCanonicalDDL();
+//
+//        assertEquals(firstCanonicalDDL, secondCanonicalDDL);
+        sqlcmd();
     }
 
 }

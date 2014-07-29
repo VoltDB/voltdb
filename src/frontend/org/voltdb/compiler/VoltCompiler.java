@@ -576,12 +576,11 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        String binDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
-        m_canonicalDDL = binDDL;
+        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, binDDL);
+            m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
@@ -592,7 +591,7 @@ public class VoltCompiler {
             return null;
         }
 
-        jarOutput.put(AUTOGEN_DDL_FILE_NAME, binDDL.getBytes(Constants.UTF8ENCODING));
+        jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
         if (DEBUG_VERIFY_CATALOG) {
             debugVerifyCatalog(new VoltCompilerJarFileReader(jarOutput, AUTOGEN_DDL_FILE_NAME), catalog);
         }

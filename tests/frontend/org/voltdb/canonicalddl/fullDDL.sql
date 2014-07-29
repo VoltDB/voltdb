@@ -229,45 +229,45 @@ CREATE TABLE T23
 
 
 -- CREATE VIEW
--- basic
+-- disabled currently due to sqlcmd bug, see ENG-6641
 
-CREATE TABLE T24 
-(
-    C1 INTEGER
-,   C2 INTEGER
-);
+--CREATE TABLE T24 
+--(
+--    C1 INTEGER
+--,   C2 INTEGER
+--);
 
-CREATE VIEW VT1 
-(
-    C1
-,   C2
-,   TOTAL
-) 
-AS 
-    SELECT C1
-        ,  C2
-        ,  COUNT(*) 
-    FROM T24 
-    GROUP BY C1
-          ,  C2
-;
+--CREATE VIEW VT1 
+--(
+--    C1
+--,   C2
+--,   TOTAL
+--) 
+--AS 
+--    SELECT C1
+--        ,  C2
+--        ,  COUNT(*) 
+--    FROM T24 
+--    GROUP BY C1
+--          ,  C2
+--;
 
-CREATE VIEW VT2 
-(
-    C1
-,   C2
-,   TOTAL
-,   SUMUP
-) 
-AS 
-    SELECT C1
-        ,  C2
-        ,  COUNT(*)
-        ,  SUM(C2) 
-    AS 
-        newTble 
-    FROM T24 
-    WHERE T24.C1 < 1000 
-    GROUP BY C1
-          ,  C2
-;
+--CREATE VIEW VT2 
+--(
+--    C1
+--,   C2
+--,   TOTAL
+--,   SUMUP
+--) 
+--AS 
+--    SELECT C1
+--        ,  C2
+--        ,  COUNT(*)
+--        ,  SUM(C2) 
+--    AS 
+--        newTble 
+--    FROM T24 
+--    WHERE T24.C1 < 1000 
+--    GROUP BY C1
+--          ,  C2
+--;
