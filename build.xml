@@ -61,6 +61,7 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
+<property name='build.testproc.dir'          location='${build.dir}/testprocs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
@@ -70,6 +71,7 @@
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
+<property name='src.testproc.dir'            location='tests/testprocs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
@@ -125,6 +127,7 @@
     <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
+    <pathelement location='${build.testproc.dir}' />
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
@@ -945,13 +948,14 @@ JAVA COMPILATION
 <target name="compile_core" depends="compile_client">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
+    <mkdir dir='${build.testproc.dir}' />
     <exec
         dir='${src.gpl.dir}/org/voltdb/utils'
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
-        destdir="${build.prod.dir}:${build.test.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
+        destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
     </depend>
@@ -997,10 +1001,21 @@ JAVA COMPILATION
             <include name="**/*.sql"/>
         </fileset>
     </copy>
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
+            <include name="**/*.sql"/>
+        </fileset>
+    </copy>
 
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
+            <include name="**/*.tar.gz"/>
+        </fileset>
+    </copy>
+
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
             <include name="**/*.tar.gz"/>
         </fileset>
     </copy>
@@ -1045,6 +1060,7 @@ JAVA COMPILATION
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
+    <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>

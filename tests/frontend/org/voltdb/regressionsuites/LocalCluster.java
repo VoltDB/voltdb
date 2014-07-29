@@ -243,6 +243,8 @@ public class LocalCluster implements VoltServerConfig {
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
             + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
 
+        classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
+
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
         if (log4j == null) {
