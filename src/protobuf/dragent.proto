@@ -32,6 +32,7 @@ message Connect {
 message Subscribe {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
+    optional bool isCovering = 3;
 }
 
 message Response {
