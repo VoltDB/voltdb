@@ -47,8 +47,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                 "testplansgroupby", false);
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
     @Override
@@ -202,16 +200,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         // inline aggregate
         assertTrue(p instanceof AbstractScanPlanNode);
-
-        PlanNodeType aggType = PlanNodeType.HASHAGGREGATE;
-        if (p instanceof IndexScanPlanNode &&
-                ((IndexScanPlanNode)p).isForGroupingOnly() ) {
-            aggType = PlanNodeType.AGGREGATE;
-        }
-        assertNotNull(p.getInlinePlanNode(aggType));
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(p));
 
         if (having && !topAgg) {
-            aggNode = (AggregatePlanNode)p.getInlinePlanNode(aggType);
+            aggNode = (AggregatePlanNode)AggregatePlanNode.getInlineAggregationNode(p);
             assertNotNull(aggNode.getPostPredicate());
         }
     }
@@ -396,7 +388,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(apn.toExplainPlanString().toLowerCase().contains("partial"));
     }
 
-    public void testPartialSerialAggregateOnJoin() {
+    public void testPartialSerialAggregateOn_Join() {
         String sql;
         sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
@@ -435,6 +427,28 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "GROUP BY RF.F_D2, G.G_PKEY, F.F_D3, G.G_D1";
         pns = compileToFragments(sql);
         checkPartialAggregate(true);
+    }
+
+
+    public void testPartialSerialAggregateOn_Subquery() {
+        String sql;
+
+        sql = "SELECT G.G_PKEY, RF.F_D2, Sum(G.G_D2) " +
+                "FROM (select G_PKEY, sum(G_D2) G_D2 from G group by G_PKEY) G " +
+                "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(true);
+
+
+        sql = "SELECT G.G_PKEY, G_D3, RF.F_D2, Sum(G.G_D2) " +
+                "FROM (select G_PKEY, G_D3, sum(G_D2) G_D2 from G group by G_PKEY, G_D3) G " +
+                "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, G_D3, RF.F_D2";
+        pns = compileToFragments(sql);
+        printExplainPlan(pns);
+        checkPartialAggregate(true);
+
     }
 
 
@@ -499,17 +513,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         */
         String expectedStr = "  inline Serial AGGREGATION ops\n" +
                              "   inline LIMIT 5";
-        AbstractPlanNode.disableVerboseExplainForDebugging();
-        AbstractExpression.disableVerboseExplainForDebugging();
 
         String explainPlan = "";
         for (AbstractPlanNode apn: pns) {
             explainPlan += apn.toExplainPlanString();
         }
         assertTrue(explainPlan.contains(expectedStr));
-
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
 
         pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);

@@ -388,6 +388,26 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_tableAggregateSubquery;
     }
 
+    public List<Integer> getDisplayOrderedColumns() {
+        if (m_subqueryStmt instanceof ParsedSelectStmt) {
+            return ((ParsedSelectStmt)m_subqueryStmt).getDisplayOrderedColumns();
+        }
+        return new ArrayList<Integer>();
+    }
+
+    public List<String> getOutputOrderedColumns() {
+        List<Integer> displayOrderedColumns = getDisplayOrderedColumns();
+        List<String> outputOrderedColumnList = new ArrayList<>();
+
+        for (Integer idx: displayOrderedColumns) {
+            SchemaColumn scol = m_outputColumnList.get(idx.intValue());
+            String exportColumnName = scol.getColumnAlias() == null ?
+                    scol.getColumnName() : scol.getColumnAlias();
+            outputOrderedColumnList.add(exportColumnName);
+        }
+        return outputOrderedColumnList;
+    }
+
     /**
      * Remove the coordinator send/receive pair if any from the graph.
      *

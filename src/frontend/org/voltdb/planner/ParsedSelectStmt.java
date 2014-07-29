@@ -51,11 +51,17 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -111,6 +117,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return col;
         }
     }
+
+    private List<Integer> m_displayOrderedColumns = new ArrayList<>();
+    private HashMap<ParsedColInfo, Integer> m_displayColumnsIndexMap = new HashMap<>();
 
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
@@ -198,6 +207,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // OrderBy needs groupBy columns to stop recursively finding TVEs for pass-through columns.
         assert(displayElement != null);
         parseDisplayColumns(displayElement, false);
+
+        // build the display columns index map
+        for (int idx = 0; idx < m_displayColumns.size(); idx++) {
+            ParsedColInfo pCol = m_displayColumns.get(idx);
+            m_displayColumnsIndexMap.put(pCol, idx);
+        }
 
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
@@ -1287,6 +1302,164 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return constant;
     }
 
+    public void processDisplayOrderedColumns(AbstractPlanNode root) {
+        if (hasAOneRowResult()) {
+            for (int ii = 0; ii < m_displayColumns.size(); ii++) {
+                m_displayOrderedColumns.add(ii);
+            }
+            return;
+        }
+
+        if ( hasOrderByColumns() ) {
+            for (int ii = 0; ii < m_orderColumns.size(); ii++) {
+                ParsedColInfo pcol = m_orderColumns.get(ii);
+                if (! m_displayColumnsIndexMap.containsKey(pcol)) {
+                    // has to be prefix match for order by columns
+                    break;
+                }
+                Integer idx = m_displayColumnsIndexMap.get(pcol);
+                m_displayOrderedColumns.add(idx);
+            }
+
+            if (m_displayOrderedColumns.size() == 0) {
+                return;
+            }
+
+            if (isGrouped()) {
+                // Order by all group by keys are like order by unique keys
+                // all the other columns in display list are functionally dependent on them.
+                // So in this case, the other left columns can be any permutation orders.
+
+                // Remember ordered display column list is different from deterministic checking.
+                // When query is not deterministic, it does not necessarily mean it does not have
+                // ordered display columns.
+
+                // TODO(xin): extend the list m_displayOrderedColumns here
+            }
+        } else {
+            // When query does not have order by clause, the result is possible ordered if
+            // using an index scan, so planner should check the plan graph now.
+
+            // Plan has to be one fragment, because coordinator will lose the order from receiving
+            // records from each partition.
+            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            if (receivers.size() > 0) {
+                return;
+            }
+
+            // Do not handle DISTINCT cases now
+            // However, LIMIT/OFFSET is all possible with ordered input (index scan)
+            if (hasDistinct()) {
+                return;
+            }
+
+            if (isGrouped()) {
+                // find the top level query aggregate node
+                ArrayList<AbstractPlanNode> aggNodes = root.findAllNodesOfType(PlanNodeType.HASHAGGREGATE, false);
+                if (aggNodes.size() > 0) {
+                    // hash aggregate does not preserve order
+                    return;
+                }
+                // partial aggregate preserve the order from index scan
+                aggNodes = root.findAllNodesOfType(PlanNodeType.PARTIALAGGREGATE, false);
+                if (aggNodes.size() == 0) {
+                    // it must be a serial aggregate
+                    // serial aggregate preserve the order from index scan
+                    aggNodes = root.findAllNodesOfType(PlanNodeType.AGGREGATE, false);
+                }
+                assert(aggNodes.size() == 1);
+
+                // find out the ordered group by columns
+                AggregatePlanNode aggNode = (AggregatePlanNode) aggNodes.get(0);
+                List<Integer> orderedGroupByColumns = aggNode.getOrderedOutputGroupByColumns();
+
+                for (Integer ii: orderedGroupByColumns) {
+                    ParsedColInfo pcol = m_groupByColumns.get(ii.intValue());
+                    if (m_displayColumnsIndexMap.containsKey(pcol)) {
+                        Integer idx = m_displayColumnsIndexMap.get(pcol);
+                        m_displayOrderedColumns.add(idx);
+                    }
+                }
+                return ;
+            }
+
+            // Now it is no group by and no order by case.
+            // Ordered query results can only come from Index scan (or subquery).
+            // And we need to check the actual plan to get the ordered information.
+            AbstractPlanNode scanNode = findScanCandidate(root);
+            if (scanNode == null) {
+                return;
+            }
+
+            if (scanNode.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+                IndexScanPlanNode indexScan = (IndexScanPlanNode) scanNode;
+                Index index = indexScan.getCatalogIndex();
+                if ( ! IndexType.isScannable(index.getType())) {
+                    return;
+                }
+
+                // TODO(xin):
+                // (1) get ordered index columns: orderedCols
+                // (2) find them in display column list
+                // (3) update m_displayOrderedColumns info
+                return;
+            }
+
+            assert(scanNode.getPlanNodeType() == PlanNodeType.SEQSCAN);
+            if (! scanNode.isSubQuery()) {
+                return;
+            }
+
+            // Now order may come out of subquery
+            SeqScanPlanNode subScanNode = (SeqScanPlanNode) scanNode;
+            StmtSubqueryScan stmtSubScan = getStmtSubqueryScan(subScanNode.getTargetTableAlias());
+            if (stmtSubScan == null) {
+                return;
+            }
+            m_displayOrderedColumns = stmtSubScan.getDisplayOrderedColumns();
+        }
+    }
+
+    public StmtSubqueryScan getStmtSubqueryScan(String scanTableAlias) {
+        for (StmtTableScan scan : m_tableAliasMap.values()) {
+            if (scan instanceof StmtSubqueryScan &&
+                    scanTableAlias.equals(scan.getTableAlias()) ) {
+                m_displayOrderedColumns = ((StmtSubqueryScan) scan).getDisplayOrderedColumns();
+                return (StmtSubqueryScan) scan;
+            }
+        }
+        return null;
+    }
+
+    public List<Integer> getDisplayOrderedColumns () {
+        return m_displayOrderedColumns;
+    }
+
+    /**
+     * This function tries to find the ordered input table.
+     * Assuming the input plan node does not have order by
+     * @param candidate
+     * @return
+     */
+    private static AbstractPlanNode findScanCandidate(AbstractPlanNode candidate) {
+        if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN ||
+                candidate.getPlanNodeType() == PlanNodeType.SEQSCAN ){
+            return candidate;
+        }
+
+        // For join node, find outer sequential scan plan node
+        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
+            assert(candidate.getChildCount() == 2);
+            return findScanCandidate(candidate.getChild(0));
+        }
+
+        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            return findScanCandidate(candidate.getChild(0));
+        }
+
+        // candidate is possible to be other plan node type, like LIMIT
+        return null;
+    }
 
     @Override
     public boolean isOrderDeterministic()

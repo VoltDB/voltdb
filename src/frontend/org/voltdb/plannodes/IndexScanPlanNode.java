@@ -769,10 +769,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_purpose = FOR_GROUPING;
     }
 
-    public boolean isForGroupingOnly() {
-        return m_purpose == FOR_GROUPING;
-    }
-
     // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter
     // only apply those optimization if it has no (post-)predicates
     // except those (post-)predicates are artifact predicates we

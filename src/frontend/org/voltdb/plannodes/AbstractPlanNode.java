@@ -660,12 +660,19 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public ArrayList<AbstractPlanNode> findAllNodesOfType(PlanNodeType type) {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        findAllNodesOfType_recurse(type, collected, visited);
+        findAllNodesOfType_recurse(type, collected, visited, true);
+        return collected;
+    }
+
+    public ArrayList<AbstractPlanNode> findAllNodesOfType(PlanNodeType type, boolean containSubquery) {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        findAllNodesOfType_recurse(type, collected, visited, containSubquery);
         return collected;
     }
 
     private void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
-        HashSet<AbstractPlanNode> visited)
+            HashSet<AbstractPlanNode> visited, boolean containSubquery)
     {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
@@ -675,11 +682,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (getPlanNodeType() == type)
             collected.add(this);
 
-        for (AbstractPlanNode child : m_children)
-            child.findAllNodesOfType_recurse(type, collected, visited);
+        for (AbstractPlanNode child : m_children) {
+            if (! containSubquery && child.isSubQuery()) {
+                if (child.getPlanNodeType() == type)
+                    collected.add(child);
+                // do not call recursively on its subquery scan
+                break;
+            }
+            child.findAllNodesOfType_recurse(type, collected, visited, containSubquery);
+        }
 
         for (AbstractPlanNode inlined : m_inlineNodes.values())
-            inlined.findAllNodesOfType_recurse(type, collected, visited);
+            inlined.findAllNodesOfType_recurse(type, collected, visited, containSubquery);
     }
 
     /**

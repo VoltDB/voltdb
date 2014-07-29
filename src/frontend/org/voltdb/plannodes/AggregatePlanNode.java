@@ -61,8 +61,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
 
-    // This list is only used for the special case of instances of PartialAggregatePlanNode.
-    protected List<Integer> m_partialGroupByColumns = null;
+    // This list is used for partial aggregate and serial aggregate.
+    // Its index map is related to ParsedSelect.m_groupByColumns, which is
+    // exactly the same order as m_groupByExpressions.
+    protected List<Integer> m_orderedOutputGroupByColumns = null;
 
     // True if this aggregate node is the coordinator summary aggregator
     // for an aggregator that was pushed down. Must know to correctly
@@ -74,6 +76,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     public AggregatePlanNode() {
         super();
+    }
+
+    public AggregatePlanNode(int groupByColumnSize) {
+        super();
+
+        assert(getPlanNodeType() == PlanNodeType.AGGREGATE);
+        m_orderedOutputGroupByColumns = new ArrayList<>();
+        for (int ii = 0; ii < groupByColumnSize; ii++) {
+            m_orderedOutputGroupByColumns.add(ii);
+        }
+    }
+
+    public List<Integer> getOrderedOutputGroupByColumns() {
+        return m_orderedOutputGroupByColumns;
     }
 
     @Override
@@ -327,10 +343,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.endArray();
 
-            if (m_partialGroupByColumns != null) {
-                assert(! m_partialGroupByColumns.isEmpty());
+            if (m_orderedOutputGroupByColumns != null &&
+                    m_groupByExpressions.size() > m_orderedOutputGroupByColumns.size()) {
+                assert(! m_orderedOutputGroupByColumns.isEmpty());
                 stringer.key(Members.PARTIAL_GROUPBY_COLUMNS.name()).array();
-                for (Integer ith: m_partialGroupByColumns) {
+                for (Integer ith: m_orderedOutputGroupByColumns) {
                     stringer.value(ith.longValue());
                 }
                 stringer.endArray();
