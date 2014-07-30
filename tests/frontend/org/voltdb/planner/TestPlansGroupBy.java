@@ -203,7 +203,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(p));
 
         if (having && !topAgg) {
-            aggNode = (AggregatePlanNode)AggregatePlanNode.getInlineAggregationNode(p);
+            aggNode = AggregatePlanNode.getInlineAggregationNode(p);
             assertNotNull(aggNode.getPostPredicate());
         }
     }
@@ -375,17 +375,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkGroupByOnlyPlan(true, P_AGG, true);
     }
 
-    private void checkPartialAggregate(boolean twoFragments) {
+    private void checkPartialAggregate(PlanNodeType type) {
         AbstractPlanNode apn;
-        if (twoFragments) {
-            assertEquals(2, pns.size());
+        if (pns.size() == 2) {
             apn = pns.get(1).getChild(0);
         } else {
             assertEquals(1, pns.size());
             apn = pns.get(0).getChild(0);
         }
 
-        assertTrue(apn.toExplainPlanString().toLowerCase().contains("partial"));
+        String explainPlan = apn.toExplainPlanString().toLowerCase();
+
+        if (type == PlanNodeType.PARTIALAGGREGATE) {
+            assertTrue(explainPlan.contains("partial"));
+        } else if (type == PlanNodeType.HASHAGGREGATE) {
+            assertTrue(explainPlan.contains("hash"));
+        } else if (type == PlanNodeType.AGGREGATE) {
+            assertTrue(explainPlan.contains("serial"));
+        }
     }
 
     public void testPartialSerialAggregateOn_Join() {
@@ -394,14 +401,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
                 "GROUP BY G.G_D1, RF.F_D2";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
                 "GROUP BY RF.F_D2, G.G_D1";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
 
         // three table joins with aggregate
@@ -410,7 +417,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
@@ -418,7 +425,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY G.G_PKEY, RF.F_D2, G.G_D1, F.F_D3";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
@@ -426,19 +433,28 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY RF.F_D2, G.G_PKEY, F.F_D3, G.G_D1";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
+
+
+        // Serial aggregate only
+        sql = "SELECT G.G_D1, COUNT(*) " +
+                "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY G.G_D1";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(S_AGG);
     }
 
 
     public void testPartialSerialAggregateOn_Subquery() {
         String sql;
 
+        // (1) order comes from subquery serial/partial aggregate
         sql = "SELECT G.G_PKEY, RF.F_D2, Sum(G.G_D2) " +
                 "FROM (select G_PKEY, sum(G_D2) G_D2 from G group by G_PKEY) G " +
                 "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
                 "GROUP BY G.G_PKEY, RF.F_D2";
         pns = compileToFragments(sql);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
 
         sql = "SELECT G.G_PKEY, G_D3, RF.F_D2, Sum(G.G_D2) " +
@@ -446,9 +462,35 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
                 "GROUP BY G.G_PKEY, G_D3, RF.F_D2";
         pns = compileToFragments(sql);
-        printExplainPlan(pns);
-        checkPartialAggregate(true);
+        checkPartialAggregate(P_AGG);
 
+
+        // (2) order comes from subquery index scan
+        sql = "SELECT G.G_PKEY, RF.F_D2, Sum(G.G_D2) " +
+                "FROM (select G_PKEY, G_D2 from G where G_PKEY > 3) G " +
+                "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(P_AGG);
+
+
+        // (3) order comes from subquery order by
+        sql = "SELECT G.G_D2, RF.F_D2, Sum(G.G_D3) " +
+                "FROM (select G_D2, G_D3 from G where G_PKEY > 3 order by G_D2) G " +
+                "INNER JOIN RF ON G.G_D2 = RF.F_D1 " +
+                "GROUP BY G.G_D2, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(P_AGG);
+
+        //
+        // Negative tests
+        //
+        sql = "SELECT G.G_PKEY, RF.F_D2, Sum(G.G_D2) " +
+                "FROM (select G_PKEY + 1 AS G_PKEY, G_D2 from G where G_PKEY > 3) G " +
+                "INNER JOIN RF ON G.G_PKEY = RF.F_D1 " +
+                "GROUP BY G.G_PKEY, RF.F_D2";
+        pns = compileToFragments(sql);
+        checkPartialAggregate(H_AGG);
     }
 
 

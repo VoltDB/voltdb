@@ -59,7 +59,6 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
@@ -211,7 +210,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // build the display columns index map
         for (int idx = 0; idx < m_displayColumns.size(); idx++) {
             ParsedColInfo pCol = m_displayColumns.get(idx);
-            m_displayColumnsIndexMap.put(pCol, idx);
+            m_displayColumnsIndexMap.put(pCol.clone(), idx);
         }
 
         if (groupbyElement != null) {
@@ -1334,7 +1333,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // When query is not deterministic, it does not necessarily mean it does not have
                 // ordered display columns.
 
-                // TODO(xin): extend the list m_displayOrderedColumns here
+                // TODO(xin): extend the list m_displayOrderedColumns here in future if needed
             }
         } else {
             // When query does not have order by clause, the result is possible ordered if
@@ -1393,16 +1392,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             if (scanNode.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
                 IndexScanPlanNode indexScan = (IndexScanPlanNode) scanNode;
-                Index index = indexScan.getCatalogIndex();
-                if ( ! IndexType.isScannable(index.getType())) {
-                    return;
-                }
-
-                // TODO(xin):
                 // (1) get ordered index columns: orderedCols
                 // (2) find them in display column list
                 // (3) update m_displayOrderedColumns info
-                return;
+                List<ParsedColInfo> orderedIndexScanColumns = indexScan.getOrderedIndexScanColumns();
+
+                for (ParsedColInfo col: orderedIndexScanColumns) {
+                    if (m_displayColumnsIndexMap.containsKey(col)) {
+                        Integer idx = m_displayColumnsIndexMap.get(col);
+                        m_displayOrderedColumns.add(idx);
+                    }
+                }
+                return ;
             }
 
             assert(scanNode.getPlanNodeType() == PlanNodeType.SEQSCAN);
@@ -1437,27 +1438,26 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     /**
      * This function tries to find the ordered input table.
-     * Assuming the input plan node does not have order by
      * @param candidate
      * @return
      */
     private static AbstractPlanNode findScanCandidate(AbstractPlanNode candidate) {
-        if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN ||
-                candidate.getPlanNodeType() == PlanNodeType.SEQSCAN ){
+        PlanNodeType type = candidate.getPlanNodeType();
+        if (type == PlanNodeType.INDEXSCAN ||
+            type == PlanNodeType.SEQSCAN ) {
             return candidate;
         }
 
         // For join node, find outer sequential scan plan node
-        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOP) {
-            assert(candidate.getChildCount() == 2);
+        if (type == PlanNodeType.NESTLOOP ||
+            type == PlanNodeType.NESTLOOPINDEX ||
+            type == PlanNodeType.PROJECTION ||
+            type == PlanNodeType.LIMIT ||
+            type == PlanNodeType.ORDERBY) {
             return findScanCandidate(candidate.getChild(0));
         }
 
-        if (candidate.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
-            return findScanCandidate(candidate.getChild(0));
-        }
-
-        // candidate is possible to be other plan node type, like LIMIT
+        // any other plan node left ?
         return null;
     }
 

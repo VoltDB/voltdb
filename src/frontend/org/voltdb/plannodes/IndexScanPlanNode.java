@@ -41,6 +41,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
@@ -794,5 +795,39 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
 
         return true;
+    }
+
+    public List<ParsedColInfo> getOrderedIndexScanColumns() {
+        List<ParsedColInfo> orderedScanColumns = new ArrayList<>();
+
+        // Hash index does not have order
+        if ( ! IndexType.isScannable(m_catalogIndex.getType())) {
+            return orderedScanColumns;
+        }
+
+        if (isReverseScan()) {
+            // Do not bother reverse scan case for now
+            return orderedScanColumns;
+        }
+
+        // For forward scan, ordered scan columns are just index columns
+        String tbName = getTargetTableName();
+        String tbAlias = getTargetTableAlias();
+
+        List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+        for (int j = 0; j < indexedColRefs.size(); j++) {
+            String colName = indexedColRefs.get(j).getColumn().getName();
+            ParsedColInfo scol = new ParsedColInfo();
+            TupleValueExpression tve = new TupleValueExpression(
+                    tbName, tbAlias, colName, colName);
+            scol.expression = tve;
+            scol.tableName = tbName;
+            scol.tableAlias = tbAlias;
+            scol.columnName = colName;
+
+            orderedScanColumns.add(scol);
+        }
+
+        return orderedScanColumns;
     }
 }
