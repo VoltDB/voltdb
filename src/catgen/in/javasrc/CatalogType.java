@@ -21,8 +21,6 @@
 
 package org.voltdb.catalog;
 
-import java.util.LinkedHashMap;
-import java.util.Map.Entry;
 
 /**
  * The base class for all objects in the Catalog. CatalogType instances all
@@ -63,7 +61,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         public String getPath() {
             if (m_unresolvedPath != null) return m_unresolvedPath;
-            else if (m_value != null) return m_value.getPath();
+            else if (m_value != null) return m_value.getCatalogPath();
             else return null;
         }
 
@@ -91,12 +89,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
     }
 
-    LinkedHashMap<String, CatalogMap<? extends CatalogType>> m_childCollections
-        = new LinkedHashMap<String, CatalogMap<? extends CatalogType>>();
-
-    String m_path;
     String m_typename;
-    CatalogType m_parent;
     CatalogMap<? extends CatalogType> m_parentMap;
     Catalog m_catalog;
     int m_relativeIndex;
@@ -136,8 +129,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * Get the full catalog path of this CatalogType instance
      * @return The full catalog path of this CatalogType instance
      */
-    public String getPath() {
-        return m_path;
+    String getCatalogPath() {
+        return m_parentMap.getPath() + "[" + m_typename + "]";
     }
 
     /**
@@ -153,7 +146,9 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The parent of this CatalogType instance
      */
     public CatalogType getParent() {
-        return m_parent;
+        // parent map only null for class Catalog which overrides this
+        assert(m_parentMap != null);
+        return m_parentMap.m_parent;
     }
 
     /**
@@ -179,6 +174,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      */
     public abstract String[] getFields();
 
+    abstract String[] getChildCollections();
+
     /**
      * Get the value of a field knowing only the name of the field
      * @param field The name of the field being requested
@@ -190,56 +187,44 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * This should only ever be called from CatalogMap.add(); it's my lazy hack
      * to avoid using reflection to instantiate records.
      */
-    void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {
+    void setBaseValues(Catalog catalog, CatalogMap<? extends CatalogType> parentMap, String name) {
         if ((name == null) || (catalog == null)) {
             throw new CatalogException("Null value where it shouldn't be.");
         }
         m_catalog = catalog;
-        m_parent = parent;
-        m_path = path;
+        m_parentMap = parentMap;
         m_typename = name;
         catalog.registerGlobally(this);
     }
 
-    CatalogType addChild(String collectionName, String childName) {
-        CatalogMap<? extends CatalogType> map = m_childCollections.get(collectionName);
-        if (map == null)
-            throw new CatalogException("No collection for name");
-        return map.add(childName);
-    }
-
-    CatalogType getChild(String collectionName, String childName) {
-        CatalogMap<? extends CatalogType> map = m_childCollections.get(collectionName);
-        if (map == null)
-            return null;
-        return map.get(childName);
+    @SuppressWarnings("unchecked")
+    CatalogMap<? extends CatalogType> getCollection(String collectionName) {
+        try {
+            return (CatalogMap<? extends CatalogType>) getField(collectionName);
+        }
+        catch (ClassCastException | NullPointerException e) {
+            throw new CatalogException("Collection name given isn't a collection.");
+        }
     }
 
     abstract void set(String field, String value);
 
-    void delete(String collectionName, String childName) {
-        if ((collectionName == null) || (childName == null)) {
-            throw new CatalogException("Null value where it shouldn't be.");
-        }
-
-        if (m_childCollections.containsKey(collectionName) == false)
-            throw new CatalogException("Unexpected collection name '" + collectionName + "' for " + this);
-        CatalogMap<? extends CatalogType> collection = m_childCollections.get(collectionName);
-
-        collection.delete(childName);
-    }
-
     void writeCreationCommand(StringBuilder sb) {
+        String path = getCatalogPath();
+
         // skip root node command
-        if (m_path.equals("/"))
+        if (path.equals("/"))
             return;
 
-        int lastSlash = m_path.lastIndexOf("/");
-        String key = m_path.substring(lastSlash + 1);
-        String newPath = m_path.substring(0, lastSlash);
+        int lastSlash = path.lastIndexOf("/");
+        String key = path.substring(lastSlash + 1);
+        String newPath = path.substring(0, lastSlash);
         if (newPath.length() == 0)
             newPath = "/";
         String[] parts = key.split("\\[");
+        if (parts.length < 2) {
+            int x = 5;
+        }
         parts[1] = parts[1].substring(0, parts[1].length() - 1);
         parts[1] = parts[1].trim();
 
@@ -249,15 +234,15 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
-        String path = m_path;
+        String path = getCatalogPath();
         if (!printFullPath) path = "$PREV"; // use cacheing to shrink output + speed parsing
 
         sb.append("set ").append(path).append(" ");
         sb.append(field).append(" ");
         Object value = getField(field);
         if (value == null) {
-            if ((field.equals("partitioncolumn")) && (m_path.equals("/clusters[cluster]/databases[database]/procedures[delivery]")))
-                System.out.printf("null for field %s at path %s\n", field, getPath());
+            if ((field.equals("partitioncolumn")) && (getCatalogPath().equals("/clusters[cluster]/databases[database]/procedures[delivery]")))
+                System.out.printf("null for field %s at path %s\n", field, getCatalogPath());
             sb.append("null");
 
         }
@@ -268,7 +253,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         else if (value.getClass() == String.class)
             sb.append("\"").append(value).append("\"");
         else if (value instanceof CatalogType)
-            sb.append(((CatalogType)value).getPath());
+            sb.append(((CatalogType)value).getCatalogPath());
         else
             throw new CatalogException("Unsupported field type '" + value + "'");
         sb.append("\n");
@@ -282,9 +267,9 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
     }
 
-    void writeChildCommands(StringBuilder sb) {
-        for (String childCollection : m_childCollections.keySet()) {
-            CatalogMap<? extends CatalogType> map = m_childCollections.get(childCollection);
+    void writeChildCommands(StringBuilder sb)  {
+        for (String childCollection : getChildCollections()) {
+            CatalogMap<? extends CatalogType> map = getCollection(childCollection);
             map.writeCommandsForMembers(sb);
         }
     }
@@ -295,12 +280,12 @@ public abstract class CatalogType implements Comparable<CatalogType> {
             return 0;
         }
         // null comparands will throw an exception here:
-        return getPath().compareTo(o.getPath());
+        return getCatalogPath().compareTo(o.getCatalogPath());
     }
 
     abstract void copyFields(CatalogType obj);
 
-    CatalogType deepCopy(Catalog catalog, CatalogType parent) {
+    CatalogType deepCopy(Catalog catalog, CatalogMap<? extends CatalogType> parentMap) {
 
         CatalogType copy = null;
         try {
@@ -311,16 +296,11 @@ public abstract class CatalogType implements Comparable<CatalogType> {
             throw new RuntimeException(e);
         }
 
-        assert(parent.getCatalog() == catalog);
-        copy.setBaseValues(catalog, parent, m_path, m_typename);
+        assert(parentMap.m_parent.getCatalog() == catalog);
+        copy.setBaseValues(catalog, parentMap, m_typename);
         copy.m_relativeIndex = m_relativeIndex;
 
         copyFields(copy);
-
-        for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
-            CatalogMap<? extends CatalogType> mapCopy = copy.m_childCollections.get(e.getKey());
-            mapCopy.copyFrom(e.getValue());
-        }
 
         catalog.registerGlobally(copy);
 
@@ -341,7 +321,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     {
         int result = 1;
         // Generate something reasonably unique but consistent for this element
-        result = 37 * result + m_path.hashCode();
+        result = 37 * result + getCatalogPath().hashCode();
         result = 31 * result + m_typename.hashCode();
         return result;
     }
@@ -357,14 +337,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
                 CatalogType ct = (CatalogType) value;
                 assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
             }
-        }*/
+        }
 
         for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
             for (CatalogType ct : e.getValue()) {
                 assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
                 ct.validate();
             }
-        }
+        }*/
     }
 }
 

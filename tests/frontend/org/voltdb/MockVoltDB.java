@@ -34,7 +34,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
@@ -53,6 +52,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
@@ -105,9 +105,8 @@ public class MockVoltDB implements VoltDBInterface
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();
-            m_catalog.execute("add / clusters " + m_clusterName);
-            m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
-                    m_databaseName);
+            m_catalog.execute(String.format("add / clusters %s", m_clusterName));
+            m_catalog.execute(String.format("add /clusters[%s]/databases %s", m_clusterName, m_databaseName));
             Cluster cluster = m_catalog.getClusters().get(m_clusterName);
             // Set a sane default for TestMessaging (at least)
             cluster.setHeartbeattimeout(10000);

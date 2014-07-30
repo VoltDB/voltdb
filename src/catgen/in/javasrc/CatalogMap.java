@@ -22,8 +22,8 @@
 package org.voltdb.catalog;
 
 import java.util.Iterator;
-import java.util.TreeMap;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 /**
  * A safe interface to a generic map of CatalogType instances. It is safe
@@ -40,13 +40,18 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     Class<T> m_cls;
     Catalog m_catalog;
     CatalogType m_parent;
-    String m_path;
+    String m_name;
 
-    CatalogMap(Catalog catalog, CatalogType parent, String path, Class<T> cls) {
+    CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls) {
         this.m_catalog = catalog;
         this.m_parent = parent;
-        this.m_path = path;
+        this.m_name = name;
         this.m_cls = cls;
+    }
+
+    public String getPath() {
+        // if parent is the catalog root, don't add an extra slash to the existing one
+        return m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
     }
 
     /**
@@ -91,6 +96,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * Get an iterator for the items in the map
      * @return The iterator for the items in the map
      */
+    @Override
     public Iterator<T> iterator() {
         return m_items.values().iterator();
     }
@@ -109,8 +115,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
                 throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
 
             T x = m_cls.newInstance();
-            String childPath = m_path + "[" + name + "]";
-            x.setBaseValues(m_catalog, m_parent, childPath, name);
+            String childPath = getPath() + "[" + name + "]";
+            x.setBaseValues(m_catalog, this, name);
             x.m_parentMap = this;
 
             m_items.put(mapKey, x);
@@ -161,7 +167,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
-            m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, m_parent));
+            m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, this));
         }
     }
 

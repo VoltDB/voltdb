@@ -21,7 +21,8 @@
 
 package org.voltdb.catalog;
 
-import java.util.HashMap;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of
@@ -30,7 +31,10 @@ import java.util.HashMap;
  */
 public class Catalog extends CatalogType {
 
-    private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    //private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    //private final PatriciaTrie<CatalogType> m_pathCache = new PatriciaTrie<>();
+    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(100).build();
+
     private CatalogType m_prevUsedPath = null;
 
     CatalogMap<Cluster> m_clusters;
@@ -39,10 +43,19 @@ public class Catalog extends CatalogType {
      * Create a new Catalog hierarchy.
      */
     public Catalog() {
-        setBaseValues(this, null, "/", "catalog");
+        setBaseValues(this, null, "catalog");
         m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class);
-        m_childCollections.put("clusters", m_clusters);
         m_relativeIndex = 1;
+    }
+
+    @Override
+    public String getCatalogPath() {
+        return "/";
+    }
+
+    @Override
+    public CatalogType getParent() {
+        return null;
     }
 
     /**
@@ -107,15 +120,12 @@ public class Catalog extends CatalogType {
 
         // run either command
         if (cmd.equals("add")) {
-            resolved.addChild(arg1, arg2);
+            resolved.getCollection(arg1).add(arg2);
         }
         else if (cmd.equals("delete")) {
-            resolved.delete(arg1, arg2);
+            resolved.getCollection(arg1).delete(arg2);
             String toDelete = ref + "/" + arg1 + "[" + arg2 + "]";
-            CatalogType thing = m_pathCache.remove(toDelete);
-            if (thing == null) {
-                throw new CatalogException("Unable to find reference to delete: " + toDelete);
-            }
+            m_pathCache.invalidate(toDelete);
         }
         else if (cmd.equals("set")) {
             resolved.set(arg1, arg2);
@@ -124,7 +134,11 @@ public class Catalog extends CatalogType {
 
     CatalogType getItemForRef(final String ref) {
         // if it's a path
-        return m_pathCache.get(ref);
+        CatalogType retval = m_pathCache.getIfPresent(ref);
+        if (retval == null) {
+            retval = getItemForPath(this, ref);
+        }
+        return retval;
     }
 
     CatalogType getItemForPath(CatalogType parent, final String path) {
@@ -151,11 +165,11 @@ public class Catalog extends CatalogType {
     CatalogType getItemForPathPart(CatalogType parent, String path) {
         String[] parts = path.split("\\[", 2);
         parts[1] = parts[1].split("\\]", 2)[0];
-        return parent.getChild(parts[0], parts[1]);
+        return parent.getCollection(parts[0]).get(parts[1]);
     }
 
     void registerGlobally(CatalogType x) {
-        m_pathCache.put(x.m_path, x);
+        m_pathCache.put(x.getCatalogPath(), x);
     }
 
     /**
@@ -194,12 +208,18 @@ public class Catalog extends CatalogType {
     }
 
     @Override
+    String[] getChildCollections() {
+        return new String[] { "clusters" };
+    }
+
+    @Override
     public Object getField(String field) {
         switch (field) {
         case "clusters":
             return getClusters();
         default:
-            throw new CatalogException("Unknown field");
+            throw new CatalogException(String.format("Unknown field: %s in class %s",
+                    field, getClass().getSimpleName()));
         }
     }
 

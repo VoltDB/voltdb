@@ -110,27 +110,37 @@ def genjava( classes, prepath, postpath, package ):
         write( '' )
 
         # setBaseValues
-        write( '    void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {' )
-        write( '        super.setBaseValues(catalog, parent, path, name);')
+        write( '    void setBaseValues(Catalog catalog, CatalogMap<? extends CatalogType> parentMap, String name) {' )
+        write( '        super.setBaseValues(catalog, parentMap, name);')
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name
             realtype = field.type[:-1]
             #methname = fname.capitalize()
             if field.type[-1] == '*':
-                write( interp( '        m_$fname = new $ftype(catalog, this, path + "/" + "$fname", $realtype.class);', locals() ) )
-                write( interp( '        m_childCollections.put("$fname", m_$fname);', locals() ) )
+                write( interp( '        m_$fname = new $ftype(catalog, this, "$fname", $realtype.class);', locals() ) )
         write( '    }\n' )
 
         # getFields
-        write( '    public String[] getFields() {' )
-        write( '        return new String[] {' )
+        write(                        '    public String[] getFields() {' )
+        write(                        '        return new String[] {' )
         for field in cls.fields:
             if field.type[-1] != '*':
                 fname = field.name
-                write( interp( '            "$fname",', locals() ) )
-        write( '        };' )
-        write( '    };\n' )
+                write( interp(        '            "$fname",', locals() ) )
+        write(                        '        };' )
+        write(                        '    };\n' )
+
+        # getChildCollections;
+        write(                        '    String[] getChildCollections() {' )
+        write(                        '        return new String[] {' )
+        for field in cls.fields:
+            if field.type[-1] == '*':
+                fname = field.name
+                write( interp(        '            "$fname",', locals() ) )
+        write(                        '        };' )
+        write(                        '    };\n' )
+
 
         #getField
         write(             '    public Object getField(String field) {' )
@@ -228,8 +238,10 @@ def genjava( classes, prepath, postpath, package ):
                 fname = field.name
                 if ftype in ["int", "boolean", "String"]:
                     write( interp( '        other.m_$fname = m_$fname;', locals() ) )
-                if field.type[-1] == '?':
+                elif field.type[-1] == '?':
                     write( interp( '        other.m_$fname.setUnresolved(m_$fname.getPath());', locals() ) )
+                elif field.type[-1] == '*':
+                    write( interp( '        other.m_$fname.copyFrom(m_$fname);', locals() ) )
         write(                     '    }\n' )
 
         # equals
