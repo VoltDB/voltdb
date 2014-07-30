@@ -73,14 +73,10 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         // Use VoltProjectBuilder to write catalog and deployment.xml
         builder.setUseAdhocSchema(true);
-        builder.addLiteralSchema("--nothing");
+        builder.addSchema(pathToSchema);
         success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        // User VoltCompiler to replace the catalog
-        success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
-        assertTrue(success);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = pathToCatalog;
@@ -172,38 +168,14 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         teardownSystem();
     }
 
-    public String getHTML(String urlToRead) {
-        URL url;
-        HttpURLConnection conn;
-        BufferedReader rd;
-        String line;
-        String result = "";
-        try {
-           url = new URL(urlToRead);
-           conn = (HttpURLConnection) url.openConnection();
-           conn.setRequestMethod("GET");
-           rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-           while ((line = rd.readLine()) != null) {
-              result += line;
-           }
-           rd.close();
-        } catch (IOException e) {
-           e.printStackTrace();
-        } catch (Exception e) {
-           e.printStackTrace();
-        }
-        return result;
-     }
-
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
         firstCanonicalDDL = getFirstCanonicalDDL();
 
 
-//        secondCanonicalDDL = getSecondCanonicalDDL();
+        secondCanonicalDDLFromAdhoc = getSecondCanonicalDDLFromAdhoc();
 //
-//        assertEquals(firstCanonicalDDL, secondCanonicalDDL);
-        sqlcmd();
+        assertEquals(firstCanonicalDDL, secondCanonicalDDLFromAdhoc);
     }
 
 }
