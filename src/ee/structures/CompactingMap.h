@@ -35,16 +35,17 @@ typedef u_int32_t NodeCount;
 #define INVALIDCT 0
 #endif
 
+// see indexes/indexkey.h
 #ifndef MAXPOINTER
-#define MAXPOINTER ((const void *) 0xffffffffffffffff)
+#define MAXPOINTER (reinterpret_cast<const void *>(UINTPTR_MAX))
 #endif
 
 namespace voltdb {
 
-//  We can define some member function like setPointerValue() to achieve the same goal.
 template <typename T>
 inline void setPointerValue(T& t, const void * v) {}
 
+// the template for KeyTypes don't contain a pointer to the tuple
 template <typename Key, typename Data = const void*>
 class NormalKeyValuePair : public std::pair<Key, Data> {
 public:
@@ -53,16 +54,13 @@ public:
     NormalKeyValuePair(const Key &key, const Data &value) : std::pair<Key, Data>(key, value) {}
     NormalKeyValuePair(std::pair<Key, Data> &p) : std::pair<Key, Data>(p) {}
 
-    // TODO: how to deconstruct this class?
-
     Key& getKey() { return std::pair<Key, Data>::first; }
     const Key& getKey() const { return std::pair<Key, Data>::first; }
     Data& getValue() { return std::pair<Key, Data>::second; }
     void setKey(Key &key) { std::pair<Key, Data>::first = key; }
     void setValue(const Data &value) { std::pair<Key, Data>::second = value; }
 
-    // This function doesn't modify the class. The caller has to understand
-    // the meaning of the return value.
+    // This function dose nothing, and is only to offer the same API as PointerKeyValuePair.
     const void *setPointerValue(const void *value) { return NULL; }
 };
 
@@ -244,9 +242,6 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 CompactingMap<KeyValuePair, Compare, hasRank>::~CompactingMap() {
     iterator iter = begin();
     while (!iter.isEnd()) {
-        // TODO: how to deconstruct this? Will pair deconstructor automatically release these two?
-        //iter.key().~Key();
-        //iter.value().~Data();
         iter.pair().~KeyValuePair();
         iter.moveNext();
     }
@@ -768,6 +763,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
     // fix xin's code by set and unset key before each comparision
+    // TODO: add a new member function to do the set/compare/unset stuff
     const void *lv1 = m_root->kv.setPointerValue(NULL);
     int m = m_comper(key, m_root->key());
     m_root->kv.setPointerValue(lv1);

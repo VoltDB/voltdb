@@ -54,9 +54,11 @@
 #include <cassert>
 #include <iostream>
 #include <sstream>
+#include <stdint.h> // our compiler doesn't open C++ 11 flag, so we cannot use cstdint
 
+// MAXPOINTER will be reinterpret_cast back to UINTPTR_MAX
 #ifndef MAXPOINTER
-#define MAXPOINTER ((const void *) 0xffffffffffffffff)
+#define MAXPOINTER (reinterpret_cast<const void *>(UINTPTR_MAX))
 #endif
 
 namespace voltdb {
@@ -765,10 +767,8 @@ private:
 };
 
 static inline int comparePointer(const void *lhs, const void *rhs) {
-    //uint64_t l = reinterpret_cast<uint64_t&>(const_cast<void *>(lhs));
-    //uint64_t r = reinterpret_cast<uint64_t&>(const_cast<void *>(rhs));
-    uint64_t l = (uint64_t&)lhs;
-    uint64_t r = (uint64_t&)rhs;
+    const uintptr_t l = reinterpret_cast<const uintptr_t>(lhs);
+    const uintptr_t r = reinterpret_cast<const uintptr_t>(rhs);
 
     if (l == r) return 0;
     else if (l < r) return -1;
@@ -778,8 +778,6 @@ static inline int comparePointer(const void *lhs, const void *rhs) {
 // Tree index only uses comparator
 template <std::size_t keySize> struct IntsPointerComparator;
 
-// TODO: use pointer instead of one element of uint64_t array
-// some case base class is easier using keySize+1
 template <std::size_t keySize>
 struct IntsPointerKey : public IntsKey<keySize> {
     typedef IntsPointerComparator<keySize> KeyComparator;
@@ -811,7 +809,7 @@ struct IntsPointerKey : public IntsKey<keySize> {
         return rv;
     }
 
-    const void * m_tuple;
+    const void * m_tuple; // point to the actual tuple
 };
 
 template <std::size_t keySize>
@@ -821,7 +819,7 @@ struct IntsPointerComparator : public IntsComparator<keySize> {
 
     inline int operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
         int rv = IntsComparator<keySize>::operator()(static_cast<const IntsKey<keySize> >(lhs),
-                                                       static_cast<const IntsKey<keySize> >(rhs));
+                                                     static_cast<const IntsKey<keySize> >(rhs));
         return rv == 0 ? comparePointer(lhs.m_tuple, rhs.m_tuple) : rv;
     }
 };
@@ -846,12 +844,11 @@ public:
 
     first_type& getKey() { return k; }
     const first_type& getKey() const { return k; }
-    // TODO: this is bad, and change it to use a member func
     second_type& getValue() { return (second_type&)k.getValue(); }
     void setKey(first_type &key) { k = key; }
     void setValue(const second_type &value) { k.setValue(const_cast<second_type&>(value)); }
 
-    // set the last slot to the new value, and return the old value
+    // set the tuple pointer to the new value, and return the old value
     const void *setPointerValue(const void *value) {
         return k.setPointerValue(value);
     }
