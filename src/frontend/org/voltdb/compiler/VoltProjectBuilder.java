@@ -674,6 +674,7 @@ public class VoltProjectBuilder {
             transformer = new StringBuffer();
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
 
         String[] schemaPath = m_schemas.toArray(new String[0]);
