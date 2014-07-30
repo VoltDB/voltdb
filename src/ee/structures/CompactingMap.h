@@ -35,13 +35,17 @@ typedef u_int32_t NodeCount;
 #define INVALIDCT 0
 #endif
 
+#ifndef MAXPOINTER
+#define MAXPOINTER ((const void *) 0xffffffffffffffff)
+#endif
+
 namespace voltdb {
 
-//  We can define some member function like fillLastSlot() to achieve the same goal.
-template <typename T, typename V>
-void fillLastSlot(T& t, const V& v) {}
+//  We can define some member function like setPointerValue() to achieve the same goal.
+template <typename T>
+inline void setPointerValue(T& t, const void * v) {}
 
-template <typename Key, typename Data = const void *>
+template <typename Key, typename Data = const void*>
 class NormalKeyValuePair : public std::pair<Key, Data> {
 public:
     NormalKeyValuePair() {}
@@ -59,8 +63,7 @@ public:
 
     // This function doesn't modify the class. The caller has to understand
     // the meaning of the return value.
-    // TODO: use the template fillLastSlot func above, and remove this
-    uint64_t fillLastSlot(uint64_t value) { return 0; }
+    const void *setPointerValue(const void *value) { return NULL; }
 };
 
 /**
@@ -765,26 +768,26 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
     // fix xin's code by set and unset key before each comparision
-    uint64_t lv1 = m_root->kv.fillLastSlot(0);
+    const void *lv1 = m_root->kv.setPointerValue(NULL);
     int m = m_comper(key, m_root->key());
-    m_root->kv.fillLastSlot(lv1);
+    m_root->kv.setPointerValue(lv1);
     if (m == 0) {
         if (m_root->right != &NIL)
             ctr = getSubct(m_root->right);
         ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
-            lv1 = p->kv.fillLastSlot(0);
+            lv1 = p->kv.setPointerValue(NULL);
             if (m_comper(key, p->key()) == 0) {
                 if (p->right != &NIL) {
-                    uint64_t lv2 = p->right->kv.fillLastSlot(0);
+                    const void *lv2 = p->right->kv.setPointerValue(NULL);
                     if (m_comper(key, p->right->key()) == 0) {
                         ct-= getSubct(p->right);
                     }
-                    p->right->kv.fillLastSlot(lv2);
+                    p->right->kv.setPointerValue(lv2);
                 }
                 ct--;
             }
-            p->kv.fillLastSlot(lv1);
+            p->kv.setPointerValue(lv1);
             p = p->parent;
         }
     } else if (m > 0) {
@@ -822,7 +825,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
 
     iterator it;
     Key temp(key);
-    fillLastSlot(temp, 0xffffffffffffffff);
+    setPointerValue(temp, MAXPOINTER);
     it = upperBound(temp);
     if (it.isEnd())
         return m_count;

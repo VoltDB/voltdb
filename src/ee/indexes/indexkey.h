@@ -55,6 +55,10 @@
 #include <iostream>
 #include <sstream>
 
+#ifndef MAXPOINTER
+#define MAXPOINTER ((const void *) 0xffffffffffffffff)
+#endif
+
 namespace voltdb {
 
 /*
@@ -760,60 +764,73 @@ private:
     const TupleSchema *m_keySchema;
 };
 
+static inline int comparePointer(const void *lhs, const void *rhs) {
+    //uint64_t l = reinterpret_cast<uint64_t&>(const_cast<void *>(lhs));
+    //uint64_t r = reinterpret_cast<uint64_t&>(const_cast<void *>(rhs));
+    uint64_t l = (uint64_t&)lhs;
+    uint64_t r = (uint64_t&)rhs;
+
+    if (l == r) return 0;
+    else if (l < r) return -1;
+    else return 1;
+}
+
 // Tree index only uses comparator
 template <std::size_t keySize> struct IntsPointerComparator;
 
 // TODO: use pointer instead of one element of uint64_t array
 // some case base class is easier using keySize+1
 template <std::size_t keySize>
-struct IntsPointerKey : public IntsKey<keySize + 1> {
+struct IntsPointerKey : public IntsKey<keySize> {
     typedef IntsPointerComparator<keySize> KeyComparator;
 
     static inline bool keyDependsOnTupleAddress() { return true; }
 
     std::string debug(const voltdb::TupleSchema *keySchema) const {
         std::ostringstream buffer;
-        buffer << IntsKey<keySize+1>::debug(keySchema) <<
-            IntsKey<keySize+1>::data[keySize]<< ",";
+        buffer << IntsKey<keySize>::debug(keySchema) << m_tuple;
         return std::string(buffer.str());
     }
 
     IntsPointerKey() {}
 
-    IntsPointerKey(const TableTuple *tuple) : IntsKey<keySize+1>(tuple) {
-        // the slot for the pointer is all zero
-    }
+    IntsPointerKey(const TableTuple *tuple) : IntsKey<keySize>(tuple), m_tuple(NULL) {}
 
     IntsPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
-                   : IntsKey<keySize+1>(tuple, indices, indexed_expressions, keySchema) {
-        IntsKey<keySize+1>::data[keySize] = (uint64_t)(tuple->address());
+                   : IntsKey<keySize>(tuple, indices, indexed_expressions, keySchema) {
+        m_tuple = static_cast<const void *>(const_cast<const char*>(tuple->address()));
     }
 
-    void fillLastSlot(uint64_t v) {
-        IntsKey<keySize+1>::data[keySize] = v;
+    const void *& getValue() { return m_tuple;}
+    void setValue(const void * &value) { m_tuple = value; }
+    const void *setPointerValue(const void * &value) {
+        const void * rv = m_tuple;
+        m_tuple = value;
+        return rv;
     }
 
-    uint64_t& getLastSlot() { return IntsKey<keySize+1>::data[keySize]; }
+    const void * m_tuple;
 };
 
 template <std::size_t keySize>
-struct IntsPointerComparator : public IntsComparator<keySize + 1> {
+struct IntsPointerComparator : public IntsComparator<keySize> {
     IntsPointerComparator(const TupleSchema *unused_keySchema)
-        : IntsComparator<keySize + 1>(unused_keySchema) {}
+        : IntsComparator<keySize>(unused_keySchema) {}
 
     inline int operator()(const IntsPointerKey<keySize> &lhs, const IntsPointerKey<keySize> &rhs) const {
-        return IntsComparator<keySize + 1>::operator()(static_cast<const IntsKey<keySize+1> >(lhs),
-                                                       static_cast<const IntsKey<keySize+1> >(rhs));
+        int rv = IntsComparator<keySize>::operator()(static_cast<const IntsKey<keySize> >(lhs),
+                                                       static_cast<const IntsKey<keySize> >(rhs));
+        return rv == 0 ? comparePointer(lhs.m_tuple, rhs.m_tuple) : rv;
     }
 };
 
 // overload template
-template <std::size_t keySize, typename V>
-void fillLastSlot(IntsPointerKey<keySize>& k, const V& v) { k.fillLastSlot((uint64_t)v); }
+template <std::size_t keySize>
+inline void setPointerValue(IntsPointerKey<keySize>& k, const void * v) { k.setValue(v); }
 
-template < typename PointerKeyType, typename DataType = const void *>
+template < typename PointerKeyType, typename DataType = const void*>
 class PointerKeyValuePair {
 public:
     // in order to be consistent with std::pair
@@ -830,15 +847,13 @@ public:
     first_type& getKey() { return k; }
     const first_type& getKey() const { return k; }
     // TODO: this is bad, and change it to use a member func
-    second_type& getValue() { return (second_type&)k.getLastSlot(); }
+    second_type& getValue() { return (second_type&)k.getValue(); }
     void setKey(first_type &key) { k = key; }
-    void setValue(const second_type &value) { k.fillLastSlot((uint64_t)value); }
+    void setValue(const second_type &value) { k.setValue(const_cast<second_type&>(value)); }
 
     // set the last slot to the new value, and return the old value
-    uint64_t fillLastSlot(uint64_t value) {
-        uint64_t rv = k.getLastSlot();
-        k.fillLastSlot(value);
-        return rv;
+    const void *setPointerValue(const void *value) {
+        return k.setPointerValue(value);
     }
 
 private:

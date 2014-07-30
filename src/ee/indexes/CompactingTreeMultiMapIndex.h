@@ -132,7 +132,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (KeyType::keyDependsOnTupleAddress()) {
             KeyType tempKey(searchKey);
             m_keyIter = m_entries.lowerBound(tempKey);
-            fillLastSlot(tempKey, 0xffffffffffffffff);
+            setPointerValue(tempKey, MAXPOINTER);
             m_keyEndIter = m_entries.upperBound(tempKey);
         }
         else {
@@ -162,7 +162,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         m_forward = true;
         KeyType tempKey(searchKey);
         if (KeyType::keyDependsOnTupleAddress()) {
-            fillLastSlot(tempKey, 0xffffffffffffffff);
+            setPointerValue(tempKey, MAXPOINTER);
         }
         m_keyIter = m_entries.upperBound(tempKey);
         return m_keyIter.isEnd();
@@ -294,7 +294,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (mapIter.isEnd()) {
             return m_entries.size();
         }
-        fillLastSlot(tmpKey, 0xffffffffffffffff);
+        setPointerValue(tmpKey, MAXPOINTER);
         int cmp = m_cmp(tmpKey, mapIter.key());
         if (cmp < 0) {
             mapIter.movePrev();
@@ -340,7 +340,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
             KeyType tempKey(searchKey);
             MapIterator rv = m_entries.lowerBound(tempKey);
             KeyType rvKey = rv.key();
-            fillLastSlot(tempKey, 0xffffffffffffffff);
+            setPointerValue(tempKey, MAXPOINTER);
             if (m_cmp(rvKey, tempKey) <= 0) {
                 return rv;
             }
