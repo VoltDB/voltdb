@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 
 /**
@@ -160,7 +161,7 @@ class ParameterizationInfo {
         }
     }
 
-    public static Object valueForStringWithType(String value, VoltType type) throws Exception {
+    public static Object valueForStringWithType(String value, VoltType type) {
         if (type == VoltType.NULL) {
             return null;
         }
@@ -172,7 +173,7 @@ class ParameterizationInfo {
         return retval;
     }
 
-    public Object[] extractedParamValues(VoltType[] parameterTypes) throws Exception {
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
         assert(paramLiteralValues.length == parameterTypes.length);
         Object[] params = new Object[paramLiteralValues.length];
 
@@ -182,7 +183,6 @@ class ParameterizationInfo {
         for (int i = 0; i < paramLiteralValues.length; i++) {
             params[i] = valueForStringWithType(paramLiteralValues[i], parameterTypes[i]);
         }
-
-        return params;
+        return ParameterSet.fromArrayNoCopy(params);
     }
 }

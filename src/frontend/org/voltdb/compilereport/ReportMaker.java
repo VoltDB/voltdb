@@ -103,15 +103,21 @@ public class ReportMaker {
         sb.append(StringUtils.join(columnNames, ", "));
         sb.append("</td>");
 
-        // uniqueness column
+        // attribute column
         sb.append("<td>");
         if (index.getAssumeunique()) {
-            tag(sb, "important", "AssumeUnique");
+            tag(sb, "success", "AssumeUnique");
         } else if (index.getUnique()) {
-            tag(sb, "important", "Unique");
+            tag(sb, "success", "Unique");
         } else {
             tag(sb, "info", "Nonunique");
         }
+        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
+        if(annotation == null) {
+            sb.append(" ");
+            tag(sb, "important", "Unused");
+        }
+
         sb.append("</td>");
 
         sb.append("</tr>\n");
@@ -120,7 +126,6 @@ public class ReportMaker {
         sb.append("<tr class='dropdown2'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
                 "-" + index.getTypeName().toLowerCase() + "--dropdown'>\n");
 
-        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
         if (annotation != null) {
             if (annotation.proceduresThatUseThis.size() > 0) {
                 sb.append("<p>Used by procedures: ");
@@ -144,7 +149,7 @@ public class ReportMaker {
                   "<th>Index Name</th>" +
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
-                  "<th>Uniqueness</th>" +
+                  "<th>Attributes</th>" +
                   "</tr></thead>\n    <tbody>\n");
 
         for (Index index : table.getIndexes()) {
@@ -208,6 +213,18 @@ public class ReportMaker {
         // column 5: index count
         sb.append("<td>");
         sb.append(table.getIndexes().size());
+
+        // computing unused indexes
+        int unusedIndexes = 0;
+        for (Index index : table.getIndexes()) {
+            IndexAnnotation indexAnnotation = (IndexAnnotation) index.getAnnotation();
+               if(indexAnnotation == null) {
+                   unusedIndexes++;
+               }
+        }
+        if(unusedIndexes !=0 ) {
+            sb.append(" (" + unusedIndexes +" unused)");
+        }
         sb.append("</td>");
 
         // column 6: has pkey

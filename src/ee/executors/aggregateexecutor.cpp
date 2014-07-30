@@ -51,6 +51,7 @@
 #include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
+#include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
@@ -353,35 +354,62 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     if (!node->isInline()) {
         setTempOutputTable(limits);
     }
+    m_partialSerialGroupByColumns = node->getPartialGroupByColumns();
 
     m_aggTypes = node->getAggregates();
     m_distinctAggs = node->getDistinctAggregates();
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
-    // FIXME(xin):
-    // Group by columns are just pass throught columns, why not right?
-    // m_passThroughColumns.size() == m_groupByExpressions.size() is not true, any case?
-
+    // m_passThroughColumns.size() == m_groupByExpressions.size() is not true,
+    // Because group by unique column may be able to select other columns
     m_prePredicate = node->getPrePredicate();
     m_postPredicate = node->getPostPredicate();
 
+    m_groupByKeySchema = constructGroupBySchema(false);
+    m_groupByKeyPartialHashSchema = NULL;
+    if (m_partialSerialGroupByColumns.size() > 0) {
+        for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
+            if (std::find(m_partialSerialGroupByColumns.begin(),
+                          m_partialSerialGroupByColumns.end(), ii)
+                       == m_partialSerialGroupByColumns.end() )
+            {
+                // Find the partial hash group by columns
+                m_partialHashGroupByColumns.push_back(ii);;
+            }
+        }
+        m_groupByKeyPartialHashSchema = constructGroupBySchema(true);
+    }
+
+    return true;
+}
+
+inline TupleSchema* AggregateExecutorBase::constructGroupBySchema(bool partial) {
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
     std::vector<bool> groupByColumnAllowNull;
     std::vector<bool> groupByColumnInBytes;
-    for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
-        AbstractExpression* expr = m_groupByExpressions[ii];
-        groupByColumnTypes.push_back(expr->getValueType());
-        groupByColumnSizes.push_back(expr->getValueSize());
-        groupByColumnAllowNull.push_back(true);
-        groupByColumnInBytes.push_back(expr->getInBytes());
+
+    if (partial) {
+        BOOST_FOREACH (int gbIdx, m_partialHashGroupByColumns) {
+            AbstractExpression* expr = m_groupByExpressions[gbIdx];
+            groupByColumnTypes.push_back(expr->getValueType());
+            groupByColumnSizes.push_back(expr->getValueSize());
+            groupByColumnAllowNull.push_back(true);
+            groupByColumnInBytes.push_back(expr->getInBytes());
+        }
+    } else {
+        BOOST_FOREACH (AbstractExpression* expr, m_groupByExpressions) {
+            groupByColumnTypes.push_back(expr->getValueType());
+            groupByColumnSizes.push_back(expr->getValueSize());
+            groupByColumnAllowNull.push_back(true);
+            groupByColumnInBytes.push_back(expr->getInBytes());
+        }
     }
-    m_groupByKeySchema = TupleSchema::createTupleSchema(groupByColumnTypes,
-                                                        groupByColumnSizes,
-                                                        groupByColumnAllowNull,
-                                                        groupByColumnInBytes);
-    return true;
+    return TupleSchema::createTupleSchema(groupByColumnTypes,
+                                          groupByColumnSizes,
+                                          groupByColumnAllowNull,
+                                          groupByColumnInBytes);
 }
 
 inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
@@ -389,20 +417,17 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
-}
 
-inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &nextGroupByKeyStorage,
-                                                       const TableTuple& nxtTuple)
-{
-    TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
-    if (nextGroupByKeyTuple.isNullTuple()) {
-        nextGroupByKeyStorage.allocateActiveTuple();
-    }
-    // TODO: Here is where an inline projection executor could be used to initialize both a group key tuple
-    // and an agg input tuple from the same raw input tuple.
-    // configure a tuple
-    for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
-        nextGroupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nxtTuple));
+    //
+    // OPTIMIZATION: NESTED LIMIT for serial aggregation
+    //
+    m_limit = -1;
+    m_offset = -1;
+    m_tupleSkipped = 0;
+    m_earlyReturn = false;
+    LimitPlanNode* inlineLimitNode = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    if (inlineLimitNode) {
+        inlineLimitNode->getLimitAndOffsetByReference(params, m_limit, m_offset);
     }
 }
 
@@ -411,6 +436,10 @@ inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &n
 /// through any additional columns from the input table.
 inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 {
+    if (m_earlyReturn) {
+        return false;
+    }
+
     TableTuple& tempTuple = m_tmpOutputTable->tempTuple();
 
     // This first pass is to add all columns that were aggregated on.
@@ -428,6 +457,19 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 
     bool inserted = false;
     if (m_postPredicate == NULL || m_postPredicate->eval(&tempTuple, NULL).isTrue()) {
+        if (m_limit >= 0) {
+            // If there is an inlined limit for serial aggregate and
+            // it is possible for LIMIT 0.
+            if (m_offset > 0 && m_tupleSkipped < m_offset) {
+                m_tupleSkipped++;
+                return false;
+            }
+            if (m_tmpOutputTable->tempTableTupleCount() == m_limit) {
+                m_earlyReturn = true;
+                return false;
+            }
+        }
+
         m_tmpOutputTable->insertTupleNonVirtual(tempTuple);
         inserted = true;
     }
@@ -458,15 +500,25 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
     }
 }
 
-void AggregateHashExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema)
+AggregateHashExecutor::~AggregateHashExecutor() {}
+
+TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("hash aggregate executor init..");
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
     executeAggBase(params);
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
     m_inputSchema = schema;
+
+    char * storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
 }
 
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
@@ -479,13 +531,13 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
-    TableTuple nextTuple(inputSchema);
-
     ProgressMonitorProxy pmp(m_engine, this);
-    AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
+
+    TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema);
 
     VOLT_TRACE("looping..");
     while (it.next(nextTuple)) {
+        assert(m_earlyReturn == false); // hash aggregation can not early return for limit
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
     AggregateHashExecutor::p_execute_finish();
@@ -494,9 +546,23 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
-inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+void AggregateHashExecutor::initHashGroupByKeyTuple(const TableTuple& nxtTuple)
+{
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+    if (nextGroupByKeyTuple.isNullTuple()) {
+        m_nextGroupByKeyStorage.allocateActiveTuple();
+    }
+    // TODO: Here is where an inline projection executor could be used to initialize both a group key tuple
+    // and an agg input tuple from the same raw input tuple.
+    // configure a tuple
+    for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
+        nextGroupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nxtTuple));
+    }
+}
+
+bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     m_pmp->countdownProgress();
-    initGroupByKeyTuple(m_nextGroupByKeyStorage, nextTuple);
+    initHashGroupByKeyTuple(nextTuple);
     AggregateRow* aggregateRow;
     TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
     // Search for the matching group.
@@ -523,6 +589,11 @@ inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) 
     }
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
 }
 
 void AggregateHashExecutor::p_execute_finish() {
@@ -543,6 +614,8 @@ void AggregateHashExecutor::p_execute_finish() {
     m_memoryPool.purge();
 }
 
+AggregateSerialExecutor::~AggregateSerialExecutor() {}
+
 inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
 {
     for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
@@ -550,8 +623,13 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
     }
 }
 
-void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * inputSchema) {
+TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
+{
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
     executeAggBase(params);
     assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
@@ -569,8 +647,13 @@ void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
     m_pmp = pmp;
 
     char* storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-    m_passThroughTupleSource = TableTuple (storage, inputSchema);
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    m_passThroughTupleSource = TableTuple(storage, schema);
+
+    // for input tuple
+    storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
@@ -588,6 +671,9 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     while (it.next(nextTuple)) {
         m_pmp->countdownProgress();
         AggregateSerialExecutor::p_execute_tuple(nextTuple);
+        if (m_earlyReturn) {
+            break;
+        }
     }
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
@@ -596,7 +682,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     return true;
 }
 
-inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // Use the first input tuple to "prime" the system.
     if (m_noInputRows) {
         // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -612,7 +698,7 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
             m_failPrePredicateOnFirstRow = true;
         }
         m_noInputRows = false;
-        return;
+        return false;
     }
 
     getNextGroupByValues(nextTuple);
@@ -636,32 +722,202 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
 
     // update the aggregation calculation.
     advanceAggs(m_aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
 }
 
 void AggregateSerialExecutor::p_execute_finish()
 {
-    if (m_noInputRows || m_failPrePredicateOnFirstRow) {
-        VOLT_TRACE("finalizing after no input rows..");
-        // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
-        // Note the difference between these two cases:
-        //   SELECT SUM(A) FROM BBB,            when BBB has no tuple, produces one output row.
-        //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
-        if (m_groupByKeySchema->columnCount() == 0) {
-            VOLT_TRACE("no input row, but output an empty result row for the whole table.");
-            initAggInstances(m_aggregateRow);
+    if (!m_earlyReturn) {
+        if (m_noInputRows || m_failPrePredicateOnFirstRow) {
+            VOLT_TRACE("finalizing after no input rows..");
+            // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
+            // Note the difference between these two cases:
+            //   SELECT SUM(A) FROM BBB,            when BBB has no tuple, produces one output row.
+            //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
+            if (m_groupByKeySchema->columnCount() == 0) {
+                VOLT_TRACE("no input row, but output an empty result row for the whole table.");
+                initAggInstances(m_aggregateRow);
+                if (insertOutputTuple(m_aggregateRow)) {
+                    m_pmp->countdownProgress();
+                }
+            }
+        } else {
+            // There's one last group (or table) row in progress that needs to be output.
             if (insertOutputTuple(m_aggregateRow)) {
                 m_pmp->countdownProgress();
             }
-        }
-    } else {
-        // There's one last group (or table) row in progress that needs to be output.
-        if (insertOutputTuple(m_aggregateRow)) {
-            m_pmp->countdownProgress();
         }
     }
 
     // clean up the member variables
     delete m_aggregateRow;
+
+    m_nextGroupByValues.clear();
+    m_inProgressGroupByValues.clear();
+
+    m_memoryPool.purge();
+}
+
+
+//
+// Partial aggregate
+//
+
+AggregatePartialExecutor::~AggregatePartialExecutor() {}
+
+inline void AggregatePartialExecutor::getNextGroupByValues(const TableTuple& nextTuple)
+{
+    for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
+        m_nextGroupByValues[ii] = m_groupByExpressions[ii]->eval(&nextTuple);
+    }
+}
+
+TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
+        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
+{
+    if (newTempTable != NULL) {
+        m_tmpOutputTable = newTempTable;
+    }
+
+    executeAggBase(params);
+
+    size_t numGroupby = m_groupByExpressions.size();
+    NValue nullValue = ValueFactory::getNullValue();
+    for (int i = 0; i < numGroupby; i++) {
+        m_inProgressGroupByValues.push_back(nullValue);
+        m_nextGroupByValues.push_back(nullValue);
+    }
+    m_pmp = pmp;
+
+    m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
+    m_inputSchema = schema;
+
+    m_atTheFirstRow = true;
+
+    char * storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    return TableTuple(storage, schema);
+}
+
+bool AggregatePartialExecutor::p_execute(const NValueArray& params)
+{
+    // Input table
+    Table* input_table = m_abstractNode->getInputTables()[0];
+    assert(input_table);
+    VOLT_TRACE("input table\n%s", input_table->debug().c_str());
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableTuple nextTuple(input_table->schema());
+
+    ProgressMonitorProxy pmp(m_engine, this);
+    AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema());
+
+    while (it.next(nextTuple)) {
+        m_pmp->countdownProgress();
+        AggregatePartialExecutor::p_execute_tuple(nextTuple);
+        if (m_earlyReturn) {
+            break;
+        }
+    }
+    AggregatePartialExecutor::p_execute_finish();
+    VOLT_TRACE("finalizing..");
+
+    cleanupInputTempTable(input_table);
+    return true;
+}
+
+inline void AggregatePartialExecutor::initPartialHashGroupByKeyTuple(const TableTuple& nxtTuple)
+{
+    TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
+    if (nextGroupByKeyTuple.isNullTuple()) {
+        m_nextPartialGroupByKeyStorage.allocateActiveTuple();
+    }
+
+    for (int ii = 0; ii < m_partialHashGroupByColumns.size(); ii++) {
+        int gbIdx = m_partialHashGroupByColumns.at(ii);
+        AbstractExpression* expr = m_groupByExpressions[gbIdx];
+        nextGroupByKeyTuple.setNValue(ii, expr->eval(&nxtTuple));
+    }
+}
+
+bool AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
+    getNextGroupByValues(nextTuple);
+
+    BOOST_FOREACH(int ii, m_partialSerialGroupByColumns) {
+        if (m_atTheFirstRow || m_nextGroupByValues.at(ii).compare(m_inProgressGroupByValues.at(ii)) != 0) {
+            VOLT_TRACE("new group!");
+            m_atTheFirstRow = false;
+
+            // Output old group rows.
+            for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
+                AggregateRow *aggregateRow = iter->second;
+                if (insertOutputTuple(aggregateRow)) {
+                    m_pmp->countdownProgress();
+                }
+                delete aggregateRow;
+            }
+            // swap inProgressGroupByValues
+            m_inProgressGroupByValues = m_nextGroupByValues;
+
+            // clean up the partial hash aggregate.
+            m_hash.clear();
+            break;
+        }
+    }
+
+    // Hash aggregate on the rest of group by expressions.
+    initPartialHashGroupByKeyTuple(nextTuple);
+    AggregateRow* aggregateRow;
+    TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
+    HashAggregateMapType::const_iterator keyIter = m_hash.find(nextGroupByKeyTuple);
+
+    // Group not found. Make a new entry in the hash for this new group.
+    if (keyIter == m_hash.end()) {
+        VOLT_TRACE("partial hash aggregate: new sub group..");
+        aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+        m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
+        initAggInstances(aggregateRow);
+
+        char* storage = reinterpret_cast<char*>(
+                        m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
+        aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
+        // The map is referencing the current key tuple for use by the new group,
+        // so force a new tuple allocation to hold the next candidate key.
+        nextGroupByKeyTuple.move(NULL);
+    } else {
+        // otherwise, the agg row is the second item of the pair...
+        aggregateRow = keyIter->second;
+    }
+
+    // update the aggregation calculation.
+    advanceAggs(aggregateRow, nextTuple);
+
+    if (m_earlyReturn) {
+        return true;
+    }
+    return false;
+}
+// TODO: Refactoring the last half of the above function with HASH aggregation
+
+void AggregatePartialExecutor::p_execute_finish()
+{
+    VOLT_TRACE("finalizing..");
+    for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
+        AggregateRow *aggregateRow = iter->second;
+        if (insertOutputTuple(aggregateRow)) {
+            m_pmp->countdownProgress();
+        }
+        delete aggregateRow;
+    }
+
+    TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
+    nextGroupByKeyTuple.move(NULL);
+    m_hash.clear();
+
     m_nextGroupByValues.clear();
     m_inProgressGroupByValues.clear();
 

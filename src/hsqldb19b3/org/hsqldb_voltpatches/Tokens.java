@@ -757,6 +757,10 @@ public class Tokens {
     static final String        T_DAYOFWEEK           = "DAYOFWEEK";
     static final String        T_DAYOFYEAR           = "DAYOFYEAR";
     static final String        T_WEEK                = "WEEK";
+    // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
+    static final String        T_WEEKOFYEAR          = "WEEKOFYEAR"; // for compliant with MySQL
+    static final String        T_WEEKDAY             = "WEEKDAY";    // for compliant with MySQL
+    // End of VoltDB extension
 
     //
     static final String        T_ACOS             = "ACOS";
@@ -1432,7 +1436,12 @@ public class Tokens {
     static final int        DAYOFMONTH              = 614;
     static final int        DAYOFWEEK               = 615;
     static final int        DAYOFYEAR               = 616;
-    static final int        WEEK                    = 617;
+    // A VoltDB extension to make WEEK public
+    public static final int WEEK                    = 617;
+    /* disable 1 line ...
+    static final int WEEK                           = 617;
+    ... disable 1 line */
+    // End of VoltDB extension
     static final int        OCTETLENGTH             = 618;
     static final int        BITLENGTH               = 619;
 
@@ -1574,6 +1583,10 @@ public class Tokens {
     public static final int X_MALFORMED_COMMENT        = 737;
     public static final int X_MALFORMED_IDENTIFIER     = 738;
     public static final int X_MALFORMED_UNICODE_ESCAPE = 739;
+    // A VoltDB extension to support WEEKOFYEAR, WEEKDAY
+    public static final int WEEKOFYEAR                 = 740; // for compliant with MySQL
+    public static final int WEEKDAY                    = 741; // for compliant with MySQL
+    // End of VoltDB extension
 
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -1917,6 +1930,10 @@ public class Tokens {
         reservedKeys.put(Tokens.T_WITHOUT, WITHOUT);
         reservedKeys.put(Tokens.T_WHILE, WHILE);
         reservedKeys.put(Tokens.T_YEAR, YEAR);
+        // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
+        reservedKeys.put(Tokens.T_WEEKOFYEAR, WEEKOFYEAR);    // For compliant with MySQL
+        reservedKeys.put(Tokens.T_WEEKDAY, WEEKDAY);          // For compliant with MySQL
+        // End of VoltDB extension
     }
 
     private static final IntValueHashMap commandSet = new IntValueHashMap(251);
@@ -2106,6 +2123,14 @@ public class Tokens {
         commandSet.put(T_ZONE, ZONE);
 
         //
+        // A VoltDB extension to extract timestamp field function
+        commandSet.put(T_DAYOFWEEK, DAYOFWEEK);
+        commandSet.put(T_DAYOFYEAR, DAYOFYEAR);
+        commandSet.put(T_WEEK, WEEK);
+        commandSet.put(T_WEEKOFYEAR, WEEKOFYEAR);
+        commandSet.put(T_WEEK_OF_YEAR, WEEK_OF_YEAR);
+        commandSet.put(T_WEEKDAY, WEEKDAY);
+        // End of VoltDB extension
         commandSet.put(T_DAY_NAME, DAY_NAME);
         commandSet.put(T_MONTH_NAME, MONTH_NAME);
         commandSet.put(T_QUARTER, QUARTER);

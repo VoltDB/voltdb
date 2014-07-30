@@ -466,8 +466,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
                 if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8))) {
                     //What ack from future is known?
-                    exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset
-                            + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
                                 + " Buffer info: " + uso + " Size: " + buffer.capacity());
@@ -528,7 +526,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                    if (!m_es.isShutdown()) {
+                        pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                    }
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {
@@ -609,7 +609,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             fut.setException(new RuntimeException("Should not poll more than once"));
                             return;
                         }
-                        pollImpl(fut);
+                        if (!m_es.isShutdown()) {
+                            pollImpl(fut);
+                        }
                     } catch (Exception e) {
                         exportLog.error("Exception polling export buffer", e);
                     } catch (Error e) {
@@ -706,7 +708,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         try {
                             m_backingCont.discard();
                             try {
-                                ackImpl(m_uso);
+                                if (!m_es.isShutdown()) {
+                                    ackImpl(m_uso);
+                                }
                             } finally {
                                 forwardAckToOtherReplicas(m_uso);
                             }
@@ -754,7 +758,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    ackImpl(uso);
+                    if (!m_es.isShutdown()) {
+                        ackImpl(uso);
+                    }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
@@ -788,7 +794,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        m_es.execute(m_onMastership);
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (!m_es.isShutdown()) {
+                        m_onMastership.run();
+                    }
+                } catch (Exception e) {
+                    exportLog.error("Error in accepting mastership", e);
+                }
+            }
+        });
     }
 
     /**

@@ -60,6 +60,11 @@ public:
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
+    /// Constructs a value copied into temporary thread-local storage.
+    static inline NValue getTempStringValue(const std::string value) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NValue::getTempStringPool());
+    }
+
     static inline NValue getNullStringValue() {
         return NValue::getNullStringValue();
     }
@@ -72,6 +77,15 @@ public:
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
         return getBinaryValue(rawBuf, (int32_t)rawLength);
+    }
+
+    /// Constructs a value copied into temporary string pool
+    /// Assumes hex-encoded input
+    static inline NValue getTempBinaryValue(const std::string& value) {
+        size_t rawLength = value.length() / 2;
+        unsigned char rawBuf[rawLength];
+        hexDecodeToBinary(rawBuf, value.c_str());
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, NValue::getTempStringPool());
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
@@ -165,7 +179,12 @@ public:
         return value.castAsString();
     }
 
-    static NValue nvalueFromSQLDefaultType(const ValueType type, std::string &value) {
+    enum StorageType {
+        USE_TEMP_STORAGE,
+        USE_LONG_TERM_STORAGE
+    };
+
+    static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, StorageType storage) {
         switch (type) {
             case VALUE_TYPE_NULL:
             {
@@ -193,11 +212,21 @@ public:
             }
             case VALUE_TYPE_VARCHAR:
             {
-                return getStringValue(value.c_str());
+                if (storage == USE_TEMP_STORAGE) {
+                    return getTempStringValue(value);
+                }
+                else {
+                    return getStringValue(value.c_str());
+                }
             }
             case VALUE_TYPE_VARBINARY:
             {
-                return getBinaryValue(value);
+                if (storage == USE_TEMP_STORAGE) {
+                    return getTempBinaryValue(value);
+                }
+                else {
+                    return getBinaryValue(value);
+                }
             }
             default:
             {

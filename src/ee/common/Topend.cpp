@@ -18,7 +18,7 @@
 #include "common/StreamBlock.h"
 
 namespace voltdb {
-    DummyTopend::DummyTopend() : receivedDRBuffer(false) {
+    DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false) {
 
     }
 

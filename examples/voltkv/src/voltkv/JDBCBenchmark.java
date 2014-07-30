@@ -146,8 +146,8 @@ public class JDBCBenchmark
             try
             {
                 con = DriverManager.getConnection(url, "", "");
-                final CallableStatement getCS = con.prepareCall("{call Get(?)}");
-                final CallableStatement putCS = con.prepareCall("{call Put(?,?)}");
+                final CallableStatement getCS = con.prepareCall("{call STORE.select(?)}");
+                final CallableStatement putCS = con.prepareCall("{call STORE.upsert(?,?)}");
                 long endTime = System.currentTimeMillis() + (1000l * this.duration);
                 Random rand = new Random();
                 while (endTime > System.currentTimeMillis())
@@ -179,7 +179,7 @@ public class JDBCBenchmark
                         final PayloadProcessor.Pair pair = processor.generateForStore();
                         try
                         {
-                            // Put a key/value pair, asynchronously
+                            // Put a key/value pair using inbuilt upsert procedure, asynchronously
                             putCS.setString(1, pair.Key);
                             putCS.setBytes(2, pair.getStoreValue());
                             putCS.executeUpdate();
@@ -256,22 +256,6 @@ public class JDBCBenchmark
                     config.keysize, config.minvaluesize, config.maxvaluesize,
                     config.entropy, config.poolsize, config.usecompression);
 
-            // Initialize the store
-            if (config.preload)
-            {
-                System.out.print("Initializing data store... ");
-                final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?,?)}");
-                for(int i=0;i<config.poolsize;i+=1000)
-                {
-                    initializeCS.setInt(1, i);
-                    initializeCS.setInt(2, Math.min(i+1000,config.poolsize));
-                    initializeCS.setString(3, processor.KeyFormat);
-                    initializeCS.setBytes(4, processor.generateForStore().getStoreValue());
-                    initializeCS.executeUpdate();
-                }
-                System.out.println(" Done.");
-            }
-
             // start the stats
             fullStatsContext.fetchAndResetBaseline();
 
@@ -284,7 +268,7 @@ public class JDBCBenchmark
                 @Override
                 public void run()
                 {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put")); } catch(Exception x) {}
+                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("STORE.select", "STORE.upsert")); } catch(Exception x) {}
                 }
             }
             , config.displayinterval*1000l
@@ -356,7 +340,7 @@ public class JDBCBenchmark
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put").toString(false));
+            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("STORE.select", "STORE.upsert").toString(false));
 
             // 3. Per-procedure detailed performance statistics
             System.out.println(
