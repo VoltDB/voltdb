@@ -1,4 +1,5 @@
 <configure-for-ints.sql>
+{@jointype = "_jointype"}
 
 -- INSERT
 -- INSERT some common values
