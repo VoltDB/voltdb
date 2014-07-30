@@ -28,7 +28,6 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -283,8 +282,7 @@ public class VoltProjectBuilder {
         m_deadHostTimeout = deadHostTimeout;
     }
 
-    public void setUseAdhocSchema(boolean useIt)
-    {
+    public void setUseAdhocSchema(boolean useIt) {
         m_useAdhocSchema = useIt;
     }
 
@@ -339,25 +337,20 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc)
-            {
+            if(info.adhoc || info.defaultproc || info.sysproc) {
                 transformer.append(" WITH ");
-                if(info.adhoc)
-                {
+                if(info.adhoc) {
                     transformer.append("adhoc,");
                 }
-                if(info.defaultproc)
-                {
+                if(info.defaultproc) {
                     transformer.append("defaultproc,");
                 }
-                if(info.sysproc)
-                {
+                if(info.sysproc) {
                     transformer.append("sysproc,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }
-            else
-            {
+            else {
                 transformer.append(";");
             }
         }
@@ -445,33 +438,27 @@ public class VoltProjectBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0)
-            {
+            if(procedure.groups.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++)
-                {
+                for(int i = 0; i < procedure.groups.length; i++) {
                     roleInfo.append(procedure.groups[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
             }
 
-            if(procedure.cls != null)
-            {
+            if(procedure.cls != null) {
                 transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
             }
-            else if(procedure.sql != null)
-            {
+            else if(procedure.sql != null) {
                 transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
 
-            if(procedure.partitionInfo != null)
-            {
+            if(procedure.partitionInfo != null) {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(Integer.parseInt(parameter[1].trim()) > 0)
-                {
+                if(Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
@@ -689,14 +676,7 @@ public class VoltProjectBuilder {
             e.printStackTrace();
         }
 
-        int index = 0;
-        String[] schemaPath = new String[m_schemas.size()];
-        Iterator<String> ite = m_schemas.iterator();
-        while(ite.hasNext())
-        {
-            schemaPath[index] = ite.next();
-            index++;
-        }
+        String[] schemaPath = m_schemas.toArray(new String[0]);
 
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
@@ -708,6 +688,7 @@ public class VoltProjectBuilder {
             success = compiler.compileFromDDL(jarPath, schemaPath);
         } catch (VoltCompilerException e1) {
             e1.printStackTrace();
+            return false;
         }
 
         m_diagnostics = compiler.harvestCapturedDetail();
