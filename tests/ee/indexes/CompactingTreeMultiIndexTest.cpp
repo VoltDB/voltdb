@@ -135,6 +135,102 @@ public:
         }
         return end - start;
     }
+
+    // init all the vectors, and we don't clear the vectors now
+    void prepareForPerformanceDifference() {
+        // tuple schema
+        for(int i = 0; i < 3; i++) {
+            m_columnTypes.push_back(VALUE_TYPE_BIGINT);
+            m_columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+            m_columnAllowNull.push_back(false);
+        }
+
+        m_columnIndices.push_back(0);
+        // index using one column
+        m_kcolumnTypes.push_back(VALUE_TYPE_BIGINT);
+        m_kcolumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_kcolumnAllowNull.push_back(false);
+
+        // index using two columns
+        m_columnIndices2.push_back(0);
+        m_kcolumnTypes2.push_back(VALUE_TYPE_BIGINT);
+        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_kcolumnAllowNull2.push_back(false);
+        m_columnIndices2.push_back(1);
+        m_kcolumnTypes2.push_back(VALUE_TYPE_BIGINT);
+        m_kcolumnLengths2.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_kcolumnAllowNull2.push_back(false);
+    }
+
+    void createSchemaAndIndexForPerformanceDifference() {
+        m_schema = TupleSchema::createTupleSchemaForTest(m_columnTypes,
+                                                         m_columnLengths,
+                                                         m_columnAllowNull);
+        m_schema1 = TupleSchema::createTupleSchemaForTest(m_columnTypes,
+                                                          m_columnLengths,
+                                                          m_columnAllowNull);
+        m_schema2 = TupleSchema::createTupleSchemaForTest(m_columnTypes,
+                                                          m_columnLengths,
+                                                          m_columnAllowNull);
+        m_kschema1 = TupleSchema::createTupleSchemaForTest(m_kcolumnTypes,
+                                                           m_kcolumnLengths,
+                                                           m_kcolumnAllowNull);
+        m_kschema2 = TupleSchema::createTupleSchemaForTest(m_kcolumnTypes2,
+                                                           m_kcolumnLengths2,
+                                                           m_kcolumnAllowNull2);
+        assert(m_schema);
+        assert(m_schema1);
+        assert(m_schema2);
+        assert(m_kschema1);
+        assert(m_kschema2);
+        TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
+                                m_columnIndices, TableIndex::simplyIndexColumns(),
+                                false, false, m_schema);
+        TableIndexScheme scheme1("test_index1", BALANCED_TREE_INDEX,
+                                m_columnIndices, TableIndex::simplyIndexColumns(),
+                                false, false, m_schema1);
+        TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
+                                m_columnIndices2, TableIndex::simplyIndexColumns(),
+                                false, false, m_schema2);
+        // build index
+        // index has one column and pointer
+        m_index = TableIndexFactory::getInstance(scheme);
+        // index has one column
+        m_indexWithoutPointer1 =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(m_kschema1, scheme1);
+        // index has two columns
+        m_indexWithoutPointer2 =
+            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(m_kschema2, scheme2);
+        assert(m_index);
+        assert(m_indexWithoutPointer1);
+        assert(m_indexWithoutPointer2);
+    }
+
+    void freeSchemaAndIndexForPerformanceDifference() {
+        TupleSchema::freeTupleSchema(m_schema);
+        TupleSchema::freeTupleSchema(m_schema1);
+        TupleSchema::freeTupleSchema(m_schema2);
+        m_schema = m_schema1 = m_schema2 = NULL;
+        delete m_index;
+        delete m_indexWithoutPointer1;
+        delete m_indexWithoutPointer2;
+        m_index = m_indexWithoutPointer1 = m_indexWithoutPointer2 = NULL;
+    }
+
+    // for tuple schema
+    vector<ValueType> m_columnTypes;
+    vector<int32_t> m_columnLengths;
+    vector<bool> m_columnAllowNull;
+
+    // for key schema
+    vector<int> m_columnIndices, m_columnIndices2;
+    vector<ValueType> m_kcolumnTypes, m_kcolumnTypes2;
+    vector<int32_t> m_kcolumnLengths, m_kcolumnLengths2;
+    vector<bool> m_kcolumnAllowNull, m_kcolumnAllowNull2;
+
+    TupleSchema *m_schema, *m_schema1, *m_schema2;
+    TupleSchema *m_kschema1, *m_kschema2;
+    TableIndex *m_index, *m_indexWithoutPointer1, *m_indexWithoutPointer2;
 };
 
 TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
@@ -187,180 +283,54 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
 
 // create three types of index and test their performace of delete
 TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
-    vector<ValueType> columnTypes;
-    vector<int32_t> columnLengths;
-    vector<bool> columnAllowNull;
-
-    vector<int> columnIndices;
-    vector<ValueType> kcolumnTypes;
-    vector<int32_t> kcolumnLengths;
-    vector<bool> kcolumnAllowNull;
-
-    vector<int> columnIndices2;
-    vector<ValueType> kcolumnTypes2;
-    vector<int32_t> kcolumnLengths2;
-    vector<bool> kcolumnAllowNull2;
-
-    // tuple schema
-    for(int i = 0; i < 3; i++) {
-        columnTypes.push_back(VALUE_TYPE_BIGINT);
-        columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        columnAllowNull.push_back(false);
-    }
-
-    columnIndices.push_back(0);
-    // index using one column
-    kcolumnTypes.push_back(VALUE_TYPE_BIGINT);
-    kcolumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    kcolumnAllowNull.push_back(false);
-
-    // index using two columns
-    columnIndices2.push_back(0);
-    kcolumnTypes2.push_back(VALUE_TYPE_BIGINT);
-    kcolumnLengths2.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    kcolumnAllowNull2.push_back(false);
-    columnIndices2.push_back(1);
-    kcolumnTypes2.push_back(VALUE_TYPE_BIGINT);
-    kcolumnLengths2.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    kcolumnAllowNull2.push_back(false);
-
     std::cout<<std::endl;
+    prepareForPerformanceDifference();
 
 #define PLACES 16
     for (int places = PLACES; places >= 4; places -= 2 ) {
-        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                    columnLengths,
-                                                                    columnAllowNull);
-        TupleSchema *schema1 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                     columnLengths,
-                                                                     columnAllowNull);
-        TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                     columnLengths,
-                                                                     columnAllowNull);
-        TupleSchema *kschema1 = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                                      kcolumnLengths,
-                                                                      kcolumnAllowNull);
-        TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
-                                                                      kcolumnLengths2,
-                                                                      kcolumnAllowNull2);
-        assert(schema);
-        assert(schema1);
-        assert(schema2);
-        assert(kschema1);
-        assert(kschema2);
-
-        TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
-                                columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, schema);
-        TableIndexScheme scheme1("test_index1", BALANCED_TREE_INDEX,
-                                columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, schema1);
-        TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
-                                columnIndices2, TableIndex::simplyIndexColumns(),
-                                false, false, schema2);
-        // build index
-        TableIndex *index = TableIndexFactory::getInstance(scheme);
-        TableIndex *indexWithoutPointer =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema1, scheme1);
-        TableIndex *indexWithoutPointer2 =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
-        assert(index);
-        assert(indexWithoutPointer);
-        assert(indexWithoutPointer2);
-
-        char *data = initTuples(schema, places);
+        createSchemaAndIndexForPerformanceDifference();
+        char *data = initTuples(m_schema, places);
         EXPECT_NE(data, NULL);
 
-        std::clock_t c1 = insertTuplesIntoIndex(index, schema, data, places);
+        std::clock_t c1 = insertTuplesIntoIndex(m_index, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-        std::clock_t c2 = insertTuplesIntoIndex(indexWithoutPointer, schema, data, places);
+        std::clock_t c2 = insertTuplesIntoIndex(m_indexWithoutPointer1, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-        std::clock_t c3 = insertTuplesIntoIndex(indexWithoutPointer2, schema, data, places);
+        std::clock_t c3 = insertTuplesIntoIndex(m_indexWithoutPointer2, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
-        c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+        c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-        c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+        c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-        c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+        c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
-        delete data;
 
-        // delete index
-        delete index;
-        delete indexWithoutPointer;
-        delete indexWithoutPointer2;
-        TupleSchema::freeTupleSchema(schema);
-        TupleSchema::freeTupleSchema(schema1);
-        TupleSchema::freeTupleSchema(schema2);
+        delete data;
+        freeSchemaAndIndexForPerformanceDifference();
     }
 
     for (int places = PLACES; places >= 4; places -= 2 ) {
-        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                    columnLengths,
-                                                                    columnAllowNull);
-        TupleSchema *schema1 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                     columnLengths,
-                                                                     columnAllowNull);
-        TupleSchema *schema2 = TupleSchema::createTupleSchemaForTest(columnTypes,
-                                                                     columnLengths,
-                                                                     columnAllowNull);
-        TupleSchema *kschema1 = TupleSchema::createTupleSchemaForTest(kcolumnTypes,
-                                                                      kcolumnLengths,
-                                                                      kcolumnAllowNull);
-        TupleSchema *kschema2 = TupleSchema::createTupleSchemaForTest(kcolumnTypes2,
-                                                                      kcolumnLengths2,
-                                                                      kcolumnAllowNull2);
-        assert(schema);
-        assert(schema1);
-        assert(schema2);
-        assert(kschema1);
-        assert(kschema2);
-
-        TableIndexScheme scheme("test_index", BALANCED_TREE_INDEX,
-                                columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, schema);
-        TableIndexScheme scheme1("test_index1", BALANCED_TREE_INDEX,
-                                columnIndices, TableIndex::simplyIndexColumns(),
-                                false, false, schema1);
-        TableIndexScheme scheme2("test_index2", BALANCED_TREE_INDEX,
-                                columnIndices2, TableIndex::simplyIndexColumns(),
-                                false, false, schema2);
-        // build index
-        TableIndex *index = TableIndexFactory::getInstance(scheme);
-        TableIndex *indexWithoutPointer =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<1> >, false>(kschema1, scheme1);
-        TableIndex *indexWithoutPointer2 =
-            new CompactingTreeMultiMapIndex<NormalKeyValuePair<IntsKey<2> >, false>(kschema2, scheme2);
-        assert(index);
-        assert(indexWithoutPointer);
-        assert(indexWithoutPointer2);
-
-        char *data = initTuples(schema, places);
+        createSchemaAndIndexForPerformanceDifference();
+        char *data = initTuples(m_schema, places);
         EXPECT_NE(data, NULL);
 
-        std::clock_t c1 = insertTuplesIntoIndex2(index, schema, data, places);
+        std::clock_t c1 = insertTuplesIntoIndex2(m_index, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-        std::clock_t c2 = insertTuplesIntoIndex2(indexWithoutPointer, schema, data, places);
+        std::clock_t c2 = insertTuplesIntoIndex2(m_indexWithoutPointer1, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-        std::clock_t c3 = insertTuplesIntoIndex2(indexWithoutPointer2, schema, data, places);
+        std::clock_t c3 = insertTuplesIntoIndex2(m_indexWithoutPointer2, m_schema, data, places);
         std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
-        c1 = deleteTuplesFromIndex(index, schema, data, places, 7);
+        c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
-        c2 = deleteTuplesFromIndex(indexWithoutPointer, schema, data, places, 7);
+        c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
-        c3 = deleteTuplesFromIndex(indexWithoutPointer2, schema, data, places, 7);
+        c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
         std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
-        delete data;
 
-        // delete index
-        delete index;
-        delete indexWithoutPointer;
-        delete indexWithoutPointer2;
-        TupleSchema::freeTupleSchema(schema);
-        TupleSchema::freeTupleSchema(schema1);
-        TupleSchema::freeTupleSchema(schema2);
+        delete data;
+        freeSchemaAndIndexForPerformanceDifference();
     }
 }
 
