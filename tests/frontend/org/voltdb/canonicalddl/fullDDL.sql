@@ -1,3 +1,8 @@
+-- This file is a short version of tests/frontend/org/voltdb/fullddlfeatures/fullDDL.sql
+-- It only contains DDLs that SQLcmd accepts. 
+-- It is used for testing canonical DDL that roundtrips through SQLcmd and AdHoc.
+-- You can add more test cases when we support more DDLs in SQLcmd.
+
 -- CREATE INDEX
 -- basic features
 

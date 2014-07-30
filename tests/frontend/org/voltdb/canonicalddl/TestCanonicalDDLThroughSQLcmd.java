@@ -64,13 +64,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
-        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
-        boolean success;
-
         builder.setUseAdhocSchema(true);
-        builder.addSchema(pathToSchema);
-        success = builder.compile(pathToCatalog);
+        boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
@@ -94,14 +89,9 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("emptyDDL.sql");
-        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
-        boolean success;
-
         builder.setUseAdhocSchema(true);
-        builder.addSchema(pathToSchema);
         builder.setHTTPDPort(8080);
-        success = builder.compile(pathToCatalog);
+        boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
