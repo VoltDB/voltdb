@@ -222,6 +222,8 @@ protected:
     int verify(const TreeNode *n) const;
     int inOrderCounterChecking(const TreeNode *n) const;
     int fullCount(const TreeNode *n) const;
+
+    inline int compareKeyRegardlessOfPointer(const Key& key, TreeNode *node);
 };
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
@@ -762,28 +764,21 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     if (n == &NIL) return -1;
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
-    // fix xin's code by set and unset key before each comparision
-    // TODO: add a new member function to do the set/compare/unset stuff
-    const void *lv1 = m_root->kv.setPointerValue(NULL);
-    int m = m_comper(key, m_root->key());
-    m_root->kv.setPointerValue(lv1);
+    // fix breaking xin's code by set and unset key before each comparision
+    int m = compareKeyRegardlessOfPointer(key, m_root);
     if (m == 0) {
         if (m_root->right != &NIL)
             ctr = getSubct(m_root->right);
         ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
-            lv1 = p->kv.setPointerValue(NULL);
-            if (m_comper(key, p->key()) == 0) {
+            if (compareKeyRegardlessOfPointer(key, p) == 0) {
                 if (p->right != &NIL) {
-                    const void *lv2 = p->right->kv.setPointerValue(NULL);
-                    if (m_comper(key, p->right->key()) == 0) {
+                    if (compareKeyRegardlessOfPointer(key, p->right) == 0) {
                         ct-= getSubct(p->right);
                     }
-                    p->right->kv.setPointerValue(lv2);
                 }
                 ct--;
             }
-            p->kv.setPointerValue(lv1);
             p = p->parent;
         }
     } else if (m > 0) {
@@ -1006,6 +1001,15 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 int CompactingMap<KeyValuePair, Compare, hasRank>::fullCount(const TreeNode *n) const {
     if (n == &NIL) return 0;
     else return fullCount(n->left) + fullCount(n->right) + 1;
+}
+
+template<typename KeyValuePair, typename Compare, bool hasRank>
+inline int CompactingMap<KeyValuePair, Compare, hasRank>::compareKeyRegardlessOfPointer(const Key& key, TreeNode *node) {
+    // assume key's pointer field is NULL, if there is a pointer field in key
+    const void *tmp = node->kv.setPointerValue(NULL);
+    int rv = m_comper(key, node->key());
+    node->kv.setPointerValue(tmp);
+    return rv;
 }
 
 } // namespace voltdb
