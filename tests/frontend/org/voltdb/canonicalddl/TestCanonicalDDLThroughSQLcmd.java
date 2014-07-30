@@ -27,7 +27,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -44,8 +43,6 @@ import org.voltdb.utils.MiscUtils;
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 {
     String firstCanonicalDDL = null;
-    String secondCanonicalDDLFromAdhoc = null;
-    String secondCanonicalDDLFromSQLcmd = null;
 
     public String getFirstCanonicalDDL() throws Exception
     {
@@ -59,7 +56,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         return compiler.getCanonicalDDL();
     }
 
-    public String getSecondCanonicalDDLFromAdhoc() throws Exception
+    public void secondCanonicalDDLFromAdhoc() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
@@ -71,7 +68,6 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
         boolean success;
 
-        // Use VoltProjectBuilder to write catalog and deployment.xml
         builder.setUseAdhocSchema(true);
         builder.addSchema(pathToSchema);
         success = builder.compile(pathToCatalog);
@@ -86,11 +82,12 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         m_client.callProcedure("@AdHoc", firstCanonicalDDL);
 
+        assertEquals(compiler.getCanonicalDDL(), firstCanonicalDDL);
+
         teardownSystem();
-        return compiler.getCanonicalDDL();
     }
 
-    public void getSecondCanonicalDDLFromSQLcmd() throws Exception
+    public void secondCanonicalDDLFromSQLcmd() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
@@ -101,9 +98,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
         boolean success;
 
-        // Use VoltProjectBuilder to write catalog and deployment.xml
         builder.setUseAdhocSchema(true);
-        builder.addLiteralSchema("--nothing");
+        builder.addSchema(pathToSchema);
         builder.setHTTPDPort(8080);
         success = builder.compile(pathToCatalog);
         assertTrue(success);
@@ -115,28 +111,47 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         startSystem(config);
 
+        String roundtripDDL;
+
+        callSQLcmd(firstCanonicalDDL);
+        roundtripDDL = getDDLFromHTTP();
+        assertTrue(firstCanonicalDDL.equals(roundtripDDL));
+
+        callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n");
+        roundtripDDL = getDDLFromHTTP();
+        assertFalse(firstCanonicalDDL.equals(roundtripDDL));
+
+        teardownSystem();
+    }
+
+    public void callSQLcmd(String ddl) throws Exception
+    {
         File f = new File("ddl.sql");
-//        f.deleteOnExit();
+        f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
-//        System.out.println(firstCanonicalDDL);
-        fos.write(firstCanonicalDDL.getBytes());
+        fos.write(ddl.getBytes());
 
         ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
         pb.redirectInput(f);
         Process process = pb.start();
 
-        InputStream is = process.getInputStream();
-        InputStreamReader isr = new InputStreamReader(is);
-        BufferedReader br = new BufferedReader(isr);
-
-        String line;
-        StringBuffer sb = new StringBuffer();
-        while((line = br.readLine()) != null)
+        while(true)
         {
-            sb.append(line);
-            System.out.println(line);
+            Thread.sleep(1000);
+            try{
+                int exitValue = process.exitValue();
+                if(exitValue == 0) {
+                    break;
+                }
+            }
+            catch (Exception e) {
+                System.out.println("Process hasn't exited");
+            }
         }
+    }
 
+    public String getDDLFromHTTP() throws Exception
+    {
         URL ddlURL = new URL("http://localhost:8080/ddl/");
 
         HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();
@@ -158,24 +173,20 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
             throw new Exception("Unable to read response from server");
         }
 
-        sb = new StringBuffer();
+        String line;
+        StringBuffer sb = new StringBuffer();
         while ((line = in.readLine()) != null) {
             sb.append(line + "\n");
         }
-        System.out.println("============================================");
-        System.out.println(sb.toString());
 
-        teardownSystem();
+        return sb.toString();
     }
 
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
         firstCanonicalDDL = getFirstCanonicalDDL();
 
-
-        secondCanonicalDDLFromAdhoc = getSecondCanonicalDDLFromAdhoc();
-//
-        assertEquals(firstCanonicalDDL, secondCanonicalDDLFromAdhoc);
+        secondCanonicalDDLFromAdhoc();
+        secondCanonicalDDLFromSQLcmd();
     }
-
 }
