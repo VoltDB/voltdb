@@ -26,8 +26,10 @@ package org.voltdb.canonicalddl;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -42,7 +44,8 @@ import org.voltdb.utils.MiscUtils;
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 {
     String firstCanonicalDDL = null;
-    String secondCanonicalDDL = null;
+    String secondCanonicalDDLFromAdhoc = null;
+    String secondCanonicalDDLFromSQLcmd = null;
 
     public String getFirstCanonicalDDL() throws Exception
     {
@@ -56,7 +59,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         return compiler.getCanonicalDDL();
     }
 
-    public String getSecondCanonicalDDL() throws Exception
+    public String getSecondCanonicalDDLFromAdhoc() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
@@ -91,7 +94,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         return compiler.getCanonicalDDL();
     }
 
-    public void sqlcmd() throws Exception
+    public void getSecondCanonicalDDLFromSQLcmd() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
@@ -105,6 +108,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         // Use VoltProjectBuilder to write catalog and deployment.xml
         builder.setUseAdhocSchema(true);
         builder.addLiteralSchema("--nothing");
+        builder.setHTTPDPort(8080);
         success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -124,7 +128,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
         pb.redirectInput(f);
         Process process = pb.start();
-//        Process process = Runtime.getRuntime().exec("bin/sqlcmd < ddl.sql");
+
         InputStream is = process.getInputStream();
         InputStreamReader isr = new InputStreamReader(is);
         BufferedReader br = new BufferedReader(isr);
@@ -136,12 +140,60 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
             sb.append(line);
             System.out.println(line);
         }
-        System.out.println(sb.toString());
-        System.out.println("=======================================");
 
-        System.out.println(new VoltCompiler().getCanonicalDDL());
+        URL ddlURL = new URL("http://localhost:8080/ddl/");
+
+        HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.connect();
+
+        BufferedReader in = null;
+        try {
+            if(conn.getInputStream() != null){
+                in = new BufferedReader(
+                        new InputStreamReader(
+                        conn.getInputStream(), "UTF-8"));
+            }
+        } catch(IOException e){
+            e.printStackTrace();
+        }
+        if(in == null) {
+            throw new Exception("Unable to read response from server");
+        }
+
+        sb = new StringBuffer();
+        while ((line = in.readLine()) != null) {
+            sb.append(line + "\n");
+        }
+        System.out.println("============================================");
+        System.out.println(sb.toString());
+
         teardownSystem();
     }
+
+    public String getHTML(String urlToRead) {
+        URL url;
+        HttpURLConnection conn;
+        BufferedReader rd;
+        String line;
+        String result = "";
+        try {
+           url = new URL(urlToRead);
+           conn = (HttpURLConnection) url.openConnection();
+           conn.setRequestMethod("GET");
+           rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+           while ((line = rd.readLine()) != null) {
+              result += line;
+           }
+           rd.close();
+        } catch (IOException e) {
+           e.printStackTrace();
+        } catch (Exception e) {
+           e.printStackTrace();
+        }
+        return result;
+     }
 
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
