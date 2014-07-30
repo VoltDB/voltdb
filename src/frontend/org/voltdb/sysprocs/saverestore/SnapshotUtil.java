@@ -450,11 +450,9 @@ public class SnapshotUtil {
             @Override
             public void run() {
                 try {
-                    if (!f.createNewFile()) {
-                        logger.warn("Failed to create .complete file for " + f.getName());
-                    }
+                    f.createNewFile();
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
                 }
             }
         };
