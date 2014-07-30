@@ -300,7 +300,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     if (spanBuffer) {
         if (partialTxnLength + minLength >= m_currBlock->capacity()) {
-            std::cout<<"SQLException:Transaction is bigger than DR Buffer size"<<std::endl;
             throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
         }
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
@@ -310,22 +309,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         oldBlock->truncateTo(m_uso);
         oldBlock->clearLastBeginTxnOffset();
         m_uso += partialTxnLength;
-//        std::cout<<"Old Block: offset=" << oldBlock->offset()
-//                            << " uso=" << oldBlock->uso()
-//                            << " lastDRBeginTxnOffset=" << oldBlock->lastDRBeginTxnOffset()
-//                            << " capacity=" << oldBlock->capacity()
-//                            << std::endl;
-//        std::cout<<"New Block: offset=" << m_currBlock->offset()
-//                            << " uso=" << m_currBlock->uso()
-//                            << " lastDRBeginTxnOffset=" << m_currBlock->lastDRBeginTxnOffset()
-//                            << " capacity=" << m_currBlock->capacity()
-//                            << std::endl;
-//        std::cout<<"TupleStreamBase:"
-//                            << " m_uso=" << m_uso
-//                            << " partialTxnLength=" << partialTxnLength
-//                            << " m_defaultCapacity=" << m_defaultCapacity
-//                            << " minLength=" << minLength
-//                            << std::endl;
     }
 
     pushPendingBlocks();
