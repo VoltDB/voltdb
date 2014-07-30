@@ -750,6 +750,7 @@ void AggregateSerialExecutor::p_execute_finish()
 
     // clean up the member variables
     delete m_aggregateRow;
+    m_inProgressGroupByKeyTuple.move(NULL);
     AggregateExecutorBase::p_execute_finish();
 }
 
@@ -896,6 +897,8 @@ void AggregatePartialExecutor::p_execute_finish()
     m_hash.clear();
     TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
     nextGroupByKeyTuple.move(NULL);
+
+    m_inProgressGroupByKeyTuple.move(NULL);
 
     AggregateExecutorBase::p_execute_finish();
 }
