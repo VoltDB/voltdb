@@ -84,6 +84,13 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
+        /**
+         * Number of maximum bytes stored in the buffer
+         */
+        size_t capacity() const {
+            return m_capacity;
+        }
+
         size_t lastDRBeginTxnOffset() const {
             return m_lastDRBeginTxnOffset;
         }

@@ -263,6 +263,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
 
     bool spanBuffer = false;
     StreamBlock* oldBlock = NULL;
+    size_t partialTxnLength = 0;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
@@ -278,28 +279,30 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         }
     }
 
-    // If partial transaction is going to span multiple buffer, move it to next buffer.
-    // But before that, make sure uso is continuous between two buffers
-    if (oldBlock && oldBlock->remaining() < minLength &&
-            oldBlock->hasDRBeginTxn() &&
-            oldBlock->lastDRBeginTxnOffset() != oldBlock->offset()) {
-        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength >= m_defaultCapacity) {
-            throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
-        }
-        m_uso -= partialTxnLength;
-        spanBuffer = true;
-    }
-
     char *buffer = new char[m_defaultCapacity];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
 
+    // If partial transaction is going to span multiple buffer, move it to next buffer.
+    // But before that, make sure uso is continuous between two buffers
+    if (oldBlock && oldBlock->remaining() < minLength &&
+            oldBlock->hasDRBeginTxn() &&
+            oldBlock->lastDRBeginTxnOffset() != oldBlock->offset()) {
+        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength < oldBlock->capacity()) {
+            m_uso -= partialTxnLength;
+        }
+        spanBuffer = true;
+    }
+
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
 
     if (spanBuffer) {
-        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength >= m_currBlock->capacity()) {
+            std::cout<<"SQLException:Transaction is bigger than DR Buffer size"<<std::endl;
+            throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+        }
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
         m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);
@@ -307,6 +310,22 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         oldBlock->truncateTo(m_uso);
         oldBlock->clearLastBeginTxnOffset();
         m_uso += partialTxnLength;
+//        std::cout<<"Old Block: offset=" << oldBlock->offset()
+//                            << " uso=" << oldBlock->uso()
+//                            << " lastDRBeginTxnOffset=" << oldBlock->lastDRBeginTxnOffset()
+//                            << " capacity=" << oldBlock->capacity()
+//                            << std::endl;
+//        std::cout<<"New Block: offset=" << m_currBlock->offset()
+//                            << " uso=" << m_currBlock->uso()
+//                            << " lastDRBeginTxnOffset=" << m_currBlock->lastDRBeginTxnOffset()
+//                            << " capacity=" << m_currBlock->capacity()
+//                            << std::endl;
+//        std::cout<<"TupleStreamBase:"
+//                            << " m_uso=" << m_uso
+//                            << " partialTxnLength=" << partialTxnLength
+//                            << " m_defaultCapacity=" << m_defaultCapacity
+//                            << " minLength=" << minLength
+//                            << std::endl;
     }
 
     pushPendingBlocks();
