@@ -719,6 +719,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 new InetSocketAddress(m_config.internalInterface, m_config.internalPort);
             hostInfoBytes = addr.toString().getBytes("UTF-8");
         }
+
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfoBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
 

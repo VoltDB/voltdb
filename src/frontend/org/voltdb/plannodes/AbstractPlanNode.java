@@ -435,6 +435,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return false;
     }
 
+    public boolean replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
+        if (oldChildIdx < 0 || oldChildIdx >= getChildCount()) {
+            return false;
+        }
+
+        AbstractPlanNode oldChild = m_children.get(oldChildIdx);
+        oldChild.m_parents.clear();
+        setAndLinkChild(oldChildIdx, newChild);
+        return true;
+    }
+
 
     /**
      * Gets the children.
@@ -858,7 +869,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             sb.append(nodePlan + "\n");
         }
 
+        // Agg < Proj < Limit < Scan
+        // Order the inline nodes with integer in ascending order
+        TreeMap<Integer, AbstractPlanNode> sort_inlineNodes =
+                new TreeMap<Integer, AbstractPlanNode>();
+
+        // every inline plan node is unique
+        int ii = 4;
         for (AbstractPlanNode inlineNode : m_inlineNodes.values()) {
+            if (inlineNode instanceof AggregatePlanNode) {
+                sort_inlineNodes.put(0, inlineNode);
+            } else if (inlineNode instanceof ProjectionPlanNode) {
+                sort_inlineNodes.put(1, inlineNode);
+            } else if (inlineNode instanceof LimitPlanNode) {
+                sort_inlineNodes.put(2, inlineNode);
+            } else if (inlineNode instanceof AbstractScanPlanNode) {
+                sort_inlineNodes.put(3, inlineNode);
+            } else {
+                // any other inline nodes currently ?  --xin
+                sort_inlineNodes.put(ii++, inlineNode);
+            }
+        }
+        // inline nodes with ascending order as their integer keys
+        for (AbstractPlanNode inlineNode : sort_inlineNodes.values()) {
             // don't bother with inlined projections
             if (( ! m_verboseExplainForDebugging) &&
                 (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)) {
