@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -38,6 +37,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
+import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -47,17 +47,9 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 
 public class TestFixedSQLSuite extends RegressionSuite {
 
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
-
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class, InnerProc.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
+        TestENG2423.InnerProc.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -1242,11 +1234,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // make sure we can call an inner proc
     public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
         Client client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
         releaseClient(client);
         // get it again to make sure the server is all good
         client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
     }
 
     // Ticket: ENG-5151
@@ -1686,7 +1678,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
         project.addProcedures(PROCEDURES);
 
-        //TODO: Now that this fails to compile with an overflow error, it should be migrated to a
+        // Now that this fails to compile with an overflow error, it should be migrated to a
         // Failures suite.
         //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
 
