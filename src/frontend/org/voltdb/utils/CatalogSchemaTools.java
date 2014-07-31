@@ -458,7 +458,8 @@ public abstract class CatalogSchemaTools {
                 List<Table> viewList = new ArrayList<Table>();
                 for (Table table : db.getTables()) {
                     Object annotation = table.getAnnotation();
-                    if (annotation != null && ((TableAnnotation)annotation).ddl != null) {
+                    if (annotation != null && ((TableAnnotation)annotation).ddl != null
+                            && table.getMaterializer() != null) {
                         viewList.add(table);
                         continue;
                     }
