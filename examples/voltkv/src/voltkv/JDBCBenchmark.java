@@ -263,25 +263,13 @@ public class JDBCBenchmark
 
                 final PreparedStatement removeCS = Con.prepareStatement("DELETE FROM store;");
                 final CallableStatement putCS = Con.prepareCall("{call STORE.upsert(?,?)}");
-
-                int batchSize = 0;
                 for(int i=0;i<config.poolsize ;i++) {
                     if (i == 0) {
                         removeCS.execute();
                     }
                     putCS.setString(1, String.format(processor.KeyFormat, i));
                     putCS.setBytes(2,processor.generateForStore().getStoreValue());
-                    putCS.addBatch();
-                    batchSize++;
-                    // We can batch up to 500 statements to push in one single execution call
-                    if (batchSize > 499) {
-                        putCS.executeBatch();
-                        batchSize = 0;
-                    }
-                }
-                // Make sure we post the last batch!
-                if (batchSize > 0) {
-                    putCS.executeBatch();
+                    putCS.execute();
                 }
                 System.out.println(" Done.");
             }
