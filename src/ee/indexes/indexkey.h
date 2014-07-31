@@ -775,11 +775,25 @@ static inline int comparePointer(const void *lhs, const void *rhs) {
     else return 1;
 }
 
+struct PointerKeyTypeBase {
+    // TODO: replace NULL with (reinterpret_cast<const void*>((uintptr_t)0))
+    PointerKeyTypeBase() : m_tuple(NULL) {}
+    const void *& getValue() { return m_tuple;}
+    void setValue(const void * &value) { m_tuple = value; }
+    const void *setPointerValue(const void * &value) {
+        const void * rv = m_tuple;
+        m_tuple = value;
+        return rv;
+    }
+    
+    const void * m_tuple; // point to the actual tuple
+};
+
 // Tree index only uses comparator
 template <std::size_t keySize> struct IntsPointerComparator;
 
 template <std::size_t keySize>
-struct IntsPointerKey : public IntsKey<keySize> {
+struct IntsPointerKey : public IntsKey<keySize>, public PointerKeyTypeBase {
     typedef IntsPointerComparator<keySize> KeyComparator;
 
     static inline bool keyDependsOnTupleAddress() { return true; }
@@ -792,24 +806,15 @@ struct IntsPointerKey : public IntsKey<keySize> {
 
     IntsPointerKey() {}
 
-    IntsPointerKey(const TableTuple *tuple) : IntsKey<keySize>(tuple), m_tuple(NULL) {}
+    IntsPointerKey(const TableTuple *tuple) : IntsKey<keySize>(tuple) {}
 
     IntsPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
         : IntsKey<keySize>(tuple, indices, indexed_expressions, keySchema) {
-        m_tuple = static_cast<const void *>(const_cast<const char*>(tuple->address()));
+        PointerKeyTypeBase::m_tuple =
+            static_cast<const void *>(const_cast<const char*>(tuple->address()));
     }
-
-    const void *& getValue() { return m_tuple;}
-    void setValue(const void * &value) { m_tuple = value; }
-    const void *setPointerValue(const void * &value) {
-        const void * rv = m_tuple;
-        m_tuple = value;
-        return rv;
-    }
-
-    const void * m_tuple; // point to the actual tuple
 };
 
 template <std::size_t keySize>
@@ -827,31 +832,22 @@ struct IntsPointerComparator : public IntsComparator<keySize> {
 template <std::size_t keySize> struct GenericPointerComparator;
 
 template <std::size_t keySize>
-struct GenericPointerKey : public GenericKey<keySize> {
+struct GenericPointerKey : public GenericKey<keySize>, public PointerKeyTypeBase {
     typedef GenericPointerComparator<keySize> KeyComparator;
 
     static inline bool keyDependsOnTupleAddress() { return true; }
 
     GenericPointerKey() {}
-    // TODO: replace NULL with (reinterpret_cast<const void*>((uintptr_t)0))
-    GenericPointerKey(const TableTuple *tuple) : GenericKey<keySize>(tuple), m_tuple(NULL) {}
+    
+    GenericPointerKey(const TableTuple *tuple) : GenericKey<keySize>(tuple) {}
 
     GenericPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
         : GenericKey<keySize>(tuple, indices, indexed_expressions, keySchema) {
-        m_tuple = static_cast<const void *>(const_cast<const char*>(tuple->address()));
+        PointerKeyTypeBase::m_tuple =
+            static_cast<const void *>(const_cast<const char*>(tuple->address()));
     }
-
-    const void *& getValue() { return m_tuple;}
-    void setValue(const void * &value) { m_tuple = value; }
-    const void *setPointerValue(const void * &value) {
-        const void * rv = m_tuple;
-        m_tuple = value;
-        return rv;
-    }
-
-    const void * m_tuple; // point to the actual tuple
 };
 
 template <std::size_t keySize>
@@ -869,7 +865,7 @@ struct GenericPointerComparator : public GenericComparator<keySize> {
 template <std::size_t keySize> struct GenericPersistentPointerComparator;
 
 template <std::size_t keySize>
-struct GenericPersistentPointerKey : public GenericPersistentKey<keySize> {
+struct GenericPersistentPointerKey : public GenericPersistentKey<keySize>, public PointerKeyTypeBase {
     typedef GenericPersistentPointerComparator<keySize> KeyComparator;
 
     static inline bool keyDependsOnTupleAddress() { return true; }
@@ -877,24 +873,15 @@ struct GenericPersistentPointerKey : public GenericPersistentKey<keySize> {
     GenericPersistentPointerKey() {}
 
     GenericPersistentPointerKey(const TableTuple *tuple)
-        : GenericPersistentKey<keySize>(tuple), m_tuple(NULL) {}
+        : GenericPersistentKey<keySize>(tuple) {}
 
     GenericPersistentPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
         : GenericPersistentKey<keySize>(tuple, indices, indexed_expressions, keySchema) {
-        m_tuple = static_cast<const void *>(const_cast<const char*>(tuple->address()));
+        PointerKeyTypeBase::m_tuple =
+            static_cast<const void *>(const_cast<const char*>(tuple->address()));
     }
-
-    const void *& getValue() { return m_tuple;}
-    void setValue(const void * &value) { m_tuple = value; }
-    const void *setPointerValue(const void * &value) {
-        const void * rv = m_tuple;
-        m_tuple = value;
-        return rv;
-    }
-
-    const void * m_tuple; // point to the actual tuple
 };
 
 template <std::size_t keySize>
