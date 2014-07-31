@@ -785,7 +785,7 @@ struct PointerKeyTypeBase {
         m_tuple = value;
         return rv;
     }
-    
+
     const void * m_tuple; // point to the actual tuple
 };
 
@@ -838,7 +838,7 @@ struct GenericPointerKey : public GenericKey<keySize>, public PointerKeyTypeBase
     static inline bool keyDependsOnTupleAddress() { return true; }
 
     GenericPointerKey() {}
-    
+
     GenericPointerKey(const TableTuple *tuple) : GenericKey<keySize>(tuple) {}
 
     GenericPointerKey(const TableTuple *tuple, const std::vector<int> &indices,
@@ -935,6 +935,11 @@ struct TuplePointerKeyComparator : public TupleKeyComparator {
 // overload template
 template <std::size_t keySize>
 inline void setPointerValue(IntsPointerKey<keySize>& k, const void * v) { k.setValue(v); }
+template <std::size_t keySize>
+inline void setPointerValue(GenericPointerKey<keySize>& k, const void * v) { k.setValue(v); }
+template <std::size_t keySize>
+inline void setPointerValue(GenericPersistentPointerKey<keySize>& k, const void * v) { k.setValue(v); }
+inline void setPointerValue(TuplePointerKey& k, const void * v) { k.setValue(v); }
 
 template < typename PointerKeyType, typename DataType = const void*>
 class PointerKeyValuePair {
