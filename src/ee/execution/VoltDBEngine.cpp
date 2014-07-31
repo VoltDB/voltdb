@@ -897,11 +897,11 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // now find all of the indexes to remove
             //////////////////////////////////////////
 
-            bool found = false;
             // iterate through all of the existing indexes
             BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
                 std::string currentIndexId = currIndex->getId();
 
+                bool found = false;
                 // iterate through all of the catalog indexes,
                 //  looking for a match.
                 BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {

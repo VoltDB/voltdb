@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.saverestore;
+package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +32,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb_testprocs.regressionsuites.saverestore.GetTxnId;
+import org.voltdb_testprocs.regressionsuites.saverestore.MatView;
+import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreSelect;
 
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
@@ -48,7 +51,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
                        };
 
     public static final URL ddlURL =
-        SaveRestoreTestProjectBuilder.class.getResource("saverestore-ddl.sql");
+        MatView.class.getResource("saverestore-ddl.sql");
     public static final String jarFilename = "saverestore.jar";
 
     public void addDefaultProcedures()

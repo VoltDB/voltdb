@@ -17,8 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
@@ -28,8 +26,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -64,10 +60,12 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // Join the schema together to form the output schema
         // The child subplan's output is the outer table
         // The inlined node's output is the inner table
-        m_outputSchema =
+        m_outputSchemaPreInlineAgg =
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
+
+        generateRealOutputSchema();
     }
 
     @Override
@@ -80,88 +78,38 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         {
             child.resolveColumnIndexes();
         }
-        for (AbstractPlanNode inline : m_inlineNodes.values())
+
+        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
+        if (limit != null)
         {
-            if (inline instanceof LimitPlanNode)
-            {
-                // special handling for possible LIMIT node
-                inline.m_outputSchema = m_outputSchema.clone();
-                inline.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
-            } else {
-                // Some of this will get undone for the inlined index scan later
-                // but this will resolve any column tracking with an inlined projection
-                inline.resolveColumnIndexes();
-            }
+            // output schema of limit node has not been used
+            limit.m_outputSchema = m_outputSchemaPreInlineAgg;
+            limit.m_hasSignificantOutputSchema = false;
         }
+
         // We need the schema from the target table from the inlined index
-        NodeSchema index_schema = inline_scan.getTableSchema();
+        final NodeSchema index_schema = inline_scan.getTableSchema();
         // We need the output schema from the child node
-        NodeSchema outer_schema = m_children.get(0).getOutputSchema();
+        final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
 
         // pull every expression out of the inlined index scan
         // and resolve all of the TVEs against our two input schema from above.
-        // The EE still uses assignTupleValueIndexes to figure out which input
-        // table to use for each of these TVEs
-        //  get the predicate (which is the inlined node's predicate,
-        //  the planner currently blithely ignores that abstractjoinnode also
-        //  has a predicate field, and so do we.
-        List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(inline_scan.getPredicate());
-        for (TupleValueExpression tve : predicate_tves)
-        {
-            // this double-schema search is somewhat common, maybe it
-            // can find a static home in NodeSchema or something --izzy
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
-            int tableIdx = 0;   // 0 for outer table
-            if (index == -1)
-            {
-                index = index_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString() + " in NodeSchemas " +
-                                               outer_schema.toString() + "\nand\n" +
-                                               index_schema.toString());
-                }
-                tableIdx = 1;   // 1 for inner table
-            }
-            tve.setColumnIndex(index);
-            tve.setTableIndex(tableIdx);
-        }
+        resolvePredicate(inline_scan.getPredicate(), outer_schema, index_schema);
+        resolvePredicate(inline_scan.getEndExpression(), outer_schema, index_schema);
+        resolvePredicate(inline_scan.getInitialExpression(), outer_schema, index_schema);
+        resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, index_schema);
+        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, index_schema);
 
-        //  get the end expression and search key expressions
-        List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getInitialExpression()));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getSkipNullPredicate()));
-        for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
-        {
-            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
-        }
-        for (TupleValueExpression tve : index_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
-            int tableIdx = 0;   // 0 for outer table
-            if (index == -1)
-            {
-                index = index_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString());
-                }
-                tableIdx = 1;   // 1 for inner table
-            }
-            tve.setColumnIndex(index);
-            tve.setTableIndex(tableIdx);
-        }
+        // resolve other predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, index_schema);
 
         // need to resolve the indexes of the output schema and
         // order the combined output schema coherently
         TreeMap<Integer, SchemaColumn> sort_cols =
             new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchema.getColumns())
+        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
         {
             // Right now these all need to be TVEs
             assert(col.getExpression() instanceof TupleValueExpression);
@@ -192,13 +140,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         {
             new_output_schema.addColumn(col);
         }
-        m_outputSchema = new_output_schema;
+        m_outputSchemaPreInlineAgg = new_output_schema;
         m_hasSignificantOutputSchema = true;
 
-        // resolve other predicates
-        resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, index_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, index_schema);
+        resolveRealOutputSchema();
     }
 
     @Override
