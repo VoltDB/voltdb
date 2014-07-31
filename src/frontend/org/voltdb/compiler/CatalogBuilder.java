@@ -28,13 +28,12 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.ProcInfoData;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 
@@ -86,12 +85,10 @@ public class CatalogBuilder {
             this.groups = groups;
             this.cls = null;
             this.name = name;
-            if(sql.endsWith(";"))
-            {
+            if(sql.endsWith(";")) {
                 this.sql = sql;
             }
-            else
-            {
+            else {
                 this.sql = sql + ";";
             }
             this.partitionInfo = partitionInfo;
@@ -142,12 +139,7 @@ public class CatalogBuilder {
         }
     }
 
-    final ArrayList<String> m_exportTables = new ArrayList<String>();
-
-    final LinkedHashSet<GroupInfo> m_groups = new LinkedHashSet<GroupInfo>();
-    final LinkedHashSet<ProcedureInfo> m_procedures = new LinkedHashSet<ProcedureInfo>();
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
-    final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
     List<String> m_elAuthGroups;      // authorized groups
 
@@ -181,32 +173,22 @@ public class CatalogBuilder {
 
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
-            final boolean added = m_groups.add(info);
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc)
-            {
+            if(info.adhoc || info.defaultproc || info.sysproc) {
                 transformer.append(" WITH ");
-                if(info.adhoc)
-                {
+                if(info.adhoc) {
                     transformer.append("adhoc,");
                 }
-                if(info.defaultproc)
-                {
+                if(info.defaultproc) {
                     transformer.append("defaultproc,");
                 }
-                if(info.sysproc)
-                {
+                if(info.sysproc) {
                     transformer.append("sysproc,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }
-            else
-            {
+            else {
                 transformer.append(";");
-            }
-
-            if (!added) {
-                assert(added);
             }
         }
     }
@@ -285,42 +267,35 @@ public class CatalogBuilder {
         final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
-            assert(m_procedures.contains(procedure) == false);
             newProcs.add(procedure);
         }
 
         // add the procs
         for (final ProcedureInfo procedure : procedures) {
-            m_procedures.add(procedure);
 
+            // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0)
-            {
+            if(procedure.groups.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++)
-                {
+                for(int i = 0; i < procedure.groups.length; i++) {
                     roleInfo.append(procedure.groups[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
             }
 
-            if(procedure.cls != null)
-            {
+            if(procedure.cls != null) {
                 transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
             }
-            else if(procedure.sql != null)
-            {
+            else if(procedure.sql != null) {
                 transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
             }
 
-            if(procedure.partitionInfo != null)
-            {
+            if(procedure.partitionInfo != null) {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(Integer.parseInt(parameter[1].trim()) > 0)
-                {
+                if(Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
@@ -350,14 +325,11 @@ public class CatalogBuilder {
     }
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
-        assert(m_partitionInfos.containsKey(tableName) == false);
-        m_partitionInfos.put(tableName, partitionColumnName);
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
     }
 
     public void setTableAsExportOnly(String name) {
         assert(name != null);
-        m_exportTables.add(name);
         transformer.append("Export TABLE " + name + ";");
     }
 
@@ -411,23 +383,24 @@ public class CatalogBuilder {
             transformer = new StringBuffer();
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
 
-        final String projectPath = null;
-        int index = 0;
-        String[] schemaPath = new String[m_schemas.size()];
-        Iterator<String> ite = m_schemas.iterator();
-        while(ite.hasNext())
-        {
-            schemaPath[index] = ite.next();
-            index++;
-        }
+        String[] schemaPath = m_schemas.toArray(new String[0]);
 
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
-        boolean success = compiler.compileWithProjectXML(projectPath, jarPath, schemaPath);
+
+        boolean success = false;
+        try {
+            success = compiler.compileFromDDL(jarPath, schemaPath);
+        } catch (VoltCompilerException e1) {
+            e1.printStackTrace();
+            return false;
+        }
+
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
