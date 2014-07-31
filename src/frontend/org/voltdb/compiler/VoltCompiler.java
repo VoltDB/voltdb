@@ -820,6 +820,9 @@ public class VoltCompiler {
     }
 
     public String getCanonicalDDL() {
+        if(m_canonicalDDL == null) {
+            throw new RuntimeException();
+        }
         return m_canonicalDDL;
     }
 
