@@ -131,6 +131,10 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
         ddlErrorTest("only supported for single-partition stored procedures",
                 "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah;");
 
+        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+                "create procedure MyInsert as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
         // if it's marked as single-partition, it's ok.
         ddlNonErrorTest("INSERT",
                 "create procedure MyInsert as insert into partitioned_blah (sval) select sval from indexed_blah where sval = ?;",

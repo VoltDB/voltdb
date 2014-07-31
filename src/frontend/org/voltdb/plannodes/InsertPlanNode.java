@@ -89,4 +89,19 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     protected String explainPlanForNode(String indent) {
         return "INSERT into \"" + m_targetTableName + "\"";
     }
+
+    /** Order determinism for insert nodes depends on the determinism of child nodes.  For subqueries producing
+     * unordered rows, the insert will be considered order-nondeterministic.
+     * */
+    @Override
+    public boolean isOrderDeterministic() {
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isOrderDeterministic()) {
+                m_nondeterminismDetail = child.m_nondeterminismDetail;
+                return false;
+            }
+        }
+        return true;
+    }
 }
