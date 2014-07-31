@@ -21,6 +21,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/*
+ * This test is used for testing round trip DDL through Adhoc and SQLcmd.
+ * We first build a catalog and pull the canonical DDL from it.
+ * Then we feed this DDL to a bare server through Adhoc/SQLcmd,
+ * pull the canonical DDL again, and check whether it remains the same.
+ */
+
 package org.voltdb.canonicalddl;
 
 import java.io.BufferedReader;
@@ -40,12 +47,11 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
-{
+public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
+
     String firstCanonicalDDL = null;
 
-    public String getFirstCanonicalDDL() throws Exception
-    {
+    public String getFirstCanonicalDDL() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
         VoltCompiler compiler = new VoltCompiler();
@@ -56,8 +62,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         return compiler.getCanonicalDDL();
     }
 
-    public void secondCanonicalDDLFromAdhoc() throws Exception
-    {
+    public void secondCanonicalDDLFromAdhoc() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
@@ -82,8 +87,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         teardownSystem();
     }
 
-    public void secondCanonicalDDLFromSQLcmd() throws Exception
-    {
+    public void secondCanonicalDDLFromSQLcmd() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
@@ -103,19 +107,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
 
         String roundtripDDL;
 
-        callSQLcmd(firstCanonicalDDL);
+        assertTrue(callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP();
         assertTrue(firstCanonicalDDL.equals(roundtripDDL));
 
-        callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n");
+        assertTrue(callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
         roundtripDDL = getDDLFromHTTP();
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
         teardownSystem();
     }
 
-    public void callSQLcmd(String ddl) throws Exception
-    {
+    public boolean callSQLcmd(String ddl) throws Exception {
         File f = new File("ddl.sql");
         f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
@@ -125,11 +128,15 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
         pb.redirectInput(f);
         Process process = pb.start();
 
-        while(true)
-        {
+        // Set timeout to 1 minute
+        long starttime = System.currentTimeMillis();
+        long endtime = starttime + 60000;
+
+        int exitValue = -1;
+        while(System.currentTimeMillis() < endtime) {
             Thread.sleep(1000);
             try{
-                int exitValue = process.exitValue();
+                exitValue = process.exitValue();
                 if(exitValue == 0) {
                     break;
                 }
@@ -138,10 +145,16 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase
                 System.out.println("Process hasn't exited");
             }
         }
+
+        if(exitValue == 0) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
-    public String getDDLFromHTTP() throws Exception
-    {
+    public String getDDLFromHTTP() throws Exception {
         URL ddlURL = new URL("http://localhost:8080/ddl/");
 
         HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();

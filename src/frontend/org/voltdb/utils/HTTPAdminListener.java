@@ -202,7 +202,6 @@ public class HTTPAdminListener {
                 response.setStatus(HttpServletResponse.SC_OK);
                 baseRequest.setHandled(true);
                 response.getWriter().print(ddl);
-                System.out.println(ddl);
                 return;
             }
 
