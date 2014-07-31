@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites;
+package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.FilenameFilter;

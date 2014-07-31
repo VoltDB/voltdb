@@ -421,19 +421,26 @@ private:
 
 // A small class to hold together a standalone tuple (not backed by any table)
 // and the associated tuple storage memory to keep the actual data.
+// This class will also make a copy of the tuple schema passed in and delete the
+// copy in its destructor (since instances of TupleSchema for persistent tables can
+// go away in the event of TRUNCATE TABLE).
 class StandAloneTupleStorage {
     public:
         /** Creates an uninitialized tuple */
         StandAloneTupleStorage() :
-            m_tupleStorage(),m_tuple() {
+            m_tupleStorage(),m_tuple(), m_tupleSchema(NULL) {
         }
 
         /** Allocates enough memory for a given schema
          * and initialies tuple to point to this memory
          */
         explicit StandAloneTupleStorage(const TupleSchema* schema) :
-            m_tupleStorage(), m_tuple() {
+            m_tupleStorage(), m_tuple(), m_tupleSchema(NULL) {
             init(schema);
+        }
+
+        ~StandAloneTupleStorage() {
+            TupleSchema::freeTupleSchema(m_tupleSchema);
         }
 
         /** Allocates enough memory for a given schema
@@ -441,22 +448,27 @@ class StandAloneTupleStorage {
          */
         void init(const TupleSchema* schema) {
             assert(schema != NULL);
-            m_tupleStorage.reset(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
-            m_tuple.m_schema = schema;
+
+            // TupleSchema can go away, so copy it here and keep it with our tuple.
+            if (m_tupleSchema != NULL) {
+                TupleSchema::freeTupleSchema(m_tupleSchema);
+            }
+            m_tupleSchema = TupleSchema::createTupleSchema(schema);
+
+            // note: apparently array new of the form
+            //   new char[N]()
+            // will zero-initialize the allocated memory.
+            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
+            m_tuple.m_schema = m_tupleSchema;
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
         }
 
-        /** Operator conversion to get an access to the underline tuple.
-         * To prevent clients from repointing the tuple to some other backing
-         * storage via move()or address() calls the tuple is returned by value
+        /** Get the tuple that this object is wrapping.
+         * Returned const ref to avoid corrupting the tuples data and schema pointers
          */
-        operator TableTuple () {
-            return m_tuple;
-        }
-
-        operator TableTuple () const {
+        const TableTuple& tuple() const {
             return m_tuple;
         }
 
@@ -464,7 +476,7 @@ class StandAloneTupleStorage {
 
         boost::scoped_array<char> m_tupleStorage;
         TableTuple m_tuple;
-
+        TupleSchema* m_tupleSchema;
 };
 
 inline TableTuple::TableTuple() :

@@ -444,7 +444,7 @@ public class AsyncBenchmark {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
-                                     "Put",
+                                     "STORE.upsert",
                                      String.format(processor.KeyFormat, i),
                                      processor.generateForStore().getStoreValue());
             }
@@ -463,13 +463,13 @@ public class AsyncBenchmark {
         while (warmupEndTime > System.currentTimeMillis()) {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
-                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
+                // Get a key/value pair using inbuilt select procedure, asynchronously
+                client.callProcedure(new NullCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
             }
             else {
-                // Put a key/value pair, asynchronously
+                // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
+                client.callProcedure(new NullCallback(), "STORE.upsert", pair.Key, pair.getStoreValue());
             }
         }
 
@@ -488,13 +488,13 @@ public class AsyncBenchmark {
         while (benchmarkEndTime > System.currentTimeMillis()) {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
-                client.callProcedure(new GetCallback(), "Get", processor.generateRandomKeyForRetrieval());
+                // Get a key/value pair using inbuilt select procedure, asynchronously
+                client.callProcedure(new GetCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
             }
             else {
-                // Put a key/value pair, asynchronously
+                // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new PutCallback(pair), "Put", pair.Key, pair.getStoreValue());
+                client.callProcedure(new PutCallback(pair), "STORE.upsert", pair.Key, pair.getStoreValue());
             }
         }
 

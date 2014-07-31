@@ -1395,14 +1395,14 @@ public abstract class CatalogUtil {
                 }
                 if (updated != null && updated.equals(table.getTypeName())) {
                     // make useage only in either read or updated, not both
-                    updateTableUsageAnnotation(table, stmt, true);
+                    updateTableUsageAnnotation(table, stmt, false);
                     updated = null;
                     continue;
                 }
-                updateTableUsageAnnotation(table, stmt, false);
+                updateTableUsageAnnotation(table, stmt, true);
             }
             else if (updated != null && updated.equals(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
+                updateTableUsageAnnotation(table, stmt, false);
                 updated = null;
             }
         }
