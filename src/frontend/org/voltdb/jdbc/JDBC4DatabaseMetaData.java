@@ -754,8 +754,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
-        return "CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
-                "REPEAT,REPLACE,RIGHT,SPACE,SUBSTRING,TRIM,UPPER";
+        // TODO: find a more suitable place for COALESCE
+        return "COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,LEFT,LOWER,OCTET_LENGTH,OVERLAY," +
+               "POSITION,REPEAT,REPLACE,RIGHT,SPACE,SUBSTRING,TRIM,UPPER";
     }
 
     // Retrieves a description of the table hierarchies defined in a particular schema in this database.
