@@ -67,6 +67,3 @@ CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
 PARTITION PROCEDURE Vote ON TABLE votes COLUMN phone_number;
 CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
-
-
-CREATE PROCEDURE U3 AS select contestant_name from contestants where contestant_number = ? union select contestant_name from contestants where contestant_number = CHAR_LENGTH(?) union select contestant_name from contestants where contestant_number = ?;

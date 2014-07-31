@@ -637,7 +637,7 @@ public class ProcedureRunner {
             // supporting @AdHocSpForTest with queries that contain '?' parameters.
             if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
-                    throw new IllegalArgumentException(
+                    throw new VoltAbortException(
                             "Number of arguments provided was " + args.length  +
                             " where 0 were expected for statement: " + sql);
                 }
@@ -794,8 +794,8 @@ public class ProcedureRunner {
         final Object[] args = new Object[numParamTypes];
         if (inArgs.length != numParamTypes) {
             throw new VoltAbortException(
-                    "The wrong number of arguments (" + inArgs.length + " vs. he " + numParamTypes +
-                    " expected) were passed for statement: " + stmt.getText());
+                    "Number of arguments provided was " + inArgs.length  +
+                    " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
         for (int ii = 0; ii < numParamTypes; ii++) {
             // this handles non-null values
@@ -1068,21 +1068,25 @@ public class ProcedureRunner {
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;
-           // For an unexpected condition, generate more output for debuggability.
+       }
+
+       // If the error is something we know can happen as part of normal operation,
+       // reduce the verbosity.
+       // Otherwise, generate more output for debuggability
+       if (expected_failure) {
+           msg.append("  ").append(e.getMessage());
+           for (StackTraceElement ste : matches) {
+               msg.append("\n    at ");
+               msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+               msg.append("(").append(ste.getFileName()).append(":");
+               msg.append(ste.getLineNumber()).append(")");
+           }
+       }
+       else {
            Writer result = new StringWriter();
            PrintWriter pw = new PrintWriter(result);
            e.printStackTrace(pw);
            msg.append("  ").append(result.toString());
-       }
-
-       // if the error is something we know can happen as part of normal
-       // operation, reduce the verbosity.
-       msg.append("  ").append(e.getMessage());
-       for (StackTraceElement ste : matches) {
-           msg.append("\n    at ");
-           msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-           msg.append("(").append(ste.getFileName()).append(":");
-           msg.append(ste.getLineNumber()).append(")");
        }
 
        return getErrorResponse(

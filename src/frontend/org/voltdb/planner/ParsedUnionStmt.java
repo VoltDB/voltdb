@@ -75,7 +75,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 childStmt = new ParsedSelectStmt(m_paramValues, m_db);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(m_paramValues,m_db);
+                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }

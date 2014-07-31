@@ -429,7 +429,7 @@ public class TestUnionSuite extends RegressionSuite {
         assertEquals(2, result.getRowCount());
     }
 
-    public void testSetStoredProcUnionWithParams()
+    public void testStoredProcUnionWithParams()
     throws NoConnectionsException, IOException, ProcCallException {
         // Test that parameterized query with union can be invoked.
         Client client = getClient();
@@ -457,7 +457,7 @@ public class TestUnionSuite extends RegressionSuite {
         // Test that parameterized query with union compiles properly.
         project.addStmtProcedure("UnionBCD",
                 "((SELECT I FROM B WHERE PKEY = ?) UNION " +
-                "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(?))) UNION " +
+                "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
                 "        SELECT I FROM D WHERE PKEY = ?");
 
         // local
