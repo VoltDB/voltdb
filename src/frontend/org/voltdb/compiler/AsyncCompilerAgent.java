@@ -168,10 +168,10 @@ public class AsyncCompilerAgent {
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             // We have an @UAC.  Is it okay to run it?
-            // If we weren't provided catalogBytes, it's a deployment-only change and okay to take
+            // If we weren't provided operationBytes, it's a deployment-only change and okay to take
             // master and adhoc DDL method chosen
             if (w.invocationName.equals("@UpdateApplicationCatalog") &&
-                w.catalogBytes != null && !w.onReplica && w.useAdhocDDL)
+                w.operationBytes != null && !w.onReplica && w.useAdhocDDL)
             {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,

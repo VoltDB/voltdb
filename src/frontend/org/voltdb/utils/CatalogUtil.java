@@ -1285,7 +1285,12 @@ public abstract class CatalogUtil {
         return versionAndBytes;
     }
 
-    public static void uploadCatalogToZK(ZooKeeper zk,
+    /**
+     *  Attempt to create the ZK node and write the catalog/deployment bytes
+     *  to ZK.  Used during the initial cluster deployment discovery and
+     *  distribution.
+     */
+    public static void writeCatalogToZK(ZooKeeper zk,
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
@@ -1299,7 +1304,11 @@ public abstract class CatalogUtil {
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
-    public static void setCatalogToZK(ZooKeeper zk,
+    /**
+     * Update the catalog/deployment contained in ZK.  Someone somewhere must have
+     * called writeCatalogToZK earlier in order to create the ZK node.
+     */
+    public static void updateCatalogToZK(ZooKeeper zk,
             int catalogVersion,
             long txnId,
             long uniqueId,

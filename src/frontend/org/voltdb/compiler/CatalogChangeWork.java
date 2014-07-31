@@ -22,14 +22,22 @@ import org.voltdb.client.ProcedureInvocationType;
 public class CatalogChangeWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -5257248292283453286L;
 
-    final byte[] catalogBytes;
-    final String deploymentString;
+    // The bytes for the catalog operation, if any.  May be null in all cases
+    // For @UpdateApplicationCatalog, this will contain the compiled catalog jarfile bytes
+    // For @UpdateClasses, this will contain the class jarfile bytes
+    // For @AdHoc DDL work, this will be null
+    final byte[] operationBytes;
+    // The string for the catalog operation, if any.  May be null in all cases
+    // For @UpdateApplicationCatalog, this will contain the deployment string to apply
+    // For @UpdateClasses, this will contain the class deletion patterns
+    // For @AdHoc DDL work, this will be null
+    final String operationString;
     final String[] adhocDDLStmts;
 
     public CatalogChangeWork(
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
-            Object clientData, byte[] catalogBytes, String deploymentString,
+            Object clientData, byte[] operationBytes, String operationString,
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
@@ -40,13 +48,13 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
               completionHandler);
-        if (catalogBytes != null) {
-            this.catalogBytes = catalogBytes.clone();
+        if (operationBytes != null) {
+            this.operationBytes = operationBytes.clone();
         }
         else {
-            this.catalogBytes = null;
+            this.operationBytes = null;
         }
-        this.deploymentString = deploymentString;
+        this.operationString = operationString;
         adhocDDLStmts = null;
     }
 
@@ -72,9 +80,9 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.useAdhocDDL,
               adhocDDL.completionHandler);
         // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
-        this.catalogBytes = null;
+        this.operationBytes = null;
         // Ditto for deployment string
-        this.deploymentString = null;
+        this.operationString = null;
         this.adhocDDLStmts = adhocDDL.sqlStatements;
     }
 }

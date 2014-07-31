@@ -1275,7 +1275,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             try {
                 if (deploymentBytes != null) {
-                    CatalogUtil.uploadCatalogToZK(zk,
+                    CatalogUtil.writeCatalogToZK(zk,
                             // Fill in innocuous values for non-deployment stuff
                             0,
                             0L,

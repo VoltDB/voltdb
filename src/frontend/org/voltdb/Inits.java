@@ -313,7 +313,7 @@ public class Inits {
                     byte[] deploymentBytes = catalogStuff.deploymentBytes;
 
                     // publish the catalog bytes to ZK
-                    CatalogUtil.setCatalogToZK(
+                    CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,

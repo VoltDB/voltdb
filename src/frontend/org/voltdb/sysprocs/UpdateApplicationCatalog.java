@@ -303,7 +303,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // update the global version. only one site per node will accomplish this.
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
-        CatalogUtil.setCatalogToZK(
+        CatalogUtil.updateCatalogToZK(
                 zk,
                 expectedCatalogVersion + 1,
                 getVoltPrivateRealTransactionIdDontUseMe(),
@@ -322,7 +322,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             // the transaction with the same input args and the new state,
             // which we will recognize as a restart and do the right thing.
             log.debug("Catalog update cannot be applied.  Rolling back ZK state");
-            CatalogUtil.setCatalogToZK(
+            CatalogUtil.updateCatalogToZK(
                     zk,
                     catalogStuff.version,
                     catalogStuff.txnId,

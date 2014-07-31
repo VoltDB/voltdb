@@ -27,6 +27,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
@@ -50,10 +51,12 @@ public class AsyncCompilerAgentHelper
 
         // catalog change specific boiler plate
         CatalogContext context = VoltDB.instance().getCatalogContext();
-        // In an @UpdateClasses, catalogBytes are actually the jarfile containing classes
-        byte[] newCatalogBytes = work.catalogBytes;
-        // In an @UpdateClasses, deploymentString is actually the delete string
-        String deploymentString = work.deploymentString;
+        // Start by assuming we're doing an @UpdateApplicationCatalog.  If-ladder below
+        // will complete with newCatalogBytes actually containing the bytes of the
+        // catalog to be applied, and deploymentString will contain an actual deployment string,
+        // or null if it still needs to be filled in.
+        byte[] newCatalogBytes = work.operationBytes;
+        String deploymentString = work.operationString;
         if (work.invocationName.equals("@UpdateApplicationCatalog")) {
             // Do the straight-forward thing with the args, filling in nulls as appropriate
             // Grab the current catalog bytes if @UAC had a null catalog
@@ -72,7 +75,6 @@ public class AsyncCompilerAgentHelper
             // Otherwise, deploymentString has the right contents, don't need to touch it
         }
         else if (work.invocationName.equals("@UpdateClasses")) {
-            compilerLog.warn("DELETE STRING: " + work.deploymentString);
             // Need the original catalog bytes, then delete classes, then add
             try {
                 newCatalogBytes = context.getCatalogJarBytes();
@@ -82,28 +84,16 @@ public class AsyncCompilerAgentHelper
                     ioe.getMessage();
                 return retval;
             }
-            // provided deploymentString is really a String with class patterns to delete
-            if (work.deploymentString != null) {
-                try {
-                    newCatalogBytes = removeClassesFromCatalog(newCatalogBytes, work.deploymentString);
-                }
-                catch (IOException e) {
-                    retval.errorMsg = "Unexpected exception @UpdateClasses deleting classes " +
-                        "from catalog: " + e.getMessage();
-                    return retval;
-                }
+            // provided operationString is really a String with class patterns to delete,
+            // provided operationBytes is the jarfile with the upsertable classes
+            try {
+                newCatalogBytes = modifyCatalogClasses(newCatalogBytes, work.operationString,
+                        work.operationBytes);
             }
-            // provided catalogBytes is really jarfile containing upsertable classes
-            if (work.catalogBytes != null) {
-                try {
-                    InMemoryJarfile jarfile = new InMemoryJarfile(work.catalogBytes);
-                    newCatalogBytes = addJarClassesToCatalog(newCatalogBytes, jarfile);
-                }
-                catch (IOException e) {
-                    retval.errorMsg = "Unexpected exception @UpdateClasses adding classes " +
-                        "to catalog: " + e.getMessage();
-                    return retval;
-                }
+            catch (IOException e) {
+                retval.errorMsg = "Unexpected exception @UpdateClasses modifying classes " +
+                    "from catalog: " + e.getMessage();
+                return retval;
             }
             // Real deploymentString should be the current deployment, just set it to null
             // here and let it get filled in correctly later.
@@ -248,44 +238,46 @@ public class AsyncCompilerAgentHelper
         }
     }
 
-    private byte[] removeClassesFromCatalog(byte[] oldCatalogBytes, String deletePatterns)
-        throws IOException
+    private byte[] modifyCatalogClasses(byte[] oldCatalogBytes, String deletePatterns,
+            byte[] newClassBytes) throws IOException
     {
+        // Create a new InMemoryJarfile based on the original catalog bytes,
+        // modify it in place based on the @UpdateClasses inputs, and then
+        // recompile it if necessary
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
-        String[] patterns = deletePatterns.split(",");
-        ClassMatcher matcher = new ClassMatcher();
-        // Need to concatenate all the classnames together for ClassMatcher
-        String currentClasses = "";
-        for (String classname : jarfile.getLoader().getClassNames()) {
-            currentClasses = currentClasses.concat(classname + "\n");
-        }
-        matcher.m_classList = currentClasses;
-        for (String pattern : patterns) {
-            matcher.addPattern(pattern.trim());
-        }
-        for (String classname : matcher.getMatchedClassList()) {
-            jarfile.removeClassFromJar(classname);
-        }
-        VoltCompiler compiler = new VoltCompiler();
-        compiler.compileInMemoryJarfile(jarfile);
-        return jarfile.getFullJarBytes();
-    }
-
-    private byte[] addJarClassesToCatalog(byte[] oldCatalogBytes, InMemoryJarfile newJarfile)
-        throws IOException
-    {
-        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
-        boolean foundClasses = false;
-        for (Entry<String, byte[]> e : newJarfile.entrySet()) {
-            String filename = e.getKey();
-            if (!filename.endsWith(".class")) {
-                continue;
+        boolean deletedClasses = false;
+        if (deletePatterns != null) {
+            String[] patterns = deletePatterns.split(",");
+            ClassMatcher matcher = new ClassMatcher();
+            // Need to concatenate all the classnames together for ClassMatcher
+            String currentClasses = "";
+            for (String classname : jarfile.getLoader().getClassNames()) {
+                currentClasses = currentClasses.concat(classname + "\n");
             }
-            foundClasses = true;
-            jarfile.put(e.getKey(), e.getValue());
+            matcher.m_classList = currentClasses;
+            for (String pattern : patterns) {
+                ClassNameMatchStatus status = matcher.addPattern(pattern.trim());
+                if (status == ClassNameMatchStatus.MATCH_FOUND) {
+                    deletedClasses = true;
+                }
+            }
+            for (String classname : matcher.getMatchedClassList()) {
+                jarfile.removeClassFromJar(classname);
+            }
         }
-        // if we actually mutated the catalog, recompile it
-        if (foundClasses) {
+        boolean foundClasses = false;
+        if (newClassBytes != null) {
+            InMemoryJarfile newJarfile = new InMemoryJarfile(newClassBytes);
+            for (Entry<String, byte[]> e : newJarfile.entrySet()) {
+                String filename = e.getKey();
+                if (!filename.endsWith(".class")) {
+                    continue;
+                }
+                foundClasses = true;
+                jarfile.put(e.getKey(), e.getValue());
+            }
+        }
+        if (deletedClasses || foundClasses) {
             VoltCompiler compiler = new VoltCompiler();
             compiler.compileInMemoryJarfile(jarfile);
         }
