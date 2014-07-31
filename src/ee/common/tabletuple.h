@@ -455,7 +455,10 @@ class StandAloneTupleStorage {
             }
             m_tupleSchema = TupleSchema::createTupleSchema(schema);
 
-            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]);
+            // note: apparently array new of the form
+            //   new char[N]()
+            // will zero-initialize the allocated memory.
+            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
             m_tuple.m_schema = m_tupleSchema;
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
