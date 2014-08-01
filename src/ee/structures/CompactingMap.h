@@ -348,10 +348,12 @@ typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator CompactingMap<K
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
 typename CompactingMap<KeyValuePair, Compare, hasRank>::iterator CompactingMap<KeyValuePair, Compare, hasRank>::upperBound(const Key &key) {
+    Key tmpKey(key);
+    setPointerValue(tmpKey, MAXPOINTER);
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
-        int cmp = m_comper(x->key(), key);
+        int cmp = m_comper(x->key(), tmpKey);
         if (cmp <= 0) {
             x = x->right;
         }
@@ -759,7 +761,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankAsc(const Key& key) {
     if (n == &NIL) return -1;
     TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
-    // fix breaking xin's code by set and unset key before each comparision
+    // only compare the "data" part of the key
     int m = compareKeyRegardlessOfPointer(key, m_root);
     if (m == 0) {
         if (m_root->right != &NIL)
@@ -810,9 +812,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank>::rankUpper(const Key& key)
     if (n == &NIL) return -1;
 
     iterator it;
-    Key temp(key);
-    setPointerValue(temp, MAXPOINTER);
-    it = upperBound(temp);
+    it = upperBound(key);
     if (it.isEnd())
         return m_count;
     return rankAsc(it.key()) - 1;
