@@ -52,6 +52,8 @@
 
 namespace voltdb {
 
+class Pool;
+
 /**
  *
  */
@@ -69,7 +71,7 @@ class InsertPlanNode : public AbstractOperationPlanNode {
 
         bool isMultiPartition() { return m_multiPartition; }
 
-        void initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple);
+        void initTemplateTuple(VoltDBEngine* engine, Pool* pool, TableTuple& templateTuple);
 
         const std::vector<int>& getFieldMap() const {
             return m_fieldMap;

@@ -102,7 +102,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_templateTuple.init(targetTable->schema());
 
     TableTuple tuple = m_templateTuple.tuple();
-    m_node->initTemplateTuple(m_engine, tuple);
+    m_node->initTemplateTuple(m_engine, &m_memoryPool, tuple);
 
     return true;
 }
