@@ -702,7 +702,7 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    // The parser currently attaches the summary parameer list
+    // The parser currently attaches the summary parameter list
     // to each leaf (select) statement in a union, but not to the
     // union statement itself. It is always the same parameter list,
     // the one that applies globally to the entire set of leaf select
