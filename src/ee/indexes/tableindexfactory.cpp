@@ -111,7 +111,7 @@ class TableIndexPicker
             if (m_scheme.unique) {
                 return getUniqueMapInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
             }
-            return getMultiMapInstanceForKeyType<IntsPointerKey<(KeySize-1)/8 + 1> >();
+            return getMultiMapInstanceForKeyType<KeyWithPointer<IntsKey<(KeySize-1)/8 + 1> > >();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
@@ -129,12 +129,12 @@ class TableIndexPicker
             if (m_scheme.unique) {
                 return getUniqueMapInstanceForKeyType<GenericKey<KeySize> >();
             }
-            return getMultiMapInstanceForKeyType<GenericPointerKey<KeySize> >();
+            return getMultiMapInstanceForKeyType<KeyWithPointer<GenericKey<KeySize> > >();
         }
         if (m_scheme.unique) {
             return getUniqueMapInstanceForKeyType<GenericPersistentKey<KeySize> >();
         }
-        return getMultiMapInstanceForKeyType<GenericPersistentPointerKey<KeySize> >();
+        return getMultiMapInstanceForKeyType<KeyWithPointer<GenericPersistentKey<KeySize> > >();
     }
 
     template <int ColCount>
@@ -214,9 +214,9 @@ public:
             }
         }
         if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TuplePointerKey>, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<KeyWithPointer<TupleKey> >, true >(m_keySchema, m_scheme);
         } else {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TuplePointerKey>, false>(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<KeyWithPointer<TupleKey> >, false>(m_keySchema, m_scheme);
         }
     }
 
