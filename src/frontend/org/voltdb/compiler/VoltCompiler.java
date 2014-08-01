@@ -829,7 +829,7 @@ public class VoltCompiler {
 
     private Database initCatalogDatabase() {
         // create the database in the catalog
-        m_catalog.execute("add /clusters[cluster] databases database");
+        m_catalog.execute("add /clusters[cluster databases database");
         return getCatalogDatabase();
     }
 

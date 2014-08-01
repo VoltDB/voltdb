@@ -224,7 +224,6 @@ CatalogType *Catalog::itemForPathPart(const CatalogType *parent, const string &p
     vector<string> parts = MiscUtil::splitToTwoString(pathPart, '[');
     if (parts.size() <= 1)
         return NULL;
-    parts[1] = MiscUtil::splitString(parts[1], ']')[0];
     return parent->getChild(parts[0], parts[1]);
 }
 

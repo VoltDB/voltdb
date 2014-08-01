@@ -129,7 +129,7 @@ public class Catalog extends CatalogType {
         }
         else if (cmd.equals("delete")) {
             resolved.getCollection(arg1).delete(arg2);
-            String toDelete = ref + "/" + arg1 + "[" + arg2 + "]";
+            String toDelete = ref + "/" + arg1 + "[" + arg2;
             m_pathCache.invalidate(toDelete);
         }
         else if (cmd.equals("set")) {
@@ -162,16 +162,13 @@ public class Catalog extends CatalogType {
         String subPath = path.substring(index);
 
         CatalogType immediateParent = getItemForPath(immediateParentPath);
-        if (immediateParent == null)
-            throw new CatalogException("couldn't find immediate parent in path.");
+        if (immediateParent == null) {
+            return null;
+        }
         // cache all parents
         m_pathCache.put(immediateParentPath, immediateParent);
 
-        CatalogType item = getItemForPathPart(immediateParent, subPath);
-        if (item == null)
-            throw new CatalogException("couldn't find next child in path.");
-
-        return item;
+        return getItemForPathPart(immediateParent, subPath);
     }
 
     CatalogType getItemForPathPart(CatalogType parent, String path) {
@@ -183,10 +180,8 @@ public class Catalog extends CatalogType {
 
         int index = path.lastIndexOf('[');
 
-        assert(path.charAt(path.length() - 1) == ']');
-
         String collection = path.substring(hasStartSlash ? 1 : 0, index);
-        String name = path.substring(index + 1, path.length() - 1);
+        String name = path.substring(index + 1, path.length());
 
         return parent.getCollection(collection).get(name);
     }

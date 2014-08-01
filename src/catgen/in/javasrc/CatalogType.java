@@ -135,7 +135,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        return m_parentMap.getPath() + "[" + m_typename + "]";
+        return m_parentMap.getPath() + "[" + m_typename;
     }
 
     /**
@@ -228,7 +228,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         if (newPath.length() == 0)
             newPath = "/";
         String[] parts = key.split("\\[");
-        parts[1] = parts[1].substring(0, parts[1].length() - 1);
         parts[1] = parts[1].trim();
 
         sb.append("add ").append(newPath).append(" ");
@@ -238,16 +237,13 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
     void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
         String path = getCatalogPath();
-        if (!printFullPath) path = "$PREV"; // use cacheing to shrink output + speed parsing
+        if (!printFullPath) path = "$PREV"; // use caching to shrink output + speed parsing
 
         sb.append("set ").append(path).append(" ");
         sb.append(field).append(" ");
         Object value = getField(field);
         if (value == null) {
-            if ((field.equals("partitioncolumn")) && (getCatalogPath().equals("/clusters[cluster]/databases[database]/procedures[delivery]")))
-                System.out.printf("null for field %s at path %s\n", field, getCatalogPath());
             sb.append("null");
-
         }
         else if (value.getClass() == Integer.class)
             sb.append(value);

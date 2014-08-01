@@ -99,7 +99,7 @@ CatalogMap<T>::CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std
 
 template <class T>
 T * CatalogMap<T>::add(const std::string &name) {
-    std::string childPath = m_path + "[" + name + "]";
+    std::string childPath = m_path + "[" + name;
     T *retval = new T(m_catalog, m_parent, childPath, name);
     std::string mapKey = name;
     boost::to_upper(mapKey);
