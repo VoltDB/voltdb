@@ -776,9 +776,9 @@ struct KeyWithPointer : public KeyType {
     typedef ComparatorWithPointer<KeyType> KeyComparator;
     friend struct ComparatorWithPointer<KeyType>;
 
-    KeyWithPointer() : KeyType() {}
+    KeyWithPointer() : KeyType(), m_keyTuple(NULL) {}
 
-    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple) {}
+    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple), m_keyTuple(NULL) {}
 
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
