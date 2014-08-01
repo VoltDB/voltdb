@@ -109,6 +109,7 @@ protected:
 
         const Key &key() const { return kv.getKey(); };
         const Data &value() const { return kv.getValue(); };
+        void setKey(const Key &value) { kv.setKey(value); }
         void setValue(const Data &value) { kv.setValue(value); }
     };
 
@@ -152,6 +153,7 @@ public:
     CompactingMap(bool unique, Compare comper);
     ~CompactingMap();
 
+    // TODO: remove this. But two eecheck depend on this.
     bool insert(std::pair<Key, Data> value) { return insert(value.first, value.second); };
     // A syntactically convenient analog to CompactingHashTable's insert function
     bool insert(const Key &key, const Data &data);
@@ -293,7 +295,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->kv = KeyValuePair(key, value);
+        z->setKey(key);
+        z->setValue(value); // for PointerKeyType, this is a little duplicating process
         z->left = z->right = &NIL;
         z->parent = y;
         z->color = RED;
@@ -314,7 +317,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const
         assert(memory);
         // placement new
         TreeNode *z = new(memory) TreeNode();
-        z->kv = KeyValuePair(key, value);
+        z->setKey(key);
+        z->setValue(value); // for PointerKeyType, this is a little duplicating process
         z->left = z->right = &NIL;
         z->parent = &NIL;
         z->color = BLACK;
