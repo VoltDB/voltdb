@@ -683,7 +683,7 @@ struct TupleKey
         assert(tuple);
         m_columnIndices = NULL;
         m_indexedExprs = NULL;
-        m_keyTuple = static_cast<void*>(tuple->address());
+        m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
     }
 
@@ -698,7 +698,7 @@ struct TupleKey
         } else {
             m_indexedExprs = NULL;
         }
-        m_keyTuple = static_cast<void*>(tuple->address());
+        m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
     }
 
