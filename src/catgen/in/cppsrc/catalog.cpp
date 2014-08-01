@@ -172,7 +172,7 @@ void Catalog::executeOne(const string &stmt) {
         // remove from collection and hash path to the deletion tracker
         // throw if nothing was removed.
         if(item->removeChild(coll, child)) {
-            m_deletions.push_back(ref + "/" + coll + "[" + child + "]");
+            m_deletions.push_back(ref + "/" + coll + "[" + child);
         }
         else {
             std::string errmsg = "Catalog reference for " + ref + " not found.";

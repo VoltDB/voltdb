@@ -26,7 +26,7 @@ namespace voltdb {
 /*
  * Interface that bridges catalog textual changes to changes
  * made to actual EE objects. That is, bridge "set /cluster/..
- * tables[A]" to a change to the actual voltdb::Table instance.
+ * tables[A" to a change to the actual voltdb::Table instance.
  */
 
 class CatalogDelegate {
