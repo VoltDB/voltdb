@@ -169,7 +169,7 @@ public class TestJDBCResultSet {
                     "SELECT * FROM HSQLEMPTY",
                     ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY);
-            hsql3RowStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLTABLE", ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            hsql3RowStmt = HsqlConn.prepareStatement("SELECT * FROM HSQLTABLE ORDER BY COL1", ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
             hsqlEmptyRS = hsqlEmptyStmt.executeQuery();
             hsql3RowRS = hsql3RowStmt.executeQuery();
@@ -178,7 +178,7 @@ public class TestJDBCResultSet {
             volt3RowStmt = VoltDBConn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
             voltEmptyRS = voltEmptyStmt.executeQuery("SELECT * FROM HSQLEMPTY");
-            volt3RowRS = volt3RowStmt.executeQuery("SELECT * FROM HSQLTABLE");
+            volt3RowRS = volt3RowStmt.executeQuery("SELECT * FROM HSQLTABLE ORDER BY COL1");
         } catch (SQLException ex) {
             fail();
         }
