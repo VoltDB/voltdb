@@ -50,13 +50,13 @@ public:
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static inline NValue getStringValue(const char *value) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, (size_t)(value ? strlen(value) : 0), NULL);
+    static inline NValue getStringValue(const char *value, Pool* pool = NULL) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, (size_t)(value ? strlen(value) : 0), pool);
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static inline NValue getStringValue(const std::string value) {
+    static inline NValue getStringValue(const std::string value, Pool* pool = NULL) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
@@ -72,11 +72,11 @@ public:
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     /// Assumes hex-encoded input
-    static inline NValue getBinaryValue(const std::string& value) {
+    static inline NValue getBinaryValue(const std::string& value, Pool* pool = NULL) {
         size_t rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
-        return getBinaryValue(rawBuf, (int32_t)rawLength);
+        return getBinaryValue(rawBuf, (int32_t)rawLength, pool);
     }
 
     /// Constructs a value copied into temporary string pool
@@ -91,8 +91,8 @@ public:
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     /// Assumes raw byte input
-    static inline NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, NULL);
+    static inline NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength, Pool* pool = NULL) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, pool);
     }
 
     static inline NValue getNullBinaryValue() {
@@ -179,12 +179,7 @@ public:
         return value.castAsString();
     }
 
-    enum StorageType {
-        USE_TEMP_STORAGE,
-        USE_LONG_TERM_STORAGE
-    };
-
-    static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, StorageType storage) {
+    static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, Pool* pool) {
         switch (type) {
             case VALUE_TYPE_NULL:
             {
@@ -212,21 +207,11 @@ public:
             }
             case VALUE_TYPE_VARCHAR:
             {
-                if (storage == USE_TEMP_STORAGE) {
-                    return getTempStringValue(value);
-                }
-                else {
-                    return getStringValue(value.c_str());
-                }
+                return getStringValue(value.c_str(), pool);
             }
             case VALUE_TYPE_VARBINARY:
             {
-                if (storage == USE_TEMP_STORAGE) {
-                    return getTempBinaryValue(value);
-                }
-                else {
-                    return getBinaryValue(value);
-                }
+                return getBinaryValue(value, pool);
             }
             default:
             {

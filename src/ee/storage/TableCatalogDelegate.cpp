@@ -565,7 +565,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
         else {
             std::string defaultValue = column->defaultvalue();
             // this could probably use the temporary string pool instead?
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, ValueFactory::USE_LONG_TERM_STORAGE);
+            // (Instead of passing NULL to use persistant storage)
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, NULL);
         }
 
         // find a source column in the existing table, if one exists
@@ -670,7 +671,7 @@ static bool isDefaultNow(const std::string& defaultValue) {
 // the table.  Note that if there are timestamp columns in the table
 // with a default value of "now", then the column will be populated
 // with whatever time you call this function.
-void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple) {
+void TableCatalogDelegate::initTemplateTuple(Pool* pool, catalog::Table const *catalogTable, TableTuple& tbTuple) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
          colIter != catalogTable->columns().end();
@@ -697,7 +698,7 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable,
 
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
                                                                          col->defaultvalue(),
-                                                                         ValueFactory::USE_TEMP_STORAGE);
+                                                                         pool);
             tbTuple.setNValue(col->index(), defaultValue);
             break;
         }

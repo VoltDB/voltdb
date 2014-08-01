@@ -20,18 +20,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+package org.voltdb_testprocs.updateclasses;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
 
-public class Get extends VoltProcedure
-{
-    // Selects a key/value pair's value
-    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
-
-    public VoltTable[] run(String key)
-    {
-        voltQueueSQL(selectStmt, key);
-        return voltExecuteSQL(true);
+public class testCreateProcFromClassProc extends VoltProcedure {
+    public long run(long isbn, String title, String author)
+    throws VoltAbortException {
+        return 1;
     }
 }

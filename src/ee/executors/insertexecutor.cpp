@@ -75,13 +75,15 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
 
+    Table* targetTable = m_node->getTargetTable();
+
     setDMLCountOutputTable(limits);
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
@@ -95,6 +97,13 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     m_multiPartition = m_node->isMultiPartition();
+
+    // allocate memory for template tuple, set defaults for all columns
+    m_templateTuple.init(targetTable->schema());
+
+    TableTuple tuple = m_templateTuple.tuple();
+    m_node->initTemplateTuple(m_engine, &m_memoryPool, tuple);
+
     return true;
 }
 
@@ -111,31 +120,15 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    // we need to use the schema of the target table here, not the input table
-    TableTuple &templateTuple = targetTable->tempTuple();
-
-    // initialize the template tuple with default values from the catalog
-    m_node->initTemplateTuple(m_engine, templateTuple);
-
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-#ifdef DEBUG
-    //
-    // This should probably just be a warning in the future when we are
-    // running in a distributed cluster
-    //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                   m_inputTable->name().c_str());
-        return false;
-    }
-#endif
-    assert ( ! m_inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;
 
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
+
+    TableTuple templateTuple = m_templateTuple.tuple();
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
@@ -147,7 +140,18 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     while (iterator.next(inputTuple)) {
 
         for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
-            templateTuple.setNValue(m_node->getFieldMap()[i], inputTuple.getNValue(i));
+            // Most executors will just call setNValue instead of
+            // setNValueAllocateForObjectCopies.
+            //
+            // However, We need to call
+            // setNValueAlocateForObjectCopies here.  Sometimes the
+            // input table's schema has an inlined string field, and
+            // it's being assigned to the target table's outlined
+            // string field.  In this case we need to tell the NValue
+            // where to allocate the string data.
+            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
+                                                           inputTuple.getNValue(i),
+                                                           ExecutorContext::getTempStringPool());
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",

@@ -35,6 +35,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
 {
@@ -171,10 +172,18 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("NUM_PREC_RADIX", VoltType.INTEGER)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog)
+    static public final ColumnInfo[] CLASS_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("CLASS_NAME", VoltType.STRING),
+            new ColumnInfo("VOLT_PROCEDURE", VoltType.TINYINT),
+            new ColumnInfo("ACTIVE_PROC", VoltType.TINYINT)
+        };
+
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        m_jarfile = jarfile;
     }
 
     public VoltTable getMetaData(String selector)
@@ -207,6 +216,12 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("TYPEINFO"))
         {
             result = getTypeInfo();
+        }
+        // This selector is not part of the JDBC standard, but we pile on here
+        // because it's a convenient way to get information about the application
+        else if (selector.equalsIgnoreCase("CLASSES"))
+        {
+            result = getClasses();
         }
         return result;
     }
@@ -667,6 +682,34 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
+    VoltTable getClasses()
+    {
+        VoltTable results = new VoltTable(CLASS_SCHEMA);
+        for (String classname : m_jarfile.getLoader().getClassNames()) {
+            try {
+                Class<?> clazz = m_jarfile.getLoader().loadClass(classname);
+                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz);
+                boolean isActive = false;
+                if (isProc) {
+                    for (Procedure proc : m_database.getProcedures()) {
+                        if (proc.getClassname().equals(clazz.getCanonicalName())) {
+                            isActive = true;
+                            break;
+                        }
+                    }
+                }
+                results.addRow(classname, isProc ? 1 : 0, isActive ? 1 : 0);
+            }
+            catch (Exception e) {
+                // if we can't load a class from the jarfile, just pretend it doesn't
+                // exist.  Other checks when we actually load the classes should
+                // ensure that we don't end up in this state.
+            }
+        }
+        return results;
+    }
+
     private final Catalog m_catalog;
     private final Database m_database;
+    private final InMemoryJarfile m_jarfile;
 }

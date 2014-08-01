@@ -46,9 +46,10 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
+#include "common/Pool.hpp"
 #include "common/common.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
@@ -63,13 +64,17 @@ class InsertExecutor : public AbstractExecutor
 {
 public:
     InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractExecutor(engine, abstract_node),
+        m_node(NULL),
+        m_inputTable(NULL),
+        m_partitionColumn(-1),
+        m_partitionColumnIsString(false),
+        m_multiPartition(false),
+        m_isStreamed(false),
+        m_templateTuple(),
+        m_memoryPool(),
+        m_engine(engine)
     {
-        m_inputTable = NULL;
-        m_node = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-        m_multiPartition = false;
     }
 
     protected:
@@ -85,6 +90,16 @@ public:
         bool m_multiPartition;
         bool m_isStreamed;
 
+    private:
+
+        /** A tuple with the target table's schema that is populated with default
+         * values for each field. */
+        StandAloneTupleStorage m_templateTuple;
+
+        /** A memory pool for allocating non-inlined varchar and varbinary default values */
+        Pool m_memoryPool;
+
+    protected:
         /** reference to the engine/context to store the number of modified tuples */
         VoltDBEngine* m_engine;
 };
