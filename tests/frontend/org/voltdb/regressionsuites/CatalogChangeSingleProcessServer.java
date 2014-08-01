@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.saverestore;
+package org.voltdb.regressionsuites;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;

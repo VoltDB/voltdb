@@ -2,6 +2,7 @@
 <classpath>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="tests/frontend"/>
+    <classpathentry kind="src" path="tests/testprocs"/>
     <classpathentry kind="src" path="tests/hsqldb"/>
     <classpathentry kind="src" path="doc/tutorials/auction/procedures"/>
     <classpathentry kind="src" path="doc/tutorials/auction/src"/>

@@ -30,6 +30,8 @@
 {@updatesource = "D"}
 {@updatevalue = "_value[int16]"}
 
+{@jointype = "_jointype"}
+
 
 INSERT INTO _table VALUES (_value[int16], _bvalue, _value[int16], _dvalue, _value[int16 null30], _value[int16])
 
