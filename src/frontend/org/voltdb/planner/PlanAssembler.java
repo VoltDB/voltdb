@@ -60,6 +60,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -1321,24 +1322,31 @@ public class PlanAssembler {
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
             LimitPlanNode distLimit = m_parsedSelect.getLimitNodeDist();
-
-            // Disconnect the distributed parts of the plan below the SEND node
             AbstractPlanNode distributedPlan = sendNode.getChild(0);
-            distributedPlan.clearParents();
-            sendNode.clearChildren();
 
-            // If the distributed limit must be performed on ordered input,
-            // ensure the order of the data on each partition.
-            distributedPlan = handleOrderBy(distributedPlan);
-
-            if (isInlineLimitPlanNodePossible(distributedPlan)) {
-                // Inline the distributed limit.
-                distributedPlan.addInlinePlanNode(distLimit);
-                sendNode.addAndLinkChild(distributedPlan);
+            AbstractPlanNode subOrderByNode = isSpceialInlineLimitPossible(distributedPlan);
+            if (subOrderByNode != null) {
+                System.err.println("case matched!");
+                subOrderByNode.addInlinePlanNode(distLimit);
             } else {
-                distLimit.addAndLinkChild(distributedPlan);
-                // Add the distributed work back to the plan
-                sendNode.addAndLinkChild(distLimit);
+                // Disconnect the distributed parts of the plan below the SEND node
+
+                distributedPlan.clearParents();
+                sendNode.clearChildren();
+
+                // If the distributed limit must be performed on ordered input,
+                // ensure the order of the data on each partition.
+                distributedPlan = handleOrderBy(distributedPlan);
+
+                if (isInlineLimitPlanNodePossible(distributedPlan)) {
+                    // Inline the distributed limit.
+                    distributedPlan.addInlinePlanNode(distLimit);
+                    sendNode.addAndLinkChild(distributedPlan);
+                } else {
+                    distLimit.addAndLinkChild(distributedPlan);
+                    // Add the distributed work back to the plan
+                    sendNode.addAndLinkChild(distLimit);
+                }
             }
         }
         // In future, inline LIMIT for join, Receive
@@ -1378,11 +1386,135 @@ public class PlanAssembler {
      */
     static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
         if (pn instanceof OrderByPlanNode ||
-                pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
+            pn.getPlanNodeType() == PlanNodeType.AGGREGATE ||
+            pn.getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE)
         {
             return true;
         }
         return false;
+    }
+
+    private AbstractPlanNode isSpceialInlineLimitPossible(AbstractPlanNode pn) {
+        if (! m_parsedSelect.hasOrderByColumns()) {
+            return null;
+        }
+
+        if (pn instanceof AggregatePlanNode == false) {
+            return null;
+        }
+        AggregatePlanNode aggNode = (AggregatePlanNode)pn;
+
+        if (aggNode.getChild(0) instanceof NestLoopIndexPlanNode == false) {
+            return null;
+        }
+        NestLoopIndexPlanNode nlpn = (NestLoopIndexPlanNode) aggNode.getChild(0);
+        if (nlpn.getJoinType() != JoinType.LEFT || ! nlpn.isIndexScanUniqeMatching()) {
+            return null;
+        }
+
+        if (nlpn.getChild(0) instanceof NestLoopIndexPlanNode == false) {
+            return null;
+        }
+        nlpn = (NestLoopIndexPlanNode) nlpn.getChild(0);
+        if (nlpn.getJoinType() != JoinType.LEFT || ! nlpn.isIndexScanUniqeMatching()) {
+            return null;
+        }
+        if (nlpn.getChild(0) instanceof SeqScanPlanNode == false) {
+            return null;
+        }
+        // the join plan is doing unique matching
+        // all the rows comes from the outer source table scan
+        SeqScanPlanNode seqScan = (SeqScanPlanNode) nlpn.getChild(0);
+        if (! seqScan.isSubQuery()) {
+            return null;
+        }
+        String fromTableAlias = seqScan.getTargetTableAlias();
+        assert(fromTableAlias != null);
+
+        // sub-query edge case will be handled now
+        StmtSubqueryScan subScan = m_parsedSelect.getStmtSubqueryScan(fromTableAlias);
+        if (subScan == null) {
+            return null;
+        }
+
+        // So GROUP BY clause containing the inner table does not produce
+        // more than one matches. GROUP BY clause from the OUTER source table
+        // will be the primary key of the results already.
+        // Find at least one GROUP BY on the outer source table
+        boolean findGroupBy = false;
+        for (ParsedColInfo gbCol : m_parsedSelect.m_groupByColumns) {
+            if (gbCol.expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                break;
+            }
+            TupleValueExpression gbTVE = (TupleValueExpression) gbCol.expression;
+            if ( ! fromTableAlias.equals(gbTVE.getTableAlias()) ) {
+                break;
+            }
+
+            if (subScan.findOutputColumnByName(gbTVE.getColumnName())) {
+                findGroupBy = true;
+                break;
+            }
+        }
+        if (! findGroupBy) {
+            return null;
+        }
+
+        // Because query has ORDER BY clause, seqScan of the subquery
+        // should have ordered input for the parent ORDER BY clause
+        // in ordered to push down the LIMIT.
+        List<String> orderedColumnNames = subScan.getOutputOrderedColumns();
+
+        // Order by has to match display columns for now
+        boolean prefixCovered = false;
+        for (int ii = 0; ii < orderedColumnNames.size(); ii++) {
+            String orderedColumName = orderedColumnNames.get(ii);
+
+            for (ParsedColInfo orderByCol : m_parsedSelect.m_displayColumns) {
+                if (! orderByCol.orderBy) {
+                    continue;
+                }
+                if (orderByCol.orderByIndex != ii) {
+                    // prefix match all ORDER BY for now
+                    break;
+                }
+                AbstractExpression orderByExpr = orderByCol.expression;
+                TupleValueExpression orderByTVE = null;
+
+                if (orderByExpr.getExpressionType() == ExpressionType.AGGREGATE_SUM) {
+                    if (orderByExpr.getLeft().getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                        break;
+                    }
+                    orderByTVE = (TupleValueExpression)orderByExpr.getLeft();
+
+                } else if (orderByExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                    orderByTVE = (TupleValueExpression)orderByExpr;
+                }
+                if (orderByTVE != null) {
+                    // TVE column index has not been resolved currently
+                    if ( fromTableAlias.equals(orderByTVE.getTableAlias()) &&
+                         orderedColumName.equals(orderByTVE.getColumnName()) ) {
+                        prefixCovered = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (! prefixCovered) {
+            return null;
+        }
+        // now ORDER BY clause is covered
+        // now we may return the ORDER BY plan node in the subquery
+
+        AbstractPlanNode node = seqScan.getChild(0);
+        if (node instanceof ProjectionPlanNode) {
+            node = node.getChild(0);
+        }
+        if (node instanceof OrderByPlanNode) {
+            return node;
+        }
+
+        return null;
     }
 
 

@@ -75,6 +75,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // orderby stuff
         public boolean orderBy = false;
         public boolean ascending = true;
+        public int orderByIndex = -1;
 
         // groupby
         public boolean groupBy = false;
@@ -443,6 +444,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Replace TVE for order by columns
         for (ParsedColInfo orderCol : m_orderColumns) {
+            Integer findItInDisplayColumns = m_displayColumnsIndexMap.get(orderCol);
+            if (findItInDisplayColumns != null) {
+                m_displayColumnsIndexMap.remove(orderCol);
+            }
+
             AbstractExpression expr = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
 
             if (hasComplexAgg()) {
@@ -462,6 +468,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     orderCol.expression = expr;
                 }
             }
+
+            if (findItInDisplayColumns != null) {
+                m_displayColumnsIndexMap.put(orderCol, findItInDisplayColumns);
+            }
         }
 
         // Replace TVE for group by columns
@@ -477,7 +487,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_having = m_having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             ExpressionUtil.finalizeValueTypes(m_having);
         }
-
     }
 
     /**
@@ -778,6 +787,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ParsedColInfo order_col = new ParsedColInfo();
         order_col.orderBy = true;
         order_col.ascending = !descending;
+        order_col.orderByIndex = m_orderColumns.size();
+
         m_aggregationList.clear();
         AbstractExpression order_exp = parseExpressionTree(child);
         assert(order_exp != null);
@@ -831,6 +842,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (orig_col != null) {
             orig_col.orderBy = true;
             orig_col.ascending = order_col.ascending;
+            orig_col.orderByIndex = m_orderColumns.size();
 
             order_col.alias = orig_col.alias;
             order_col.columnName = orig_col.columnName;
@@ -847,6 +859,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<TupleValueExpression> tveList = new ArrayList<TupleValueExpression>();
         findAllTVEs(order_col.expression, tveList);
         insertTVEsToAggResultColumns(tveList);
+
         m_orderColumns.add(order_col);
     }
 

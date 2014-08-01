@@ -242,4 +242,17 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         }
     }
+
+    public boolean isIndexScanUniqeMatching() {
+        IndexScanPlanNode indexScan =
+                (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+        assert(indexScan != null);
+
+        org.voltdb.catalog.Index index = indexScan.getCatalogIndex();
+        if (index.getUnique()) {
+            return true;
+        }
+
+        return false;
+    }
 }

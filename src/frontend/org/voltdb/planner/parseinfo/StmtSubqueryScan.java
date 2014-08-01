@@ -408,6 +408,13 @@ public class StmtSubqueryScan extends StmtTableScan {
         return outputOrderedColumnList;
     }
 
+    public boolean findOutputColumnByName (String columnName) {
+        if (m_outputColumnIndexMap.get(columnName) == null) {
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Remove the coordinator send/receive pair if any from the graph.
      *
