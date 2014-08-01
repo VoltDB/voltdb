@@ -41,6 +41,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     Catalog m_catalog;
     CatalogType m_parent;
     String m_name;
+    Boolean m_hasComputedOrder = false;
 
     CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls) {
         this.m_catalog = catalog;
@@ -115,16 +116,13 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
                 throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
 
             T x = m_cls.newInstance();
-            String childPath = getPath() + "[" + name + "]";
             x.setBaseValues(m_catalog, this, name);
             x.m_parentMap = this;
 
             m_items.put(mapKey, x);
 
-            // assign a relative index to every child item
-            int index = 1;
-            for (Entry<String, T> e : m_items.entrySet()) {
-                e.getValue().m_relativeIndex = index++;
+            if (m_hasComputedOrder) {
+                recomputeRelativeIndexes();
             }
 
             return x;
@@ -166,6 +164,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     @SuppressWarnings("unchecked")
     void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
+        m_hasComputedOrder = castedMap.m_hasComputedOrder;
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
             m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, this));
         }
@@ -217,6 +216,15 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
         }
         return result;
+    }
+
+    void recomputeRelativeIndexes() {
+        // assign a relative index to every child item
+        int index = 1;
+        for (Entry<String, T> e : m_items.entrySet()) {
+            e.getValue().m_relativeIndex = index++;
+        }
+        m_hasComputedOrder = true;
     }
 
 }

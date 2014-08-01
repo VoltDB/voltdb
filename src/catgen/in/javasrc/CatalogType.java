@@ -92,7 +92,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     String m_typename;
     CatalogMap<? extends CatalogType> m_parentMap;
     Catalog m_catalog;
-    int m_relativeIndex;
+    Integer m_relativeIndex = null;
 
     // Annotation where additional non-runtime info can be squirreled away
     // Used by the compiler report generator for now
@@ -165,6 +165,9 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The index of this CatalogType instance
      */
     public int getRelativeIndex() {
+        if (m_relativeIndex == null) {
+            m_parentMap.recomputeRelativeIndexes();
+        }
         return m_relativeIndex;
     }
 
@@ -194,7 +197,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_catalog = catalog;
         m_parentMap = parentMap;
         m_typename = name;
-        catalog.registerGlobally(this);
     }
 
     @SuppressWarnings("unchecked")

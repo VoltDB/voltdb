@@ -134,38 +134,56 @@ public class Catalog extends CatalogType {
 
     CatalogType getItemForRef(final String ref) {
         // if it's a path
-        CatalogType retval = m_pathCache.getIfPresent(ref);
+        CatalogType retval = null; // m_pathCache.getIfPresent(ref);
         if (retval == null) {
-            retval = getItemForPath(this, ref);
+            retval = getItemForPath(ref);
         }
+        //m_pathCache.put(ref, retval);
         return retval;
     }
 
-    CatalogType getItemForPath(CatalogType parent, final String path) {
-        // remove the starting slash
-        String realpath = path;
-        if (path.startsWith("/"))
-            realpath = path.substring(1);
+    CatalogType getItemForPath(final String path) {
+        // check the cache
+        CatalogType retval = m_pathCache.getIfPresent(path);
+        if (retval != null) return retval;
 
-        String[] parts = realpath.split("/", 2);
-        // root case
-        if (parts[0].length() == 0)
-            return this;
-        // child of root
-        if (parts.length == 1)
-            return getItemForPathPart(parent, parts[0]);
+        int index = path.lastIndexOf('/');
+        if (index == -1) {
+            return getItemForPathPart(this, path);
+        }
 
         // recursive case
-        CatalogType nextParent = getItemForPathPart(parent, parts[0]);
-        if (nextParent == null)
+        String immediateParentPath = path.substring(0, index);
+        String subPath = path.substring(index);
+
+        CatalogType immediateParent = getItemForPath(immediateParentPath);
+        if (immediateParent == null)
+            throw new CatalogException("couldn't find immediate parent in path.");
+        // cache all parents
+        m_pathCache.put(immediateParentPath, immediateParent);
+
+        CatalogType item = getItemForPathPart(immediateParent, subPath);
+        if (item == null)
             throw new CatalogException("couldn't find next child in path.");
-        return getItemForPath(nextParent, parts[1]);
+
+        return item;
     }
 
     CatalogType getItemForPathPart(CatalogType parent, String path) {
-        String[] parts = path.split("\\[", 2);
-        parts[1] = parts[1].split("\\]", 2)[0];
-        return parent.getCollection(parts[0]).get(parts[1]);
+        if (path.length() == 0) return parent;
+
+        boolean hasStartSlash = path.charAt(0) == '/';
+
+        if ((path.length() == 1) && hasStartSlash) return parent;
+
+        int index = path.lastIndexOf('[');
+
+        assert(path.charAt(path.length() - 1) == ']');
+
+        String collection = path.substring(hasStartSlash ? 1 : 0, index);
+        String name = path.substring(index + 1, path.length() - 1);
+
+        return parent.getCollection(collection).get(name);
     }
 
     void registerGlobally(CatalogType x) {
