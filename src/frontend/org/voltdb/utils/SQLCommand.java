@@ -417,6 +417,9 @@ public class SQLCommand
             // SHOW CLASSES
             else if (ListClassesToken.matcher(line).matches()) {
                 if (interactive) {
+                    if (Classlist.isEmpty()) {
+                        System.out.println("\n--- Empty Class List -----------------------\n");
+                    }
                     List<String> list = new LinkedList<String>(Classlist.keySet());
                     Collections.sort(list);
                     int padding = 0;
@@ -643,9 +646,8 @@ public class SQLCommand
                     else if (paramType.equals("tinyint"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_TINYINT;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             try
                             {
                                 objectParams[i] = Byte.parseByte(param);
@@ -659,9 +661,8 @@ public class SQLCommand
                     else if (paramType.equals("smallint"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_SMALLINT;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             try
                             {
                                 objectParams[i] = Short.parseShort(param);
@@ -675,9 +676,8 @@ public class SQLCommand
                     else if (paramType.equals("int") || paramType.equals("integer"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_INTEGER;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             try
                             {
                                 objectParams[i] = Integer.parseInt(param);
@@ -691,9 +691,8 @@ public class SQLCommand
                     else if (paramType.equals("bigint"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_BIGINT;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             try
                             {
                                 objectParams[i] = Long.parseLong(param);
@@ -707,9 +706,8 @@ public class SQLCommand
                     else if (paramType.equals("float"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_FLOAT;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             try
                             {
                                 objectParams[i] = Double.parseDouble(param);
@@ -723,7 +721,7 @@ public class SQLCommand
                     else if (paramType.equals("varchar"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
+                            objectParams[i] = null;
                         } else {
                             objectParams[i] = Unquote.matcher(param).replaceAll("").replace("''","'");
                         }
@@ -731,7 +729,7 @@ public class SQLCommand
                     else if (paramType.equals("decimal"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_DECIMAL;
+                            objectParams[i] = null;
                         } else {
                             objectParams[i] = new BigDecimal(param);
                         }
@@ -740,7 +738,7 @@ public class SQLCommand
                     {
                         if (IsNull.matcher(param).matches())
                         {
-                            objectParams[i] = VoltType.NULL_TIMESTAMP;
+                            objectParams[i] = null;
                         }
                         else
                         {
@@ -766,9 +764,8 @@ public class SQLCommand
                     else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
                     {
                         if (IsNull.matcher(param).matches()) {
-                            objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
-                        } else
-                        {
+                            objectParams[i] = null;
+                        } else {
                             // Make sure we have an even amount of characters, otherwise it is an invalid hex string
                             if (param.length() % 2 == 1) {
                                 throw new Exception("Invalid varbinary value: input must have an even amount of characters to be a valid hex string.");
@@ -783,10 +780,29 @@ public class SQLCommand
             }
             if (procedure.equals("@UpdateApplicationCatalog"))
             {
-                printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
-                                                              new File((String) objectParams[1])));
+                File catfile = null;
+                if (objectParams[0] != null) {
+                    catfile = new File((String)objectParams[0]);
+                }
+                File depfile = null;
+                if (objectParams[1] != null) {
+                    depfile = new File((String)objectParams[1]);
+                }
+                printResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
 
                 // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
+                Procedures.clear();
+                loadSystemProcedures();
+                loadStoredProcedures(Procedures, Classlist);
+            }
+            else if (procedure.equals("@UpdateClasses"))
+            {
+                File jarfile = null;
+                if (objectParams[0] != null) {
+                    jarfile = new File((String)objectParams[0]);
+                }
+                printResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
+                // Need to reload the procedures and classes
                 Procedures.clear();
                 loadSystemProcedures();
                 loadStoredProcedures(Procedures, Classlist);
@@ -914,6 +930,8 @@ public class SQLCommand
         Procedures.put("@SystemInformation",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("sysinfoselector")).build());
         Procedures.put("@UpdateApplicationCatalog",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@UpdateClasses",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
         Procedures.put("@UpdateLogging",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());

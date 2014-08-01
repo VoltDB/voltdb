@@ -36,6 +36,7 @@ public class AsyncCompilerWork implements Serializable {
     final String hostname;
     final boolean adminConnection;
     final transient public Object clientData;
+    final public String invocationName;
     final public ProcedureInvocationType invocationType;
     public final long originalTxnId;
     public final long originalUniqueId;
@@ -46,7 +47,8 @@ public class AsyncCompilerWork implements Serializable {
 
     public AsyncCompilerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
-            Object clientData, ProcedureInvocationType invocationType,
+            Object clientData, String invocationName,
+            ProcedureInvocationType invocationType,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler)
@@ -59,6 +61,7 @@ public class AsyncCompilerWork implements Serializable {
         this.adminConnection = adminConnection;
         this.clientData = clientData;
         this.completionHandler = completionHandler;
+        this.invocationName = invocationName;
         this.invocationType = invocationType;
         this.originalTxnId = originalTxnId;
         this.originalUniqueId = originalUniqueId;
