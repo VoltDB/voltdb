@@ -30,6 +30,7 @@ class Database;
 namespace voltdb {
 class Table;
 class PersistentTable;
+class Pool;
 class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
@@ -91,7 +92,7 @@ class TableCatalogDelegate : public CatalogDelegate {
      * then they will be evaluated when you call this function (so
      * don't call this method and then cache the tuple for later use).
      */
-    void initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple);
+    void initTemplateTuple(Pool* pool, catalog::Table const *catalogTable, TableTuple& tbTuple);
 
     // ADXXX: should be const
     Table *getTable() {
