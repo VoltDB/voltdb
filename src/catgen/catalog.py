@@ -118,7 +118,7 @@ def genjava( classes, prepath, postpath, package ):
             realtype = field.type[:-1]
             #methname = fname.capitalize()
             if field.type[-1] == '*':
-                write( interp( '        m_$fname = new $ftype(getCatalog(), this, "$fname", $realtype.class);', locals() ) )
+                write( interp( '        m_$fname = new $ftype(getCatalog(), this, "$fname", $realtype.class, m_parentMap.m_depth + 1);', locals() ) )
         write( '    }\n' )
 
         # getFields

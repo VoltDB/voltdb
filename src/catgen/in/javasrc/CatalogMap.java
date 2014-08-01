@@ -41,18 +41,30 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     Catalog m_catalog;
     CatalogType m_parent;
     String m_name;
+    String m_cachedPath = null;
     boolean m_hasComputedOrder = false;
+    int m_depth;
 
-    CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls) {
-        this.m_catalog = catalog;
-        this.m_parent = parent;
-        this.m_name = name;
-        this.m_cls = cls;
+    CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls, int depth) {
+        m_catalog = catalog;
+        m_parent = parent;
+        m_name = name;
+        m_cls = cls;
+        m_depth = depth;
     }
 
     public String getPath() {
+        if (m_cachedPath != null) {
+            return m_cachedPath;
+        }
         // if parent is the catalog root, don't add an extra slash to the existing one
-        return m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
+        String path = m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
+
+        // cache the top 3 levels of maps' paths
+        if (m_depth <= 3) {
+            m_cachedPath = path;
+        }
+        return path;
     }
 
     /**

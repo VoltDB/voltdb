@@ -44,7 +44,7 @@ public class Catalog extends CatalogType {
      */
     public Catalog() {
         setBaseValues(null, "catalog");
-        m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class);
+        m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class, 1);
         m_relativeIndex = 1;
     }
 
