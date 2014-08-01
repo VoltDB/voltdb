@@ -110,15 +110,15 @@ def genjava( classes, prepath, postpath, package ):
         write( '' )
 
         # setBaseValues
-        write( '    void setBaseValues(Catalog catalog, CatalogMap<? extends CatalogType> parentMap, String name) {' )
-        write( '        super.setBaseValues(catalog, parentMap, name);')
+        write( '    void setBaseValues(CatalogMap<? extends CatalogType> parentMap, String name) {' )
+        write( '        super.setBaseValues(parentMap, name);')
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name
             realtype = field.type[:-1]
             #methname = fname.capitalize()
             if field.type[-1] == '*':
-                write( interp( '        m_$fname = new $ftype(catalog, this, "$fname", $realtype.class);', locals() ) )
+                write( interp( '        m_$fname = new $ftype(getCatalog(), this, "$fname", $realtype.class);', locals() ) )
         write( '    }\n' )
 
         # getFields
@@ -194,10 +194,6 @@ def genjava( classes, prepath, postpath, package ):
         write(                     '            throw new CatalogException("Null value where it shouldn\'t be.");' )
         write(                     '        }\n' )
 
-        write(                     '        value = value.trim();\n' )
-
-        write(                     '        if (value.startsWith("null")) value = null;\n' )
-
         write(                     '        switch (field) {' )
         for field in cls.fields:
             if field.type[-1] == '*':
@@ -207,6 +203,8 @@ def genjava( classes, prepath, postpath, package ):
             ftype = javatypify( field.type )
             write( interp(         '        case "$fname":', locals() ) )
             if field.type[-1] == '?':
+                write(             '            value = value.trim();' )
+                write(             '            if (value.startsWith("null")) value = null;' )
                 write(             '            assert((value == null) || value.startsWith("/"));' )
                 write( interp(     '            m_$fname.setUnresolved(value);', locals() ) )
             elif ftype == "int":
@@ -216,6 +214,8 @@ def genjava( classes, prepath, postpath, package ):
                 write(             '            assert(value != null);' )
                 write( interp(     '            m_$fname = Boolean.parseBoolean(value);', locals() ) )
             elif ftype == "String":
+                write(             '            value = value.trim();' )
+                write(             '            if (value.startsWith("null")) value = null;' )
                 write(             '            if (value != null) {')
                 write(             '                assert(value.startsWith("\\"") && value.endsWith("\\""));' )
                 write(             '                value = value.substring(1, value.length() - 1);' )

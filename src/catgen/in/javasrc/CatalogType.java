@@ -21,6 +21,8 @@
 
 package org.voltdb.catalog;
 
+import java.lang.reflect.Field;
+
 
 /**
  * The base class for all objects in the Catalog. CatalogType instances all
@@ -49,7 +51,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         @SuppressWarnings("unchecked")
         T resolve() {
             if (m_unresolvedPath != null) {
-                m_value = (T) m_catalog.getItemForRef(m_unresolvedPath);
+                m_value = (T) getCatalog().getItemForRef(m_unresolvedPath);
                 m_unresolvedPath = null;
             }
             return m_value;
@@ -91,7 +93,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
     String m_typename;
     CatalogMap<? extends CatalogType> m_parentMap;
-    Catalog m_catalog;
     Integer m_relativeIndex = null;
 
     // Annotation where additional non-runtime info can be squirreled away
@@ -156,7 +157,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     * @return The base Catalog object
     */
     public Catalog getCatalog() {
-        return m_catalog;
+        return m_parentMap.m_catalog;
     }
 
     /**
@@ -190,11 +191,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * This should only ever be called from CatalogMap.add(); it's my lazy hack
      * to avoid using reflection to instantiate records.
      */
-    void setBaseValues(Catalog catalog, CatalogMap<? extends CatalogType> parentMap, String name) {
-        if ((name == null) || (catalog == null)) {
+    void setBaseValues(CatalogMap<? extends CatalogType> parentMap, String name) {
+        if (name == null) {
             throw new CatalogException("Null value where it shouldn't be.");
         }
-        m_catalog = catalog;
         m_parentMap = parentMap;
         m_typename = name;
     }
@@ -224,9 +224,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         if (newPath.length() == 0)
             newPath = "/";
         String[] parts = key.split("\\[");
-        if (parts.length < 2) {
-            int x = 5;
-        }
         parts[1] = parts[1].substring(0, parts[1].length() - 1);
         parts[1] = parts[1].trim();
 
@@ -299,7 +296,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         assert(parentMap.m_parent.getCatalog() == catalog);
-        copy.setBaseValues(catalog, parentMap, m_typename);
+        copy.setBaseValues(parentMap, m_typename);
         copy.m_relativeIndex = m_relativeIndex;
 
         copyFields(copy);
@@ -331,22 +328,31 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     /**
      * Fails an assertion if any child of this object doesn't think
      * it's part of the same catalog.
+     * @throws IllegalAccessException
+     * @throws IllegalArgumentException
      */
-    public void validate() {
-        /*for (Entry<String, Object> e : m_fields.entrySet()) {
-            Object value = e.getValue();
-            if (value instanceof CatalogType) {
-                CatalogType ct = (CatalogType) value;
-                assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
+    public void validate() throws IllegalArgumentException, IllegalAccessException {
+        for (Field field : getClass().getDeclaredFields()) {
+            if (CatalogType.class.isAssignableFrom(field.getType())) {
+                CatalogType ct = (CatalogType) field.get(this);
+                assert(ct.getCatalog() == getCatalog()) : ct.getCatalogPath() + " has wrong catalog";
+            }
+            if (CatalogReference.class.isAssignableFrom(field.getType())) {
+                @SuppressWarnings("unchecked")
+                CatalogReference<? extends CatalogType> cr = (CatalogReference<? extends CatalogType>) field.get(this);
+                if (cr.m_value != null) {
+                    assert(cr.m_value.getCatalog() == getCatalog()) : cr.m_value.getCatalogPath() + " has wrong catalog";
+                }
+            }
+            if (CatalogMap.class.isAssignableFrom(field.getClass())) {
+                @SuppressWarnings("unchecked")
+                CatalogMap<? extends CatalogType> cm = (CatalogMap<? extends CatalogType>) field.get(this);
+                for (CatalogType ct : cm) {
+                    assert(ct.getCatalog() == getCatalog()) : ct.getCatalogPath() + " has wrong catalog";
+                    ct.validate();
+                }
             }
         }
-
-        for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
-            for (CatalogType ct : e.getValue()) {
-                assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
-                ct.validate();
-            }
-        }*/
     }
 }
 

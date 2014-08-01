@@ -36,12 +36,12 @@ import java.util.TreeMap;
  */
 public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
-    TreeMap<String, T> m_items = new TreeMap<String, T>();
+    TreeMap<String, T> m_items = null;
     Class<T> m_cls;
     Catalog m_catalog;
     CatalogType m_parent;
     String m_name;
-    Boolean m_hasComputedOrder = false;
+    boolean m_hasComputedOrder = false;
 
     CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls) {
         this.m_catalog = catalog;
@@ -61,10 +61,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T get(String name) {
+        if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
 
     public T getExact(String name) {
+        if (m_items == null) return null;
         return m_items.get(name);
     }
 
@@ -74,6 +76,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T getIgnoreCase(String name) {
+        if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
 
@@ -82,6 +85,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The number of items in the map
      */
     public int size() {
+        if (m_items == null) return 0;
         return m_items.size();
     }
 
@@ -90,6 +94,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return A boolean indicating whether the map is empty
      */
     public boolean isEmpty() {
+        if (m_items == null) return true;
         return (m_items.size() == 0);
     }
 
@@ -99,6 +104,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     @Override
     public Iterator<T> iterator() {
+        if (m_items == null) {
+            m_items = new TreeMap<String, T>();
+        }
         return m_items.values().iterator();
     }
 
@@ -111,12 +119,17 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public T add(String name) {
         try {
+            if (m_items == null) {
+                m_items = new TreeMap<String, T>();
+            }
+
             String mapKey = name.toUpperCase();
-            if (m_items.containsKey(mapKey))
+            if (m_items.containsKey(mapKey)) {
                 throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
+            }
 
             T x = m_cls.newInstance();
-            x.setBaseValues(m_catalog, this, name);
+            x.setBaseValues(this, name);
             x.m_parentMap = this;
 
             m_items.put(mapKey, x);
@@ -138,8 +151,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     public void delete(String name) {
         try {
             String mapKey = name.toUpperCase();
-            if (m_items.containsKey(mapKey) == false)
+            if ((m_items == null) || (m_items.containsKey(mapKey) == false)) {
                 throw new CatalogException("Catalog item '" + mapKey + "' doesn't exists in " + m_parent);
+            }
 
             m_items.remove(mapKey);
 
@@ -165,6 +179,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
         m_hasComputedOrder = castedMap.m_hasComputedOrder;
+        if (castedMap.m_items == null) {
+            return;
+        }
+        if (m_items == null) {
+            m_items = new TreeMap<String, T>();
+        }
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
             m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, this));
         }
@@ -188,6 +208,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (other.size() != size())
             return false;
 
+        if (m_items == null) {
+            return (other.m_items == null) || (other.m_items.size() == 0);
+        }
+
         for (Entry<String, T> e : m_items.entrySet()) {
             assert(e.getValue() != null);
             T type = other.get(e.getKey());
@@ -202,6 +226,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
     @Override
     public int hashCode() {
+        if (m_items == null) return 0;
+
         // based on implementation of equals
         int result = size();
 
@@ -219,6 +245,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     }
 
     void recomputeRelativeIndexes() {
+        if (m_items == null) return;
+
         // assign a relative index to every child item
         int index = 1;
         for (Entry<String, T> e : m_items.entrySet()) {

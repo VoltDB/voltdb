@@ -43,9 +43,14 @@ public class Catalog extends CatalogType {
      * Create a new Catalog hierarchy.
      */
     public Catalog() {
-        setBaseValues(this, null, "catalog");
+        setBaseValues(null, "catalog");
         m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class);
         m_relativeIndex = 1;
+    }
+
+    @Override
+    public Catalog getCatalog() {
+        return this;
     }
 
     @Override
