@@ -54,12 +54,6 @@
 #include <cassert>
 #include <iostream>
 #include <sstream>
-#include <stdint.h> // our compiler doesn't open C++ 11 flag, so we cannot use cstdint
-
-// MAXPOINTER will be reinterpret_cast back to UINTPTR_MAX
-#ifndef MAXPOINTER
-#define MAXPOINTER (reinterpret_cast<const void *>(UINTPTR_MAX))
-#endif
 
 namespace voltdb {
 
@@ -778,10 +772,10 @@ static inline int comparePointer(const void *lhs, const void *rhs) {
 struct PointerKeyTypeBase {
     // TODO: replace NULL with (reinterpret_cast<const void*>((uintptr_t)0))
     PointerKeyTypeBase() : m_tuple(NULL) {}
-    const void *& getValue() { return m_tuple;}
-    void setValue(const void * &value) { m_tuple = value; }
-    const void *setPointerValue(const void * &value) {
-        const void * rv = m_tuple;
+    const void * const& getValue() const { return m_tuple;}
+    void setValue(const void * const &value) { m_tuple = value; }
+    const void *setPointerValue(const void *value) {
+        const void *rv = m_tuple;
         m_tuple = value;
         return rv;
     }
@@ -911,8 +905,8 @@ struct TuplePointerKey : public TupleKey {
                     const TupleSchema *unused_keySchema)
         : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
 
-    const void *& getValue() { return m_keyTuple; }
-    void setValue(const void * &value) { m_keyTuple = value; }
+    const void * const& getValue() const { return m_keyTuple; }
+    void setValue(const void * const &value) { m_keyTuple = value; }
     const void *setPointerValue(const void * &value) {
         const void *rv = m_keyTuple;
         m_keyTuple = value;
@@ -951,15 +945,12 @@ public:
     // the caller has to make sure the key has already contained the value
     // the signatures are to be consist with the general template
     PointerKeyValuePair() {}
-    PointerKeyValuePair(first_type &key, second_type &value) : k(key) {}
     PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
-    PointerKeyValuePair(std::pair<first_type, second_type> &p) : k(p.first) {}
 
-    first_type& getKey() { return k; }
     const first_type& getKey() const { return k; }
-    second_type& getValue() { return (second_type&)k.getValue(); }
-    void setKey(first_type &key) { k = key; }
-    void setValue(const second_type &value) { k.setValue(const_cast<second_type&>(value)); }
+    const second_type& getValue() const { return k.getValue(); }
+    void setKey(const first_type &key) { k = key; }
+    void setValue(const second_type &value) { k.setValue(value); }
 
     // set the tuple pointer to the new value, and return the old value
     const void *setPointerValue(const void *value) {

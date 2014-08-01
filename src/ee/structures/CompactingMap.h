@@ -35,7 +35,7 @@ typedef u_int32_t NodeCount;
 #define INVALIDCT 0
 #endif
 
-// see indexes/indexkey.h
+// MAXPOINTER will be reinterpret_cast back to UINTPTR_MAX
 #ifndef MAXPOINTER
 #define MAXPOINTER (reinterpret_cast<const void *>(UINTPTR_MAX))
 #endif
@@ -50,17 +50,14 @@ template <typename Key, typename Data = const void*>
 class NormalKeyValuePair : public std::pair<Key, Data> {
 public:
     NormalKeyValuePair() {}
-    NormalKeyValuePair(Key &key, Data &value) : std::pair<Key, Data>(key, value) {}
     NormalKeyValuePair(const Key &key, const Data &value) : std::pair<Key, Data>(key, value) {}
-    NormalKeyValuePair(std::pair<Key, Data> &p) : std::pair<Key, Data>(p) {}
 
-    Key& getKey() { return std::pair<Key, Data>::first; }
     const Key& getKey() const { return std::pair<Key, Data>::first; }
-    Data& getValue() { return std::pair<Key, Data>::second; }
-    void setKey(Key &key) { std::pair<Key, Data>::first = key; }
+    const Data& getValue() const { return std::pair<Key, Data>::second; }
+    void setKey(const Key &key) { std::pair<Key, Data>::first = key; }
     void setValue(const Data &value) { std::pair<Key, Data>::second = value; }
 
-    // This function dose nothing, and is only to offer the same API as PointerKeyValuePair.
+    // This function does nothing, and is only to offer the same API as PointerKeyValuePair.
     const void *setPointerValue(const void *value) { return NULL; }
 };
 
@@ -110,9 +107,8 @@ protected:
         char color;
         NodeCount subct;
 
-        Key &key() { return kv.getKey(); };
         const Key &key() const { return kv.getKey(); };
-        Data &value() { return kv.getValue(); };
+        const Data &value() const { return kv.getValue(); };
         void setValue(const Data &value) { kv.setValue(value); }
     };
 
@@ -141,9 +137,8 @@ public:
     public:
         iterator() : m_map(NULL), m_node(NULL) {}
         iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
-        Key &key() { return m_node->key(); }
         const Key &key() const { return m_node->key(); }
-        Data &value() const { return m_node->value(); }
+        const Data &value() const { return m_node->value(); }
         void setValue(const Data &value) { m_node->kv.setValue(value); }
         void moveNext() { m_node = m_map->successor(m_node); }
         void movePrev() { m_node = m_map->predecessor(m_node); }
