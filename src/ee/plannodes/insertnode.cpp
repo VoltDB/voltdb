@@ -56,6 +56,15 @@ void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
 
     m_multiPartition = obj.valueForKey("MULTI_PARTITION").asBool();
+    if (obj.hasNonNullKey("FIELD_MAP")) {
+        PlannerDomValue fieldMap = obj.valueForKey("FIELD_MAP");
+        for (int i = 0; i < fieldMap.arrayLen(); ++i) {
+          m_fieldMap.push_back(fieldMap.valueAtIndex(i).asInt());
+        }
+    }
 }
 
+void InsertPlanNode::initTemplateTuple(VoltDBEngine* engine, Pool *pool, TableTuple& templateTuple) {
+    m_tcd->initTemplateTuple(pool, engine->getCatalogTable(getTargetTableName()), templateTuple);
+}
 }

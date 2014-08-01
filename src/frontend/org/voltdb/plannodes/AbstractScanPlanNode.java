@@ -83,11 +83,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
             } else {
                 assert(m_tableScan instanceof StmtSubqueryScan);
-                StmtSubqueryScan subScan = (StmtSubqueryScan) m_tableScan;
-                List<StmtTargetTableScan> tableScans = subScan.getAllTargetTables();
-                for (StmtTargetTableScan tb: tableScans) {
-                    tablesRead.put(tb.getTableName(), tb);
-                }
+                getChild(0).getTablesAndIndexes(tablesRead, indexes);
             }
         }
     }
@@ -321,11 +317,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
         }
 
-        AggregatePlanNode aggNode =
-                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
-        if (aggNode == null) {
-            aggNode = (HashAggregatePlanNode)getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
-        }
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = true;
@@ -389,11 +381,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
 
-        AggregatePlanNode aggNode =
-                (AggregatePlanNode)getInlinePlanNode(PlanNodeType.AGGREGATE);
-        if (aggNode == null) {
-            aggNode = (HashAggregatePlanNode)getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
-        }
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
+
         if (aggNode != null) {
             aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
             m_outputSchema = aggNode.getOutputSchema().clone();

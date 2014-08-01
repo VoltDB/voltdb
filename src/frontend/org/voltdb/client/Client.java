@@ -182,6 +182,51 @@ public interface Client {
                                             File deploymentPath)
     throws IOException, NoConnectionsException;
 
+    /**
+     * <p>Synchronously invokes UpdateClasses procedure. Blocks until a
+     * result is available. A {@link ProcCallException} is thrown if the
+     * response is anything other then success.</p>
+     *
+     * <p>This method is a convenience method that is equivalent to reading a jarfile containing
+     * to be added/updated into a byte array in Java code, then calling
+     * {@link #callProcedure(String, Object...)}
+     * with "@UpdateClasses" as the procedure name, followed by the bytes of the jarfile
+     * and a string containing a comma-separates list of classes to delete from the catalog.</p>
+     *
+     * @param jarPath Path to the jar file containing new/updated classes.
+     * @param classesToDelete comma-separated list of classes to delete.
+     * @return {@link ClientResponse} instance of procedure call results.
+     * @throws IOException If the files cannot be serialized or if there is a Java network error.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws ProcCallException on any VoltDB specific failure.
+     */
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>Asynchronously invokes UpdateClasses procedure. Does not
+     * guarantee that the invocation is actually queued. If there is
+     * backpressure on all connections to the cluster then the invocation will
+     * not be queued. Check the return value to determine if queuing actually
+     * took place.</p>
+     *
+     * <p>This method is a convenience method that is equivalent to reading a jarfile containing
+     * to be added/updated into a byte array in Java code, then calling
+     * {@link #callProcedure(ProcedureCallback, String, Object...)}
+     * with "@UpdateClasses" as the procedure name, followed by the bytes of the jarfile
+     * and a string containing a comma-separates list of classes to delete from the catalog.</p>
+     *
+     * @param callback ProcedureCallback that will be invoked with procedure results.
+     * @param jarPath Path to the jar file containing new/updated classes.  May be null.
+     * @param classesToDelete comma-separated list of classes to delete.  May be null.
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @throws IOException If the files cannot be serialized or if there is a Java network error.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     */
+    public boolean updateClasses(ProcedureCallback callback,
+                                 File jarPath,
+                                 String classesToDelete)
+    throws IOException, NoConnectionsException;
 
     /**
      * <p>Block the current thread until all queued stored procedure invocations have received responses

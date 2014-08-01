@@ -268,6 +268,20 @@ public class TestHSQLDB extends TestCase {
         System.out.println(xml);
     }
 
+    public void testInsertIntoSelectFrom() {
+        HSQLInterface hsql = setupTPCCDDL();
+        assertNotNull(hsql);
+
+        String sql = "INSERT INTO new_order (NO_O_ID, NO_D_ID, NO_W_ID) SELECT O_ID, O_D_ID+1, CAST(? AS INTEGER) FROM ORDERS;";
+        VoltXMLElement xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+        }
+        assertNotNull(xml);
+    }
+
     /*public void testSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
