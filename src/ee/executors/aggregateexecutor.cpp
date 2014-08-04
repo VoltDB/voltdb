@@ -639,8 +639,8 @@ TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
-    m_inProgressGroupByKeyTuple.move(NULL);
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
+    m_inProgressGroupByKeyTuple.move(NULL);
 
     char* storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
@@ -771,8 +771,8 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
 
-    m_inProgressGroupByKeyTuple.move(NULL);
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
+    m_inProgressGroupByKeyTuple.move(NULL);
 
     // for next input tuple
     return nextInputTuple;
