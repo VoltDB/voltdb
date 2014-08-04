@@ -830,9 +830,7 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
         : KeyType::KeyComparator(keySchema) {}
 
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
-        int rv = KeyType::KeyComparator::operator()(static_cast<const KeyType>(lhs),
-                                                    static_cast<const KeyType>(rhs));
-
+        int rv = KeyType::KeyComparator::operator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
     }
 };
