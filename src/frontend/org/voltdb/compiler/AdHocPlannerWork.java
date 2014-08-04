@@ -41,13 +41,14 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             String sqlBatchText, String[] sqlStatements,
             Object[] userParamSet, CatalogContext context, boolean isExplain,
             boolean inferPartitioning, Object[] userPartitionKey,
-            ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
+            String invocationName, ProcedureInvocationType type,
+            long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
-              adminConnection, clientConnection, type,
+              adminConnection, clientConnection, invocationName, type,
               originalTxnId, originalUniqueId, onReplica, useAdhocDDL,
               completionHandler);
         this.sqlBatchText = sqlBatchText;
@@ -77,6 +78,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.isExplainWork,
                 orig.inferPartitioning,
                 orig.userPartitionKey,
+                orig.invocationName,
                 orig.invocationType,
                 orig.originalTxnId,
                 orig.originalUniqueId,
@@ -105,7 +107,8 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             // should be no correlation inferred or assumed between the partitioning and the
             // statement's constants or parameters.
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
-            ProcedureInvocationType.ORIGINAL, 0, 0, false, false, // don't allow adhoc DDL in this path
+            "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0,
+            false, false, // don't allow adhoc DDL in this path
             completionHandler);
     }
 

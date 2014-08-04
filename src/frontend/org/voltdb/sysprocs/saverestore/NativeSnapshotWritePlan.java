@@ -283,5 +283,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }
+        completionTask = SnapshotUtil.writeSnapshotCompletion(file_path, file_nonce, context.getHostId(), SNAP_LOG);
+        if (completionTask != null) {
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+        }
     }
 }

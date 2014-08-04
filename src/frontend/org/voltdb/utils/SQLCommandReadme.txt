@@ -46,6 +46,7 @@ executed immediately (they do not require a semi-colon). The interactive
 commands are:
 
     GO
+    HELP
     LIST | SHOW CLASSES
     LIST | SHOW PROC[EDURES]
     LIST | SHOW TABLES
