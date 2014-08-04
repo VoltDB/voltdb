@@ -264,7 +264,8 @@ public class TestPlansJoin extends PlannerTestCase {
     public void testDisplayColumnFromUsingCondition() {
         AbstractPlanNode pn = compile("select  max(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof AggregatePlanNode);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
+        assertTrue(pn instanceof NestLoopPlanNode);
         NodeSchema ns = pn.getOutputSchema();
         for (SchemaColumn sc : ns.getColumns()) {
             AbstractExpression e = sc.getExpression();

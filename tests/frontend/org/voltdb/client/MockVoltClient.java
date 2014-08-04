@@ -349,4 +349,18 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return null;
     }
 
+    @Override
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+            throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean updateClasses(ProcedureCallback callback, File jarPath,
+            String classesToDelete) throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
 }

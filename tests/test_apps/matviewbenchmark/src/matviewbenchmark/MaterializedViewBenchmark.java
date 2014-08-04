@@ -259,7 +259,7 @@ public class MaterializedViewBenchmark {
                                   newThroughput) * 100);
             savedExecute = (((savedExecute - newExecute) /
                                newExecute) * 100);
-            fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
+            fw.append(String.format("%s,%d,-1,0,0,0,%.2f,%.2f,0,0,0,0,0,0\n",
                                     name,
                                     stats.getStartTimestamp(),
                                     savedThroughput,

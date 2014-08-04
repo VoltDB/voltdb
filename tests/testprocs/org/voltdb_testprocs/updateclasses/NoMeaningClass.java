@@ -20,18 +20,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
 
-import org.voltdb.*;
+package org.voltdb_testprocs.updateclasses;
 
-public class Remove extends VoltProcedure
-{
-    // Deletes a key/value pair
-    public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM store WHERE key = ?;");
-
-    public VoltTable[] run(String key)
-    {
-        voltQueueSQL(deleteStmt, key);
-        return voltExecuteSQL(true);
+public class NoMeaningClass {
+    public int returnTen() {
+        return 10;
     }
 }

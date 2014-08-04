@@ -30,9 +30,11 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
@@ -170,6 +172,22 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
         assertTrue("Adhoc DDL should have failed", threw);
         assertFalse(findTableInSystemCatalogResults("BAR"));
 
+        // @UpdateClasses should be rejected
+        assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+        threw = false;
+        try {
+            InMemoryJarfile jarfile = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+        }
+        catch (ProcCallException pce) {
+            threw = true;
+            assertTrue(pce.getMessage().contains("@UpdateClasses is forbidden"));
+        }
+        assertTrue("@UpdateClasses should have failed", threw);
+        assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+
         verifyAdhocQuery();
     }
 
@@ -219,6 +237,19 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
         verifyDeploymentOnlyUAC();
         // And so should adhoc queries
         verifyAdhocQuery();
+
+        // Also, @UpdateClasses should only work with adhoc DDL
+        assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler();
+        comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+        try {
+            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+        }
+        catch (ProcCallException pce) {
+            fail("Should be able to call @UpdateClasses when adhoc DDL enabled.");
+        }
+        assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
     }
 
     public void testMasterWithAdhocDDL() throws Exception
@@ -327,6 +358,22 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
             assertTrue("Adhoc DDL should have failed", threw);
             assertFalse(findTableInSystemCatalogResults("BAR"));
 
+            // @UpdateClasses should be rejected
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+            threw = false;
+            try {
+                InMemoryJarfile jarfile = new InMemoryJarfile();
+                VoltCompiler comp = new VoltCompiler();
+                comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+                m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
+            }
+            assertTrue("@UpdateClasses should have failed", threw);
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+
             verifyUACfromMasterToReplica();
 
             // Promote, should behave like the original master test
@@ -388,6 +435,22 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             assertTrue("Adhoc DDL should have failed", threw);
             assertFalse(findTableInSystemCatalogResults("BAR"));
+
+            // @UpdateClasses should be rejected
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+            threw = false;
+            try {
+                InMemoryJarfile jarfile = new InMemoryJarfile();
+                VoltCompiler comp = new VoltCompiler();
+                comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+                m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
+            }
+            assertTrue("@UpdateClasses should have failed", threw);
+            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
 
             verifyUACfromMasterToReplica();
 
