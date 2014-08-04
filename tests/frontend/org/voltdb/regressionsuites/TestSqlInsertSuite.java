@@ -73,6 +73,8 @@ public class TestSqlInsertSuite extends RegressionSuite {
         verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
     }
 
+    // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
+
     //
     // JUnit / RegressionSuite boilerplate
     //
