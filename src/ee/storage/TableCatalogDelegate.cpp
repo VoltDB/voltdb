@@ -670,7 +670,11 @@ static bool isDefaultNow(const std::string& defaultValue) {
 // This method produces a row containing all the default values for
 // the table, skipping over fields explictly set, and adding "default
 // now" fields to nowFields.
-void TableCatalogDelegate::initTemplateTuple(Pool* pool, catalog::Table const *catalogTable, const std::set<int>& fieldsExplicitlySet, TableTuple& tbTuple, std::vector<int>& nowFields) {
+void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
+                                                      catalog::Table const *catalogTable,
+                                                      const std::set<int>& fieldsExplicitlySet,
+                                                      TableTuple& tbTuple,
+                                                      std::vector<int>& nowFields) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
          colIter != catalogTable->columns().end();

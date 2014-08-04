@@ -64,15 +64,15 @@ void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     }
 }
 
-void InsertPlanNode::initTemplateTuple(VoltDBEngine* engine,
-                                       Pool *pool,
-                                       const std::set<int>& fieldsExplicitlySet,
-                                       TableTuple& templateTuple,
-                                       std::vector<int>& nowFields) {
-    m_tcd->initTemplateTuple(pool,
-                             engine->getCatalogTable(getTargetTableName()),
-                             fieldsExplicitlySet,
-                             templateTuple,
-                             nowFields);
+void InsertPlanNode::initTupleWithDefaultValues(VoltDBEngine* engine,
+                                                Pool *pool,
+                                                const std::set<int>& fieldsExplicitlySet,
+                                                TableTuple& templateTuple,
+                                                std::vector<int>& nowFields) {
+    m_tcd->initTupleWithDefaultValues(pool,
+                                      engine->getCatalogTable(getTargetTableName()),
+                                      fieldsExplicitlySet,
+                                      templateTuple,
+                                      nowFields);
 }
 }

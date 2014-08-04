@@ -107,7 +107,11 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     TableTuple tuple = m_templateTuple.tuple();
 
     std::set<int> fieldsExplicitlySet(m_node->getFieldMap().begin(), m_node->getFieldMap().end());
-    m_node->initTemplateTuple(m_engine, &m_memoryPool, fieldsExplicitlySet, tuple, m_nowFields);
+    m_node->initTupleWithDefaultValues(m_engine,
+                                       &m_memoryPool,
+                                       fieldsExplicitlySet,
+                                       tuple,
+                                       m_nowFields);
 
     return true;
 }

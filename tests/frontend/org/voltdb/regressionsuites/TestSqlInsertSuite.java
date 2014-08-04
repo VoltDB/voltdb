@@ -24,13 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlInsertSuite extends RegressionSuite {
@@ -77,39 +73,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
         verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
     }
 
-    public void testInsertDefaultNow() throws IOException, ProcCallException, InterruptedException {
-        Client client = getClient();
-        ClientResponse resp;
-
-        // Let's make sure that when we insert a row into a table with DEFAULT NOW column,
-        // that we get a different timestamp on every insert (even if we are reusing the same plan each time).
-
-        int aaaValue = 10;
-        resp = client.callProcedure("@AdHoc", "insert into ts_table (aaa) values (?)", aaaValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-
-        resp = client.callProcedure("@AdHoc", "select ts from ts_table where aaa = ?", aaaValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        VoltTable result = resp.getResults()[0];
-        result.advanceRow();
-        Timestamp firstTimestamp = result.getTimestampAsSqlTimestamp(0);
-
-        // sleep for a quarter second to make sure we get a different timestamp when we insert again
-        Thread.sleep(250);
-
-        aaaValue++;
-        resp = client.callProcedure("@AdHoc", "insert into ts_table (aaa) values (?)", aaaValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-
-        resp = client.callProcedure("@AdHoc", "select ts from ts_table where aaa = ?", aaaValue);
-        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        result = resp.getResults()[0];
-        result.advanceRow();
-        Timestamp secondTimestamp = result.getTimestampAsSqlTimestamp(0);
-
-        assertTrue("Expected first timestamp to be smaller than second, but it was not.\n" +
-                   "First: " + firstTimestamp + ", Second: " + secondTimestamp, firstTimestamp.compareTo(secondTimestamp) < 0);
-    }
+    // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -133,11 +97,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
-                "" +
-                "CREATE TABLE ts_table ( " +
-                "  aaa bigint, " +
-                "  ts timestamp default now" +
-                ");"
+                ""
                 ;
         try {
             project.addLiteralSchema(literalSchema);

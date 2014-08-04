@@ -94,7 +94,11 @@ class TableCatalogDelegate : public CatalogDelegate {
      *    their indices will be appended to nowFields.  It's up to the
      *    caller to set these to the appropriate time.
      */
-    void initTemplateTuple(Pool* pool, catalog::Table const *catalogTable, const std::set<int>& fieldsExplicitlySet, TableTuple& tbTuple, std::vector<int>& nowFields);
+    void initTupleWithDefaultValues(Pool* pool,
+                                    catalog::Table const *catalogTable,
+                                    const std::set<int>& fieldsExplicitlySet,
+                                    TableTuple& tbTuple,
+                                    std::vector<int>& nowFields);
 
     // ADXXX: should be const
     Table *getTable() {
