@@ -176,6 +176,8 @@ CREATE TABLE votes
 
 PARTITION TABLE votes ON COLUMN phone_number;
 
+CREATE INDEX votes_state_tree1 ON votes (state);
+
 CREATE VIEW v_votes_by_contestant_number_state
 (
   contestant_number
