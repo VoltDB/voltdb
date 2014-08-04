@@ -1239,9 +1239,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicy(new ParameterDeserializationPolicy(true));
         registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
 
+        // NOTE: These "policies" are really parameter correctness checks, not permissions
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
+        registerPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
@@ -1496,7 +1498,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
-                task.type, task.originalTxnId, task.originalUniqueId,
+                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
@@ -1534,7 +1536,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
-                    task.type, task.originalTxnId, task.originalUniqueId,
+                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
@@ -1767,6 +1769,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
+            else if (task.procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                catProc =
+                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+            }
         }
 
         if (user == null) {
@@ -1851,6 +1861,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // PRO SYSPROC SPECIAL HANDLING
 
             if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@UpdateClasses")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             }
             else if (task.procName.equals("@SnapshotSave")) {

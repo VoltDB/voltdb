@@ -748,9 +748,25 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0));
         // Test NULL
 
-        assertTrue(after.getTime()*1000 >= vt.getTimestampAsLong(2));
-        assertTrue(before.getTime()*1000 <= vt.getTimestampAsLong(2));
-        assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
+        long t2FirstRow = vt.getTimestampAsLong(2);
+        long t3FirstRow = vt.getTimestampAsLong(3);
+
+        assertTrue(after.getTime()*1000 >= t2FirstRow);
+        assertTrue(before.getTime()*1000 <= t2FirstRow);
+        assertEquals(t2FirstRow, t3FirstRow);
+
+        // execute the same insert again, to assert that we get a newer timestamp
+        // even if we are re-using the same plan (ENG-6755)
+
+        // sleep a quarter of a second just to be certain we get a different timestamp
+        Thread.sleep(250);
+
+        cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(2);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 2;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        long t2SecondRow = vt.getTimestampAsLong(2);
+        assertTrue(t2FirstRow < t2SecondRow);
 
         before = new Date();
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
