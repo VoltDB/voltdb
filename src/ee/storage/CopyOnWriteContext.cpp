@@ -175,6 +175,23 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
+                /*
+                 * Start with fresh iterators and count how many rows are visible
+                 * to hint at why the right number of rows may not have been processed
+                 */
+                m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks));
+                int32_t cowCount = 0;
+                while (m_iterator->next(tuple)) {
+                    cowCount++;
+                }
+
+                int32_t iterationCount = 0;
+                TupleIterator *iter = table.makeIterator();
+                while (iter->next(tuple)) {
+                    iterationCount++;
+                }
+                delete iter;
+
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
                          "serializeMore(): tuple count > 0 after streaming:\n"
@@ -186,7 +203,9 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          "Compacted block count: %jd\n"
                          "Dirty insert count: %jd\n"
                          "Dirty update count: %jd\n"
-                         "Partition column: %d\n",
+                         "Partition column: %d\n"
+                         "Discovered COW rows: %d\n"
+                         "Discovered iteration rows: %d\n",
                          table.name().c_str(),
                          table.tableType().c_str(),
                          (intmax_t)m_totalTuples,
@@ -195,13 +214,15 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          (intmax_t)m_blocksCompacted,
                          (intmax_t)m_inserts,
                          (intmax_t)m_updates,
-                         table.partitionColumn());
-#ifdef DEBUG
+                         table.partitionColumn(),
+                         cowCount,
+                         iterationCount);
+//#ifdef DEBUG
                 // Use a format string to prevent overzealous compiler warnings.
                 throwFatalException("%s", message);
-#else
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
-#endif
+//#else
+//                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+//#endif
             }
             // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
             if (m_tuplesRemaining < 0)  {
