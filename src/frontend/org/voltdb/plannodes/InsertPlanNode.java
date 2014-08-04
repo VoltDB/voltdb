@@ -96,12 +96,17 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     @Override
     public boolean isOrderDeterministic() {
         assert(m_children != null);
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isOrderDeterministic()) {
-                m_nondeterminismDetail = child.m_nondeterminismDetail;
-                return false;
-            }
+        assert(m_children.size() == 1);
+
+        // This implementation is very close to AbstractPlanNode's implementation of this
+        // method, except that we assert just one child.
+        // Java doesn't allow calls to super-super-class methods via super.super.
+        AbstractPlanNode child = m_children.get(0);
+        if (! child.isOrderDeterministic()) {
+            m_nondeterminismDetail = child.m_nondeterminismDetail;
+            return false;
         }
+
         return true;
     }
 }
