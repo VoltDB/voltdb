@@ -739,4 +739,84 @@ public class TestCatalogUtil extends TestCase {
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getUseadhocschema());
     }
+
+    public void testDRConnection() throws Exception {
+        final String noConnections =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr name='test' id='0'>"
+                + "    </dr>"
+                + "</deployment>";
+        final String multipleConnections =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr name='test' id='0'>"
+                + "        <connection source='master'/>"
+                + "        <connection source='imposter'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String oneConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr name='test' id='0'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String oneEnabledConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr>"
+                + "        <connection source='master' enabled='true'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String oneDisabledConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr>"
+                + "        <connection source='master' enabled='false'/>"
+                + "    </dr>"
+                + "</deployment>";
+
+        final File tmpNoParse = VoltProjectBuilder.writeStringToTempFile(noConnections);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpNoParse)));
+
+        final File tmpInvalidMultiple = VoltProjectBuilder.writeStringToTempFile(multipleConnections);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidMultiple)));
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+
+        final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(oneConnection);
+        DeploymentType valid_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
+        assertNotNull(valid_deployment);
+
+        long crc = CatalogUtil.compileDeployment(catalog, valid_deployment, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+
+        final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
+        DeploymentType valid_deployment_enabled = CatalogUtil.getDeployment(new FileInputStream(tmpEnabled));
+        assertNotNull(valid_deployment_enabled);
+
+        setUp();
+        crc = CatalogUtil.compileDeployment(catalog, valid_deployment_enabled, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+
+        final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(oneDisabledConnection);
+        DeploymentType valid_deployment_disabled = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
+        assertNotNull(valid_deployment_disabled);
+
+        setUp();
+        crc = CatalogUtil.compileDeployment(catalog, valid_deployment_disabled, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+    }
 }

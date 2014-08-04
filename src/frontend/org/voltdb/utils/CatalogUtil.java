@@ -85,6 +85,7 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -496,6 +497,8 @@ public abstract class CatalogUtil {
         }
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
+
+        setDrInfo(catalog, deployment.getDr());
 
         return 1;
     }
@@ -1215,6 +1218,20 @@ public abstract class CatalogUtil {
         // set the catalog info
         cluster.setHttpdportno(httpdPort);
         cluster.setJsonapi(jsonEnabled);
+    }
+
+    private static void setDrInfo(Catalog catalog, DrType dr) {
+        if (dr != null) {
+            Cluster cluster = catalog.getClusters().get("cluster");
+            String drSource = dr.getConnection().getSource();
+            if (dr.getConnection().isEnabled()) {
+                cluster.setDrmasterhost(drSource);
+                hostLog.info("Configured connection for DR replica role to host " + drSource);
+            } else {
+                hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
+                        "Starting cluster as replica will be disabled.");
+            }
+        }
     }
 
     /** Read a hashed password from password.

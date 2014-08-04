@@ -1932,6 +1932,10 @@ public final class DRAgent {
     // optional fixed64 timestamp = 2;
     boolean hasTimestamp();
     long getTimestamp();
+    
+    // optional bool isCovering = 3;
+    boolean hasIsCovering();
+    boolean getIsCovering();
   }
   public static final class Subscribe extends
       com.google.protobuf.GeneratedMessage
@@ -1982,9 +1986,20 @@ public final class DRAgent {
       return timestamp_;
     }
     
+    // optional bool isCovering = 3;
+    public static final int ISCOVERING_FIELD_NUMBER = 3;
+    private boolean isCovering_;
+    public boolean hasIsCovering() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    public boolean getIsCovering() {
+      return isCovering_;
+    }
+    
     private void initFields() {
       partitionId_ = 0;
       timestamp_ = 0L;
+      isCovering_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2004,6 +2019,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeFixed64(2, timestamp_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeBool(3, isCovering_);
+      }
       getUnknownFields().writeTo(output);
     }
     
@@ -2020,6 +2038,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(2, timestamp_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(3, isCovering_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2149,6 +2171,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         timestamp_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
+        isCovering_ = false;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
       
@@ -2195,6 +2219,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.timestamp_ = timestamp_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.isCovering_ = isCovering_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2216,6 +2244,9 @@ public final class DRAgent {
         }
         if (other.hasTimestamp()) {
           setTimestamp(other.getTimestamp());
+        }
+        if (other.hasIsCovering()) {
+          setIsCovering(other.getIsCovering());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2256,6 +2287,11 @@ public final class DRAgent {
             case 17: {
               bitField0_ |= 0x00000002;
               timestamp_ = input.readFixed64();
+              break;
+            }
+            case 24: {
+              bitField0_ |= 0x00000004;
+              isCovering_ = input.readBool();
               break;
             }
           }
@@ -2302,6 +2338,27 @@ public final class DRAgent {
       public Builder clearTimestamp() {
         bitField0_ = (bitField0_ & ~0x00000002);
         timestamp_ = 0L;
+        onChanged();
+        return this;
+      }
+      
+      // optional bool isCovering = 3;
+      private boolean isCovering_ ;
+      public boolean hasIsCovering() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      public boolean getIsCovering() {
+        return isCovering_;
+      }
+      public Builder setIsCovering(boolean value) {
+        bitField0_ |= 0x00000004;
+        isCovering_ = value;
+        onChanged();
+        return this;
+      }
+      public Builder clearIsCovering() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        isCovering_ = false;
         onChanged();
         return this;
       }
@@ -6593,37 +6650,37 @@ public final class DRAgent {
       "onId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\013Snapsho" +
       "tReq\022\r\n\005nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitio" +
       "nId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n" +
-      "\013partitionId\030\001 \001(\005\"3\n\tSubscribe\022\023\n\013parti" +
-      "tionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\376\002\n\010Resp" +
-      "onse\022\026\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030\002 \001" +
-      "(\0162\036.pmsg.Response.ReplicationMode\022\031\n\021sn" +
-      "apshotTimestamp\030\003 \001(\006\022\026\n\016instanceIdHash\030",
-      "\004 \001(\006\022\017\n\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 \003(\013" +
-      "2\016.pmsg.NodeInfo\022\034\n\024globalPartitionCount" +
-      "\030\007 \001(\005\022*\n\rpartitionInfo\030\010 \003(\0132\023.pmsg.Par" +
-      "titionInfo\022\021\n\006status\030\t \001(\005:\0010\"i\n\017Replica" +
-      "tionMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED" +
-      "\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022" +
-      "\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010hostname" +
-      "\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC\030\003 \001" +
-      "(\006\"\360\001\n\rPartitionInfo\022\023\n\013partitionId\030\001 \001(" +
-      "\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030\n\020lowestTu",
-      "pleIndex\030\003 \001(\003\022\032\n\022lastSentTupleIndex\030\004 \001" +
-      "(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n\026outstandi" +
-      "ngBufferCount\030\006 \001(\003\022\034\n\024outstandingByteCo" +
-      "unt\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSynced\030" +
-      "\t \001(\010\"\234\003\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.p" +
-      "msg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg" +
-      ".UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004" +
-      " \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg." +
-      "Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.Response\022" +
-      "&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022",
-      "\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscribe\"\216\001\n\004" +
-      "Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005Q" +
-      "UERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021" +
-      "\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONN" +
-      "ECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb.pmsgB" +
-      "\007DRAgent"
+      "\013partitionId\030\001 \001(\005\"G\n\tSubscribe\022\023\n\013parti" +
+      "tionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\nisCov" +
+      "ering\030\003 \001(\010\"\376\002\n\010Response\022\026\n\002id\030\001 \002(\0132\n.p" +
+      "msg.UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Response.R" +
+      "eplicationMode\022\031\n\021snapshotTimestamp\030\003 \001(",
+      "\006\022\026\n\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030\005 \001" +
+      "(\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024" +
+      "globalPartitionCount\030\007 \001(\005\022*\n\rpartitionI" +
+      "nfo\030\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006status" +
+      "\030\t \001(\005:\0010\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026" +
+      "\n\022SYNCING_REPLICATED\020\002\022\027\n\023SYNCING_PARTIT" +
+      "IONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010" +
+      "NodeInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001" +
+      "(\005\022\022\n\ncatalogCRC\030\003 \001(\006\"\360\001\n\rPartitionInfo" +
+      "\022\023\n\013partitionId\030\001 \001(\005\022\031\n\021lastSentTimesta",
+      "mp\030\002 \001(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022la" +
+      "stSentTupleIndex\030\004 \001(\003\022\027\n\017totalTupleCoun" +
+      "t\030\005 \001(\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022" +
+      "\034\n\024outstandingByteCount\030\007 \001(\003\022\020\n\010isPause" +
+      "d\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\"\234\003\n\014CtrlEnvelo" +
+      "pe\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Typ" +
+      "e\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t" +
+      ".pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n" +
+      "\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 " +
+      "\001(\0132\016.pmsg.Response\022&\n\013snapshotReq\030\007 \001(\013",
+      "2\021.pmsg.SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017" +
+      ".pmsg.Subscribe\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RES" +
+      "ET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005" +
+      "\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n" +
+      "\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n" +
+      "B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -6675,7 +6732,7 @@ public final class DRAgent {
           internal_static_pmsg_Subscribe_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Subscribe_descriptor,
-              new java.lang.String[] { "PartitionId", "Timestamp", },
+              new java.lang.String[] { "PartitionId", "Timestamp", "IsCovering", },
               org.voltdb.pmsg.DRAgent.Subscribe.class,
               org.voltdb.pmsg.DRAgent.Subscribe.Builder.class);
           internal_static_pmsg_Response_descriptor =
