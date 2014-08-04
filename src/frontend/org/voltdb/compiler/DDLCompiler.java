@@ -861,6 +861,7 @@ public class DDLCompiler {
                             "IMPORT CLASS no match for wildcarded class: '%s'",
                             classNameStr), ddlStatement.lineNo);
                 }
+                m_tracker.addImportLine(statement);
             }
 
             return true;
