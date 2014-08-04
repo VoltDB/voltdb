@@ -506,6 +506,8 @@ public class CatalogDiffEngine {
             return true;
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
             return true;
+        if (suspect instanceof Cluster && field.equals("drMasterHost"))
+            return true;
         if (suspect instanceof Constraint && field.equals("index"))
             return true;
         if (suspect instanceof Table) {
