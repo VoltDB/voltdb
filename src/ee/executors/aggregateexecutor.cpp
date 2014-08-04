@@ -504,6 +504,7 @@ void AggregateExecutorBase::initGroupByKeyTuple(const TableTuple& nextTuple)
 {
     TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
     if (nextGroupByKeyTuple.isNullTuple()) {
+        // Tuple spaces got allocated
         m_nextGroupByKeyStorage.allocateActiveTuple();
     }
     // TODO: Here is where an inline projection executor could be used to initialize both a group key tuple
@@ -638,6 +639,7 @@ TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
+    m_inProgressGroupByKeyTuple.move(NULL);
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
 
     char* storage = reinterpret_cast<char*>(
@@ -769,6 +771,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
 
+    m_inProgressGroupByKeyTuple.move(NULL);
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
 
     // for next input tuple

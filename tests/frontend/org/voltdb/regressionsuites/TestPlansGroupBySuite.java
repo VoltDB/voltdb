@@ -669,6 +669,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         }
     }
 
+    // Fix bug: serial grouping by an inline varchar field only has one group
     public void testENG6732_serialAggInlineVarchar() throws IOException, ProcCallException, InterruptedException {
         System.out.println("STARTING serial/parital aggregate test.....");
         String sql;

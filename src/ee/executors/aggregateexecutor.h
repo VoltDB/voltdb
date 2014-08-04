@@ -221,7 +221,7 @@ protected:
     std::vector<int> m_partialHashGroupByColumns;
     TupleSchema* m_groupByKeyPartialHashSchema;
 
-    // used for inline limit for serial/patial aggregate
+    // used for inline limit for serial/partial aggregate
     int m_limit;
     int m_offset;
     int m_tupleSkipped;
