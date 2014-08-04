@@ -475,11 +475,14 @@ public class VoltCompiler {
      * The generated catalog is diffed with the original catalog to verify compilation and
      * catalog generation consistency.
      */
-    private void debugVerifyCatalog(VoltCompilerReader origDDLFileReader, Catalog origCatalog)
+    private void debugVerifyCatalog(InMemoryJarfile origJarFile, Catalog origCatalog)
     {
         final VoltCompiler autoGenCompiler = new VoltCompiler();
+        // Make the new compiler use the original jarfile's classloader so it can
+        // pull in the class files for procedures and imports
+        autoGenCompiler.m_classLoader = origJarFile.getLoader();
         List<VoltCompilerReader> autogenReaderList = new ArrayList<VoltCompilerReader>(1);
-        autogenReaderList.add(origDDLFileReader);
+        autogenReaderList.add(new VoltCompilerJarFileReader(origJarFile, AUTOGEN_DDL_FILE_NAME));
         DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
         autoGenCompiler.m_currentFilename = AUTOGEN_DDL_FILE_NAME;
@@ -593,7 +596,7 @@ public class VoltCompiler {
 
         jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
         if (DEBUG_VERIFY_CATALOG) {
-            debugVerifyCatalog(new VoltCompilerJarFileReader(jarOutput, AUTOGEN_DDL_FILE_NAME), catalog);
+            debugVerifyCatalog(jarOutput, catalog);
         }
 
         // WRITE CATALOG TO JAR HERE
