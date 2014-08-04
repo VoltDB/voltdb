@@ -466,6 +466,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+    throws IOException, NoConnectionsException, ProcCallException
+    {
+        byte[] jarbytes = null;
+        if (jarPath != null) {
+            jarbytes = ClientUtils.fileToBytes(jarPath);
+        }
+        return callProcedure("@UpdateClasses", jarbytes, classesToDelete);
+    }
+
+    @Override
+    public boolean updateClasses(ProcedureCallback callback,
+                                 File jarPath,
+                                 String classesToDelete)
+    throws IOException, NoConnectionsException
+    {
+        byte[] jarbytes = null;
+        if (jarPath != null) {
+            jarbytes = ClientUtils.fileToBytes(jarPath);
+        }
+        return callProcedure(callback, "@UpdateClasses", jarbytes, classesToDelete);
+    }
+
+    @Override
     public void drain() throws InterruptedException {
         if (m_isShutdown) {
             return;

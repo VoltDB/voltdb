@@ -171,6 +171,9 @@ public abstract class VoltProcedure {
             if (t.getMessage() != null) {
                 message = t.getMessage();
             }
+            else if (t.getCause() != null) {
+                message = t.getCause().getMessage();
+            }
         }
 
         /**

@@ -42,6 +42,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;

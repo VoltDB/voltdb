@@ -64,7 +64,7 @@ void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     }
 }
 
-void InsertPlanNode::initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple) {
-    m_tcd->initTemplateTuple(engine->getCatalogTable(getTargetTableName()), templateTuple);
+void InsertPlanNode::initTemplateTuple(VoltDBEngine* engine, Pool *pool, TableTuple& templateTuple) {
+    m_tcd->initTemplateTuple(pool, engine->getCatalogTable(getTargetTableName()), templateTuple);
 }
 }
