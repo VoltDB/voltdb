@@ -61,8 +61,11 @@ public class AdHocDDLBenchmark {
      * and validation.
      */
     static class BenchmarkConfig extends CLIConfig {
+        @Option(desc = "Number of warmup tests sent to server")
+        int numOfWarmup = 5;
+        
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 50;
+        int numOfTests = 15;
 
         @Option(desc = "Number of SPs per table in server")
         int numOfSPs = 4;
@@ -220,6 +223,14 @@ public class AdHocDDLBenchmark {
     {
         String createStmt = DDLGen.CreateTable(0, config.table);
         String dropStmt = DDLGen.DropTable(0, config.table);
+        
+        // Warmup
+        for(int i = 0; i < config.numOfWarmup; i++)
+        {
+            runTest(createStmt);
+            runTest(dropStmt);
+        }
+        
         long sum = 0;
         for(int i = 0; i < config.numOfTests; i++)
         {
