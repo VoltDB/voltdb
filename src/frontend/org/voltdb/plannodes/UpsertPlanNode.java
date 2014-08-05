@@ -71,4 +71,9 @@ public class UpsertPlanNode extends AbstractOperationPlanNode {
     protected String explainPlanForNode(String indent) {
         return "UPSERT into \"" + m_targetTableName + "\"";
     }
+
+    @Override
+    public boolean isOrderDeterministic() {
+        return true;
+    }
 }

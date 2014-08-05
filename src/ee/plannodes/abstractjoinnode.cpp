@@ -45,21 +45,44 @@
 
 #include "abstractjoinnode.h"
 
+#include "common/TupleSchema.h"
 #include "expressions/abstractexpression.h"
 
-#include <sstream>
+#include "boost/foreach.hpp"
 
-using namespace std;
+#include <sstream>
 
 namespace voltdb {
 
 AbstractJoinPlanNode::AbstractJoinPlanNode() { }
 
-AbstractJoinPlanNode::~AbstractJoinPlanNode() { }
-
-string AbstractJoinPlanNode::debugInfo(const string& spacer) const
+AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
-    ostringstream buffer;
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
+    }
+
+    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
+}
+
+void AbstractJoinPlanNode::getOutputColumnExpressions(
+        std::vector<AbstractExpression*>& outputExpressions) const {
+    std::vector<SchemaColumn*> outputSchema;
+    if (m_outputSchemaPreAgg.size() > 0) {
+        outputSchema = m_outputSchemaPreAgg;
+    } else {
+        outputSchema = getOutputSchema();
+    }
+    size_t schemaSize = outputSchema.size();
+
+    for (int i = 0; i < schemaSize; i++) {
+        outputExpressions.push_back(outputSchema[i]->getExpression());
+    }
+}
+
+std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
+{
+    std::ostringstream buffer;
     buffer << spacer << "JoinType[" << m_joinType << "]\n";
     if (m_preJoinPredicate != NULL)
     {
@@ -87,6 +110,29 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
     m_joinPredicate.reset(loadExpressionFromJSONObject("JOIN_PREDICATE", obj));
     m_wherePredicate.reset(loadExpressionFromJSONObject("WHERE_PREDICATE", obj));
+
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        int schema_size = outputSchemaArray.arrayLen();
+        std::vector<voltdb::ValueType> columnTypes;
+        std::vector<int32_t> columnSizes;
+        std::vector<bool> columnAllowNull(schema_size, true);
+        std::vector<bool> columnInBytes;
+
+        for (int i = 0; i < schema_size; i++) {
+            PlannerDomValue colObject = outputSchemaArray.valueAtIndex(i);
+            AbstractExpression* expr = loadExpressionFromJSONObject("EXPRESSION", colObject);
+            assert(expr);
+            columnTypes.push_back(expr->getValueType());
+            columnSizes.push_back(expr->getValueSize());
+            columnInBytes.push_back(expr->getInBytes());
+            delete expr;
+        }
+
+        m_tupleSchemaPreAgg =
+            TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, columnInBytes);
+    }
+
 }
 
 } // namespace voltdb

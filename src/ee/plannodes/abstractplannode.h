@@ -178,12 +178,8 @@ public:
      * Convenience method:
      * Generate a TupleSchema based on the contents of the output schema
      * from the plan
-     *
-     * @param allowNulls whether or not the generated schema should
-     * permit null values in the output columns.
-     *TODO: -- This is always passed true, so deprecate it?
      */
-    TupleSchema* generateTupleSchema(bool allowNulls=true) const;
+    TupleSchema* generateTupleSchema() const;
 
     /**
      * Convenience method:
@@ -208,6 +204,8 @@ protected:
     AbstractPlanNode();
 
     virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
+
+    static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
                                                             PlannerDomValue obj);

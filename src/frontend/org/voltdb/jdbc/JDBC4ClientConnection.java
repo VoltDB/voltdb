@@ -19,7 +19,6 @@ package org.voltdb.jdbc;
 
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -50,7 +49,6 @@ import org.voltdb.client.ProcedureCallback;
  * @since 2.0
  */
 public class JDBC4ClientConnection implements Closeable {
-    private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
     private final ClientConfig config;
     private AtomicReference<Client> client = new AtomicReference<Client>();
@@ -133,7 +131,6 @@ public class JDBC4ClientConnection implements Closeable {
 
         this.keyBase = clientConnectionKeyBase;
         this.key = clientConnectionKey;
-        this.statistics = JDBC4ClientConnectionPool.getStatistics(clientConnectionKeyBase);
 
         // Create configuration
         this.config = new ClientConfig(user, password);
@@ -277,15 +274,12 @@ public class JDBC4ClientConnection implements Closeable {
         try {
             // If connections are lost try reconnecting.
             ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, TimeUnit.SECONDS, parameters);
-            this.statistics.update(procedure, response);
             return response;
         }
         catch (ProcCallException pce) {
-            this.statistics.update(procedure, System.currentTimeMillis() - start, false);
             throw pce;
         }
         catch (NoConnectionsException e) {
-            this.statistics.update(procedure, System.currentTimeMillis() - start, false);
             this.dropClient(currentClient);
             throw e;
         }
@@ -325,8 +319,6 @@ public class JDBC4ClientConnection implements Closeable {
          */
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-
-            this.Owner.getStatistics().update(this.Procedure, response);
             if (this.UserCallback != null)
                 this.UserCallback.clientCallback(response);
         }
@@ -409,66 +401,14 @@ public class JDBC4ClientConnection implements Closeable {
     }
 
     /**
-     * @deprecated
-     * Gets the global performance statistics for this connection (and all connections with the same
-     * parameters).
-     *
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as this connection.
-     */
-    @Deprecated
-    public JDBC4PerfCounterMap getStatistics() {
-        return JDBC4ClientConnectionPool.getStatistics(this);
-    }
-
-    /**
-     * @deprecated
-     * Gets the performance statistics for a specific procedure on this connection (and all
-     * connections with the same parameters).
-     *
-     * @param procedure
-     *            the name of the procedure for which to retrieve the statistics.
-     * @return the counter aggregated across all the connections in the pool with the same
-     *         parameters as this connection.
-     */
-    @Deprecated
-    public JDBC4PerfCounter getStatistics(String procedure) {
-        return JDBC4ClientConnectionPool.getStatistics(this).get(procedure);
-    }
-
-    /**
-     * @deprecated
-     * Gets the aggregated performance statistics for a list of procedures on this connection (and
-     * all connections with the same parameters).
-     *
-     * @param procedures
-     *            the list of procedures for which to retrieve the statistics.
-     * @return the counter aggregated across all the connections in the pool with the same
-     *         parameters as this connection, and across all procedures.
-     */
-    @Deprecated
-    public JDBC4PerfCounter getStatistics(String... procedures) {
-        JDBC4PerfCounterMap map = JDBC4ClientConnectionPool.getStatistics(this);
-        JDBC4PerfCounter result = new JDBC4PerfCounter(false);
-        for (String procedure : procedures)
-            result.merge(map.get(procedure));
-        return result;
-    }
-
-    /**
      * Save statistics to a CSV file.
      *
      * @param file
      *            File path
      * @throws IOException
      */
-    public void saveStatistics(String file) throws IOException {
-        if (file != null && !file.trim().isEmpty()) {
-            FileWriter fw = new FileWriter(file);
-            fw.write(getStatistics().toRawString(','));
-            fw.flush();
-            fw.close();
-        }
+    public void saveStatistics(ClientStats stats, String file) throws IOException {
+        this.client.get().writeSummaryCSV(stats, file);
     }
 
     void writeSummaryCSV(ClientStats stats, String path) throws IOException {

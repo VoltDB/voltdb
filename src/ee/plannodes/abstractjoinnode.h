@@ -63,6 +63,8 @@ public:
     AbstractExpression* getPreJoinPredicate() const { return m_preJoinPredicate.get(); }
     AbstractExpression* getJoinPredicate() const { return m_joinPredicate.get(); }
     AbstractExpression* getWherePredicate() const { return m_wherePredicate.get(); }
+    const TupleSchema* getTupleSchemaPreAgg() const { return m_tupleSchemaPreAgg; }
+    void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
@@ -84,6 +86,11 @@ protected:
 
     // Currently either inner or left outer.
     JoinType m_joinType;
+
+    // output schema pre inline aggregation
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    TupleSchema* m_tupleSchemaPreAgg;
 };
 
 } // namespace voltdb

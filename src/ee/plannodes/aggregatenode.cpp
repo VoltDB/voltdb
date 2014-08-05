@@ -129,6 +129,8 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_groupByExpressions.loadExpressionArrayFromJSONObject("GROUPBY_EXPRESSIONS", obj);
     m_prePredicate.reset(loadExpressionFromJSONObject("PRE_PREDICATE", obj));
     m_postPredicate.reset(loadExpressionFromJSONObject("POST_PREDICATE", obj));
+
+    loadIntArrayFromJSONObject("PARTIAL_GROUPBY_COLUMNS", obj, m_partialGroupByColumns);
 }
 
 void AggregatePlanNode::collectOutputExpressions(

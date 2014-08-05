@@ -46,8 +46,10 @@ executed immediately (they do not require a semi-colon). The interactive
 commands are:
 
     GO
-    LIST PROC[EDURES]
-    LIST TABLES
+    HELP
+    LIST | SHOW CLASSES
+    LIST | SHOW PROC[EDURES]
+    LIST | SHOW TABLES
     RECALL [command-number]
     QUIT or EXIT
 
@@ -108,6 +110,7 @@ Executing Stored Procedures ----------------------------------------------------
   + @SystemInformation
   + @SystemCatalog CatalogComponent
   + @UpdateApplicationCatalog varchar, varchar
+  + @UpdateClasses varchar, varchar
   + @UpdateLogging varchar
 
 + 'bit' values may be provided as either {true|yes|1} or {false|no|0}.
@@ -157,12 +160,21 @@ Listing Stored Procedures ------------------------------------------------------
 
       list proc[edures]
 
++ You can list the Java classes in the currently running catalog, showing which
+  ones are currently being used as stored procedures, which could potentially
+  be used to create a new stored procedure, and all other supporting classes, 
+  using the following interactive command:
+
+      list classes
+
 + List operations are considered as interactive mode commands only, thus they
   do not require a terminating semi-colon and will execute immediately (even if
   you are in the middle of typing a batch - your batch is left unchanged and the
   command not tracked).
 
 + List commands are ignored in script files.
+
++ The command 'show' may be used instead of 'list'
 
 
 Recalling commands -------------------------------------------------------------

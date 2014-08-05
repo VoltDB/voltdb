@@ -151,31 +151,33 @@ public:
     { }
     ~AggregateExecutorBase()
     {
-        if (m_groupByKeySchema != NULL) {
-            TupleSchema::freeTupleSchema(m_groupByKeySchema);
-        }
-    }
-    void executeAggBase(const NValueArray& params);
-
-
-    void setAggregateOutputTable(TempTable* newTempTable) {
-        // inlined aggregate will not allocate its own output table, but will use Scan's output table instead
-        m_tmpOutputTable = newTempTable;
+        // NULL safe operation
+        TupleSchema::freeTupleSchema(m_groupByKeySchema);
+        TupleSchema::freeTupleSchema(m_groupByKeyPartialHashSchema);
     }
 
-    virtual void p_execute_init(const NValueArray& params,
-            ProgressMonitorProxy* pmp, const TupleSchema * schema) = 0;
-    virtual void p_execute_tuple(const TableTuple& nextTuple) = 0;
-    virtual void p_execute_finish() = 0;
+    /**
+     * Initiate the member variables for execute the aggregate.
+     * Inlined aggregate will not allocate its own output table,
+     * but will use other's output table instead.
+     */
+    virtual TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+            const TupleSchema * schema, TempTable* newTempTable = NULL);
 
-    bool p_execute_early_returned() const {
-        return m_earlyReturn;
-    }
+    /**
+     * Return true when limit has been met. By default, return false.
+     */
+    virtual bool p_execute_tuple(const TableTuple& nextTuple) = 0;
+
+    /**
+     * Last method to insert the results to output table and clean up memory or variables.
+     */
+    virtual void p_execute_finish();
 
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 
-    void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
+    void executeAggBase(const NValueArray& params);
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
@@ -190,6 +192,8 @@ protected:
      */
     void initAggInstances(AggregateRow* aggregateRow);
 
+
+    void initGroupByKeyTuple(const TableTuple& nextTuple);
     /*
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
@@ -209,13 +213,22 @@ protected:
     AbstractExpression* m_postPredicate;
 
     ProgressMonitorProxy* m_pmp;
-    TableTuple m_passThroughTupleSource;
+    PoolBackedTupleStorage m_nextGroupByKeyStorage;
+    const TupleSchema * m_inputSchema;
 
-    // used for serial aggregation and partial aggregation in future.
+    // used for partial aggregation.
+    std::vector<int> m_partialSerialGroupByColumns;
+    std::vector<int> m_partialHashGroupByColumns;
+    TupleSchema* m_groupByKeyPartialHashSchema;
+
+    // used for inline limit for serial/partial aggregate
     int m_limit;
     int m_offset;
     int m_tupleSkipped;
     bool m_earlyReturn;
+
+private:
+    TupleSchema* constructGroupBySchema(bool partial);
 };
 
 typedef boost::unordered_map<TableTuple,
@@ -233,19 +246,19 @@ class AggregateHashExecutor : public AggregateExecutorBase
 public:
     AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node) { }
-    ~AggregateHashExecutor() { }
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
-    void p_execute_tuple(const TableTuple& nextTuple);
+    // empty destructor defined in .cpp file because of it is called virtually (not inline)
+    // same reason for serial and partial
+    ~AggregateHashExecutor();
+
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
+    bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
 
-protected:
-    virtual bool p_execute(const NValueArray& params);
 private:
+    virtual bool p_execute(const NValueArray& params);
     HashAggregateMapType m_hash;
-    PoolBackedTupleStorage m_nextGroupByKeyStorage;
-
-    const TupleSchema * m_inputSchema;
 };
 
 /**
@@ -257,28 +270,71 @@ class AggregateSerialExecutor : public AggregateExecutorBase
 {
 public:
     AggregateSerialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node) { }
-    ~AggregateSerialExecutor() { }
+        AggregateExecutorBase(engine, abstract_node),
+        m_aggregateRow(NULL), m_noInputRows(true),
+        m_failPrePredicateOnFirstRow(false) { }
+    ~AggregateSerialExecutor();
 
-    void p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp, const TupleSchema * schema);
-
-    void p_execute_tuple(const TableTuple& nextTuple);
-
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
+    bool p_execute_tuple(const TableTuple& nextTuple);
     void p_execute_finish();
+
 protected:
-    virtual bool p_execute(const NValueArray& params);
-
-    void getNextGroupByValues(const TableTuple& nextTuple);
-
     AggregateRow * m_aggregateRow;
-    std::vector<NValue> m_inProgressGroupByValues;
-    std::vector<NValue> m_nextGroupByValues;
-
     // State variables for iteration on input table
     bool m_noInputRows;
     bool m_failPrePredicateOnFirstRow;
 
+    TableTuple m_inProgressGroupByKeyTuple;
+    TableTuple m_passThroughTupleSource;
+
+private:
+    virtual bool p_execute(const NValueArray& params);
 };
+
+
+class AggregatePartialExecutor : public AggregateExecutorBase
+{
+public:
+    AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
+        AggregateExecutorBase(engine, abstract_node), m_atTheFirstRow(true) { }
+    ~AggregatePartialExecutor();
+
+    TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
+                              const TupleSchema * schema, TempTable* newTempTable  = NULL);
+    bool p_execute_tuple(const TableTuple& nextTuple);
+    void p_execute_finish();
+
+private:
+    virtual bool p_execute(const NValueArray& params);
+    void initPartialHashGroupByKeyTuple(const TableTuple& nextTuple);
+
+    bool m_atTheFirstRow;
+    PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
+    TableTuple m_inProgressGroupByKeyTuple;
+    HashAggregateMapType m_hash;
+};
+
+
+inline AggregateExecutorBase* getInlineAggregateExecutor(const AbstractPlanNode* node) {
+    AbstractPlanNode* aggNode = NULL;
+    AggregateExecutorBase* aggExec = NULL;
+    if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_PARTIALAGGREGATE)) ) {
+        VOLT_TRACE("init inline partial aggregation stuff...");
+        aggExec = dynamic_cast<AggregatePartialExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    } else if ( NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_AGGREGATE)) ) {
+        VOLT_TRACE("init inline serial aggregation stuff...");
+        aggExec = dynamic_cast<AggregateSerialExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    } else if (NULL != (aggNode = node->getInlinePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE)) ) {
+        VOLT_TRACE("init inline hash aggregation stuff...");
+        aggExec = dynamic_cast<AggregateHashExecutor*>(aggNode->getExecutor());
+        assert(aggExec != NULL);
+    }
+    return aggExec;
+}
 
 }
 #endif

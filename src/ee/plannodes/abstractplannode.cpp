@@ -195,7 +195,7 @@ const vector<SchemaColumn*>& AbstractPlanNode::getOutputSchema() const
     throwFatalLogicErrorStreamed("No valid output schema defined for plannode:\n" << debug(""));
 }
 
-TupleSchema* AbstractPlanNode::generateTupleSchema(bool allowNulls) const
+TupleSchema* AbstractPlanNode::generateTupleSchema() const
 {
     // Get the effective output schema.
     // In general, this may require a search.
@@ -203,7 +203,7 @@ TupleSchema* AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     int schema_size = static_cast<int>(outputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
-    vector<bool> columnAllowNull(schema_size, allowNulls);
+    vector<bool> columnAllowNull(schema_size, true);
     vector<bool> columnInBytes;
 
     for (int i = 0; i < schema_size; i++)
@@ -271,13 +271,7 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
         }
     }
 
-    if (obj.hasKey("CHILDREN_IDS")) {
-        PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
-        for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
-            int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
-            node->m_childIds.push_back(childNodeId);
-        }
-    }
+    loadIntArrayFromJSONObject("CHILDREN_IDS", obj, node->m_childIds);
 
     // Output schema are optional -- when they can be determined by a child's copy.
     if (obj.hasKey("OUTPUT_SCHEMA")) {
@@ -311,6 +305,17 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
     node.release();
     assert(retval);
     return retval;
+}
+
+void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
+        PlannerDomValue obj, std::vector<int>& result)
+{
+    if (obj.hasNonNullKey(label)) {
+        PlannerDomValue intArray = obj.valueForKey("PARTIAL_GROUPBY_COLUMNS");
+        for (int i = 0; i < intArray.arrayLen(); i++) {
+            result.push_back(intArray.valueAtIndex(i).asInt());
+        }
+    }
 }
 
 AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label,

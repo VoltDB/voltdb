@@ -71,6 +71,9 @@ public:
     const std::vector<int>& getAggregateOutputColumns() const
     { return m_aggregateOutputColumns; }
 
+    const std::vector<int>& getPartialGroupByColumns() const
+    { return m_partialGroupByColumns; }
+
     const std::vector<AbstractExpression*>& getAggregateInputExpressions() const
     { return m_aggregateInputExpressions; }
 
@@ -98,7 +101,9 @@ protected:
     //
     OwningExpressionVector m_groupByExpressions;
 
-    PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
+    std::vector<int> m_partialGroupByColumns;
+
+    PlanNodeType m_type; //AGGREGATE, PARTIALAGGREGATE, HASHAGGREGATE
 
     // ENG-1565: for accelerating min() / max() using index purpose only
     boost::scoped_ptr<AbstractExpression> m_prePredicate;

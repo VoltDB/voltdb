@@ -20,43 +20,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+package org.voltdb_testprocs.updateclasses;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
 
-public class Initialize extends VoltProcedure
-{
-    // Delete everything
-    public final SQLStmt cleanStmt = new SQLStmt("DELETE FROM store;");
+public class BadInnerClassesTestProc extends VoltProcedure {
 
-    // Inserts a key/value pair
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
-
-    public long run(int startIndex, int stopIndex, String keyFormat, byte[] defaultValue)
-    {
-        // Wipe out the data store to re-initialize
-        if (startIndex == 0)
-        {
-            voltQueueSQL(cleanStmt);
-            voltExecuteSQL();
+    static class InnerNotPublic {
+        public static int blerg;
+        static {
+            blerg = 10 / 0;
         }
 
-        // Initialize the data store with given parameters
-        int batchSize = 0;
-        for(int i=startIndex;i<stopIndex;i++)
-        {
-            voltQueueSQL(insertStmt, String.format(keyFormat, i), defaultValue);
-            batchSize++;
-            if (batchSize > 499) // We can batch up to 500 statements to push in one single execution call
-            {
-                voltExecuteSQL();
-                batchSize = 0;
-            }
-        }
-        // Make sure we post the last batch!
-        if (batchSize > 0)
-            voltExecuteSQL(true);
+        public final int doesntMatter;
+        public final int dontCare;
 
-        return stopIndex;
+        public InnerNotPublic()
+        {
+            doesntMatter = 0;
+            dontCare = 0;
+        }
+    }
+
+    public long run() throws VoltAbortException {
+        return 1;
     }
 }

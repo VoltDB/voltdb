@@ -324,7 +324,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, T1.DEPT, P2.WAGE FROM (SELECT ID, DEPT FROM P1) T1 LEFT OUTER JOIN P2 " +
-                "ON T1.ID = P2.DEPT AND P2.DEPT = 2 order by T1.ID;").getResults()[0];
+                "ON T1.ID = P2.DEPT AND P2.DEPT = 2 order by 1, 2, 3;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1, 1, Long.MIN_VALUE}, {2, 1, 40}, {2, 1, 50},
                 {3, 1, Long.MIN_VALUE},{4,2, Long.MIN_VALUE}, {5,2, Long.MIN_VALUE}});
 

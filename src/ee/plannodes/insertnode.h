@@ -53,6 +53,7 @@
 namespace voltdb {
 
 class VoltDBEngine;
+class Pool;
 
 /**
  *
@@ -64,7 +65,11 @@ public:
 
     bool isMultiPartition() { return m_multiPartition; }
 
-    void initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple);
+    void initTupleWithDefaultValues(VoltDBEngine* engine,
+                                    Pool* pool,
+                                    const std::set<int>& fieldsExplicitlySet,
+                                    TableTuple& templateTuple,
+                                    std::vector<int> &nowFields);
 
     const std::vector<int>& getFieldMap() const { return m_fieldMap; }
 
