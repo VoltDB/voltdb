@@ -150,7 +150,7 @@ public class ReportMaker {
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
                   "<th>Attributes</th>" +
-                  "</tr>\nq");
+                  "</tr>\n");
 
         for (Index index : table.getIndexes()) {
             sb.append(genrateIndexRow(table, index));
