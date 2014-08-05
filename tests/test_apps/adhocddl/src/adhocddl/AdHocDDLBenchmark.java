@@ -230,7 +230,7 @@ public class AdHocDDLBenchmark {
             runTest(createStmt);
             runTest(dropStmt);
         }
-        
+
         long sum = 0;
         for(int i = 0; i < config.numOfTests; i++)
         {
