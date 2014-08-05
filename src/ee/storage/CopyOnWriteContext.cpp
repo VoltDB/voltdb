@@ -175,6 +175,9 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
+                int32_t skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+                int32_t skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
+
                 /*
                  * Start with fresh iterators and count how many rows are visible
                  * to hint at why the right number of rows may not have been processed
@@ -204,6 +207,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          "Dirty insert count: %jd\n"
                          "Dirty update count: %jd\n"
                          "Partition column: %d\n"
+                         "Skipped dirty rows: %d\n"
+                         "Skipped inactive rows: %d\n"
                          "Discovered COW rows: %d\n"
                          "Discovered iteration rows: %d\n",
                          table.name().c_str(),
@@ -215,6 +220,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          (intmax_t)m_inserts,
                          (intmax_t)m_updates,
                          table.partitionColumn(),
+                         skippedDirtyRows,
+                         skippedInactiveRows,
                          cowCount,
                          iterationCount);
 //#ifdef DEBUG
