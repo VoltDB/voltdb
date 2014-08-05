@@ -1919,14 +1919,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
-                if (m_replicaDRGateway != null) {
-                    try {
-                        m_replicaDRGateway.shutdown();
-                        m_replicaDRGateway.join();
-                    } catch (InterruptedException e) {
-                        hostLog.warn("Interrupted shutting down dr replication", e);
-                    }
-                }
+                shutdownReplicaRole();
 
                 if (m_snapshotIOAgent != null) {
                     m_snapshotIOAgent.shutdown();
@@ -2367,10 +2360,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            shutdownReplicaRole();
         }
         m_config.m_replicationRole = role;
         if (m_clientInterface != null) {
             m_clientInterface.setReplicationRole(m_config.m_replicationRole);
+        }
+    }
+
+    private void shutdownReplicaRole() {
+        if (m_replicaDRGateway != null) {
+            try {
+                m_replicaDRGateway.shutdown();
+                m_replicaDRGateway.join();
+            } catch (InterruptedException e) {
+                hostLog.warn("Interrupted shutting down dr replication", e);
+            }
         }
     }
 
@@ -2563,6 +2568,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public boolean getReplicationActive()
     {
         return m_replicationActive;
+    }
+
+    @Override
+    public ReplicaDRGateway getReplicaDRGateway() {
+        return m_replicaDRGateway;
     }
 
     @Override

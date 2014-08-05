@@ -624,4 +624,9 @@ public class MockVoltDB implements VoltDBInterface
     public void halt() {
         assert (true);
     }
+
+    @Override
+    public ReplicaDRGateway getReplicaDRGateway() {
+        return null;
+    }
 }
