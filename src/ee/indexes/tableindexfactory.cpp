@@ -64,7 +64,7 @@ class TableIndexPicker
     template <class TKeyType>
     TableIndex *getInstanceForKeyType() const
     {
-           if (m_scheme.unique) {
+        if (m_scheme.unique) {
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {

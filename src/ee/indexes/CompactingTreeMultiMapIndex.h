@@ -137,8 +137,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     {
         ++m_lookups;
         m_forward = true;
-        KeyType tempKey(searchKey);
-        m_keyIter = m_entries.upperBound(tempKey);
+        m_keyIter = m_entries.upperBound(KeyType(searchKey));
         return m_keyIter.isEnd();
     }
 
