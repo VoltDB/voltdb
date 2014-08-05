@@ -3157,6 +3157,77 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
     }
 
+    // ENG-3283
+    public void testAliaseOfSomeStringFunction() throws IOException, ProcCallException {
+        String sql;
+        VoltTable result;
+        Client cl = getClient();
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, "abcABC", null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // LTRIM and RTRIM has been implemented and tested
+
+        // SUBSTR
+        if (!isHSQL()){ // surprisingly, hsql doesn't work
+            sql = "select SUBSTR('abc123ABC', 1, 2) from p1 where id = 0;";
+            cr = cl.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+            // some wired cases can pass test
+            sql = "select SUBSTR('abc123ABC', 0, 2) from p1 where id = 0;";
+            cr = cl.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+            sql = "select SUBSTR('abc123ABC', -1, 2) from p1 where id = 0;";
+            cr = cl.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+        }
+
+        // LCASE and UCASE
+        sql = "select LCASE('abc123ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"abc123abc"});
+
+        sql = "select UCASE('abc123ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        // INSERT
+        sql = "select INSERT('abc123ABC', 1, 3,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        sql = "select INSERT('abc123ABC', 1, 1,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCbc123ABC"});
+
+        sql = "select INSERT('abc123ABC', 1, 4,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC23ABC"});
+
+        sql = "select INSERT('abc123ABC', 1, 0,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCabc123ABC"});
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
