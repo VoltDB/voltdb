@@ -150,13 +150,13 @@ public class ReportMaker {
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
                   "<th>Attributes</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "</tr>\nq");
 
         for (Index index : table.getIndexes()) {
             sb.append(genrateIndexRow(table, index));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
@@ -416,13 +416,13 @@ public class ReportMaker {
                   "<th>Params</th>" +
                   "<th>R/W</th>" +
                   "<th>Attributes</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "</tr>\n");
 
         for (Statement statement : procedure.getStatements()) {
             sb.append(genrateStatementRow(procedure, statement));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
