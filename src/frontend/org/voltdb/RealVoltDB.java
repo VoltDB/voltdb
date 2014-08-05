@@ -1651,6 +1651,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(line);
         }
 
+        if (m_catalogContext.cluster.getUseadhocschema()) {
+            consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
+                  "This feature is currently a preview of work-in-progress and not recommended for " +
+                  "production environments.  Remove the schema attribute in the <cluster> " +
+                  "element of your deployment file if you did not intend to use the preview.");
+        }
+
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
         String[] lines = pp.toLogLines().split("\n");

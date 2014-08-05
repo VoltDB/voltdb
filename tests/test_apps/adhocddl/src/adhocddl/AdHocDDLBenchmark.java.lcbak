@@ -65,7 +65,7 @@ public class AdHocDDLBenchmark {
         int numOfWarmup = 5;
 
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 5;
+        int numOfTests = 15;
 
         @Option(desc = "Number of SPs per table in server")
         int numOfSPs = 4;
@@ -223,7 +223,7 @@ public class AdHocDDLBenchmark {
     {
         String createStmt = DDLGen.CreateTable(0, config.table);
         String dropStmt = DDLGen.DropTable(0, config.table);
-
+        
         // Warmup
         for(int i = 0; i < config.numOfWarmup; i++)
         {

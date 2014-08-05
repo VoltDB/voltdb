@@ -76,19 +76,19 @@ public class SQLCommand
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern CreateView =
         Pattern.compile("(\\s*)(create\\s+view\\s+.*\\s+as\\s+)select",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureSelect =
         Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)select",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureInsert =
         Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)insert",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureUpdate =
         Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)update",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureDelete =
         Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)delete",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb

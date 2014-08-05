@@ -26,9 +26,6 @@ public interface IVoltDBConnection
 {
     void writeSummaryCSV(ClientStats stats, String path) throws IOException;
     ClientStatsContext createStatsContext();
-    JDBC4PerfCounterMap getStatistics();
-    JDBC4PerfCounter getStatistics(String procedure);
-    JDBC4PerfCounter getStatistics(String... procedures);
-    void saveStatistics(String file) throws IOException;
+    void saveStatistics(ClientStats stats, String file) throws IOException;
 }
 

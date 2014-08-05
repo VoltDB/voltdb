@@ -43,24 +43,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "insertexecutor.h"
-#include "common/debuglog.h"
+#include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "common/types.h"
-#include "plannodes/insertnode.h"
 #include "execution/VoltDBEngine.h"
+#include "expressions/functionexpression.h"
+#include "insertexecutor.h"
+#include "plannodes/insertnode.h"
+#include "storage/ConstraintFailureException.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
-#include "storage/ConstraintFailureException.h"
 
 #include <vector>
+#include <set>
 
 using namespace std;
 using namespace voltdb;
@@ -101,8 +103,15 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // allocate memory for template tuple, set defaults for all columns
     m_templateTuple.init(targetTable->schema());
 
+
     TableTuple tuple = m_templateTuple.tuple();
-    m_node->initTemplateTuple(m_engine, &m_memoryPool, tuple);
+
+    std::set<int> fieldsExplicitlySet(m_node->getFieldMap().begin(), m_node->getFieldMap().end());
+    m_node->initTupleWithDefaultValues(m_engine,
+                                       &m_memoryPool,
+                                       fieldsExplicitlySet,
+                                       tuple,
+                                       m_nowFields);
 
     return true;
 }
@@ -129,6 +138,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(outputTable);
 
     TableTuple templateTuple = m_templateTuple.tuple();
+
+    std::vector<int>::iterator it;
+    for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
+        templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+    }
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable

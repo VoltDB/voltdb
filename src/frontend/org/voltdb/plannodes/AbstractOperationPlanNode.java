@@ -61,12 +61,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true, since statement does not produce a query result
+     * @return Force subclasses to assess determinism (INSERT INTO ... SELECT may be nondeterministic)
      */
     @Override
-    public boolean isOrderDeterministic() {
-        return true;
-    }
+    public abstract boolean isOrderDeterministic();
 
     /**
      * @return the target_table_name

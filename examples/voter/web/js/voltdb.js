@@ -391,7 +391,8 @@ var IVoltDB = (function(){
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
         var conn = new Connection(server, port, admin, user, password, isHashedPassword);
-        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) { onConnectionTested(true); } else onConnectionTested(false);} catch(x) {onConnectionTested(true);} });
+        var timeout = setTimeout(function() {onConnectionTested(false);}, 5000);
+        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) {clearTimeout(timeout); onConnectionTested(true); } else onConnectionTested(false);} catch(x) {clearTimeout(timeout); onConnectionTested(true);} });
     }
     this.AddConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionAdded)
     {
