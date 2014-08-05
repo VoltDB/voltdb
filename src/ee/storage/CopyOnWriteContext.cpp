@@ -224,12 +224,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          skippedInactiveRows,
                          cowCount,
                          iterationCount);
-//#ifdef DEBUG
                 // Use a format string to prevent overzealous compiler warnings.
                 throwFatalException("%s", message);
-//#else
-//                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
-//#endif
             }
             // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
             if (m_tuplesRemaining < 0)  {
