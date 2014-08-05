@@ -120,6 +120,7 @@ public:
 
     // delete num tuples
     std::clock_t deleteTuplesFromIndex(TableIndex *index, TupleSchema *schema, char *data, int places, int num) {
+        EXPECT_EQ(index->getSize(), (1L << places));
         long gap = (1L << places) / num;
         TableTuple deleteTuple(data, schema);
         std::clock_t start = std::clock();
@@ -133,6 +134,7 @@ public:
             deleteTuple.move(data + (25 * gap * ii));
             EXPECT_FALSE(index->exists(&deleteTuple));
         }
+        EXPECT_EQ(index->getSize(), ((1L << places) - num));
         return end - start;
     }
 
