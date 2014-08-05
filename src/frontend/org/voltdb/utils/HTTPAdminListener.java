@@ -195,6 +195,16 @@ public class HTTPAdminListener {
                 return;
             }
 
+            if (baseRequest.getRequestURI().contains("/ddl/")) {
+                byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+                String ddl = new String(reportbytes, Charsets.UTF_8);
+                response.setContentType("text/plain;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
+                response.getWriter().print(ddl);
+                return;
+            }
+
             handleReportPage(baseRequest, response);
         }
 

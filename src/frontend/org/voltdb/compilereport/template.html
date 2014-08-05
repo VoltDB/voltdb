@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -61,6 +60,7 @@
   </head>
 
   <body>
+    <iframe name="versioncheck" id="versioncheck" style="display:none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
         <div class="container">
@@ -128,7 +128,8 @@
         </div>
         
         <div id='d' class='reportpage' style='display: none;'>
-          <a name='d'></a><h1>DDL Source</h1><br/>
+          <a name='d'></a><h1>DDL Source
+          <a href = '/ddl/' class = "btn" download = "ddl.sql">Download</a></h1><br/>
           <pre>##DDL##</pre>
         </div>
 
@@ -240,6 +241,8 @@
     <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
 
     <script>
+        $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=catreport&ver=##VERSION##');
+
         function navigate(hash) {
             console.log(hash);
             if (hash.length == 0) hash = '#o';

@@ -306,6 +306,26 @@ public class TestSqlCommandParserInteractive extends TestCase {
         System.out.println("RESULT: " + result.get());
         assertEquals(1, result.get().size());
         assertEquals(create, result.get().get(0));
+
+        // From ENG-6641
+        result = cmd.openQuery();
+        create = "create view foo\n" +
+                 "(\n" +
+                 "C1\n" +
+                 ",C2\n" +
+                 ", TOTAL\n" +
+                 ")\n" +
+                 "as\n" +
+                 "select C1\n" +
+                 ", C2\n" +
+                 ", COUNT(*)\n" +
+                 "from bar\n" +
+                 "group by C1\n" +
+                 ", C2\n";
+        cmd.submitText(create + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
     }
 
     public void testCreateProcedure() throws Exception
