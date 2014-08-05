@@ -62,40 +62,27 @@ namespace voltdb {
 class TableIndexPicker
 {
     template <class TKeyType>
-    TableIndex *getUniqueMapInstanceForKeyType() const
+    TableIndex *getInstanceForKeyType() const
     {
-        assert(m_scheme.unique);
-        if (m_scheme.countable) {
-            return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+           if (m_scheme.unique) {
+            if (m_type != BALANCED_TREE_INDEX) {
+                return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
+            } else if (m_scheme.countable) {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+            } else {
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+            }
         } else {
-            return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+            if (m_type != BALANCED_TREE_INDEX) {
+                return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
+            } else if (m_scheme.countable) {
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+            } else {
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
+            }
         }
     }
 
-    template <class TKeyType>
-    TableIndex *getMultiMapInstanceForKeyType() const
-    {
-        assert(!m_scheme.unique);
-        if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
-        } else {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
-        }
-    }
-
-    template <class TKeyType>
-    TableIndex *getHashInstanceForKeyType() const
-    {
-        assert(m_type != BALANCED_TREE_INDEX);
-        if (m_scheme.unique) {
-            return new CompactingHashUniqueIndex<TKeyType>(m_keySchema, m_scheme);
-        }
-        else {
-            return new CompactingHashMultiMapIndex<TKeyType>(m_keySchema, m_scheme);
-        }
-    }
-
-//TODO: refactor code here
     template <std::size_t KeySize>
     TableIndex *getInstanceIfKeyFits()
     {
@@ -105,13 +92,7 @@ class TableIndexPicker
         if (m_intsOnly) {
             // The IntsKey size parameter ((KeySize-1)/8 + 1) is calculated to be
             // the number of 8-byte uint64's required to store KeySize packed bytes.
-            if (m_type!=BALANCED_TREE_INDEX) {
-                return getHashInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
-            }
-            if (m_scheme.unique) {
-                return getUniqueMapInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
-            }
-            return getMultiMapInstanceForKeyType<KeyWithPointer<IntsKey<(KeySize-1)/8 + 1> > >();
+            return getInstanceForKeyType<IntsKey<(KeySize-1)/8 + 1> >();
         }
         // Generic Key
         if (m_type == HASH_TABLE_INDEX) {
@@ -126,15 +107,9 @@ class TableIndexPicker
         // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
         // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
-            if (m_scheme.unique) {
-                return getUniqueMapInstanceForKeyType<GenericKey<KeySize> >();
-            }
-            return getMultiMapInstanceForKeyType<KeyWithPointer<GenericKey<KeySize> > >();
+            return getInstanceForKeyType<GenericKey<KeySize> >();
         }
-        if (m_scheme.unique) {
-            return getUniqueMapInstanceForKeyType<GenericPersistentKey<KeySize> >();
-        }
-        return getMultiMapInstanceForKeyType<KeyWithPointer<GenericPersistentKey<KeySize> > >();
+        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
     }
 
     template <int ColCount>
@@ -214,9 +189,9 @@ public:
             }
         }
         if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<KeyWithPointer<TupleKey> >, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
         } else {
-            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<KeyWithPointer<TupleKey> >, false>(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
         }
     }
 

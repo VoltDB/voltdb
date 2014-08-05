@@ -839,11 +839,11 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 template <typename KeyType>
 inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) { k.setValue(v); }
 
-template < typename PointerKeyType, typename DataType = const void*>
+template < typename KeyType, typename DataType = const void*>
 class PointerKeyValuePair {
 public:
     // in order to be consistent with std::pair
-    typedef PointerKeyType first_type;
+    typedef KeyWithPointer<KeyType> first_type;
     typedef DataType second_type;
 
     // the caller has to make sure the key has already contained the value
