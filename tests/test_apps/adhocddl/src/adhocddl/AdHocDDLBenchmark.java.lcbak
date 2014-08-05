@@ -223,7 +223,7 @@ public class AdHocDDLBenchmark {
     {
         String createStmt = DDLGen.CreateTable(0, config.table);
         String dropStmt = DDLGen.DropTable(0, config.table);
-
+        
         // Warmup
         for(int i = 0; i < config.numOfWarmup; i++)
         {
