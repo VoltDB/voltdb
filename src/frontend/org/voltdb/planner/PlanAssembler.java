@@ -400,6 +400,16 @@ public class PlanAssembler {
         if ( ! coordinateResult) {
             retval.rootPlanGraph = StmtSubqueryScan.removeCoordinatorSendReceivePair(retval.rootPlanGraph);
         }
+
+        // If we have content non-determinism on DML, then fail planning.
+        // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
+        // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
+        //   (e.g., WHERE c IN (SELECT ...))
+        if (retval != null && retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.readOnly) {
+            throw new PlanningErrorException("DML statement manipulates data in content non-deterministic way " +
+                        "(this may happen on INSERT INTO ... SELECT, for example).");
+        }
+
         return retval;
     }
 

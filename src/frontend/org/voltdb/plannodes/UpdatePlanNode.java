@@ -65,4 +65,9 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
     protected String explainPlanForNode(String indent) {
         return "UPDATE";
     }
+
+    @Override
+    public boolean isOrderDeterministic() {
+        return true;
+    }
 }
