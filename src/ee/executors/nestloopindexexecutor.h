@@ -85,8 +85,6 @@ public:
 
     ~NestLoopIndexExecutor();
 
-    void updateTargetTableAndIndex();
-
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
