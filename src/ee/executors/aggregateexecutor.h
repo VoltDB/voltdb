@@ -194,6 +194,14 @@ protected:
 
 
     void initGroupByKeyTuple(const TableTuple& nextTuple);
+
+    /*
+     * Swap the current group by key tuple with the in-progress group by key tuple.
+     * Return the new group by key tuple associated with in-progress tuple address.
+     * This function is only used in serial or partial aggregation.
+     */
+    TableTuple& swapWithInprogressGroupByKeyTuple();
+
     /*
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
@@ -216,6 +224,8 @@ protected:
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
     const TupleSchema * m_inputSchema;
 
+    // used for serial/partial aggregation only
+    TableTuple m_inProgressGroupByKeyTuple;
     // used for partial aggregation.
     std::vector<int> m_partialSerialGroupByColumns;
     std::vector<int> m_partialHashGroupByColumns;
@@ -286,7 +296,6 @@ protected:
     bool m_noInputRows;
     bool m_failPrePredicateOnFirstRow;
 
-    TableTuple m_inProgressGroupByKeyTuple;
     TableTuple m_passThroughTupleSource;
 
 private:
@@ -312,7 +321,6 @@ private:
 
     bool m_atTheFirstRow;
     PoolBackedTupleStorage m_nextPartialGroupByKeyStorage;
-    TableTuple m_inProgressGroupByKeyTuple;
     HashAggregateMapType m_hash;
 };
 

@@ -247,8 +247,7 @@ function export-on-server-verify() {
 
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
-        genqa.ExportKafkaOnServerVerifier kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
-        4 $CLIENTLOG
+        genqa.ExportKafkaOnServerVerifier kafka1:7181 voltdbexport
 }
 
 function export-rabbitmq-verify() {

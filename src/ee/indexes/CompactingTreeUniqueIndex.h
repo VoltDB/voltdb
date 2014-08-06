@@ -60,11 +60,12 @@ namespace voltdb {
  * Index implemented as a Binary Tree Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, bool hasRank>
+template<typename KeyValuePair, bool hasRank>
 class CompactingTreeUniqueIndex : public TableIndex
 {
+    typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyType::KeyComparator KeyComparator;
-    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
+    typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;
 
     ~CompactingTreeUniqueIndex() {};
@@ -306,7 +307,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     virtual TableIndex *cloneEmptyNonCountingTreeIndex() const
     {
-        return new CompactingTreeUniqueIndex<KeyType, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
+        return new CompactingTreeUniqueIndex<KeyValuePair, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
     }
 
 
