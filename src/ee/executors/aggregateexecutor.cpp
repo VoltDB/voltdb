@@ -515,6 +515,17 @@ void AggregateExecutorBase::initGroupByKeyTuple(const TableTuple& nextTuple)
     }
 }
 
+TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+
+    void* recycledStorage = m_inProgressGroupByKeyTuple.address();
+    void* inProgressStorage = nextGroupByKeyTuple.address();
+    m_inProgressGroupByKeyTuple.move(inProgressStorage);
+    nextGroupByKeyTuple.move(recycledStorage);
+
+    return nextGroupByKeyTuple;
+}
+
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
@@ -527,6 +538,10 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
     m_inputSchema = schema;
 
+    m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
+    // set the schema first because of the NON-null check in MOVE function
+    m_inProgressGroupByKeyTuple.move(NULL);
+
     char * storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     return TableTuple(storage, schema);
@@ -536,6 +551,8 @@ void AggregateExecutorBase::p_execute_finish()
 {
     TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
     nextGroupByKeyTuple.move(NULL);
+
+    m_inProgressGroupByKeyTuple.move(NULL);
 
     m_memoryPool.purge();
 }
@@ -639,9 +656,6 @@ TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
-    m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
-    m_inProgressGroupByKeyTuple.move(NULL);
-
     char* storage = reinterpret_cast<char*>(
             m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple(storage, schema);
@@ -693,12 +707,8 @@ bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         m_noInputRows = false;
         return false;
     }
-    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
 
-    void* recycledStorage = m_inProgressGroupByKeyTuple.address();
-    void* inProgressStorage = nextGroupByKeyTuple.address();
-    m_inProgressGroupByKeyTuple.move(inProgressStorage);
-    nextGroupByKeyTuple.move(recycledStorage);
+    TableTuple& nextGroupByKeyTuple = swapWithInprogressGroupByKeyTuple();
 
     initGroupByKeyTuple(nextTuple);
 
@@ -752,7 +762,6 @@ void AggregateSerialExecutor::p_execute_finish()
 
     // clean up the member variables
     delete m_aggregateRow;
-    m_inProgressGroupByKeyTuple.move(NULL);
     AggregateExecutorBase::p_execute_finish();
 }
 
@@ -770,9 +779,6 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
-
-    m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
-    m_inProgressGroupByKeyTuple.move(NULL);
 
     // for next input tuple
     return nextInputTuple;
@@ -819,12 +825,7 @@ inline void AggregatePartialExecutor::initPartialHashGroupByKeyTuple(const Table
 }
 
 bool AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
-    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
-
-    void* recycledStorage = m_inProgressGroupByKeyTuple.address();
-    void* inProgressStorage = nextGroupByKeyTuple.address();
-    m_inProgressGroupByKeyTuple.move(inProgressStorage);
-    nextGroupByKeyTuple.move(recycledStorage);
+    TableTuple& nextGroupByKeyTuple = swapWithInprogressGroupByKeyTuple();
 
     initGroupByKeyTuple(nextTuple);
 
@@ -900,8 +901,6 @@ void AggregatePartialExecutor::p_execute_finish()
     m_hash.clear();
     TableTuple& nextGroupByKeyTuple = m_nextPartialGroupByKeyStorage;
     nextGroupByKeyTuple.move(NULL);
-
-    m_inProgressGroupByKeyTuple.move(NULL);
 
     AggregateExecutorBase::p_execute_finish();
 }
