@@ -71,7 +71,7 @@ function client() {
     srccompile
     java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
         --servers=localhost \
-        --numOfTests=15 \
+        --numOfTests=5 \
         --numOfCols=5 \
         --idxPercent=0.1 \
         --numOfSPs=4 \

@@ -58,11 +58,12 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, bool hasRank>
+template<typename KeyValuePair, bool hasRank>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
+    typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyType::KeyComparator KeyComparator;
-    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
+    typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;
     typedef std::pair<MapIterator, MapIterator> MapRange;
 
@@ -90,22 +91,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
     bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
         assert(originalTuple.address() != destinationTuple.address());
-
-        // full delete and insert for certain key types
-        if (KeyType::keyDependsOnTupleAddress()) {
-            if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
-                return false;
-            }
-            return CompactingTreeMultiMapIndex::addEntry(&destinationTuple);
-        }
-
-        MapIterator mapiter = findTuple(originalTuple);
-        if (mapiter.isEnd()) {
+        // The KeyType will always depend on tuple address, excpet for CompactingTreeMultiIndexTest.
+        if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
         }
-        mapiter.setValue(destinationTuple.address());
-        m_updates++;
-        return true;
+        return CompactingTreeMultiMapIndex::addEntry(&destinationTuple);
     }
 
     bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
@@ -272,13 +262,14 @@ class CompactingTreeMultiMapIndex : public TableIndex
            return -1;
         }
         ++m_lookups;
-        const KeyType tmpKey(searchKey);
+        KeyType tmpKey(searchKey);
         MapIterator mapIter = m_entries.lowerBound(tmpKey);
         if (mapIter.isEnd()) {
             return m_entries.size();
         }
+        setPointerValue(tmpKey, MAXPOINTER);
         int cmp = m_cmp(tmpKey, mapIter.key());
-        if (cmp != 0) {
+        if (cmp < 0) {
             mapIter.movePrev();
             if (mapIter.isEnd()) {
                 // we can not find a previous key
@@ -318,11 +309,24 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     MapIterator findKey(const TableTuple *searchKey) {
         m_keyEndIter = MapIterator();
-        return m_entries.find(KeyType(searchKey));
+        KeyType tempKey(searchKey);
+        MapIterator rv = m_entries.lowerBound(tempKey);
+        KeyType rvKey = rv.key();
+        setPointerValue(tempKey, MAXPOINTER);
+        if (m_cmp(rvKey, tempKey) <= 0) {
+            return rv;
+        }
+        return MapIterator();
     }
 
     MapIterator findTuple(const TableTuple &originalTuple)
     {
+        // TODO: couldn't remove this, because of CompactingTreeMultiIndexTest in eecheck
+        // code will force to use non-pointer-key.
+        if (KeyType::keyDependsOnTupleAddress()) {
+            return m_entries.find(setKeyFromTuple(&originalTuple));
+        }
+
         for (MapRange iter_pair = m_entries.equalRange(setKeyFromTuple(&originalTuple));
              ! iter_pair.first.equals(iter_pair.second);
              iter_pair.first.moveNext()) {

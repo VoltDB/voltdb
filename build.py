@@ -413,6 +413,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_scripted_test
      index_test
      compacting_hash_index
+     CompactingTreeMultiIndexTest
     """
 
 if whichtests in ("${eetestsuite}", "storage"):

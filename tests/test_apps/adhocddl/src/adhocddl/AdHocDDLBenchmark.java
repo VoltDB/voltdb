@@ -65,7 +65,7 @@ public class AdHocDDLBenchmark {
         int numOfWarmup = 5;
 
         @Option(desc = "Number of tests sent to server")
-        int numOfTests = 15;
+        int numOfTests = 5;
 
         @Option(desc = "Number of SPs per table in server")
         int numOfSPs = 4;
