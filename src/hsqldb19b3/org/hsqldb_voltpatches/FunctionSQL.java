@@ -296,7 +296,7 @@ public class FunctionSQL extends Expression {
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
                     /* disable 1 line ...
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
-                    ... disable 1 line */
+                    ... disabled 1 line */
                     // End of VoltDB extension
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
