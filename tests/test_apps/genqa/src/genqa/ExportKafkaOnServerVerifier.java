@@ -130,8 +130,8 @@ public class ExportKafkaOnServerVerifier {
         //Zookeeper
         m_zookeeper = args[0];
         System.out.println("Zookeeper is: " + m_zookeeper);
-        //Topic
-        m_topic = args[1]; //"voltdbexportEXPORT_PARTITIONED_TABLE";
+        //Topic Prefix
+        m_topicPrefix = args[1]; //"voltdbexport";
 
         boolean skinny = false;
         if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
@@ -151,7 +151,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifyFat() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic, false);
+        createAndConsumeKafkaStreams(m_topicPrefix, false);
     }
 
     /**
@@ -162,7 +162,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifySkinny() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic, true);
+        createAndConsumeKafkaStreams(m_topicPrefix, true);
     }
 
     public class ExportConsumer implements Runnable {
@@ -234,7 +234,10 @@ public class ExportKafkaOnServerVerifier {
     }
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
-    void createAndConsumeKafkaStreams(String topic, String doneTopic, boolean skinny) throws Exception {
+    void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
+        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
+
         List<Future<Long>> doneFutures = new ArrayList<>();
 
         Map<String, Integer> topicCountMap = new HashMap<>();
@@ -289,8 +292,7 @@ public class ExportKafkaOnServerVerifier {
         m_kafkaConfig = null;
     }
 
-    String m_topic = null;
-    final String m_doneTopic = "voltdbexportEXPORT_DONE_TABLE";
+    String m_topicPrefix = null;
     String m_zookeeper = null;
 
     static {
