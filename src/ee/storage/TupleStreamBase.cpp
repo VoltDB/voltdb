@@ -261,14 +261,9 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
-    bool spanBuffer = false;
-    StreamBlock* oldBlock = NULL;
-    size_t partialTxnLength = 0;
-
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
-            oldBlock = m_currBlock;
             m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
@@ -284,32 +279,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Failed to claim managed buffer for Export.");
     }
 
-    // If partial transaction is going to span multiple buffer, move it to next buffer.
-    // But before that, make sure uso is continuous between two buffers
-    if (oldBlock && oldBlock->remaining() < minLength &&
-            oldBlock->hasDRBeginTxn() &&
-            oldBlock->lastDRBeginTxnOffset() != oldBlock->offset()) {
-        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength < oldBlock->capacity()) {
-            m_uso -= partialTxnLength;
-        }
-        spanBuffer = true;
-    }
-
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
-
-    if (spanBuffer) {
-        if (partialTxnLength + minLength >= m_currBlock->capacity()) {
-            throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
-        }
-        ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
-        m_currBlock->recordLastBeginTxnOffset();
-        m_currBlock->consumed(partialTxnLength);
-        ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
-        oldBlock->truncateTo(m_uso);
-        oldBlock->clearLastBeginTxnOffset();
-        m_uso += partialTxnLength;
-    }
 
     pushPendingBlocks();
 }

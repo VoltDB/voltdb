@@ -69,7 +69,7 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 

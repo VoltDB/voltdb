@@ -62,6 +62,8 @@ public:
     void beginTransaction(int64_t txnId, int64_t spHandle);
     void endTransaction(int64_t spHandle);
 
+    void extendBufferChain(size_t minLength);
+
     bool m_enabled;
 private:
     CatalogId m_partitionId;
