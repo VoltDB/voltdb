@@ -3187,6 +3187,18 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+            sql = "select SUBSTR('abc123ABC', 3) from p1 where id = 0;";
+            cr = cl.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+            sql = "select SUBSTRING('abc123ABC', 3) from p1 where id = 0;";
+            cr = cl.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
         }
 
         // LCASE and UCASE
