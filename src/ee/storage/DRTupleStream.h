@@ -30,8 +30,8 @@ class StreamBlock;
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
-    //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
-    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
+    //Version(1), type(1), txnid(8), sphandle(8), uniqueId(8), checksum(4)
+    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 8 + 4;
     //Version(1), type(1), sphandle(8), checksum(4)
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
@@ -54,17 +54,19 @@ public:
                        char *tableHandle,
                        int64_t txnId,
                        int64_t spHandle,
+                       int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t txnId, int64_t spHandle);
+    void beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId);
     void endTransaction(int64_t spHandle);
 
     bool m_enabled;
 private:
     CatalogId m_partitionId;
+    int8_t m_clusterId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
@@ -74,6 +76,7 @@ public:
                            char *tableHandle,
                            int64_t txnId,
                            int64_t spHandle,
+                           int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type) {
         return 0;

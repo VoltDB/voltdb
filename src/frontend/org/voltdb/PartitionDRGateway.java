@@ -122,7 +122,7 @@ public class PartitionDRGateway {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public void onBinaryDR(int partitionId, long startSpHandle, long lastSpHandle, long lastCommittedSpHandle, ByteBuffer buf) {
+    public void onBinaryDR(int partitionId, long startSpHandle, long lastSpHandle, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -237,6 +237,6 @@ public class PartitionDRGateway {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, lastCommittedSpHandle, buf);
+        pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, buf);
     }
 }

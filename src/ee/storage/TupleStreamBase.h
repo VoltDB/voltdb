@@ -73,11 +73,11 @@ public:
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    virtual void beginTransaction(int64_t txnId, int64_t spHandle) {}
-    virtual void endTransaction(int64_t spHandle) {}
+    virtual void beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId) {}
+    virtual void endTransaction(int64_t uniqueId) {}
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync = false, bool flush = false);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
@@ -97,6 +97,8 @@ public:
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openSpHandle;
 
+    int64_t m_openUniqueId;
+
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
@@ -105,6 +107,8 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
+
+    int64_t m_committedUniqueId;
 };
 
 }

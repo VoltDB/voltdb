@@ -327,7 +327,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Flush to generate a buffer
     drStream.periodicFlush(-1, 42);
-    EXPECT_TRUE( topend.receivedDRBuffer );
+    ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
     boost::unordered_map<int64_t, PersistentTable*> tables;
@@ -370,7 +370,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Flush to generate the log buffer
     drStream.periodicFlush(-1, 101);
-    EXPECT_TRUE( topend.receivedDRBuffer );
+    ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated block of log data
     sb = topend.blocks[0];

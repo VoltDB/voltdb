@@ -35,18 +35,16 @@ namespace voltdb
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
               m_uso(uso),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
+              m_startUniqueId(std::numeric_limits<int64_t>::max()),
+              m_lastUniqueId(std::numeric_limits<int64_t>::max())
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
               m_uso(other->m_uso),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
+              m_startUniqueId(other->m_startUniqueId),
+              m_lastUniqueId(other->m_lastUniqueId)
         {
         }
 
@@ -90,28 +88,24 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
-        int64_t startSpHandle() {
-            return m_startSpHandle;
+        int64_t startUniqueId() {
+            return m_startUniqueId;
         }
 
-        void startSpHandle(int64_t spHandle) {
-            m_startSpHandle = spHandle;
+        /*
+         * Sneakily set both start and last
+         */
+        void startUniqueId(int64_t uniqueId) {
+            m_lastUniqueId = uniqueId;
+            m_startUniqueId = std::min(uniqueId, m_startUniqueId);
         }
 
-        int64_t lastSpHandle() {
-            return m_lastSpHandle;
+        int64_t lastUniqueId() {
+            return m_lastUniqueId;
         }
 
-        void lastSpHandle(int64_t spHandle) {
-            m_lastSpHandle = spHandle;
-        }
-
-        int64_t lastCommittedSpHandle() {
-            return m_lastCommittedSpHandle;
-        }
-
-        void lastCommittedSpHandle(int64_t spHandle) {
-            m_lastCommittedSpHandle = spHandle;
+        void lastUniqueId(int64_t uniqueId) {
+            m_lastUniqueId = uniqueId;
         }
 
     private:
@@ -140,9 +134,8 @@ namespace voltdb
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
-        int64_t m_startSpHandle;
-        int64_t m_lastSpHandle;
-        int64_t m_lastCommittedSpHandle;
+        int64_t m_startUniqueId;
+        int64_t m_lastUniqueId;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

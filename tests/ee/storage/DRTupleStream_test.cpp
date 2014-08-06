@@ -51,12 +51,12 @@ const int COLUMN_COUNT = 5;
 // 5 * sizeof(int32_t) for tuple data = 40
 // total: 67
 const int MAGIC_TUPLE_SIZE = 39;
-const int MAGIC_TRANSACTION_SIZE = 36;
-const int MAGIC_BEGIN_SIZE = 22;
+const int MAGIC_TRANSACTION_SIZE = 44;
+const int MAGIC_BEGIN_SIZE = 30;
 const int MAGIC_END_SIZE = MAGIC_TRANSACTION_SIZE - MAGIC_BEGIN_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // 1k buffer
-const int BUFFER_SIZE = 983;
+const int BUFFER_SIZE = 1082;
 const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
 
 class DRTupleStreamTest : public Test {
@@ -104,7 +104,7 @@ public:
         }
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, *m_tuple,
+                               currentSpHandle, currentSpHandle, *m_tuple,
                                DR_RECORD_INSERT);
     }
 
