@@ -1424,7 +1424,12 @@ public class FunctionSQL extends Expression {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
+                // A VoltDB extension to make the third parameter optional
+                /* disable 1 line ...
                 if (nodes[2] != null) {
+                ... disabled 1 line */
+                if (nodes.length > 2 && nodes[2] != null) {
+                // End of VoltDB extension
                     if (nodes[2].dataType == null) {
                         nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
                     }
@@ -2073,7 +2078,7 @@ public class FunctionSQL extends Expression {
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
-            if (nodes[2] == null) {
+            if (nodes.length == 2 || nodes[2] == null) {
                 exp.attributes.put("volt_alias", "substring_from");
                 volt_funcType = FUNC_VOLT_SUBSTRING_CHAR_FROM;
             } else {
@@ -2301,7 +2306,7 @@ public class FunctionSQL extends Expression {
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
-            if (nodes[2] == null) {
+            if (nodes.length == 2 || nodes[2] == null) {
                 exp.attributes.put("volt_alias", "substring_from");
             } else {
                 exp.attributes.put("volt_alias", "substring_from_for");
