@@ -414,7 +414,12 @@ public class FunctionSQL extends Expression {
                 };
                 parseListAlt = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    // A VoltDB extension to make the third parameter optional
+                    /* disable 1 line ...
                     Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                    ... disabled 1 line */
+                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
+                    // End of VoltDB extension
                     Tokens.CLOSEBRACKET
                 };
                 break;
