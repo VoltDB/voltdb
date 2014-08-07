@@ -149,7 +149,6 @@ public class PartitionDRGateway {
             int partitionId,
             long startSpHandle,
             long lastSpHandle,
-            long lastCommittedSpHandle,
             ByteBuffer buf) {
         if (logDebug) {
             System.out.println("Received DR buffer size " + buf.remaining());
