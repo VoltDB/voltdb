@@ -26,8 +26,11 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -66,6 +69,7 @@ public class Collector {
     private static boolean m_calledFromVEM = false;
     private static boolean m_copyToVEM = false;
     private static boolean m_fileInfoOnly = false;
+    private static int m_daysOfFileToCollect = 13;
 
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
@@ -84,18 +88,22 @@ public class Collector {
         m_noPrompt = Boolean.parseBoolean(args[5]);
         m_dryRun = Boolean.parseBoolean(args[6]);
         m_skipHeapDump = Boolean.parseBoolean(args[7]);
+        m_daysOfFileToCollect = Integer.parseInt(args[8]);
+
+        // To Do
+        // Fix the VEM call because the argument numbers has been changed
 
         // arguments only used when Collector is called from VEM
-        if (args.length > 8) {
+        if (args.length > 9) {
             m_calledFromVEM = true;
 
             // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
             // so the resulting file is easier to be located and copied to VEM
-            m_copyToVEM = Boolean.parseBoolean(args[8]);
+            m_copyToVEM = Boolean.parseBoolean(args[9]);
 
             // generate a list of information (server name, size, and path) of files rather than actually collect files
             // used by files display panel in VEM UI
-            m_fileInfoOnly = Boolean.parseBoolean(args[9]);
+            m_fileInfoOnly = Boolean.parseBoolean(args[10]);
         }
 
         File voltDbRoot = new File(m_voltDbRootPath);
@@ -230,33 +238,39 @@ public class Collector {
 
             for (String path: m_logPaths) {
                 for (File file: new File(path).getParentFile().listFiles()) {
-                    if (file.getName().startsWith(new File(path).getName())) {
-                        collectionFilesList.add(file.getCanonicalPath());
+                    if (file.getName().startsWith(new File(path).getName())
+                            && checkToIncludeFile(file)) {
+                       collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
             }
 
             for (File file: new File(m_voltDbRootPath).listFiles()) {
-                if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
+                if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
+                        && checkToIncludeFile(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
-                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
+                        && checkToIncludeFile(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
 
             for (File file: new File(m_workingDir).listFiles()) {
-                if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
+                if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
+                        && checkToIncludeFile(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
-                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
+                        && checkToIncludeFile(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
 
             if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
-                    if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")) {
+                    if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
+                            && checkToIncludeFile(file)) {
                         collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
@@ -268,7 +282,8 @@ public class Collector {
             File varlogDir = new File("/var/log");
             if (varlogDir.canRead()) {
                 for (File file: varlogDir.listFiles()) {
-                    if (file.getName().startsWith("syslog") || file.getName().equals("dmesg")) {
+                    if (file.getName().startsWith("syslog") || file.getName().equals("dmesg")
+                            && checkToIncludeFile(file)) {
                         if (file.canRead()) {
                             collectionFilesList.add(file.getCanonicalPath());
                         }
@@ -280,6 +295,15 @@ public class Collector {
         }
 
         return collectionFilesList;
+    }
+
+    private static boolean checkToIncludeFile(File file){
+        Date modifiedDate = new Date(file.lastModified());
+        SimpleDateFormat formatter = new SimpleDateFormat("D");
+        int modifyDay = Integer.parseInt(formatter.format(modifiedDate));
+        int currentDay = Integer.parseInt(formatter.format(Calendar.getInstance().getTime()));
+        int diff = currentDay - modifyDay;
+        return   diff <= m_daysOfFileToCollect;
     }
 
     private static void generateCollection(List<String> paths, boolean copyToVEM) {
