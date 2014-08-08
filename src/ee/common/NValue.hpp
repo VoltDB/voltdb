@@ -1412,9 +1412,18 @@ class NValue {
         // note: we allow binary conversion to strings to support
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
-            NValue retval(VALUE_TYPE_VARCHAR);
-            memcpy(retval.m_data, m_data, sizeof(m_data));
-            return retval;
+            if (! m_sourceInlined) {
+                NValue retval(VALUE_TYPE_VARCHAR);
+                memcpy(retval.m_data, m_data, sizeof(m_data));
+                return retval;
+            }
+            else {
+                // Create a new temp copy for the caller.  Inlined
+                // data references the interior of a record somewhere,
+                // which can be troublesome.
+                return getTempStringValue(static_cast<const char*>(getObjectValue_withoutNull()),
+                                          getObjectLength_withoutNull());
+            }
         }
         case VALUE_TYPE_TIMESTAMP: {
             streamTimestamp(value);
@@ -1433,7 +1442,16 @@ class NValue {
         const ValueType type = getValueType();
         switch (type) {
         case VALUE_TYPE_VARBINARY:
-            memcpy(retval.m_data, m_data, sizeof(m_data));
+            if (! m_sourceInlined) {
+                memcpy(retval.m_data, m_data, sizeof(m_data));
+            }
+            else {
+                // return an un-inlined version of the data.
+                void* data = getObjectValue_withoutNull();
+                size_t len = getObjectLength_withoutNull();
+                return getTempBinaryValue(static_cast<const unsigned char*>(data),
+                                          len);
+            }
             break;
         default:
             throwCastSQLException(type, VALUE_TYPE_VARBINARY);
@@ -3245,7 +3263,7 @@ inline NValue NValue::castAs(ValueType type) const {
     VOLT_TRACE("Converting from %s to %s",
             voltdb::getTypeName(getValueType()).c_str(),
             voltdb::getTypeName(type).c_str());
-    if (getValueType() == type) {
+    if (getValueType() == type && !m_sourceInlined) {
         return *this;
     }
     if (isNull()) {
