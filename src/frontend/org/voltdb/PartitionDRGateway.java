@@ -239,4 +239,8 @@ public class PartitionDRGateway {
         }
         pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, lastCommittedSpHandle, buf);
     }
+
+    public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync) {
+        return null;
+    }
 }

@@ -2566,6 +2566,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return m_nodeDRGateway;
+    }
+
+    @Override
     public SiteTracker getSiteTrackerForSnapshot()
     {
         return new SiteTracker(m_messenger.getHostId(), m_cartographer.getSiteTrackerMailboxMap(), 0);

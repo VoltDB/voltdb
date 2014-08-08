@@ -370,6 +370,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
         }
+
+        @Override
+        public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            return Site.this.m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+        }
     };
 
     /** Create a new execution site and the corresponding EE */

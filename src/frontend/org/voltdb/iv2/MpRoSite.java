@@ -221,6 +221,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                 List<DBBPool.BBContainer> outputBuffers)
         {
