@@ -28,6 +28,14 @@
 namespace voltdb {
 class StreamBlock;
 
+//If you change this constant here change it in Java in the StreamBlockQueue where
+//it is used to calculate the number of bytes queued
+//I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care
+//It just reports the size of used bytes and not the size of the allocation
+//Add a 4k page at the end for bytes beyond the 2 meg row limit due to null mask and length prefix and so on
+//Necessary for very large rows
+const int SECONDAERY_BUFFER_SIZE = /* 1024; */ (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
     //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
@@ -46,6 +54,9 @@ public:
     void configure(CatalogId partitionId) {
         m_partitionId = partitionId;
     }
+
+    // for test purpose
+    virtual void setSecondaryCapacity(size_t capacity);
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
@@ -67,6 +78,7 @@ public:
     bool m_enabled;
 private:
     CatalogId m_partitionId;
+    size_t m_secondaryCapacity;
 };
 
 class MockDRTupleStream : public DRTupleStream {

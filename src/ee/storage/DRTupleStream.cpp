@@ -40,8 +40,19 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0)
+      m_partitionId(0),m_secondaryCapacity(SECONDAERY_BUFFER_SIZE)
 {}
+
+void DRTupleStream::setSecondaryCapacity(size_t capacity) {
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    {
+        throwFatalException("setSecondaryCapacity only callable before "
+                            "TupleStreamBase is used");
+    }
+    m_secondaryCapacity = capacity;
+}
 
 /*
  * If SpHandle represents a new transaction, commit previous data.
@@ -205,9 +216,11 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
-    bool spanBuffer = false;
     StreamBlock* oldBlock = NULL;
     size_t partialTxnLength = 0;
+    size_t blockSize = m_defaultCapacity;
+    bool spanBuffer = false;
+    bool throwException = false;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
@@ -223,29 +236,45 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
         }
     }
 
-    char *buffer = new char[m_defaultCapacity];
-    if (!buffer) {
-        throwFatalException("Failed to claim managed buffer for Export.");
-    }
-
-    // If partial transaction is going to span multiple buffer, move it to next buffer.
-    // But before that, make sure uso is continuous between two buffers
-    if (oldBlock && oldBlock->remaining() < minLength &&
-            oldBlock->hasDRBeginTxn() &&
-            oldBlock->lastDRBeginTxnOffset() != oldBlock->offset()) {
-        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength < oldBlock->capacity()) {
-            m_uso -= partialTxnLength;
-        }
+    // If partial transaction is going to span multiple buffer, first time move it to
+    // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
+    // an exception and rollback.
+    if (oldBlock && oldBlock->remaining() < minLength   /* remain space is not big enough */
+            && oldBlock->hasDRBeginTxn()   /* this block contains a DR begin txn */
+            && oldBlock->lastDRBeginTxnOffset() != oldBlock->offset() /* current txn is not a DR begin txn */) {
         spanBuffer = true;
+        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        m_uso -= partialTxnLength;
+        if (partialTxnLength + minLength >= oldBlock->capacity()) {
+            switch (oldBlock->type()) {
+                case voltdb::NORMAL_STREAM_BLOCK:
+                {
+                    blockSize = m_secondaryCapacity;
+                    break;
+                }
+                case voltdb::LARGE_STREAM_BLOCK:
+                {
+                    throwException = true;
+                    break;
+                }
+            }
+        }
+    }
+    char * buffer = new char[blockSize];
+    if (!buffer) {
+        throwFatalException("Failed to claim managed buffer for DR");
+    }
+    m_currBlock = new StreamBlock(buffer, blockSize, m_uso);
+    if (blockSize == m_secondaryCapacity) {
+        m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
 
-    m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    if (throwException) {
+        rollbackTo(m_uso);
+        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
 
     if (spanBuffer) {
-        if (partialTxnLength + minLength >= m_currBlock->capacity()) {
-            throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
-        }
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
         m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);

@@ -26,6 +26,10 @@
 #define MAGIC_HEADER_SPACE_FOR_JAVA 8
 namespace voltdb
 {
+    enum StreamBlockType {
+        NORMAL_STREAM_BLOCK = 1,
+        LARGE_STREAM_BLOCK = 2
+    };
     /**
      * A single data block with some buffer semantics.
      */
@@ -33,14 +37,14 @@ namespace voltdb
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
-              m_uso(uso), m_lastDRBeginTxnOffset(0), m_hasDRBeginTxn(false)
+              m_uso(uso), m_lastDRBeginTxnOffset(0), m_hasDRBeginTxn(false), m_type(voltdb::NORMAL_STREAM_BLOCK)
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
               m_uso(other->m_uso), m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
-              m_hasDRBeginTxn(other->m_hasDRBeginTxn)
+              m_hasDRBeginTxn(other->m_hasDRBeginTxn), m_type(other->m_type)
         {
         }
 
@@ -95,6 +99,10 @@ namespace voltdb
             return m_lastDRBeginTxnOffset;
         }
 
+        StreamBlockType type() const {
+            return m_type;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
@@ -135,12 +143,15 @@ namespace voltdb
             return m_data + m_lastDRBeginTxnOffset;
         }
 
+        void setType(StreamBlockType type) { m_type = type; }
+
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
+        StreamBlockType m_type;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

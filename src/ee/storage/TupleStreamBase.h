@@ -59,6 +59,7 @@ public:
      * to test buffer rollover.
      */
     void setDefaultCapacity(size_t capacity);
+    virtual void setSecondaryCapacity(size_t capacity) {};
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
