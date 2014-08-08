@@ -225,7 +225,9 @@ struct IntsKey
         return std::string(buffer.str());
     }
 
-    IntsKey() {}
+    IntsKey() {
+        ::memset(data, 0, keySize * sizeof(uint64_t));
+    }
 
     IntsKey(const TableTuple *tuple) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
@@ -428,7 +430,9 @@ struct GenericKey
     static inline bool keyDependsOnTupleAddress() { return false; }
     static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
 
-    GenericKey() {}
+    GenericKey() {
+        ::memset(data, 0, keySize * sizeof(char));
+    }
 
     GenericKey(const TableTuple *tuple) {
         assert(tuple);
