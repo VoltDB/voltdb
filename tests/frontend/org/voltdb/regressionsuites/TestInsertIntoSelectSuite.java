@@ -780,6 +780,42 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                         "INSERT INTO ... SELECT statement subquery is too complex");
     }
 
+    public void testSelectListConstants() throws Exception {
+        Client client = getClient();
+
+        // This statements illustrate existing limitations
+        // of partitioning inference.
+        //
+        // Constants in the select list of the subquery
+        // do not help refine partitioning.
+
+        // In this example, the subquery is multipart, but
+        // we are only inserting into one partition---only two fragments
+        // are required in this plan.
+        verifyStmtFails(client, "insert into target_p " +
+                "select 9, vc, ii, ti " +
+                "from source_p1 as sp1",
+                "Partitioning could not be determined");
+
+        // this whole statement should be single-partition!
+        verifyStmtFails(client, "insert into target_p " +
+                "select 9, vc, ii, ti " +
+                "from source_p1 as sp1 where sp1.bi = 9",
+                "Partitioning could not be determined");
+
+        // Note however that this issue is not specific to
+        // INSERT INTO ... SELECT.  This fails to plan as well:
+        verifyStmtFails(client,
+                "select count(*) " +
+                "from target_p " +
+                "inner join " +
+                "(select 9 as bi, vc, ii, ti from source_p1) as ins_sq " +
+                "on target_p.bi = ins_sq.bi",
+                "Join of multiple partitioned tables " +
+                "has insufficient join criteria"
+                );
+    }
+
     public void testInsertIntoSelectGeneratedProcs() throws Exception
     {
         Set<Map.Entry<String, List<String>>> allEntries = mapOfAllGeneratedStatements().entrySet();

@@ -32,7 +32,8 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.types.PlanNodeType;
 
 public class InsertSubPlanAssembler extends SubPlanAssembler {
 
@@ -42,19 +43,6 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             StatementPartitioning partitioning) {
         super(db, parsedStmt, partitioning);
         // TODO Auto-generated constructor stub
-    }
-
-    private static int countSendNodes(AbstractPlanNode node) {
-        int count = 0;
-        if (node instanceof SendPlanNode) {
-            count++;
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            count += countSendNodes(node.getChild(i));
-        }
-
-        return count;
     }
 
     @Override
@@ -72,7 +60,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
         String targetTableName = targetTable.getTypeName();
-        StmtSubqueryScan subquery = insertStmt.getSubquery();
+        StmtSubqueryScan subquery = insertStmt.getSubqueries().get(0);
 
         if (targetTable.getIsreplicated()) {
             // must not be single-partition insert if targeting a replicated table
@@ -100,7 +88,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             //
             // Build the corresponding data structures for analysis by StatementPartitioning.
 
-            if (countSendNodes(subquery.getBestCostPlan().rootPlanGraph) > 0) {
+            if (subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // What is the appropriate level of detail for this message?
                 m_recentErrorMsg = "INSERT INTO ... SELECT statement subquery is too complex.  " +
                     "Please either simplify the subquery or use a SELECT followed by an INSERT.";
@@ -108,7 +96,8 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             }
 
             List<StmtTableScan> tables = new ArrayList<>();
-            tables.add(new StmtTargetTableScan(targetTable, targetTable.getTypeName()));
+            StmtTargetTableScan stmtTargetTableScan = new StmtTargetTableScan(targetTable, targetTable.getTypeName());
+            tables.add(stmtTargetTableScan);
             tables.add(subquery);
 
             // Create value equivalence between the partitioning column of the target table
@@ -120,16 +109,18 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             boolean setEquivalenceForPartitioningCol = false;
             for (Column col : insertStmt.m_columns.keySet()) {
                 if (partitioningCol.compareTo(col) == 0) {
-                    TupleValueExpression tve = new TupleValueExpression(targetTableName, targetTableName, col.getName(), col.getName(), col.getIndex());
-                    AbstractExpression selectedExpr = subquery.getOutputExpression(i);
-                    assert(!valueEquivalence.containsKey(tve));
+                    List<SchemaColumn> partitioningColumns = stmtTargetTableScan.getPartitioningColumns();
+                    assert(partitioningColumns.size() == 1);
+                    AbstractExpression targetPartitionColExpr = partitioningColumns.get(0).getExpression();
+                    TupleValueExpression selectedExpr = subquery.getOutputExpression(i);
+                    assert(!valueEquivalence.containsKey(targetPartitionColExpr));
                     assert(!valueEquivalence.containsKey(selectedExpr));
 
                     Set<AbstractExpression> equivSet = new HashSet<>();
-                    equivSet.add(tve);
+                    equivSet.add(targetPartitionColExpr);
                     equivSet.add(selectedExpr);
 
-                    valueEquivalence.put(tve,  equivSet);
+                    valueEquivalence.put(targetPartitionColExpr,  equivSet);
                     valueEquivalence.put(selectedExpr,  equivSet);
                     setEquivalenceForPartitioningCol = true;
 

@@ -390,7 +390,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     /** Produce a tuple value expression for a column produced by this subquery */
-    public AbstractExpression getOutputExpression(int index) {
+    public TupleValueExpression getOutputExpression(int index) {
         SchemaColumn schemaCol = m_outputColumnList.get(index);
         TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
                 schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);

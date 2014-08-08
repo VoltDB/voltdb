@@ -1018,13 +1018,13 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
-
-        final boolean hasSubquery = (m_parsedInsert.getSubquery() != null);
+        StmtSubqueryScan subquery = m_parsedInsert.isInsertWithSubquery() ?
+                m_parsedInsert.getSubqueries().get(0) : null;
 
         CompiledPlan retval = null;
-        if (hasSubquery) {
+        if (subquery != null) {
 
-            if (m_parsedInsert.getSubquery().getBestCostPlan() == null) {
+            if (subquery.getBestCostPlan() == null) {
                 // Seems like this should really be caught earlier
                 // in getBestCostPlan, above.
                 throw new PlanningErrorException("INSERT INTO ... SELECT subquery could not be planned: "
@@ -1032,7 +1032,8 @@ public class PlanAssembler {
 
             }
 
-            InsertSubPlanAssembler subPlanAssembler = new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
+            InsertSubPlanAssembler subPlanAssembler =
+                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -1040,7 +1041,7 @@ public class PlanAssembler {
             assert(m_partitioning.isJoinValid());
 
             //  Use the subquery's plan as the basis for the insert plan.
-            retval = m_parsedInsert.getSubquery().getBestCostPlan();
+            retval = subquery.getBestCostPlan();
         }
         else {
             retval = new CompiledPlan();
@@ -1060,7 +1061,7 @@ public class PlanAssembler {
             }
 
             // hint that this statement can be executed SP.
-            if (col.equals(m_partitioning.getPartitionColForDML()) && ! hasSubquery) {
+            if (col.equals(m_partitioning.getPartitionColForDML()) && subquery == null) {
                 // When AdHoc insert-into-select is supported, we'll need to be able to infer
                 // partitioning of the sub-select
                 AbstractExpression expr = m_parsedInsert.getExpressionForPartitioning(col);
@@ -1070,7 +1071,7 @@ public class PlanAssembler {
         }
 
         NodeSchema matSchema = null;
-        if (! hasSubquery) {
+        if (subquery == null) {
             matSchema = new NodeSchema();
         }
 

@@ -100,9 +100,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             retval += "\n";
         }
 
-        if (getSubselect() != null) {
+        if (getSubselectStmt() != null) {
             retval += "SUBSELECT:\n";
-            retval += getSubselect().toString();
+            retval += getSubselectStmt().toString();
         }
         return retval;
     }
@@ -158,20 +158,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
-    @Override
-    public List<StmtSubqueryScan> getSubqueries() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<>();
-
-        if (m_subquery != null) {
-            subqueries.add(m_subquery);
-        }
-
-        return subqueries;
-    }
-
     public AbstractExpression getExpressionForPartitioning(Column column) {
         AbstractExpression expr = null;
-        if (getSubselect() != null) {
+        if (getSubselectStmt() != null) {
             // This method is used by statement partitioning to help infer single partition statements.
             // Caller expects a constant or parameter to be returned.
             return null;
@@ -187,25 +176,41 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
+    public boolean isInsertWithSubquery() {
+        if (m_subquery != null) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Return the subqueries for this statement.  For INSERT statements,
+     * there can be only one.
+     */
+    @Override
+    public List<StmtSubqueryScan> getSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_subquery != null) {
+            subqueries.add(m_subquery);
+        }
+
+        return subqueries;
+    }
+
     /**
      * @return the subquery for the insert stmt if there is one, null otherwise
      */
-    private ParsedSelectStmt getSubselect() {
+    private ParsedSelectStmt getSubselectStmt() {
         if (m_subquery != null) {
             return (ParsedSelectStmt)(m_subquery.getSubqueryStmt());
         }
-        else {
-            return null;
-        }
-    }
-
-    public StmtSubqueryScan getSubquery() {
-        return m_subquery;
+        return null;
     }
 
     @Override
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
-        assert(getSubselect() != null);
-        return getSubselect().isOrderDeterministicInSpiteOfUnorderedSubqueries();
+        assert(getSubselectStmt() != null);
+        return getSubselectStmt().isOrderDeterministicInSpiteOfUnorderedSubqueries();
     }
 }

@@ -703,6 +703,10 @@ public abstract class AbstractParsedStmt {
         }
     }
 
+    /** Get a list of the subqueries used by this statement.  This method
+     * may be overridden by subclasses, e.g., insert statements have a subquery
+     * but does not use m_joinTree.
+     **/
     public List<StmtSubqueryScan> getSubqueries() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
