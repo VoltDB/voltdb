@@ -231,8 +231,14 @@ class NValue {
     /* Create a default NValue */
     NValue();
 
-        // todo: free() should not really be const
+#ifdef MEMCHECK
+    /* If we're not memchecking, then the default copy ctor
+     * is fine. If we are, then perform extra checks on
+     * variable-length data. */
+    NValue(const NValue&);
+#endif
 
+    // todo: free() should not really be const
     /* Release memory associated to object type NValues */
     void free() const;
 
@@ -554,6 +560,11 @@ class NValue {
 
     /* Return a string full of arcana and wonder. */
     std::string debug() const;
+
+    /* for variable length values, check that the NValue's
+     * cached length matches the length preceding the value.
+     * Throws an exception if the check fails. */
+    void verifyLength() const;
 
     // Constants for Decimal type
     // Precision and scale (inherent in the schema)
@@ -2285,6 +2296,16 @@ inline NValue::NValue() {
     m_sourceInlined = false;
 }
 
+#ifdef MEMCHECK
+inline NValue::NValue(const NValue &that) {
+    ::memcpy(m_data, that.m_data, sizeof(m_data));
+    m_valueType = that.m_valueType;
+    m_sourceInlined = that.m_sourceInlined;
+
+    verifyLength();
+}
+#endif
+
 /**
  * Retrieve a boolean NValue that is true
  */
@@ -2649,6 +2670,10 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
 {
     const ValueType type = getValueType();
 
+#ifdef MEMCHECK
+    verifyLength();
+#endif
+
     switch (type) {
     case VALUE_TYPE_TIMESTAMP:
         *reinterpret_cast<int64_t*>(storage) = getTimestamp();
@@ -2715,6 +2740,11 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         const int32_t maxLength, const bool isInBytes) const
 {
     const ValueType type = getValueType();
+
+#ifdef MEMCHECK
+    verifyLength();
+#endif
+
     switch (type) {
     case VALUE_TYPE_TIMESTAMP:
         *reinterpret_cast<int64_t*>(storage) = getTimestamp();

@@ -179,6 +179,39 @@ std::string NValue::debug() const {
     return (ret);
 }
 
+void NValue::verifyLength() const {
+
+    if (m_valueType != VALUE_TYPE_VARBINARY &&
+        m_valueType != VALUE_TYPE_VARCHAR) {
+        return;
+    }
+
+    if (isNull()) {
+        return;
+    }
+
+    const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    int32_t cachedLength = getObjectLength_withoutNull();
+    int32_t lengthLength = getObjectLengthLength();
+    int32_t realLength;
+    assert(lengthLength == 1 || lengthLength == 4);
+    if (lengthLength == 1) {
+        realLength = *reinterpret_cast<const int8_t*>(ptr - lengthLength);
+    }
+    else {
+        realLength = *reinterpret_cast<const int32_t*>(ptr - lengthLength);
+    }
+
+    if (realLength != cachedLength) {
+        int64_t addr = reinterpret_cast<int64_t>(ptr);
+        std::ostringstream oss;
+        oss << "NValue's cached length does not match length preceding value!\n";
+        oss << "  cached length: " << cachedLength << "\n";
+        oss << "  length preceding value: " << realLength << "\n";
+        oss << "  value: \"" << std::string(ptr, realLength) << "\" [@" << addr << "]\n";
+        throw SQLException(SQLException::dynamic_sql_error, oss.str().c_str());
+    }
+}
 
 /**
  * Serialize sign and value using radix point (no exponent).
