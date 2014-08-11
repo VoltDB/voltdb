@@ -946,11 +946,15 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
+            String tableName = col.getKey().getTypeName();
+            AbstractExpression expr = col.getValue();
+            expr.setInBytes(col.getKey().getInbytes());
+
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    "VOLT_TEMP_TABLE",
-                                                   col.getKey().getTypeName(),
-                                                   col.getKey().getTypeName(),
-                                                   col.getValue()));
+                                                   tableName,
+                                                   tableName,
+                                                   expr));
 
             // check if this column is an indexed column
             if (affectedColumns.contains(col.getKey().getTypeName()))
@@ -1647,9 +1651,9 @@ public class PlanAssembler {
                     // Oh, oh, it's magic, you know..
                     TupleValueExpression tve = new TupleValueExpression(
                             "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
-                    tve.setValueType(rootExpr.getValueType());
-                    tve.setValueSize(rootExpr.getValueSize());
-                    tve.setInBytes(rootExpr.getInBytes());
+                    tve.setTypeSizeBytes(rootExpr.getValueType(), rootExpr.getValueSize(),
+                            rootExpr.getInBytes());
+
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
