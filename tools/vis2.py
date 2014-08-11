@@ -138,20 +138,26 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
+            ma = [None]
             if len(u[0]) > 10:
-                ma = moving_average(u[1], 10)
+                (ma,mstd) = moving_average(u[1], 14)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
                 if k.startswith('lat'):
+                    twosigma = np.sum([np.convolve(mstd,2),ma], axis=0)
                     cv = np.nanmin(ma)
                     if ma[-1] > cv * 1.05:
                         failed = -1
                         rp = (u[0][np.nanargmin(ma)], cv)
                 else:
+                    twosigma = np.sum([np.convolve(mstd,-2),ma], axis=0)
                     cv = np.nanmax(ma)
                     if ma[-1] < cv * 0.95:
                         failed = 1
                         rp = (u[0][np.nanargmax(ma)], cv)
+
+                pl.plot(u[0], twosigma, mc[b][0], None, None, '-.')
+                pl.ax.annotate(r"$2\sigma$", xy=(u[0][-1], twosigma[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
 
                 if failed != 0:
                     p = (ma[-1]-rp[1])/rp[1]*100.
@@ -280,7 +286,11 @@ def moving_average(x, n, type='simple'):
 
     a =  np.convolve(x, weights, mode='full')[:len(x)]
     a[:n-1] = None
-    return a
+
+    s = [float('NaN')]*(n-1)
+    for d in range(n, len(x)+1):
+        s.append(np.std(x[d-n:d]))
+    return (a,s)
 
 
 def usage():
