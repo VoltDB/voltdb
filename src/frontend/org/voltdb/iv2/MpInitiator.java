@@ -116,7 +116,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 Long txnid = Long.MIN_VALUE;
-                Long uniqueId = Long.MIN_VALUE;
+                Long uniqueId = UniqueIdGenerator.makeIdFromComponents(0, 0, MP_INIT_PID);
                 try {
                     Pair<Long, Long> p = repair.start().get();
                     txnid = p.getFirst();
