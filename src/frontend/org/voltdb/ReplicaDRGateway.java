@@ -28,6 +28,8 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract void updateCatalog(CatalogContext catalog);
 
+    public abstract boolean isActive();
+
     public abstract void shutdown();
 
 }
