@@ -1061,7 +1061,7 @@ public class TableHelper {
         if (table.m_extraMetadata != null) {
             int[] pkeyIndexes = table.m_extraMetadata.pkeyIndexes;
             if (pkeyIndexes != null) {
-                if (pkeyIndexes.length != 1) {
+                if (pkeyIndexes.length > 0) {
                     VoltTable.ColumnInfo column = table.m_extraMetadata.originalColumnInfos[pkeyIndexes[0]];
                     if (column.type == VoltType.BIGINT) {
                         return pkeyIndexes[0];
