@@ -20,7 +20,6 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -84,9 +83,7 @@ public class StmtTargetTableScan extends StmtTableScan {
 
         TupleValueExpression tve = new TupleValueExpression(
                 tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
-        tve.setValueSize(partitionCol.getSize());
-        tve.setValueType(VoltType.get((byte)partitionCol.getType()));
-        tve.setInBytes(partitionCol.getInbytes());
+        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
 
         SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
         m_partitioningColumns = new ArrayList<SchemaColumn>();
