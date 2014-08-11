@@ -317,8 +317,9 @@ class NValue {
     /* Serialize this NValue to an Export stream */
     void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
-    // See comment with inlined body, below.
-    void allocateObjectFromInlinedValue();
+    // See comment with inlined body, below.  If NULL is supplied for
+    // the pool, use the temp string pool.
+    void allocateObjectFromInlinedValue(Pool* pool);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -329,6 +330,11 @@ class NValue {
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
+
+    /* Tell caller if this NValue's value refers back to VARCHAR or
+       VARBINARY data internal to a TableTuple (and not a
+       StringRef) */
+    bool getSourceInlined() const;
 
     /* For number values, check the number line. */
     bool isZero() const;
@@ -2330,6 +2336,10 @@ inline bool NValue::isBooleanNULL() const {
     return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
 }
 
+inline bool NValue::getSourceInlined() const {
+    return m_sourceInlined;
+}
+
 /**
  * Objects may have storage allocated for them. Calling free causes the NValue to return the storage allocated for
  * the object to the heap
@@ -3064,9 +3074,11 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
             "Invalid type in serializeToExport");
 }
 
-/** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a wider/widened tuple column, always from the temp pool**/
-inline void NValue::allocateObjectFromInlinedValue()
+/** Reformat an object-typed value from its inlined form to its
+ *  allocated out-of-line form, for use with a wider/widened tuple
+ *  column.  Use the pool specified by the caller, or the temp string
+ *  pool if none was supplied. **/
+inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -3082,6 +3094,10 @@ inline void NValue::allocateObjectFromInlinedValue()
         return;
     }
 
+    if (pool == NULL) {
+        pool = getTempStringPool();
+    }
+
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);
 
@@ -3090,7 +3106,7 @@ inline void NValue::allocateObjectFromInlinedValue()
 
     int32_t length = getObjectLength_withoutNull();
     // inlined objects always have a minimal (1-byte) length field.
-    StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, getTempStringPool());
+    StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, pool);
     char* storage = sref->get();
     // Copy length and value into the allocated out-of-line storage
     ::memcpy(storage, source, length + SHORT_OBJECT_LENGTHLENGTH);
