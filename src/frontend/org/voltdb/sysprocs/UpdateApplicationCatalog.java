@@ -386,6 +386,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             performCatalogVerifyWork(
                     catalogDiffCommands,
                     expectedCatalogVersion,
+                    tablesThatMustBeEmpty,
+                    reasonsForEmptyTables,
                     requiresSnapshotIsolation);
         }
         catch (VoltAbortException vae) {
@@ -411,8 +413,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         performCatalogUpdateWork(
                 catalogDiffCommands,
                 expectedCatalogVersion,
-                tablesThatMustBeEmpty,
-                reasonsForEmptyTables,
                 requiresSnapshotIsolation);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
