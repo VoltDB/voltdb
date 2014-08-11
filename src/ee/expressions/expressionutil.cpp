@@ -78,7 +78,7 @@ hashRangeFactory(PlannerDomValue obj) {
 
 /** Parse JSON parameters to create a subquery expression */
 static AbstractExpression*
-subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
+subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
     int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
     std::vector<int> paramIdxs;
     if (obj.hasNonNullKey("PARAM_IDX")) {
@@ -94,7 +94,18 @@ subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* arg
             paramIdxs.push_back(paramIdx);
         }
     }
-    return new SubqueryExpression(subqueryId, paramIdxs, args);
+    std::vector<int> otherParamIdxs;
+    if (obj.hasNonNullKey("OTHER_PARAM_IDX")) {
+        PlannerDomValue otherParams = obj.valueForKey("OTHER_PARAM_IDX");
+        int otherParamSize = otherParams.arrayLen();
+        otherParamIdxs.reserve(otherParamSize);
+        otherParamIdxs.reserve(otherParamSize);
+        for (int i = 0; i < otherParamSize; ++i) {
+            int paramIdx = otherParams.valueAtIndex(i).asInt();
+            otherParamIdxs.push_back(paramIdx);
+        }
+    }
+    return new SubqueryExpression(subqueryType, subqueryId, paramIdxs, otherParamIdxs, args);
 }
 
 /** Function static helper templated functions to vivify an optimal
@@ -506,8 +517,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
 
     // Subquery
-    case (EXPRESSION_TYPE_SUBQUERY):
-        ret = subqueryFactory(obj, args);
+    case (EXPRESSION_TYPE_IN_SUBQUERY):
+    case (EXPRESSION_TYPE_EXISTS_SUBQUERY):
+        ret = subqueryFactory(et, obj, args);
         break;
 
         // must handle all known expressions in this factory

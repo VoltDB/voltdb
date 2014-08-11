@@ -61,5 +61,4 @@
 #include "expressions/hashrangeexpression.h"
 #include "expressions/subqueryexpression.h"
 
-
 #endif

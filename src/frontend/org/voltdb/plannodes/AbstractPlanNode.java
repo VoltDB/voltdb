@@ -47,7 +47,6 @@ import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
@@ -138,11 +137,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (expr == null) {
             return newId;
         }
-        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
+        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
         for (AbstractExpression subquery : subqueries) {
             assert(subquery instanceof SubqueryExpression);
             CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getTable().getBestCostPlan();
             newId = subqueryPlan.resetPlanNodeIds(newId);
+            ((SubqueryExpression)subquery).resetSubqueryNodeId();
         }
         return newId;
     }
@@ -868,8 +868,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         StringBuilder sb = new StringBuilder();
         explainPlan_recurse(sb, "");
         String fullExpalinString = sb.toString();
-        // Extract subqueries into a map to explain them separately
-        Pattern subqueryPattern = Pattern.compile("Subquery_([0-9]+)(.*)(\\s*)Subquery_(\\1)", Pattern.DOTALL);
+        // Extract subqueries into a map to explain them separately. Each subquery is
+        // surrounded by the 'Subquery_[SubqueryId]' tags. Example:
+        // Subquery_1SEQUENTIAL SCAN of "R1"Subquery_1
+        Pattern subqueryPattern = Pattern.compile(
+                String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", SubqueryExpression.SUBQUERY_TAG,SubqueryExpression.SUBQUERY_TAG),
+                Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
         String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
@@ -883,12 +887,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         Matcher matcher = pattern.matcher(explainedSubquery);
         int pos = 0;
         StringBuilder sb = new StringBuilder();
+        // Find all the subqueries from the input string
         while(matcher.find()) {
-            sb.append(explainedSubquery.substring(pos, matcher.end(1)));
+            sb.append(explainedSubquery.substring(pos, matcher.end(2)));
             pos = matcher.end();
-            String nextExplainedStmt = extractExplainedSubquries(matcher.group(2), pattern, subqueries);
-            subqueries.put("Subquery_" + matcher.group(1), nextExplainedStmt);
+            // Recurse into the subquery string to extract its own subqueries if any
+            String nextExplainedStmt = extractExplainedSubquries(matcher.group(3), pattern, subqueries);
+            subqueries.put(SubqueryExpression.SUBQUERY_TAG + matcher.group(2), nextExplainedStmt);
         }
+        // Append the rest of the input string
         if (pos < explainedSubquery.length()) {
             sb.append(explainedSubquery.substring(pos));
         }

@@ -95,7 +95,8 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SEQSCAN:
+    case PLAN_NODE_TYPE_SEMISEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);

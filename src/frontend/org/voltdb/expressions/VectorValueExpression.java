@@ -21,7 +21,7 @@ import org.voltdb.types.ExpressionType;
 
 /**
  * Represents a vector of expression trees.
- * Currently used for SQL IN lists (of values, not subqueries).
+ * Currently used for SQL IN lists (of values), and (column list) IN (SELECT ...)
  */
 public class VectorValueExpression extends AbstractExpression {
 

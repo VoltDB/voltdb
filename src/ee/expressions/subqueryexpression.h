@@ -19,7 +19,6 @@
 #define HSTORESUBQUERYEXPRESSION_H
 
 #include <vector>
-#include <sstream>
 
 #include <boost/shared_ptr.hpp>
 
@@ -32,29 +31,33 @@ class NValue;
 
 class SubqueryExpression : public AbstractExpression {
     public:
-    SubqueryExpression(int subqueryId, const std::vector<int>& paramIdxs,
+    SubqueryExpression(ExpressionType subqueryType,
+        int subqueryId,
+        std::vector<int> paramIdxs,
+        std::vector<int> otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams);
 
     ~SubqueryExpression();
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
 
-    std::string debugInfo(const std::string &spacer) const {
-        std::ostringstream buffer;
-        buffer << spacer << "SubqueryExpression: " << m_subqueryId;
-        return (buffer.str());
-    }
+    std::string debugInfo(const std::string &spacer) const;
 
-  protected:
+  private:
     int m_subqueryId;
     // The list of parameter indexes that need to be set by this subquery
     // before the expression can be evaluated
     std::vector<int> m_paramIdxs;
+    // The list of parameter indexes that this subquery depends upon including
+    // its child subqueries but not set by this subquery. Theu originate at
+    // the grandparent levels.
+    std::vector<int> m_otherParamIdxs;
     // The list of the corresponding TVE for each parameter index
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
     // The pointer to the global parameters
     NValueArray* m_parameterContainer;
 
 };
+
 }
 #endif

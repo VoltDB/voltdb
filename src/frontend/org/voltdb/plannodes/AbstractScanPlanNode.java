@@ -392,7 +392,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
-        if (m_isSubQuery) {
+        if (m_isSubQuery || PlanNodeType.SEMISEQSCAN == getPlanNodeType()) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
     }

@@ -24,6 +24,7 @@
 #include "Topend.h"
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
+#include "common/subquerycontext.h"
 
 namespace voltdb {
 
@@ -99,6 +100,7 @@ class ExecutorContext {
     void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
+        m_subqueryContextMap.clear();
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
@@ -143,6 +145,25 @@ class ExecutorContext {
         return *m_executorsMap->find(stmtId)->second;
     }
 
+    /** Return pointer to a subquery context or NULL */
+    SubqueryContext* getSubqueryContext(int stmtId) {
+        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(stmtId);
+        if (it != m_subqueryContextMap.end()) {
+            return &(it->second);
+        } else {
+            return NULL;
+        }
+    }
+
+    /** Set a new subquery context or NULL */
+    void setSubqueryContext(int stmtId, SubqueryContext context) {
+        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
+            m_subqueryContextMap.insert(std::make_pair(stmtId, context));
+        if (!result.second) {
+            // the old context is there
+            result.first->second = context;
+        }
+    }
 
     static ExecutorContext* getExecutorContext();
 
@@ -154,11 +175,17 @@ class ExecutorContext {
     }
 
   private:
+
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+    // Pointer to the static parameters
     NValueArray* m_staticParams;
+    // Executor stack map. The key is the statement id (0 means the main/parent statement)
+    // The value is the pointer to the executor stack for that statement
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, SubqueryContext> m_subqueryContextMap;
+
     int64_t m_spHandle;
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;

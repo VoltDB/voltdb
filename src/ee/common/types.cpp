@@ -410,6 +410,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
+    case PLAN_NODE_TYPE_SEMISEQSCAN: {
+        return "SEMISEQSCAN";
+    }
     }
     return "UNDEFINED";
 }
@@ -458,6 +461,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
+    } else if (str == "SEMISEQSCAN") {
+        return PLAN_NODE_TYPE_SEMISEQSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -573,8 +578,11 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
-    case EXPRESSION_TYPE_SUBQUERY: {
-        return "SUBQUERY";
+    case EXPRESSION_TYPE_IN_SUBQUERY: {
+        return "IN_SUBQUERY";
+    }
+    case EXPRESSION_TYPE_EXISTS_SUBQUERY: {
+        return "EXISTS_SUBQUERY";
     }
     }
     return "INVALID";
@@ -654,8 +662,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
-    } else if (str == "SUBQUERY") {
-        return EXPRESSION_TYPE_SUBQUERY;
+    } else if (str == "IN_SUBQUERY") {
+        return EXPRESSION_TYPE_IN_SUBQUERY;
+    } else if (str == "EXISTS_SUBQUERY") {
+        return EXPRESSION_TYPE_EXISTS_SUBQUERY;
     }
 
     return EXPRESSION_TYPE_INVALID;

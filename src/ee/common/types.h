@@ -182,6 +182,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_TABLECOUNT       = 13,
     // for sql-in using indexes
     PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
+    // for sql-in-select
+    PLAN_NODE_TYPE_SEMISEQSCAN      = 15,
     //
     // Join Nodes
     //
@@ -317,9 +319,10 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_ALTERNATIVE                     = 301,
 
     // -----------------------------
-    // Subquery
+    // Subquery IN/EXISTS
     // -----------------------------
-    EXPRESSION_TYPE_SUBQUERY                        = 400,
+    EXPRESSION_TYPE_IN_SUBQUERY                        = 401,
+    EXPRESSION_TYPE_EXISTS_SUBQUERY                    = 402,
 
 };
 

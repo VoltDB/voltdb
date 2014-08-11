@@ -37,6 +37,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SemiSeqScanPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
@@ -52,11 +53,12 @@ public enum PlanNodeType {
     //
     // Scan Nodes
     //
-    SEQSCAN         (10, SeqScanPlanNode.class),
-    INDEXSCAN       (11, IndexScanPlanNode.class),
+    SEQSCAN          (10, SeqScanPlanNode.class),
+    INDEXSCAN        (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
     TABLECOUNT       (13, TableCountPlanNode.class),
     MATERIALIZEDSCAN (14, MaterializedScanPlanNode.class),
+    SEMISEQSCAN      (15, SemiSeqScanPlanNode.class),
 
     //
     // Join Nodes

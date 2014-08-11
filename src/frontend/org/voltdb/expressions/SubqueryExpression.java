@@ -18,8 +18,10 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -39,23 +41,33 @@ public class SubqueryExpression extends AbstractExpression {
     public enum Members {
         SUBQUERY_ID,
         SUBQUERY_ROOT_NODE_ID,
-        PARAM_IDX;
+        PARAM_IDX,
+        OTHER_PARAM_IDX;
     }
+
+    public static final String SUBQUERY_TAG = "Subquery_";
 
     private StmtSubqueryScan m_subquery;
     private int m_subqueryId;
     private int m_subqueryNodeId = -1;
     private AbstractPlanNode m_subqueryNode = null;
-    // TODO ENG_451 - better comment
-    // List of parameter indexes that this subquery depends on
+    // List of correlated parameter indexes that originate at the immediate parent's level
+    // and need to be set by this SubqueryExpression on the EE side prior to the evaluation
     private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
+    // List of all correlated parameter indexes this subquery and its descendants depend on
+    // They may originate at different levels in the subquery hierarchy.
+    private List<Integer> m_allParameterIdxList = new ArrayList<Integer>();
 
     /**
      * Create a new SubqueryExpression
      * @param subquey The parsed statement
      */
     public SubqueryExpression(StmtSubqueryScan subquery) {
-        super(ExpressionType.SUBQUERY);
+        this(ExpressionType.SUBQUERY, subquery);
+    }
+
+    public SubqueryExpression(ExpressionType subqueryType, StmtSubqueryScan subquery) {
+        super(subqueryType);
         assert(subquery != null);
         m_subquery = subquery;
         assert(m_subquery.getSubquery() != null);
@@ -101,6 +113,13 @@ public class SubqueryExpression extends AbstractExpression {
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
         m_subqueryNode = subqueryNode;
+        if (m_subquery != null && m_subquery.getBestCostPlan() != null) {
+            m_subquery.getBestCostPlan().rootPlanGraph = m_subqueryNode;
+        }
+        resetSubqueryNodeId();
+    }
+
+    public void resetSubqueryNodeId() {
         m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
     }
 
@@ -111,6 +130,7 @@ public class SubqueryExpression extends AbstractExpression {
     @Override
     public Object clone() {
         SubqueryExpression clone = new SubqueryExpression(m_subquery);
+        clone.setExpressionType(m_type);
         // The parameter TVE map must be cloned explicitly because the original TVEs
         // from the statement are already replaced with the corresponding PVEs
         clone.m_args = new ArrayList<AbstractExpression>();
@@ -119,6 +139,7 @@ public class SubqueryExpression extends AbstractExpression {
         }
         clone.m_parameterIdxList = new ArrayList<Integer>();
         clone.m_parameterIdxList.addAll(m_parameterIdxList);
+        clone.m_allParameterIdxList.addAll(m_allParameterIdxList);
         return clone;
     }
 
@@ -154,12 +175,30 @@ public class SubqueryExpression extends AbstractExpression {
         super.toJSONString(stringer);
         stringer.key(Members.SUBQUERY_ID.name()).value(m_subqueryId);
         stringer.key(Members.SUBQUERY_ROOT_NODE_ID.name()).value(m_subqueryNodeId);
+        // Output the correlated parameter ids that originates at this subquery immediate
+        // parent and need to be set before the evaluation
         if (!m_parameterIdxList.isEmpty()) {
             stringer.key(Members.PARAM_IDX.name()).array();
             for (Integer idx : m_parameterIdxList) {
                 stringer.value(idx);
             }
             stringer.endArray();
+        }
+        // Output the correlated parameter ids that this subquery or its descendants
+        // depends upon but originate at the grandparent level and do not need to be set
+        // by this subquery
+        if (!m_allParameterIdxList.isEmpty()) {
+            // Calculate the difference between two sets of parameters
+            Set<Integer> allParams = new HashSet<Integer>();
+            allParams.addAll(m_allParameterIdxList);
+            allParams.removeAll(m_parameterIdxList);
+            if (!allParams.isEmpty()) {
+                stringer.key(Members.OTHER_PARAM_IDX.name()).array();
+                for (Integer idx : allParams) {
+                    stringer.value(idx);
+                }
+                stringer.endArray();
+            }
         }
     }
 
@@ -175,15 +214,23 @@ public class SubqueryExpression extends AbstractExpression {
                 m_parameterIdxList.add(paramIdxArray.getInt(i));
             }
         }
+        if (obj.has(Members.OTHER_PARAM_IDX.name())) {
+            JSONArray allParamIdxArray = obj.getJSONArray(Members.OTHER_PARAM_IDX.name());
+            int paramSize = allParamIdxArray.length();
+            for (int i = 0; i < paramSize; ++i) {
+                m_allParameterIdxList.add(allParamIdxArray.getInt(i));
+            }
+        }
     }
 
     @Override
     public String explain(String impliedTableName) {
         if (m_subqueryNode != null) {
-            // Explain the subquery
+            // Surround the explained subquery by the 'Subquery_#' tags.The explained subquery
+            // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "(Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
+            return "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString() + SUBQUERY_TAG +
             m_subqueryId + ")";
         } else {
             return "(Subquery: null)";
@@ -195,16 +242,21 @@ public class SubqueryExpression extends AbstractExpression {
         // Nothing to do there
     }
 
-    private void moveUpTVE() {
-        // Get TVE
-        /** Traverse down the expression tree identifying all the TVEs which reference the
-         * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
-         * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
-         * and new PVE which will be required by the back-end executor*/
+    /**
+     * Traverse down the expression tree identifying all the TVEs which reference the
+     * columns from the parent statement (getOrigStmtId() != parentStmt.subqueryId) and replace them with
+     * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
+     * and new PVE which will be required by the back-end executor.
+     * If a TVE references the grandparent, move it up to be resolved at a higher level.
+     */
+    public void moveUpTVE() {
         AbstractParsedStmt subqueryStmt = m_subquery.getSubquery();
         AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
         // we must have a parent -it's a subquery statement
         assert(parentStmt != null);
+        // Preserve indexes of all parameters this subquery depends on.
+        // It includes parameters from the child subqueries.
+        m_allParameterIdxList.addAll(subqueryStmt.m_parameterTveMap.keySet());
         for (Map.Entry<Integer, AbstractExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {
             Integer paramIdx = entry.getKey();
             AbstractExpression expr = entry.getValue();

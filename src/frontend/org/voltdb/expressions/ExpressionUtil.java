@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -246,12 +247,6 @@ public abstract class ExpressionUtil {
         } else if (input instanceof TupleValueExpression) {
             tves.add((TupleValueExpression) input);
             return tves;
-        } else if (input instanceof SubqueryExpression) {
-            SubqueryExpression subqueryExpr = (SubqueryExpression) input;
-            for(AbstractExpression arg : subqueryExpr.m_args) {
-                tves.addAll(getTupleValueExpressions(arg));
-            }
-            return tves;
         }
 
         // recursive calls
@@ -360,6 +355,33 @@ public abstract class ExpressionUtil {
             // of reasons and may need special casing here.
             return containsMatchingTVE(expr, tableAlias);
         }
+    }
+
+    /**
+     *  Given two equal length lists of the expressions build a combined equivalence expression
+     *  (le1, le2,..., leN) (re1, re2,..., reN) =>
+     *  (le1=re1) AND (le2=re2) AND .... AND (leN=reN)
+     *
+     * @param leftExprs
+     * @param rightExprs
+     * @return AbstractExpression
+     */
+    public static AbstractExpression buildEquavalenceExpression(Collection<AbstractExpression> leftExprs, Collection<AbstractExpression> rightExprs) {
+        assert(leftExprs.size() == rightExprs.size());
+        Iterator<AbstractExpression> leftIt = leftExprs.iterator();
+        Iterator<AbstractExpression> rightIt = rightExprs.iterator();
+        AbstractExpression result = null;
+        while (leftIt.hasNext() && rightIt.hasNext()) {
+            AbstractExpression leftExpr = leftIt.next();
+            AbstractExpression rightExpr = rightIt.next();
+            AbstractExpression eqaulityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL, leftExpr, rightExpr);
+            if (result == null) {
+                result = eqaulityExpr;
+            } else {
+                result = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, result, eqaulityExpr);
+            }
+        }
+        return result;
     }
 
     /**

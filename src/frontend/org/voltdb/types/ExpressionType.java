@@ -61,9 +61,9 @@ public enum ExpressionType {
         // explicitly cast left as right (right is integer in ValueType enum)
     OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
         // logical not
-    OPERATOR_IS_NULL               (OperatorExpression.class, 9, "IS NULL"),
+    OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL"),
     // unary null evaluation
-    OPERATOR_EXISTS                (OperatorExpression.class, 9, "EXISTS"),
+    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
     // unary exists evaluation
 
     // ----------------------------
@@ -133,7 +133,9 @@ public enum ExpressionType {
     // -----------------------------
     // Subquery
     // -----------------------------
-    SUBQUERY    (SubqueryExpression.class, 400, "<subquery>"),
+    SUBQUERY                    (SubqueryExpression.class, 400, "<subquery>"),
+    IN_SUBQUERY                 (SubqueryExpression.class, 401, "<in subquery>"),
+    EXISTS_SUBQUERY             (SubqueryExpression.class, 402, "<exists subquery>"),
 ;
 
     private final int m_value;
