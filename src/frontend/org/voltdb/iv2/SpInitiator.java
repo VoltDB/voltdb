@@ -151,7 +151,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 try {
                     Pair<Long, Long> p = repair.start().get();
                     txnid = p.getFirst();
-                    txnid = p.getSecond();
+                    uniqueId = p.getSecond();
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
