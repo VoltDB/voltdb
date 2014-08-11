@@ -221,6 +221,7 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
     size_t blockSize = m_defaultCapacity;
     bool spanBuffer = false;
     bool throwException = false;
+    size_t uso = m_uso;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
@@ -244,8 +245,7 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
             && oldBlock->lastDRBeginTxnOffset() != oldBlock->offset() /* current txn is not a DR begin txn */) {
         spanBuffer = true;
         partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
-        m_uso -= partialTxnLength;
-        if (partialTxnLength + minLength >= oldBlock->capacity()) {
+        if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
             switch (oldBlock->type()) {
                 case voltdb::NORMAL_STREAM_BLOCK:
                 {
@@ -259,18 +259,21 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
                 }
             }
         }
+        if (!throwException) {
+            uso -= partialTxnLength;
+        }
     }
     char * buffer = new char[blockSize];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for DR");
     }
-    m_currBlock = new StreamBlock(buffer, blockSize, m_uso);
+    m_currBlock = new StreamBlock(buffer, blockSize, uso);
     if (blockSize == m_secondaryCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
 
     if (throwException) {
-        rollbackTo(m_uso);
+        rollbackTo(uso);
         throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
     }
 
@@ -279,9 +282,8 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
         m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);
         ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
-        oldBlock->truncateTo(m_uso);
+        oldBlock->truncateTo(uso);
         oldBlock->clearLastBeginTxnOffset();
-        m_uso += partialTxnLength;
     }
 
     pushPendingBlocks();
