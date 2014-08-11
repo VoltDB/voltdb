@@ -121,7 +121,7 @@ public class TestSpSchedulerDedupe extends TestCase
         return task;
     }
 
-    private final long ZERO_UNIQUE_ID = UniqueIdGenerator.makeIdFromComponents(0, 0, 0);
+    private final long ZERO_UNIQUE_ID = UniqueIdGenerator.makeIdFromComponents(UniqueIdGenerator.VOLT_EPOCH, 0, 0);
 
     private FragmentTaskMessage createFrag(long txnId, boolean readOnly, long destHSId)
     {

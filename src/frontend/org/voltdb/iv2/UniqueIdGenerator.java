@@ -249,6 +249,10 @@ public class UniqueIdGenerator {
         return lastUniqueId;
     }
 
+    public static long makeZero(int partitionId) {
+        return makeIdFromComponents(VOLT_EPOCH, 0, partitionId);
+    }
+
     public static long makeIdFromComponents(long ts, long seqNo, long partitionId) {
         // compute the time in millis since VOLT_EPOCH
         long uniqueId = ts - VOLT_EPOCH;

@@ -118,7 +118,7 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
-        m_maxSeenUniqueId = UniqueIdGenerator.makeIdFromComponents(0, 0, partitionId);
+        m_maxSeenUniqueId = UniqueIdGenerator.makeZero(partitionId);
     }
 
     @Override
