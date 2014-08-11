@@ -56,6 +56,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t txnId,
                                   int64_t spHandle,
                                   int64_t uniqueId,
+                                  int64_t spUniqueId,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
@@ -154,7 +155,7 @@ void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfSt
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId) {
+void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId, int64_t spUniqueId) {
 //    std::cout << "Beginning txn " << txnId << " spHandle " << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -165,15 +166,14 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle, int64_t un
      }
 
      //Set start sp handle if necessary, also sneakily updates last uniqueId
-     m_currBlock->startUniqueId(uniqueId);
+     m_currBlock->startSpUniqueId(uniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
-     io.writeLong(txnId);
-     io.writeLong(spHandle);
      io.writeLong(uniqueId);
+     io.writeLong(spUniqueId);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), BEGIN_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
@@ -182,7 +182,7 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle, int64_t un
      m_uso += io.position();
 }
 
-void DRTupleStream::endTransaction(int64_t uniqueId) {
+void DRTupleStream::endTransaction(int64_t spUniqueId) {
 //    std::cout << "Ending txn spHandle " << spHandle << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -196,7 +196,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
-     io.writeLong(uniqueId);
+     io.writeLong(spUniqueId);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);

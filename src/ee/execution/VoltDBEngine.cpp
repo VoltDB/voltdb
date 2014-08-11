@@ -363,6 +363,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
+                                       int64_t spUniqueId,
                                        int64_t undoToken)
 {
     // count failures
@@ -394,6 +395,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 spHandle,
                                 lastCommittedSpHandle,
                                 uniqueId,
+                                spUniqueId,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
@@ -417,6 +419,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t spHandle,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
+                                      int64_t spUniqueId,
                                       bool first,
                                       bool last)
 {
@@ -453,7 +456,8 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             spUniqueId);
 
     // count the number of plan fragments executed
     ++m_pfCount;
@@ -1024,6 +1028,7 @@ bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
+                        int64_t uniqueId, int64_t spUniqueId,
                         bool returnUniqueViolations,
                         bool shouldDRStream)
 {
@@ -1034,8 +1039,9 @@ VoltDBEngine::loadTable(int32_t tableId,
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
                                              spHandle,
-                                             -1,
-                                             lastCommittedSpHandle);
+                                             lastCommittedSpHandle,
+                                             uniqueId,
+                                             spUniqueId);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {

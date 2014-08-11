@@ -121,6 +121,8 @@ public class TestSpSchedulerDedupe extends TestCase
         return task;
     }
 
+    private final long ZERO_UNIQUE_ID = UniqueIdGenerator.makeIdFromComponents(0, 0, 0);
+
     private FragmentTaskMessage createFrag(long txnId, boolean readOnly, long destHSId)
     {
         FragmentTaskMessage frag =
@@ -131,7 +133,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                     readOnly,
                                     false,
                                     false);
-        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
+        frag.setSpHandleAndSpUniqueId(TxnEgo.makeZero(0).getTxnId(), ZERO_UNIQUE_ID);
         return frag;
     }
 
@@ -143,7 +145,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
-        sptask.setSpHandle(txnid);
+        sptask.setSpHandleAndSpUniqueId(txnid, ZERO_UNIQUE_ID);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -160,7 +162,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, dut_hsid);
-        sptask.setSpHandle(txnid);
+        sptask.setSpHandleAndSpUniqueId(txnid, ZERO_UNIQUE_ID);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

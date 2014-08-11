@@ -336,7 +336,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long unqiueId, long spUniqueId, String clusterName, String databaseName,
             String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
@@ -344,7 +344,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
             boolean undo)
     {
@@ -456,7 +456,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long txnId, long spHandle, long uniqueId, boolean readOnly)
+            Object[] parameterSets, long txnId, long spHandle, long uniqueId, long spUniqueId, boolean readOnly)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

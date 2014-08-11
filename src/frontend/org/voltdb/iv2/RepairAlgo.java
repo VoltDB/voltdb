@@ -52,8 +52,10 @@ public interface RepairAlgo
      * Start a new RepairAlgo. Returns a future that is done when the
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
+     *
+     * The return value is the largest seen txnid and largest seen unique id
      */
-    public Future<Long> start();
+    public Future<Pair<Long, Long>> start();
 
     public boolean cancel();
 

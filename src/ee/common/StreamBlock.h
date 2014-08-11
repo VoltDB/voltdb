@@ -35,16 +35,16 @@ namespace voltdb
         StreamBlock(char* data, size_t capacity, size_t uso)
             : m_data(data + MAGIC_HEADER_SPACE_FOR_JAVA), m_capacity(capacity - MAGIC_HEADER_SPACE_FOR_JAVA), m_offset(0),
               m_uso(uso),
-              m_startUniqueId(std::numeric_limits<int64_t>::max()),
-              m_lastUniqueId(std::numeric_limits<int64_t>::max())
+              m_startSpUniqueId(std::numeric_limits<int64_t>::max()),
+              m_lastSpUniqueId(std::numeric_limits<int64_t>::max())
         {
         }
 
         StreamBlock(StreamBlock *other)
             : m_data(other->m_data), m_capacity(other->m_capacity), m_offset(other->m_offset),
               m_uso(other->m_uso),
-              m_startUniqueId(other->m_startUniqueId),
-              m_lastUniqueId(other->m_lastUniqueId)
+              m_startSpUniqueId(other->m_startSpUniqueId),
+              m_lastSpUniqueId(other->m_lastSpUniqueId)
         {
         }
 
@@ -88,24 +88,24 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
-        int64_t startUniqueId() {
-            return m_startUniqueId;
+        int64_t startSpUniqueId() {
+            return m_startSpUniqueId;
         }
 
         /*
          * Sneakily set both start and last
          */
-        void startUniqueId(int64_t uniqueId) {
-            m_lastUniqueId = uniqueId;
-            m_startUniqueId = std::min(uniqueId, m_startUniqueId);
+        void startSpUniqueId(int64_t spUniqueId) {
+            m_lastSpUniqueId = spUniqueId;
+            m_startSpUniqueId = std::min(spUniqueId, m_startSpUniqueId);
         }
 
-        int64_t lastUniqueId() {
-            return m_lastUniqueId;
+        int64_t lastSpUniqueId() {
+            return m_lastSpUniqueId;
         }
 
-        void lastUniqueId(int64_t uniqueId) {
-            m_lastUniqueId = uniqueId;
+        void lastSpUniqueId(int64_t spUniqueId) {
+            m_lastSpUniqueId = spUniqueId;
         }
 
     private:
@@ -114,8 +114,8 @@ namespace voltdb
         }
 
         void consumed(size_t consumed) {
+            assert ((m_offset + consumed) <= m_capacity);
             m_offset += consumed;
-            assert (m_offset < m_capacity);
         }
 
         void truncateTo(size_t mark) {
@@ -134,8 +134,8 @@ namespace voltdb
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
-        int64_t m_startUniqueId;
-        int64_t m_lastUniqueId;
+        int64_t m_startSpUniqueId;
+        int64_t m_lastSpUniqueId;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

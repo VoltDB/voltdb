@@ -122,7 +122,7 @@ public class PartitionDRGateway {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public void onBinaryDR(int partitionId, long startSpHandle, long lastSpHandle, ByteBuffer buf) {
+    public void onBinaryDR(int partitionId, long startSpUniqueId, long lastSpUniqueId, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();

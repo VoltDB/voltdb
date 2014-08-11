@@ -54,6 +54,13 @@ public class RepairLog
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
 
+    /*
+     * Track the highest seen MP unique id so that it can be provided to the MPI
+     * on repair
+     */
+    private long m_maxSeenMpUniqueId = Long.MIN_VALUE;
+
+
     // is this a partition leader?
     boolean m_isLeader = false;
 
@@ -163,6 +170,7 @@ public class RepairLog
                     m_lastMpHandle = m.getTxnId();
                     m_lastSpHandle = m.getSpHandle();
                 }
+                m_maxSeenMpUniqueId = Math.max(m_maxSeenMpUniqueId, m.getUniqueId());
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
@@ -263,7 +271,8 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfigCooked());
+                        TheHashinator.getCurrentVersionedConfigCooked(),
+                        m_maxSeenMpUniqueId);
         responses.add(hheader);
 
         int seq = responses.size();

@@ -45,9 +45,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
 
         int64_t tableHandle = 0;
-        int64_t __attribute__ ((unused)) txnId = 0;
-        int64_t __attribute__ ((unused)) spHandle = 0;
         int64_t __attribute__ ((unused)) uniqueId = 0;
+        int64_t __attribute__ ((unused)) spUniqueId = 0;
         uint32_t checksum = 0;
         const char * rowData = NULL;
         switch (type) {
@@ -80,15 +79,14 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
-            txnId = taskInfo.readLong();
-            spHandle = taskInfo.readLong();
             uniqueId = taskInfo.readLong();
+            spUniqueId = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_END_TXN: {
-            spHandle = taskInfo.readLong();
+            spUniqueId = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;

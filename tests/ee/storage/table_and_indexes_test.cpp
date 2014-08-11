@@ -356,7 +356,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, 100, 100, 99, 72);
+    engine->setupForPlanFragments( NULL, 100, 100, 99, 72, 72);
 
     /*
      * Test that update propagates
@@ -393,7 +393,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
 
     //Prep another transaction to test propagating a delete
-    engine->setupForPlanFragments( NULL, 102, 102, 101, 89);
+    engine->setupForPlanFragments( NULL, 102, 102, 101, 89, 89);
 
     districtTable->deleteTuple( toDelete, true);
 

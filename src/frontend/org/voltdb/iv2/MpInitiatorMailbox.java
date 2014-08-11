@@ -108,14 +108,14 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     }
 
     @Override
-    public void setLeaderState(final long maxSeenTxnId)
+    public void setLeaderState(final long maxSeenTxnId, final long maxSeenUniqueId)
     {
         final CountDownLatch cdl = new CountDownLatch(1);
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
                 try {
-                    setLeaderStateInternal(maxSeenTxnId);
+                    setLeaderStateInternal(maxSeenTxnId, maxSeenUniqueId);
                 } finally {
                     cdl.countDown();
                 }

@@ -1011,6 +1011,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
+            long spUniqueId,
             String clusterName,
             String databaseName,
             String tableName,
@@ -1033,7 +1035,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(txnId, spHandle, uniqueId, spUniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
     }
 
     /**
@@ -1042,12 +1044,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      * @param table
      */
     @Override
-    public byte[] loadTable(long txnId, long spHandle, int tableId,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId,
             VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) {
         return ee.loadTable(tableId, data,
                      txnId,
                      spHandle,
+                     uniqueId,
+                     spUniqueId,
                      lastCommittedTxnId,
                      returnUniqueViolations,
                      shouldDRStream,
@@ -1063,6 +1067,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             long txnId,
             long spHandle,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
+            long spUniqueId,
             boolean readOnly) throws EEException
     {
         return ee.executePlanFragments(
@@ -1074,6 +1079,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             txnId,
             lastCommittedTxnId,
             txnIdAsUniqueId,
+            spUniqueId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 

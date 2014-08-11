@@ -34,6 +34,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_coordinatorHSId;
     protected long m_txnId;
     protected long m_uniqueId;
+    protected long m_spUniqueId;
     // IV2: within a partition, the primary initiator and its replicas
     // use this for intra-partition ordering/lookup
     private long m_spHandle;
@@ -79,6 +80,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = rhs.m_txnId;
         m_uniqueId = rhs.m_uniqueId;
+        m_spUniqueId = rhs.m_spUniqueId;
         m_isReadOnly = rhs.m_isReadOnly;
         m_isForReplay = rhs.m_isForReplay;
         m_subject = rhs.m_subject;
@@ -111,8 +113,17 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_uniqueId = uniqueId;
     }
 
-    public void setSpHandle(long spHandle) {
+    public long getSpUniqueId() {
+        return m_spUniqueId;
+    }
+
+    public void setSpUniqueId(long spUniqueId) {
+        m_spUniqueId = spUniqueId;
+    }
+
+    public void setSpHandleAndSpUniqueId(long spHandle, long spUniqueId) {
         m_spHandle = spHandle;
+        m_spUniqueId = spUniqueId;
     }
 
     public long getSpHandle() {

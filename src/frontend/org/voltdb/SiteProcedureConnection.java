@@ -68,6 +68,8 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
+            long spUniqueId,
             String clusterName,
             String databaseName,
             String tableName,
@@ -83,6 +85,8 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
+            long spUniqueId,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
@@ -102,6 +106,7 @@ public interface SiteProcedureConnection {
             long txnId,
             long spHandle,
             long uniqueId,
+            long spUniqueId,
             boolean readOnly) throws EEException;
 
     /**

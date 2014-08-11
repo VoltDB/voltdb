@@ -754,7 +754,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, String clusterName, String databaseName,
             String tableName, VoltTable data,
             boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
     {
@@ -771,11 +771,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(txnId, spHandle, uniqueId, spUniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, int tableId,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId,
             VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo)
     {
@@ -783,6 +783,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
+                uniqueId, spUniqueId,
                 returnUniqueViolations,
                 shouldDRStream,
                 undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
@@ -1082,6 +1083,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long txnId,
                                             long spHandle,
                                             long uniqueId,
+                                            long spUniqueId,
                                             boolean readOnly)
             throws EEException
     {
@@ -1094,6 +1096,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
+                spUniqueId,
                 readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken());
     }
 

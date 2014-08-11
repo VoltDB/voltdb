@@ -406,6 +406,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_pendingTasks.getMaxTaskedSpHandle();
     }
 
+    private long getMaxTaskedSpUniqueId() {
+        return m_pendingTasks.getMaxTaskedSpUniqueId();
+    }
+
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -497,7 +501,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getConnectionId(),
                     message.isForReplay());
 
-            msg.setSpHandle(newSpHandle);
+            msg.setSpHandleAndSpUniqueId(newSpHandle, uniqueId);
 
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
@@ -524,7 +528,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getConnectionId(),
                             msg.isForReplay());
                 // Update the handle in the copy since the constructor doesn't set it
-                replmsg.setSpHandle(newSpHandle);
+                replmsg.setSpHandleAndSpUniqueId(newSpHandle, uniqueId);
                 m_mailbox.send(m_sendToHSIds, replmsg);
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
@@ -748,6 +752,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         FragmentTaskMessage msg = message;
         long newSpHandle;
+        long newSpUniqueId;
         if (m_isLeader) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
@@ -758,12 +763,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                newSpUniqueId = m_uniqueIdGenerator.getNextUniqueId();
             } else {
                 newSpHandle = getMaxTaskedSpHandle();
+                newSpUniqueId = getMaxTaskedSpUniqueId();
             }
-            msg.setSpHandle(newSpHandle);
+
+            msg.setSpHandleAndSpUniqueId(newSpHandle, newSpUniqueId);
             if (msg.getInitiateTask() != null) {
-                msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
+                msg.getInitiateTask().setSpHandleAndSpUniqueId(newSpHandle, newSpUniqueId);//set the handle
                 //Trigger reserialization so the new handle is used
                 msg.setStateForDurability(msg.getInitiateTask(), msg.getInvolvedPartitions());
             }
@@ -947,7 +955,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             if (!msg.isForReplay()) advanceTxnEgo();
-            msg.setSpHandle(getCurrentTxnId());
+            msg.setSpHandleAndSpUniqueId(getCurrentTxnId(), m_uniqueIdGenerator.getLastUniqueId());
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
@@ -1061,5 +1069,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
+    }
+
+    @Override
+    public void setMaxSeenUniqueId(final long maxSeenUniqueId) {
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(maxSeenUniqueId);
     }
 }

@@ -43,10 +43,11 @@ public class SpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
+    private long m_maxSeenUniqueId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -117,10 +118,11 @@ public class SpPromoteAlgo implements RepairAlgo
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_maxSeenUniqueId = UniqueIdGenerator.makeIdFromComponents(0, 0, partitionId);
     }
 
     @Override
-    public Future<Long> start()
+    public Future<Pair<Long, Long>> start()
     {
         try {
             prepareForFaultRecovery();
@@ -174,6 +176,10 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getHandle() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
             }
+            if (response.getUniqueId() != Long.MIN_VALUE) {
+                m_maxSeenUniqueId = Math.max(m_maxSeenUniqueId, response.getUniqueId());
+            }
+
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
                 if (tmLog.isTraceEnabled()) {
@@ -237,6 +243,6 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
-        m_promotionResult.set(m_maxSeenTxnId);
+        m_promotionResult.set(Pair.of(m_maxSeenTxnId, m_maxSeenUniqueId));
     }
 }

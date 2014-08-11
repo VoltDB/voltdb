@@ -112,7 +112,7 @@ public class TestMpPromoteAlgo
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig);
+            ofTotal, handle, handle, versionedHashinatorConfig, handle);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -206,7 +206,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Long> result = algo.start();
+        Future<Pair<Long, Long>> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
@@ -236,8 +236,9 @@ public class TestMpPromoteAlgo
         needsRepair.add(2L);
         needsRepair.add(3L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        Long real_result = result.get();
+        Long real_result = result.get().getFirst();
         assertEquals(txnEgo(1000L), (long)real_result);
+        assertEquals(new Long(1000L), result.get().getSecond());
 
         // check if the hashinator was updated to the newer version
         assertEquals(torv3.getFirst(), TheHashinator.getCurrentVersionedConfig().getFirst());
@@ -256,7 +257,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Long> result = algo.start();
+        Future<Pair<Long, Long>> result = algo.start();
 
         // Master 1
         // First, everyone completed
@@ -304,8 +305,9 @@ public class TestMpPromoteAlgo
         needsRepair.add(3L);
         inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
-        Long real_result = result.get();
+        Long real_result = result.get().getFirst();
         assertEquals(txnEgo(1003L), (long)real_result);
+        assertEquals(1003L, (long)result.get().getFirst());
     }
 
     // verify correct txnID when no MP has ever been done
@@ -321,7 +323,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Long> result = algo.start();
+        Future<Pair<Long, Long>> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has only the normal ack. Never saw an MP transaction.
@@ -337,8 +339,9 @@ public class TestMpPromoteAlgo
         algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
-        Long real_result = result.get();
+        Long real_result = result.get().getFirst();
         assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)real_result);
+        assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)result.get().getSecond());
     }
 
     // Verify that if the MPI is the only person with a complete, that we
@@ -355,7 +358,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Long> result = algo.start();
+        Future<Pair<Long, Long>> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
@@ -374,8 +377,9 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        Long real_result = result.get();
+        Long real_result = result.get().getFirst();
         assertEquals(txnEgo(1000L), (long)real_result);
+        assertEquals(txnEgo(1000L), (long)result.get().getSecond());
     }
 
     @Test
@@ -387,6 +391,7 @@ public class TestMpPromoteAlgo
         // at random points to all but one.  Validate that promotion repair
         // results in identical, correct, repair streams to all replicas.
         TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator uig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         boolean[] stops = new boolean[3];
@@ -400,7 +405,7 @@ public class TestMpPromoteAlgo
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
-            msg.setSpHandle(sphandle.getTxnId());
+            msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {
@@ -429,7 +434,7 @@ public class TestMpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox, "bleh ");
-        Future<Long> result = dut.start();
+        Future<Pair<Long, Long>> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), true);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());
