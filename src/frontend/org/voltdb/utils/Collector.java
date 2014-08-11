@@ -353,15 +353,15 @@ public class Collector {
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    tarGenerator.queueEntry(entryPath, file);
+                    tarGenerator.queueEntry(m_prefix + timestamp + File.separator + entryPath, file);
                 }
             }
 
             String[] sarCmd = {"bash", "-c", "sar -A"};
-            cmd(tarGenerator, sarCmd, "sardata");
+            cmd(tarGenerator, sarCmd, m_prefix + timestamp + File.separator + "sardata");
 
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
-            cmd(tarGenerator, dmesgCmd, "dmesgdata");
+            cmd(tarGenerator, dmesgCmd, m_prefix + timestamp + File.separator + "dmesgdata");
 
             tarGenerator.write(m_calledFromVEM ? null : System.out);
 
