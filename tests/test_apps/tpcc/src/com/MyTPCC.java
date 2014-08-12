@@ -27,6 +27,9 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.client.ClientResponse;
 import com.Clock;
 import com.procedures.LoadStatus;
+
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -60,6 +63,7 @@ public class MyTPCC
     public static long[] latencyCounter = new long[] {0,0,0,0,0,0,0,0,0};
     public static boolean checkLatency = false;
     public static final ReentrantLock counterLock = new ReentrantLock();
+    final ClientStatsContext fullStatsContext;
 
     public static void main(String args[])
     {
@@ -218,7 +222,9 @@ public class MyTPCC
 
         // Dump stats to file
         try {
-            m_clientCon.saveStatistics(statsFile);
+            ClientStats stats = fullStatsContext.fetch().getStats();
+            m_clientCon.writeSummaryCSV(stats, statsFile);
+
         } catch (IOException e) {
             System.err.println("Unable to save statistics file: " + e.getMessage());
         }
@@ -263,6 +269,7 @@ public class MyTPCC
             }
         }
         System.out.println("Connected.  Starting benchmark.");
+        fullStatsContext = m_clientCon.createStatsContext();
 
         try
         {
