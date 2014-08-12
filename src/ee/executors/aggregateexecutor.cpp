@@ -320,11 +320,11 @@ private:
     Pool* m_memoryPool;
 };
 
-    /*
-     * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
-     * The object is allocated from the provided memory pool.
-     */
-    inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct)
+/*
+ * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
+ * The object is allocated from the provided memory pool.
+ */
+inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
