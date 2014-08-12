@@ -284,8 +284,10 @@ class NValue {
     /* Serialize the scalar this NValue represents to the storage area
        provided. If the scalar is an Object type then the object will
        be copy if it can be inlined into the tuple. Otherwise a
-       pointer to the object will be copied into the storage area. No
-       allocations are performed. */
+       pointer to the object will be copied into the storage area. Any
+       allocations needed (if this NValue refers to inlined memory
+       whereas the field in the tuple is not inlined), will be done in
+       the temp string pool. */
     void serializeToTupleStorage(
         void *storage, const bool isInlined, const int32_t maxLength, const bool isInBytes) const;
 
@@ -2716,66 +2718,20 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
 
 /**
  * Serialize the scalar this NValue represents to the storage area
- * provided. If the scalar is an Object type then the object will
- * be copy if it can be inlined into the tuple. Otherwise a
- * pointer to the object will be copied into the storage area. No
- * allocations are performed.
+ * provided. If the scalar is an Object type then the object will be
+ * copy if it can be inlined into the tuple. Otherwise a pointer to
+ * the object will be copied into the storage area.  Any allocations
+ * needed (if this NValue refers to inlined memory whereas the field
+ * in the tuple is not inlined), will be done in the temp string pool.
  */
 inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         const int32_t maxLength, const bool isInBytes) const
 {
-    const ValueType type = getValueType();
-    switch (type) {
-    case VALUE_TYPE_TIMESTAMP:
-        *reinterpret_cast<int64_t*>(storage) = getTimestamp();
-        break;
-    case VALUE_TYPE_TINYINT:
-        *reinterpret_cast<int8_t*>(storage) = getTinyInt();
-        break;
-    case VALUE_TYPE_SMALLINT:
-        *reinterpret_cast<int16_t*>(storage) = getSmallInt();
-        break;
-    case VALUE_TYPE_INTEGER:
-        *reinterpret_cast<int32_t*>(storage) = getInteger();
-        break;
-    case VALUE_TYPE_BIGINT:
-        *reinterpret_cast<int64_t*>(storage) = getBigInt();
-        break;
-    case VALUE_TYPE_DOUBLE:
-        *reinterpret_cast<double*>(storage) = getDouble();
-        break;
-    case VALUE_TYPE_DECIMAL:
-        ::memcpy( storage, m_data, sizeof(TTInt));
-        break;
-    case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY:
-        //Potentially non-inlined type requires special handling
-        if (isInlined) {
-            inlineCopyObject(storage, maxLength, isInBytes);
-        }
-        else {
-            if (m_sourceInlined) {
-                throwDynamicSQLException(
-                        "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
-            }
-
-            if (!isNull()) {
-                int objLength = getObjectLength_withoutNull();
-                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
-            }
-
-            // copy the StringRef pointers, even for NULL case.
-            *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);
-        }
-        break;
-    default:
-        char message[128];
-        snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
-                getTypeName(type).c_str());
-        throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                message);
-    }
+    serializeToTupleStorageAllocateForObjects(storage,
+                                              isInlined,
+                                              maxLength,
+                                              isInBytes,
+                                              getTempStringPool());
 }
 
 
