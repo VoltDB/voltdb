@@ -133,6 +133,7 @@ public class VoltCompiler {
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
+    String[] m_importLines = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -579,7 +580,7 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_addedClasses);
+        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_importLines);
 
         // generate the catalog report and write it to disk
         try {
@@ -1090,6 +1091,9 @@ public class VoltCompiler {
 
         // add extra classes from the DDL
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
+        // Also, grab the IMPORT CLASS lines so we can add them to the
+        // generated DDL
+        m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
     }
 

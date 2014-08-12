@@ -193,3 +193,16 @@ AS
         , state
 ;
 
+
+CREATE TABLE votesBytes
+(
+  phone_number       bigint     NOT NULL
+, state              varchar(63 bytes) NOT NULL
+, contestant_number  integer    NOT NULL
+);
+
+PARTITION TABLE votesBytes ON COLUMN phone_number;
+
+CREATE INDEX votesBytes_state_tree1 ON votesBytes (state);
+
+

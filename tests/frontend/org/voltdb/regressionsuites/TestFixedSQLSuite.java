@@ -1659,6 +1659,44 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     }
 
+    // This is a regression test for ENG-6792
+    public void testInlineVarcharAggregation() throws IOException, ProcCallException {
+        Client client = getClient();
+        ClientResponse cr;
+
+
+        cr = client.callProcedure("VARCHARTB.insert",  1, "z", "cat");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "insert into VarcharTB values (?, ?, ?)", 6, "a", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "insert into VarcharTB values (?, ?, ?)", 7, "o", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select max(var2), min(var2) from VarcharTB");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("z", vt.getString(0));
+        assertEquals("a", vt.getString(1));
+
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 0, "MM", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 1, "ZZ", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 2, "AA", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 3, "NN", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select num, max(wee), min(wee) " +
+                "from pwee_with_index group by num order by num");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("ZZ", vt.getString(1));
+        assertEquals("AA", vt.getString(2));
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate
