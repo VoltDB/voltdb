@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -700,6 +701,20 @@ public abstract class AbstractParsedStmt {
                 m_paramList[index] = pve;
             }
         }
+    }
+
+    /** Get a list of the subqueries used by this statement.  This method
+     * may be overridden by subclasses, e.g., insert statements have a subquery
+     * but does not use m_joinTree.
+     **/
+    public List<StmtSubqueryScan> getSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_joinTree != null) {
+          m_joinTree.extractSubQueries(subqueries);
+        }
+
+        return subqueries;
     }
 
     // The parser currently attaches the summary parameter list
