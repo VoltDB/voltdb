@@ -310,9 +310,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     inputDepIds,
                     txnId,
                     spHandle,
-                    spUniqueId,
                     lastCommittedSpHandle,
                     uniqueId,
+                    spUniqueId,
                     undoToken);
 
         try {
