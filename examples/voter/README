@@ -51,6 +51,14 @@ For more on benchmarking and tips on application tuning, make sure you visit the
  - http://voltdb.com/search/node/benchmark
  - http://voltdb.com/search/node/tuning
 
+
+Demonstrating VoltDB Export
+---------------------------
+Change the export enabled attribute in the deployment.xml from `false` to `true` and restart the VoltDB server. Now when you run the client, VoltDB CSV export files will be produced containing the vote history.
+
+The export feature is described in full in our documentation: https://voltdb.com/docs/UsingVoltDB/ExportClients.php.
+
+
 run.sh actions
 -----------
 

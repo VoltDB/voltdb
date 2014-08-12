@@ -20,6 +20,16 @@ CREATE TABLE votes
 
 PARTITION TABLE votes ON COLUMN phone_number;
 
+-- votes export table: ship all recorded volts to VoltDB export.
+CREATE TABLE votes_export
+(
+  phone_number       bigint     NOT NULL
+, state              varchar(2) NOT NULL
+, contestant_number  integer    NOT NULL
+);
+
+EXPORT table votes_export;
+
 -- Map of Area Codes and States for geolocation classification of incoming calls
 CREATE TABLE area_code_state
 (
