@@ -586,9 +586,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     serialize_in,
                                                     txnId,
                                                     spHandle,
-                                                    spUniqueId,
                                                     lastCommittedSpHandle,
                                                     uniqueId,
+                                                    spUniqueId,
                                                     undoToken);
 
         if (failures > 0) {
