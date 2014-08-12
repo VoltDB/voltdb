@@ -1672,7 +1672,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "insert into VarcharTB values (?, ?, ?)", 7, "o", "panda");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("@AdHoc", "select max(var2), min(var2) from VarcharTB order by id");
+        cr = client.callProcedure("@AdHoc", "select max(var2), min(var2) from VarcharTB");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
