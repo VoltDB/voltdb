@@ -148,7 +148,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             extendBufferChain(0);
         }
 
-        beginTransaction(txnId, currentSpHandle, uniqueId, spUniqueId);
+        beginTransaction(uniqueId, spUniqueId);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open

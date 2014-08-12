@@ -76,7 +76,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -152,11 +152,12 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
+//    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId, int64_t spUniqueId) {
-//    std::cout << "Beginning txn " << txnId << " spHandle " << std::endl;
+void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
+//    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }

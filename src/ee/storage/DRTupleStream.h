@@ -61,7 +61,7 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId, int64_t spUniqueId);
+    void beginTransaction(int64_t uniqueId, int64_t spUniqueId);
     void endTransaction(int64_t spUniqueId);
 
     bool m_enabled;

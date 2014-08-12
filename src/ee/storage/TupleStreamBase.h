@@ -73,11 +73,11 @@ public:
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    virtual void beginTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId, int64_t spUniqueId) {}
+    virtual void beginTransaction(int64_t uniqueId, int64_t spUniqueId) {}
     virtual void endTransaction(int64_t spUniqueId) {}
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, int64_t spUniqueId, bool sync = false, bool flush = false);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, int64_t spUniqueId, bool sync, bool flush);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
