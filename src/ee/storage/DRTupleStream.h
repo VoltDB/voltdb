@@ -28,7 +28,7 @@
 namespace voltdb {
 class StreamBlock;
 
-const int SECONDAERY_BUFFER_SIZE = /* 1024; */ (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -67,7 +67,7 @@ public:
     void beginTransaction(int64_t txnId, int64_t spHandle);
     void endTransaction(int64_t spHandle);
 
-    void extendBufferChain(size_t minLength);
+    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     bool m_enabled;
 private:

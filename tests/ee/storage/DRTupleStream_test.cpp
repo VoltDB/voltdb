@@ -59,7 +59,7 @@ const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTI
 const int BUFFER_SIZE = 950;
 const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
 // roughly 22.5k
-const int SECONDARY_BUFFER_SIZE = 21375;
+const int LARGE_BUFFER_SIZE = 21375;
 
 class DRTupleStreamTest : public Test {
 public:
@@ -86,7 +86,7 @@ public:
 
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + 8);
-        m_wrapper.setSecondaryCapacity(SECONDARY_BUFFER_SIZE + 8);
+        m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + 8);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -404,7 +404,7 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
         appendTuple(i-1, i);
     }
 
-    int tuples_to_fill_large_buffer = (SECONDARY_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
+    int tuples_to_fill_large_buffer = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
     for (int i = 1; i <= tuples_to_fill_large_buffer; i++)
     {
         appendTuple(tuples_to_fill_buffer, tuples_to_fill_buffer + 1);
@@ -424,13 +424,6 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * tuples_to_fill_buffer);
-    EXPECT_EQ(results->offset(), 0);
-
-    // now get the third
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * tuples_to_fill_buffer);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE * tuples_to_fill_large_buffer + MAGIC_TRANSACTION_SIZE);
 }
 
@@ -440,7 +433,7 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
 TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
 {
     bool expectedException = false;
-    int tuples_cant_fill = 3 * SECONDARY_BUFFER_SIZE / MAGIC_TUPLE_SIZE;
+    int tuples_cant_fill = 3 * LARGE_BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     for (int i = 1; i <= tuples_cant_fill; i++)
     {
         try {
@@ -451,15 +444,8 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
     }
     ASSERT_TRUE(expectedException);
 
-    // get the first buffer flushed
-    ASSERT_TRUE(m_topend.receivedDRBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), 0);
-
-    // the second is empty
-    ASSERT_TRUE(m_topend.blocks.empty());
+    // We shouldn't get any buffer as the exception is thrown.
+    ASSERT_FALSE(m_topend.receivedDRBuffer);
 }
 
 /**

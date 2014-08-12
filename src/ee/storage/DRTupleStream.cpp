@@ -40,7 +40,7 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0),m_secondaryCapacity(SECONDAERY_BUFFER_SIZE)
+      m_partitionId(0),m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -223,43 +223,16 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      m_uso += io.position();
 }
 
-void DRTupleStream::extendBufferChain(size_t minLength) {
-    if (m_defaultCapacity < minLength) {
-        // exportxxx: rollback instead?
-        throwFatalException("Default capacity is less than required buffer size.");
-    }
-
-    StreamBlock* oldBlock = NULL;
-    size_t partialTxnLength = 0;
-    size_t blockSize = m_defaultCapacity;
-    bool spanBuffer = false;
-    bool throwException = false;
-    size_t uso = m_uso;
-
-    if (m_currBlock) {
-        if (m_currBlock->offset() > 0) {
-            m_pendingBlocks.push_back(m_currBlock);
-            oldBlock = m_currBlock;
-            m_currBlock = NULL;
-        }
-        // fully discard empty blocks. makes valgrind/testcase
-        // conclusion easier.
-        else {
-            discardBlock(m_currBlock);
-            m_currBlock = NULL;
-        }
-    }
-
-    // If partial transaction is going to span multiple buffer, first time move it to
-    // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
-    // an exception and rollback.
-    if (oldBlock && oldBlock->remaining() < minLength   /* remain space is not big enough */
-            && oldBlock->hasDRBeginTxn()   /* this block contains a DR begin txn */
-            && oldBlock->lastDRBeginTxnOffset() != oldBlock->offset() /* current txn is not a DR begin txn */) {
-        spanBuffer = true;
-        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+// If partial transaction is going to span multiple buffer, first time move it to
+// the next buffer, the next time move it to a 45 megabytes buffer, then after throw
+// an exception and rollback.
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+    if (sb && sb->remaining() < minLength   /* remain space is not big enough */
+            && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
+            && sb->lastDRBeginTxnOffset() != sb->offset() /* current txn is not a DR begin txn */) {
+        size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
         if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
-            switch (oldBlock->type()) {
+            switch (sb->type()) {
                 case voltdb::NORMAL_STREAM_BLOCK:
                 {
                     blockSize = m_secondaryCapacity;
@@ -267,37 +240,15 @@ void DRTupleStream::extendBufferChain(size_t minLength) {
                 }
                 case voltdb::LARGE_STREAM_BLOCK:
                 {
-                    throwException = true;
+                    blockSize = 0;
                     break;
                 }
             }
         }
-        if (!throwException) {
+        if (blockSize != 0) {
             uso -= partialTxnLength;
         }
+        return true;
     }
-    char * buffer = new char[blockSize];
-    if (!buffer) {
-        throwFatalException("Failed to claim managed buffer for DR");
-    }
-    m_currBlock = new StreamBlock(buffer, blockSize, uso);
-    if (blockSize == m_secondaryCapacity) {
-        m_currBlock->setType(LARGE_STREAM_BLOCK);
-    }
-
-    if (throwException) {
-        rollbackTo(uso);
-        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
-    }
-
-    if (spanBuffer) {
-        ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
-        m_currBlock->recordLastBeginTxnOffset();
-        m_currBlock->consumed(partialTxnLength);
-        ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
-        oldBlock->truncateTo(uso);
-        oldBlock->clearLastBeginTxnOffset();
-    }
-
-    pushPendingBlocks();
+    return false;
 }
