@@ -59,6 +59,7 @@ public class RepairLog
      * on repair
      */
     private long m_maxSeenMpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpUniqueId = Long.MIN_VALUE;
 
 
     // is this a partition leader?
@@ -159,6 +160,7 @@ public class RepairLog
                 m_lastSpHandle = m.getSpHandle();
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+                m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
@@ -171,6 +173,7 @@ public class RepairLog
                     m_lastSpHandle = m.getSpHandle();
                 }
                 m_maxSeenMpUniqueId = Math.max(m_maxSeenMpUniqueId, m.getUniqueId());
+                m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
@@ -250,8 +253,10 @@ public class RepairLog
         List<Item> items = new LinkedList<Item>();
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
+        long maxSeenUniqueId = m_maxSeenMpUniqueId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
+            maxSeenUniqueId = m_maxSeenSpUniqueId;
             items.addAll(m_logSP);
         }
 
@@ -272,7 +277,7 @@ public class RepairLog
                         m_lastSpHandle,
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
-                        m_maxSeenMpUniqueId);
+                        maxSeenUniqueId);
         responses.add(hheader);
 
         int seq = responses.size();
