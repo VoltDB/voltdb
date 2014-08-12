@@ -59,6 +59,7 @@ public:
      * to test buffer rollover.
      */
     void setDefaultCapacity(size_t capacity);
+    virtual void setSecondaryCapacity(size_t capacity) {};
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
@@ -69,7 +70,7 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 

@@ -27,6 +27,10 @@
 #define MAGIC_HEADER_SPACE_FOR_JAVA 8
 namespace voltdb
 {
+    enum StreamBlockType {
+        NORMAL_STREAM_BLOCK = 1,
+        LARGE_STREAM_BLOCK = 2
+    };
     /**
      * A single data block with some buffer semantics.
      */
@@ -37,7 +41,10 @@ namespace voltdb
               m_uso(uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastDRBeginTxnOffset(0),
+              m_hasDRBeginTxn(false),
+              m_type(voltdb::NORMAL_STREAM_BLOCK)
         {
         }
 
@@ -46,7 +53,10 @@ namespace voltdb
               m_uso(other->m_uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max())
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
+              m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+              m_type(other->m_type)
         {
         }
 
@@ -114,6 +124,21 @@ namespace voltdb
             m_lastCommittedSpHandle = spHandle;
         }
 
+        /**
+         * Number of maximum bytes stored in the buffer
+         */
+        size_t capacity() const {
+            return m_capacity;
+        }
+
+        size_t lastDRBeginTxnOffset() const {
+            return m_lastDRBeginTxnOffset;
+        }
+
+        StreamBlockType type() const {
+            return m_type;
+        }
+
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
@@ -136,6 +161,26 @@ namespace voltdb
             }
         }
 
+        void recordLastBeginTxnOffset() {
+            m_lastDRBeginTxnOffset = m_offset;
+            m_hasDRBeginTxn = true;
+        }
+
+        void clearLastBeginTxnOffset() {
+            m_lastDRBeginTxnOffset = 0;
+            m_hasDRBeginTxn =false;
+        }
+
+        bool hasDRBeginTxn() {
+            return m_hasDRBeginTxn;
+        }
+
+        char* mutableLastBeginTxnDataPtr() {
+            return m_data + m_lastDRBeginTxnOffset;
+        }
+
+        void setType(StreamBlockType type) { m_type = type; }
+
         char *m_data;
         const size_t m_capacity;
         size_t m_offset;         // position for next write.
@@ -143,6 +188,9 @@ namespace voltdb
         int64_t m_startSpHandle;
         int64_t m_lastSpHandle;
         int64_t m_lastCommittedSpHandle;
+        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
+        bool m_hasDRBeginTxn;    // only used for DR Buffer
+        StreamBlockType m_type;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

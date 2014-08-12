@@ -28,6 +28,8 @@
 namespace voltdb {
 class StreamBlock;
 
+const int SECONDAERY_BUFFER_SIZE = /* 1024; */ (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
     //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
@@ -47,6 +49,9 @@ public:
         m_partitionId = partitionId;
     }
 
+    // for test purpose
+    virtual void setSecondaryCapacity(size_t capacity);
+
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /** write a tuple to the stream */
@@ -62,9 +67,12 @@ public:
     void beginTransaction(int64_t txnId, int64_t spHandle);
     void endTransaction(int64_t spHandle);
 
+    void extendBufferChain(size_t minLength);
+
     bool m_enabled;
 private:
     CatalogId m_partitionId;
+    size_t m_secondaryCapacity;
 };
 
 class MockDRTupleStream : public DRTupleStream {

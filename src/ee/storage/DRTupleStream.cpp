@@ -40,8 +40,19 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0)
+      m_partitionId(0),m_secondaryCapacity(SECONDAERY_BUFFER_SIZE)
 {}
+
+void DRTupleStream::setSecondaryCapacity(size_t capacity) {
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    {
+        throwFatalException("setSecondaryCapacity only callable before "
+                            "TupleStreamBase is used");
+    }
+    m_secondaryCapacity = capacity;
+}
 
 /*
  * If SpHandle represents a new transaction, commit previous data.
@@ -162,6 +173,8 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
          extendBufferChain(m_defaultCapacity);
      }
 
+     m_currBlock->recordLastBeginTxnOffset();
+
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
@@ -208,4 +221,83 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
      m_uso += io.position();
+}
+
+void DRTupleStream::extendBufferChain(size_t minLength) {
+    if (m_defaultCapacity < minLength) {
+        // exportxxx: rollback instead?
+        throwFatalException("Default capacity is less than required buffer size.");
+    }
+
+    StreamBlock* oldBlock = NULL;
+    size_t partialTxnLength = 0;
+    size_t blockSize = m_defaultCapacity;
+    bool spanBuffer = false;
+    bool throwException = false;
+    size_t uso = m_uso;
+
+    if (m_currBlock) {
+        if (m_currBlock->offset() > 0) {
+            m_pendingBlocks.push_back(m_currBlock);
+            oldBlock = m_currBlock;
+            m_currBlock = NULL;
+        }
+        // fully discard empty blocks. makes valgrind/testcase
+        // conclusion easier.
+        else {
+            discardBlock(m_currBlock);
+            m_currBlock = NULL;
+        }
+    }
+
+    // If partial transaction is going to span multiple buffer, first time move it to
+    // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
+    // an exception and rollback.
+    if (oldBlock && oldBlock->remaining() < minLength   /* remain space is not big enough */
+            && oldBlock->hasDRBeginTxn()   /* this block contains a DR begin txn */
+            && oldBlock->lastDRBeginTxnOffset() != oldBlock->offset() /* current txn is not a DR begin txn */) {
+        spanBuffer = true;
+        partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
+            switch (oldBlock->type()) {
+                case voltdb::NORMAL_STREAM_BLOCK:
+                {
+                    blockSize = m_secondaryCapacity;
+                    break;
+                }
+                case voltdb::LARGE_STREAM_BLOCK:
+                {
+                    throwException = true;
+                    break;
+                }
+            }
+        }
+        if (!throwException) {
+            uso -= partialTxnLength;
+        }
+    }
+    char * buffer = new char[blockSize];
+    if (!buffer) {
+        throwFatalException("Failed to claim managed buffer for DR");
+    }
+    m_currBlock = new StreamBlock(buffer, blockSize, uso);
+    if (blockSize == m_secondaryCapacity) {
+        m_currBlock->setType(LARGE_STREAM_BLOCK);
+    }
+
+    if (throwException) {
+        rollbackTo(uso);
+        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
+
+    if (spanBuffer) {
+        ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        m_currBlock->recordLastBeginTxnOffset();
+        m_currBlock->consumed(partialTxnLength);
+        ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
+        oldBlock->truncateTo(uso);
+        oldBlock->clearLastBeginTxnOffset();
+    }
+
+    pushPendingBlocks();
 }
