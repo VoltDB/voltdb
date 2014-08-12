@@ -43,6 +43,7 @@ public class VoltDDLElementTracker {
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
+    final Set<String> m_importLines = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -80,6 +81,10 @@ public class VoltDDLElementTracker {
      */
     void addExtraClasses(Set<String> classNames) {
         m_extraClassses.addAll(classNames);
+    }
+
+    void addImportLine(String importLine) {
+        m_importLines.add(importLine);
     }
 
     /**
