@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.CLIConfig;
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
@@ -54,7 +55,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
 
 public class Collector {
-    private static String m_voltDbRootPath = null;
+    private static String m_voltDbRootPath;
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
@@ -63,48 +64,88 @@ public class Collector {
     private static String m_host = "";
     private static String m_username = "";
     private static String m_password = "";
-    private static boolean m_noPrompt = false;
-    private static boolean m_dryRun = false;
-    private static boolean m_skipHeapDump = false;
-    private static boolean m_calledFromVEM = false;
-    private static boolean m_copyToVEM = false;
-    private static boolean m_fileInfoOnly = false;
-    private static int m_daysOfFileToCollect = 13;
+    private static boolean m_noPrompt;
+    private static boolean m_dryRun;
+    private static boolean m_skipHeapDump;
+    private static boolean m_calledFromVEM;
+    private static boolean m_copyToVEM;
+    private static boolean m_fileInfoOnly;
+    private static int m_daysOfFileToCollect;
 
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata"};
 
+    static class CollectConfig extends CLIConfig {
+        @Option(desc = "file name prefix for uniquely identifying collection")
+        String prefix = "";
+
+        @Option(desc = "upload resulting collection to HOST via SFTP")
+        String host = "";
+
+        @Option(desc = "user name for SFTP upload.")
+        String username = "";
+
+        @Option(desc = "password for SFTP upload")
+        String password = "";
+
+        @Option(desc = "automatically upload collection (without user prompt)")
+        boolean noprompt = false;
+
+        @Option(desc = "list the log files without collecting them")
+        boolean dryrun = false;
+
+        @Option(desc = "exclude heap dump file from collection")
+        boolean skipheapdump = false;
+
+        @Option(desc = "number of days of file to collect")
+        int days = 13;
+
+        @Option(desc = "the voltdbroot path")
+        String voltdbroot = "";
+
+        @Option
+        boolean calledFromVEM = false;
+
+        @Option
+        boolean copyToVEM=false;
+
+        @Option
+        boolean fileInfoOnly=false;
+
+        @Override
+        public void validate() {
+            if (days < 0) exitWithMessageAndUsage("days must be >= 0");
+            if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
+        }
+    }
+
     public static void main(String[] args) {
         // get rid of log4j "no appenders could be found for logger" warning when called from VEM
         Logger.getRootLogger().addAppender(new NullAppender());
 
-        m_voltDbRootPath = args[0];
-        m_prefix = args[1];
-        m_host = args[2];
-        m_username = args[3];
-        m_password = args[4];
-        m_noPrompt = Boolean.parseBoolean(args[5]);
-        m_dryRun = Boolean.parseBoolean(args[6]);
-        m_skipHeapDump = Boolean.parseBoolean(args[7]);
-        m_daysOfFileToCollect = Integer.parseInt(args[8]);
+        CollectConfig config = new CollectConfig();
+        config.parse(Collector.class.getName(), args);
 
-        // To Do
-        // Fix the VEM call because the argument numbers has been changed
+        m_voltDbRootPath = config.voltdbroot;
+        m_prefix = config.prefix;
+        m_host = config.host;
+        m_username = config.username;
+        m_password = config.password;
+        m_noPrompt = config.noprompt;
+        m_dryRun = config.dryrun;
+        m_skipHeapDump = config.skipheapdump;
+        m_daysOfFileToCollect = config.days;
+        m_calledFromVEM = config.calledFromVEM;
 
-        // arguments only used when Collector is called from VEM
-        if (args.length > 9) {
-            m_calledFromVEM = true;
+        // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
+        // so the resulting file is easier to be located and copied to VEM
+        m_copyToVEM = config.copyToVEM;
 
-            // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
-            // so the resulting file is easier to be located and copied to VEM
-            m_copyToVEM = Boolean.parseBoolean(args[9]);
-
-            // generate a list of information (server name, size, and path) of files rather than actually collect files
-            // used by files display panel in VEM UI
-            m_fileInfoOnly = Boolean.parseBoolean(args[10]);
-        }
+        // generate a list of information (server name, size, and path) of files rather than actually collect files
+        // used by files display panel in VEM UI
+        m_fileInfoOnly = config.fileInfoOnly;
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
