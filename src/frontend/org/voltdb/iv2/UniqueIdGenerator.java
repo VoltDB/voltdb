@@ -302,8 +302,8 @@ public class UniqueIdGenerator {
      * @param uniqueId The unique id value to examine.
      * @return The site id embedded within the unique id.
      */
-    public static long getPartitionIdFromUniqueId(long uniqueId) {
-        return uniqueId & PARTITIONID_MAX_VALUE;
+    public static int getPartitionIdFromUniqueId(long uniqueId) {
+        return (int)(uniqueId & PARTITIONID_MAX_VALUE);
     }
 
     public static long getSequenceNumberFromUniqueId(long uniqueId) {

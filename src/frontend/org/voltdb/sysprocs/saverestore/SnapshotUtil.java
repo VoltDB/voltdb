@@ -142,6 +142,7 @@ public class SnapshotUtil {
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
+        Map<Integer, Long> partitionUniqueIds,
         InstanceId instanceId,
         long timestamp,
         int newPartitionCount)
@@ -192,6 +193,12 @@ public class SnapshotUtil {
 
                 stringer.key("partitionTransactionIds").object();
                 for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
+                    stringer.key(entry.getKey().toString()).value(entry.getValue());
+                }
+                stringer.endObject();
+
+                stringer.key("partitionUniqueIds").object();
+                for (Map.Entry<Integer, Long> entry : partitionUniqueIds.entrySet()) {
                     stringer.key(entry.getKey().toString()).value(entry.getValue());
                 }
                 stringer.endObject();

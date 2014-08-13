@@ -44,6 +44,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
@@ -86,6 +87,8 @@ public class SnapshotSaveAPI
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
     private static Map<Integer, Long> m_partitionLastSeenTransactionIds =
             new HashMap<Integer, Long>();
+    private static Map<Integer, Long> m_partitionLastSeenUniqueIds =
+            new HashMap<Integer, Long>();
 
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
@@ -111,7 +114,7 @@ public class SnapshotSaveAPI
      */
     public VoltTable startSnapshotting(
             final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
-            final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
+            final long multiPartTxnId, final long partitionTxnId, final long partitionUniqueId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
             final long timestamp)
@@ -128,10 +131,11 @@ public class SnapshotSaveAPI
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrierActualAction.set(new Runnable() {
                 @Override
                 public void run() {
-                    Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
-                    partitionTransactionIds = m_partitionLastSeenTransactionIds;
-                    SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
+                    Map<Integer, Long> partitionTransactionIds = m_partitionLastSeenTransactionIds;
+                    Map<Integer, Long> partitionUniqueIds = m_partitionLastSeenUniqueIds;
+                    SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds + " and unique ids " + partitionUniqueIds);
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
+                    m_partitionLastSeenUniqueIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
 
@@ -157,6 +161,7 @@ public class SnapshotSaveAPI
                             format,
                             multiPartTxnId,
                             partitionTransactionIds,
+                            partitionUniqueIds,
                             data,
                             context,
                             result,
@@ -175,8 +180,10 @@ public class SnapshotSaveAPI
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
             SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
-                    TxnEgo.getPartitionId(partitionTxnId));
+                    TxnEgo.getPartitionId(partitionTxnId) + " and unique id " + partitionUniqueId);
             m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
+            m_partitionLastSeenUniqueIds.put((int)UniqueIdGenerator.getPartitionIdFromUniqueId(partitionUniqueId), partitionUniqueId);
+
         }
 
         boolean runPostTasks = false;
@@ -440,6 +447,7 @@ public class SnapshotSaveAPI
     private void createSetupIv2(
             final String file_path, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Long> partitionUniqueIds,
             String data, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -475,7 +483,7 @@ public class SnapshotSaveAPI
             throw new RuntimeException("BAD BAD BAD");
         }
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
-                partitionTransactionIds, jsData, context, result, exportSequenceNumbers, tracker,
+                partitionTransactionIds, partitionUniqueIds, jsData, context, result, exportSequenceNumbers, tracker,
                 hashinatorData, timestamp);
         m_deferredSetupFuture =
                 VoltDB.instance().submitSnapshotIOWork(

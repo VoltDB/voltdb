@@ -69,6 +69,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Long> partitionUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -106,6 +107,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                           partitionUniqueIds,
                                            jsData, context, result,
                                            exportSequenceNumbers, tracker,
                                            hashinatorData,
@@ -225,6 +227,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
+                                                             Map<Integer, Long> partitionUniqueIds,
                                                              JSONObject jsData,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
@@ -236,7 +239,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
                         jsData, context, result, exportSequenceNumbers,
                         tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);

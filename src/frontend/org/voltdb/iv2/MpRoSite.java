@@ -122,6 +122,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public long getSpUniqueIdForSnapshotDigest() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public long getSiteId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -365,13 +370,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setSpHandleForSnapshotDigest(long spHandle)
+    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, long spUniqueId,
             List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

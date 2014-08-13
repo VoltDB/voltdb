@@ -1102,7 +1102,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setSpHandleForSnapshotDigest(long spHandle)
+    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
     {
 
     }
@@ -1257,7 +1257,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoLog) {
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, long spUniqueId, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
