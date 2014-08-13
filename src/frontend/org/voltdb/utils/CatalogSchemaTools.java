@@ -328,6 +328,10 @@ public abstract class CatalogSchemaTools {
             sb.append("EXPORT TABLE " + catalog_tbl.getTypeName() + ";\n");
         }
 
+        if (catalog_tbl.getIsdred()) {
+            sb.append("DR TABLE " + catalog_tbl.getTypeName() + ";\n");
+        }
+
         sb.append("\n");
     }
 
