@@ -44,6 +44,8 @@ DRTupleStream::DRTupleStream()
       m_clusterId(0)
 {}
 
+const int64_t PARTITION_ID_MASK = (1 << 14) - 1;
+
 /*
  * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
@@ -60,6 +62,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
+    assert((spUniqueId & PARTITION_ID_MASK) == m_partitionId);
+    assert((spHandle & PARTITION_ID_MASK) == m_partitionId);
+    assert((lastCommittedSpHandle & PARTITION_ID_MASK) == m_partitionId);
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
@@ -152,12 +157,20 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
+    if ((block->startSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+        throwFatalException("oops");
+    }
+    if ((block->lastSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+        throwFatalException("oops");
+    }
 //    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
+//    std::cout << "Pushing block with start " << (block->startSpUniqueId() & PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & PARTITION_ID_MASK) << std::endl;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
 void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
 //    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
+//    std::cout << "Beginning txn uniqueId " << (uniqueId & PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -167,7 +180,7 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
      }
 
      //Set start sp handle if necessary, also sneakily updates last uniqueId
-     m_currBlock->startSpUniqueId(uniqueId);
+     m_currBlock->startSpUniqueId(spUniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
@@ -184,7 +197,7 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
 }
 
 void DRTupleStream::endTransaction(int64_t spUniqueId) {
-//    std::cout << "Ending txn spHandle " << spHandle << std::endl;
+//    std::cout << "Ending txn spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }

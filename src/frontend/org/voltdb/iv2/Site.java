@@ -257,7 +257,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public long getSpUniqueIdForSnapshotDigest() {
-            return m_spHandleForSnapshotDigest;
+            return m_spUniqueIdForSnapshotDigest;
         }
 
         @Override

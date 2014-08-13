@@ -147,8 +147,8 @@ public class PartitionDRGateway {
 
     public static synchronized void pushDRBuffer(
             int partitionId,
-            long startSpHandle,
-            long lastSpHandle,
+            long startSpUniqueId,
+            long lastSpUniqueId,
             ByteBuffer buf) {
         if (logDebug) {
             System.out.println("Received DR buffer size " + buf.remaining());
@@ -236,6 +236,6 @@ public class PartitionDRGateway {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, buf);
+        pdrg.onBinaryDR(partitionId,  startSpUniqueId, lastSpUniqueId, buf);
     }
 }
