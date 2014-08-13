@@ -2781,15 +2781,15 @@ public class TestFunctionsSuite extends RegressionSuite {
         sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
             "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
         cl.callProcedure("@AdHoc", sql);
-        sql = "SELECT CASE WHEN ID < 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
-        assertEquals("BAR", vt.getString(0));
+        assertEquals("FOO", vt.getString(0));
 
-        sql = "SELECT CASE WHEN ID < 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
-        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("CDCDCDCD"));
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
 
         cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
@@ -3296,10 +3296,10 @@ public class TestFunctionsSuite extends RegressionSuite {
 
                 "CREATE TABLE INLINED_VC_VB_TABLE (" +
                 "ID INTEGER DEFAULT 0 NOT NULL," +
-                "VC1 VARCHAR(6)," +
-                "VC2 VARCHAR(6)," +
-                "VB1 VARBINARY(6)," +
-                "VB2 VARBINARY(6));" +
+                "VC1 VARCHAR(6)," +     // inlined
+                "VC2 VARCHAR(16)," +    // not inlined
+                "VB1 VARBINARY(6)," +   // inlined
+                "VB2 VARBINARY(64));" + // not inlined
                 "";
         try {
             project.addLiteralSchema(literalSchema);

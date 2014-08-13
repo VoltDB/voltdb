@@ -2727,11 +2727,62 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
 inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         const int32_t maxLength, const bool isInBytes) const
 {
-    serializeToTupleStorageAllocateForObjects(storage,
-                                              isInlined,
-                                              maxLength,
-                                              isInBytes,
-                                              getTempStringPool());
+    const ValueType type = getValueType();
+    switch (type) {
+    case VALUE_TYPE_TIMESTAMP:
+        *reinterpret_cast<int64_t*>(storage) = getTimestamp();
+        break;
+    case VALUE_TYPE_TINYINT:
+        *reinterpret_cast<int8_t*>(storage) = getTinyInt();
+        break;
+    case VALUE_TYPE_SMALLINT:
+        *reinterpret_cast<int16_t*>(storage) = getSmallInt();
+        break;
+    case VALUE_TYPE_INTEGER:
+        *reinterpret_cast<int32_t*>(storage) = getInteger();
+        break;
+    case VALUE_TYPE_BIGINT:
+        *reinterpret_cast<int64_t*>(storage) = getBigInt();
+        break;
+    case VALUE_TYPE_DOUBLE:
+        *reinterpret_cast<double*>(storage) = getDouble();
+        break;
+    case VALUE_TYPE_DECIMAL:
+        ::memcpy( storage, m_data, sizeof(TTInt));
+        break;
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+        //Potentially non-inlined type requires special handling
+        if (isInlined) {
+            inlineCopyObject(storage, maxLength, isInBytes);
+        }
+        else {
+            if (!isNull()) {
+                int objLength = getObjectLength_withoutNull();
+                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+            }
+
+            // copy the StringRef pointers, even for NULL case.
+            if (m_sourceInlined) {
+                // create a non-const temp here for the outlined value
+                NValue outlinedValue = *this;
+                outlinedValue.allocateObjectFromInlinedValue(getTempStringPool());
+                *reinterpret_cast<StringRef**>(storage) =
+                    *reinterpret_cast<StringRef* const*>(outlinedValue.m_data);
+            }
+            else {
+                *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);
+            }
+        }
+        break;
+    default:
+        char message[128];
+        snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
+                getTypeName(type).c_str());
+        throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                message);
+    }
 }
 
 
