@@ -284,8 +284,10 @@ class NValue {
     /* Serialize the scalar this NValue represents to the storage area
        provided. If the scalar is an Object type then the object will
        be copy if it can be inlined into the tuple. Otherwise a
-       pointer to the object will be copied into the storage area. No
-       allocations are performed. */
+       pointer to the object will be copied into the storage area. Any
+       allocations needed (if this NValue refers to inlined memory
+       whereas the field in the tuple is not inlined), will be done in
+       the temp string pool. */
     void serializeToTupleStorage(
         void *storage, const bool isInlined, const int32_t maxLength, const bool isInBytes) const;
 
@@ -2716,10 +2718,11 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
 
 /**
  * Serialize the scalar this NValue represents to the storage area
- * provided. If the scalar is an Object type then the object will
- * be copy if it can be inlined into the tuple. Otherwise a
- * pointer to the object will be copied into the storage area. No
- * allocations are performed.
+ * provided. If the scalar is an Object type then the object will be
+ * copy if it can be inlined into the tuple. Otherwise a pointer to
+ * the object will be copied into the storage area.  Any allocations
+ * needed (if this NValue refers to inlined memory whereas the field
+ * in the tuple is not inlined), will be done in the temp string pool.
  */
 inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         const int32_t maxLength, const bool isInBytes) const
@@ -2754,11 +2757,6 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
-            if (m_sourceInlined) {
-                throwDynamicSQLException(
-                        "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
-            }
-
             if (!isNull()) {
                 int objLength = getObjectLength_withoutNull();
                 const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
@@ -2766,7 +2764,16 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
 
             // copy the StringRef pointers, even for NULL case.
-            *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);
+            if (m_sourceInlined) {
+                // create a non-const temp here for the outlined value
+                NValue outlinedValue = *this;
+                outlinedValue.allocateObjectFromInlinedValue(getTempStringPool());
+                *reinterpret_cast<StringRef**>(storage) =
+                    *reinterpret_cast<StringRef* const*>(outlinedValue.m_data);
+            }
+            else {
+                *reinterpret_cast<StringRef**>(storage) = *reinterpret_cast<StringRef* const*>(m_data);
+            }
         }
         break;
     default:
