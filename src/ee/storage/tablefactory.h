@@ -82,6 +82,7 @@ public:
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
         char *signature,
+        bool drEnabled,
         bool tableIsMaterialized = false,
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,

@@ -365,6 +365,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool drEnabled = catalogTable.isDRed();
     materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -372,8 +373,11 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1_Init(&shaCTX);
     SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
     SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
+    catalogTable.isDRed();
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, signatureHash, materialized,
+                                                    schema, columnNames, signatureHash,
+                                                    drEnabled,
+                                                    materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,

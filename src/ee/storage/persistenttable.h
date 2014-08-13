@@ -427,7 +427,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn, char *signature, bool drEnabled, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -483,7 +483,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream = true);
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -562,6 +562,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     //Cache config info, is this a materialized view
     bool m_isMaterialized;
+
+    // is DR enabled
+    bool m_drEnabled;
 
     //SHA-1 of signature string
     char m_signature[20];

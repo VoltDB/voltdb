@@ -88,7 +88,7 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
+PersistentTable::PersistentTable(int partitionColumn, char * signature, bool drEnabled, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -98,7 +98,8 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
-    m_isMaterialized(isMaterialized)
+    m_isMaterialized(isMaterialized),
+    m_drEnabled(drEnabled)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -365,7 +366,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
 {
     if (fallible) {
         // not null checks at first
@@ -402,7 +403,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = ec->drStream();
     size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && shouldDRStream) {
+    if (!m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
@@ -571,7 +572,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = ec->drStream();
     size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized) {
+    if (!m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
@@ -698,7 +699,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = ec->drStream();
     size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized) {
+    if (!m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
@@ -1061,7 +1062,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
     try {
-        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
+        insertTupleCommon(tuple, tuple, true);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
