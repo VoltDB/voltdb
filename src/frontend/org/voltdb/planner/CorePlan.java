@@ -100,7 +100,7 @@ public class CorePlan {
         isReplicatedTableDML = plan.replicatedTableDML;
         this.catalogVersion = catalogVersion;
         parameterTypes = plan.parameterTypes();
-        readOnly = plan.readOnly;
+        readOnly = plan.getReadOnly();
     }
 
     /***
