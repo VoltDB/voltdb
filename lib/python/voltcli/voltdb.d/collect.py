@@ -59,6 +59,6 @@
 )
 
 def collect(runner):
-    runner.args.extend(['--voltdbroot='+runner.opts.voltdbroot, '--prefix='+runner.opts.prefix, '--host='+runner.opts.host, '--username='+runner.opts.username,
-    '--password='+runner.opts.password,'--days='+runner.opts.days])
+    runner.args.extend(['--voltdbroot='+runner.opts.voltdbroot, '--prefix='+runner.opts.prefix, '--host='+runner.opts.host, '--username='+runner.opts.username, '--password='+runner.opts.password,
+    '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump), '--days='+runner.opts.days])
     runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)
