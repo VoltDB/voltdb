@@ -67,7 +67,7 @@ public:
     bool m_enabled;
 private:
     CatalogId m_partitionId;
-    int8_t m_clusterId;
+    int8_t __attribute__ ((unused)) m_clusterId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
