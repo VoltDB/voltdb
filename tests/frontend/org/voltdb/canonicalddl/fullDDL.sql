@@ -234,45 +234,77 @@ CREATE TABLE T23
 
 
 -- CREATE VIEW
--- disabled currently due to sqlcmd bug, see ENG-6641
 
---CREATE TABLE T24 
---(
---    C1 INTEGER
---,   C2 INTEGER
---);
+CREATE TABLE T24 
+(
+    C1 INTEGER
+,   C2 INTEGER
+);
 
---CREATE VIEW VT1 
---(
---    C1
---,   C2
---,   TOTAL
---) 
---AS 
---    SELECT C1
---        ,  C2
---        ,  COUNT(*) 
---    FROM T24 
---    GROUP BY C1
---          ,  C2
---;
+-- Verify that the sqlcmd parsing survives two consecutive views
+CREATE VIEW VT1 
+(
+    C1
+,   C2
+,   TOTAL
+) 
+AS 
+    SELECT C1
+        ,  C2
+        ,  COUNT(*) 
+    FROM T24 
+    GROUP BY C1
+          ,  C2
+;
 
---CREATE VIEW VT2 
---(
---    C1
---,   C2
---,   TOTAL
---,   SUMUP
---) 
---AS 
---    SELECT C1
---        ,  C2
---        ,  COUNT(*)
---        ,  SUM(C2) 
---    AS 
---        newTble 
---    FROM T24 
---    WHERE T24.C1 < 1000 
---    GROUP BY C1
---          ,  C2
---;
+CREATE VIEW VT2 
+(
+    C1
+,   C2
+,   TOTAL
+,   SUMUP
+) 
+AS 
+    SELECT C1
+        ,  C2
+        ,  COUNT(*)
+        ,  SUM(C2) 
+    AS 
+        newTble 
+    FROM T24 
+    WHERE T24.C1 < 1000 
+    GROUP BY C1
+          ,  C2
+;
+
+-- CREATE PROCEDURE
+-- Verify that the sqlcmd parsing survives two consecutive create procedures
+
+CREATE TABLE T25
+(
+    C1 BIGINT
+,   C2 BIGINT
+);
+
+CREATE PROCEDURE FOO1 AS SELECT * FROM T25;
+CREATE PROCEDURE FOO2 AS SELECT COUNT(*) FROM T25;
+
+-- Verify that consecutive procedure/view statements survive sqlcmd parsing
+CREATE PROCEDURE FOO3 AS SELECT * FROM T25;
+
+CREATE VIEW VT3 
+(
+    C1
+,   C2
+,   TOTAL
+) 
+AS 
+    SELECT C1
+        ,  C2
+        ,  COUNT(*) 
+    FROM T25 
+    GROUP BY C1
+          ,  C2
+;
+
+CREATE PROCEDURE FOO4 AS SELECT * FROM VT3;

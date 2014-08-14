@@ -69,25 +69,81 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(create|select|insert|update|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern Subquery =
             Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Ugh, these are all fragile.
     private static final Pattern CreateView =
-        Pattern.compile("(\\s*)(create\\s+view\\s+.*\\s+as\\s+)select",
+        Pattern.compile(
+                "(\\s*)" + // 0 or more spaces
+                "(" + // start group 2
+                "create\\s+view" + // 'create view'
+                "\\s+" + // 1 or more spaces
+                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
+                                                       // or 'create procedure' again
+                "\\s+" + // 1 or more spaces
+                "as" +
+                "\\s+" + // 1 or more spaces
+                ")" + // end group 2
+                "select",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureSelect =
-        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)select",
+        Pattern.compile(
+                "(\\s*)" + // 0 or more spaces
+                "(" + // start group 2
+                "create\\s+procedure" + // 'create procedure'
+                "\\s+" + // 1 or more spaces
+                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
+                                                       // or 'create procedure' again
+                "\\s+" + // 1 or more spaces
+                "as" +
+                "\\s+" + // 1 or more spaces
+                ")" + // end group 2
+                "select",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureInsert =
-        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)insert",
+        Pattern.compile(
+                "(\\s*)" + // 0 or more spaces
+                "(" + // start group 2
+                "create\\s+procedure" + // 'create procedure'
+                "\\s+" + // 1 or more spaces
+                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
+                                                       // or 'create procedure' again
+                "\\s+" + // 1 or more spaces
+                "as" +
+                "\\s+" + // 1 or more spaces
+                ")" + // end group 2
+                "insert",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureUpdate =
-        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)update",
+        Pattern.compile(
+                "(\\s*)" + // 0 or more spaces
+                "(" + // start group 2
+                "create\\s+procedure" + // 'create procedure'
+                "\\s+" + // 1 or more spaces
+                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
+                                                       // or 'create procedure' again
+                "\\s+" + // 1 or more spaces
+                "as" +
+                "\\s+" + // 1 or more spaces
+                ")" + // end group 2
+                "update",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern CreateProcedureDelete =
-        Pattern.compile("(\\s*)(create\\s+procedure\\s+.*\\s+as\\s+)delete",
+        Pattern.compile(
+                "(\\s*)" + // 0 or more spaces
+                "(" + // start group 2
+                "create\\s+procedure" + // 'create procedure'
+                "\\s+" + // 1 or more spaces
+                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
+                                                       // or 'create procedure' again
+                "\\s+" + // 1 or more spaces
+                "as" +
+                "\\s+" + // 1 or more spaces
+                ")" + // end group 2
+                "delete",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
