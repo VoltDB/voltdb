@@ -40,8 +40,19 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0)
+      m_partitionId(0),m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
 {}
+
+void DRTupleStream::setSecondaryCapacity(size_t capacity) {
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    {
+        throwFatalException("setSecondaryCapacity only callable before "
+                            "TupleStreamBase is used");
+    }
+    m_secondaryCapacity = capacity;
+}
 
 /*
  * If SpHandle represents a new transaction, commit previous data.
@@ -162,6 +173,8 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
          extendBufferChain(m_defaultCapacity);
      }
 
+     m_currBlock->recordLastBeginTxnOffset();
+
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
@@ -208,4 +221,34 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
      m_uso += io.position();
+}
+
+// If partial transaction is going to span multiple buffer, first time move it to
+// the next buffer, the next time move it to a 45 megabytes buffer, then after throw
+// an exception and rollback.
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+    if (sb && sb->remaining() < minLength   /* remain space is not big enough */
+            && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
+            && sb->lastDRBeginTxnOffset() != sb->offset() /* current txn is not a DR begin txn */) {
+        size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
+            switch (sb->type()) {
+                case voltdb::NORMAL_STREAM_BLOCK:
+                {
+                    blockSize = m_secondaryCapacity;
+                    break;
+                }
+                case voltdb::LARGE_STREAM_BLOCK:
+                {
+                    blockSize = 0;
+                    break;
+                }
+            }
+        }
+        if (blockSize != 0) {
+            uso -= partialTxnLength;
+        }
+        return true;
+    }
+    return false;
 }
