@@ -269,7 +269,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     RestoreAgent m_restoreAgent = null;
 
-    private ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
 
@@ -2574,8 +2574,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public NodeDRGateway getNodeDRGateway()
     {
         return m_nodeDRGateway;
-	}
-	
+    }
+
     public ReplicaDRGateway getReplicaDRGateway() {
         return m_replicaDRGateway;
     }
