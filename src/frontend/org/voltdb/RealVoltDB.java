@@ -234,6 +234,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
+    private ReplicaDRGateway m_replicaDRGateway = null;
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -641,10 +642,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // DR overflow directory
             File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
+            boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    if (Boolean.getBoolean("USE_DR_V2")) {
+                    if (useDRV2) {
                         ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     } else {
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
@@ -786,6 +788,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_config.m_timestampTestingSalt);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
+            // Configure replica-side DR if relevant
+            if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                String drMasterHost = m_catalogContext.cluster.getDrmasterhost();
+                if (drMasterHost == null || drMasterHost.isEmpty()) {
+                    VoltDB.crashLocalVoltDB("Cannot start as replica without an enabled DR data connection.");
+                }
+                try {
+                    Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.AgentReceiver");
+                    Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            String.class,
+                            ClientInterface.class,
+                            boolean.class);
+                    m_replicaDRGateway = (ReplicaDRGateway) rdrgwConstructor.newInstance(
+                            drMasterHost,
+                            m_clientInterface,
+                            true);
+                    m_replicaDRGateway.initializeReplicaCluster(m_cartographer);
+                    m_globalServiceElector.registerService(m_replicaDRGateway);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
+                }
             }
 
             // Create the statistics manager and register it to JMX registry
@@ -1901,6 +1926,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
+                if (m_replicaDRGateway != null) {
+                    try {
+                        m_replicaDRGateway.shutdown();
+                        m_replicaDRGateway.join();
+                    } catch (InterruptedException e) {
+                        hostLog.warn("Interrupted shutting down dr replication", e);
+                    }
+                }
+
                 if (m_snapshotIOAgent != null) {
                     m_snapshotIOAgent.shutdown();
                 }
@@ -1941,8 +1975,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 AdHocCompilerCache.clearVersionCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
-                // probably unnecessary
+                PartitionDRGateway.gateways.clear();
+
+                // probably unnecessary, but for tests it's nice because it
+                // will do the memory checking and run finalizers
                 System.gc();
+                System.runFinalization();
+
                 m_isRunning = false;
             }
             return did_it;
@@ -2100,6 +2139,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // the MPI statistics.
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+            }
+
+            // 6. If we are a DR replica, we may care about a
+            // deployment update
+            if (m_replicaDRGateway != null) {
+                m_replicaDRGateway.updateCatalog(m_catalogContext);
             }
 
             new ConfigLogging().logCatalogAndDeployment();
@@ -2483,6 +2528,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_nodeDRGateway.start();
                 m_nodeDRGateway.bindPorts();
             }
+            if (m_replicaDRGateway != null) {
+                m_replicaDRGateway.start();
+            }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
@@ -2522,6 +2570,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public boolean getReplicationActive()
     {
         return m_replicationActive;
+    }
+
+    @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return m_nodeDRGateway;
     }
 
     @Override

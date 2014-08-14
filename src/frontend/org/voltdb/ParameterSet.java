@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -165,6 +166,9 @@ public class ParameterSet implements JSONString {
             }
             else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
+                continue;
+            } else if (obj instanceof BBContainer) {
+                size += 4 + ((BBContainer)obj).b().remaining();
                 continue;
             }
 
@@ -602,6 +606,16 @@ public class ParameterSet implements JSONString {
                     continue;
                 }
 
+                //Same as before, but deal with the fact it is coming in as a unmanaged bytebuffer
+                if (obj instanceof BBContainer) {
+                    final BBContainer cont = (BBContainer) obj;
+                    final ByteBuffer paramBuf = cont.b();
+                    buf.put(VoltType.VARBINARY.getValue());
+                    buf.putInt(paramBuf.remaining());
+                    buf.put(paramBuf);
+                    continue;
+                }
+
                 buf.put(ARRAY);
 
                 VoltType type;
@@ -676,6 +690,13 @@ public class ParameterSet implements JSONString {
             else if (obj == VoltType.NULL_DECIMAL) {
                 buf.put(VoltType.DECIMAL.getValue());
                 VoltDecimalHelper.serializeNull(buf);
+                continue;
+            } else if (obj instanceof BBContainer) {
+                final BBContainer cont = (BBContainer) obj;
+                final ByteBuffer paramBuf = cont.b();
+                buf.put(VoltType.VARBINARY.getValue());
+                buf.putInt(paramBuf.remaining());
+                buf.put(paramBuf);
                 continue;
             }
 

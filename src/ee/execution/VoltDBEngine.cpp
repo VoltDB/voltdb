@@ -1763,9 +1763,11 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
         dispatchValidatePartitioningTask(taskParams);
         break;
-    case TASK_TYPE_APPLY_BINARY_LOG:
+    case TASK_TYPE_APPLY_BINARY_LOG: {
+        DRTupleStreamDisableGuard guard(&m_drStream);
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool);
         break;
+    }
     default:
         throwFatalException("Unknown task type %d", taskType);
     }
