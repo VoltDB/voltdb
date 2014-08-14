@@ -812,6 +812,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
     {
+        assert(spUniqueId != 0);
         // During rejoin, the spHandle is updated even though the site is not executing the tasks. If it's a live
         // rejoin, all logged tasks will be replayed. So the spHandle may go backward and forward again. It should
         // stop at the same point after replay.
@@ -820,7 +821,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId) != m_partitionId) {
             VoltDB.crashLocalVoltDB("Mismatch SpUniqueId partitiond id " +
                                     m_partitionId + ", " +
-                                    UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId), true, null);
+                                    UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId) +
+                                    " id is " + spUniqueId, true, null);
         }
         m_spUniqueIdForSnapshotDigest = Math.max(m_spUniqueIdForSnapshotDigest, spUniqueId);
     }
