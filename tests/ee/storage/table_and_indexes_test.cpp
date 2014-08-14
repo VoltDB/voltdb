@@ -58,6 +58,8 @@ class TableAndIndexTest : public Test {
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
 
+            engine->setupForPlanFragments( NULL, 44, 44, 44, 44, 44);
+
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
             vector<bool> districtColumnAllowNull(11, true);
