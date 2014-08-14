@@ -221,7 +221,20 @@ public:
         return bytes;
     }
 
+<<<<<<< HEAD
     void setNValue(const int idx, voltdb::NValue value) const;
+=======
+    /*
+     * This will put the NValue into this tuple at the idx-th field.
+     *
+     * If the NValue refers to inlined storage (points to storage
+     * interior to some tuple memory), and the storage is not inlined
+     * in this tuple, then this will allocate the un-inlined value in
+     * the temp string pool.  So, don't use this to update a tuple in
+     * a persistent table!
+     */
+    void setNValue(const int idx, voltdb::NValue value);
+>>>>>>> master
     /*
      * Copies range of NValues from one tuple to another.
      */

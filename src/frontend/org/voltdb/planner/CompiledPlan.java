@@ -80,8 +80,8 @@ public class CompiledPlan {
      */
     public boolean replicatedTableDML = false;
 
-    /** Does the statment write? */
-    public boolean readOnly = false;
+    /** Does the statement write? */
+    private boolean m_readOnly = false;
 
     /**
      * Whether the plan's statement mandates a result with nondeterministic content;
@@ -285,4 +285,11 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
+    public boolean getReadOnly() {
+        return m_readOnly;
+    }
+
+    public void setReadOnly(boolean newValue) {
+        m_readOnly = newValue;
+    }
 }

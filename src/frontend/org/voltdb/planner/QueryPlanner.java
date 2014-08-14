@@ -280,7 +280,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly) {
+        if (bestPlan.getReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);

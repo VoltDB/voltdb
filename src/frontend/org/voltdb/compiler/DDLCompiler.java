@@ -72,6 +72,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -426,6 +427,9 @@ public class DDLCompiler {
     final VoltDDLElementTracker m_tracker;
 
     // used to match imported class with those in the classpath
+    // For internal cluster compilation, this will point to the
+    // InMemoryJarfile for the current catalog, so that we can
+    // find classes provided as part of the application.
     ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
@@ -844,23 +848,35 @@ public class DDLCompiler {
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-                // Only process the statement if this is not for the StatementPlanner
-                String classNameStr = statementMatcher.group(1);
+                // Semi-hacky way of determining if we're doing a cluster-internal compilation.
+                // Command-line compilation will never have an InMemoryJarfile.
+                if (!(m_classLoader instanceof InMemoryJarfile.JarLoader)) {
+                    // Only process the statement if this is not for the StatementPlanner
+                    String classNameStr = statementMatcher.group(1);
 
-                // check that the match pattern is a valid match pattern
-                checkIdentifierWithWildcard(classNameStr, statement);
+                    // check that the match pattern is a valid match pattern
+                    checkIdentifierWithWildcard(classNameStr, statement);
 
-                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
-                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "IMPORT CLASS not found: '%s'",
-                            classNameStr)); // remove trailing semicolon
+                    ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                    if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                                    "IMPORT CLASS not found: '%s'",
+                                    classNameStr)); // remove trailing semicolon
+                    }
+                    else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                        m_compiler.addWarn(String.format(
+                                    "IMPORT CLASS no match for wildcarded class: '%s'",
+                                    classNameStr), ddlStatement.lineNo);
+                    }
                 }
-                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
-                    m_compiler.addWarn(String.format(
-                            "IMPORT CLASS no match for wildcarded class: '%s'",
-                            classNameStr), ddlStatement.lineNo);
+                else {
+                    m_compiler.addInfo("Internal cluster recompilation ignoring IMPORT CLASS line: " +
+                            statement);
                 }
+                // Need to track the IMPORT CLASS lines even on internal compiles so that
+                // we don't lose them from the DDL source.  When the @UAC path goes away,
+                // we could change this.
+                m_tracker.addImportLine(statement);
             }
 
             return true;

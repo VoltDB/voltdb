@@ -242,7 +242,10 @@ private:
 class MaxAgg : public Agg
 {
 public:
-    MaxAgg() {}
+    MaxAgg(Pool* memoryPool)
+        : m_memoryPool(memoryPool)
+    {
+    }
 
     virtual void advance(const NValue& val)
     {
@@ -253,19 +256,40 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
+            if (m_value.getSourceInlined()) {
+                // If the incoming value is inlined, that means its
+                // data really lives in a record somewhere.  In serial
+                // aggregation, the NValue may be backed by a row that
+                // is reused and updated for each row produced by a
+                // child node.  Because NValue's copy constructor only
+                // does a shallow copy, this can lead wrong answers
+                // when the Agg's NValue changes unexpectedly.  To
+                // avoid this, un-inline the incoming NValue to its
+                // own storage.
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_max(val);
+            if (m_value.getSourceInlined()) {
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            }
         }
     }
+
+private:
+    Pool* m_memoryPool;
 };
 
 class MinAgg : public Agg
 {
 public:
-    MinAgg() { }
+    MinAgg(Pool* memoryPool)
+        : m_memoryPool(memoryPool)
+    {
+    }
 
     virtual void advance(const NValue& val)
     {
@@ -276,13 +300,24 @@ public:
         if (!m_haveAdvanced)
         {
             m_value = val;
+            if (m_value.getSourceInlined()) {
+                // see comment in MaxAgg above, regarding why we're
+                // doing this.
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            }
             m_haveAdvanced = true;
         }
         else
         {
             m_value = m_value.op_min(val);
+            if (m_value.getSourceInlined()) {
+                m_value.allocateObjectFromInlinedValue(m_memoryPool);
+            }
         }
     }
+
+private:
+    Pool* m_memoryPool;
 };
 
 /*
@@ -295,9 +330,9 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
         return new (memoryPool) CountStarAgg();
     case EXPRESSION_TYPE_AGGREGATE_MIN:
-        return new (memoryPool) MinAgg();
+        return new (memoryPool) MinAgg(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_MAX  :
-        return new (memoryPool) MaxAgg();
+        return new (memoryPool) MaxAgg(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_COUNT:
         if (isDistinct) {
             return new (memoryPool) CountAgg<Distinct>();
