@@ -170,6 +170,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_txnId
             + 8        // m_timestamp
             + 8        // m_spHandle
+            + 8        // m_spUniqueId
             + 8        // m_truncationHandle
             + 8        // m_originalDRTxnId
             + 1        // m_isReadOnly
@@ -184,6 +185,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_txnId);
         buf.putLong(m_uniqueId);
         buf.putLong(m_spHandle);
+        buf.putLong(m_spUniqueId);
         buf.putLong(m_truncationHandle);
         buf.putLong(m_originalDRTxnId);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
@@ -197,6 +199,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_txnId = buf.getLong();
         m_uniqueId = buf.getLong();
         m_spHandle = buf.getLong();
+        m_spUniqueId = buf.getLong();
         m_truncationHandle = buf.getLong();
         m_originalDRTxnId = buf.getLong();
         m_isReadOnly = buf.get() == 1;
