@@ -373,6 +373,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    bool isDREnabled() const { return m_drEnabled; }
+
     void setTupleLimit(int32_t newLimit) {
         m_tupleLimit = newLimit;
     }

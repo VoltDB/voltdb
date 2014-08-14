@@ -28,7 +28,7 @@ public class SQLLexer
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
+            "(alter|create|drop|export|import|partition|dr)" + // tokens we consider DDL
             "\\s+", // one or more whitespace
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
@@ -48,7 +48,7 @@ public class SQLLexer
     // Don't accept these DDL tokens yet
     private static final Pattern BLACKLIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(export|import)" + // DDL we're not ready to handle
+            "(export|import|dr)" + // DDL we're not ready to handle
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL

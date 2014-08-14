@@ -692,6 +692,11 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
         return true;
     }
 
+    PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(t2);
+    if (t1->isDRed() != persistenttable->isDREnabled()) {
+        return true;
+    }
+
     // make sure each column has same metadata
     map<string, catalog::Column*>::const_iterator outerIter;
     for (outerIter = t1->columns().begin();
