@@ -154,6 +154,8 @@ public interface VoltDBInterface
     public boolean getReplicationActive();
 
     public NodeDRGateway getNodeDRGateway();
+    
+    public ReplicaDRGateway getReplicaDRGateway();
 
     /**
      * Set the operation mode of this server.

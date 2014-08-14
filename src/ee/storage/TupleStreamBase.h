@@ -59,6 +59,7 @@ public:
      * to test buffer rollover.
      */
     void setDefaultCapacity(size_t capacity);
+    virtual void setSecondaryCapacity(size_t capacity) {};
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
@@ -69,12 +70,14 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
     virtual void beginTransaction(int64_t txnId, int64_t spHandle) {}
     virtual void endTransaction(int64_t spHandle) {}
+
+    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
 
     /** Send committed data to the top end */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);

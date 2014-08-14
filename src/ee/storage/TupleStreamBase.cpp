@@ -261,10 +261,13 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         // exportxxx: rollback instead?
         throwFatalException("Default capacity is less than required buffer size.");
     }
+    StreamBlock *oldBlock = NULL;
+    size_t uso = m_uso;
 
     if (m_currBlock) {
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
+            oldBlock = m_currBlock;
             m_currBlock = NULL;
         }
         // fully discard empty blocks. makes valgrind/testcase
@@ -274,13 +277,37 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
             m_currBlock = NULL;
         }
     }
+    size_t blockSize = m_defaultCapacity;
+    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
-    char *buffer = new char[m_defaultCapacity];
+    char *buffer = new char[blockSize];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
+    m_currBlock = new StreamBlock(buffer, blockSize, uso);
+    if (blockSize > m_defaultCapacity) {
+        m_currBlock->setType(LARGE_STREAM_BLOCK);
+    }
 
-    m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    if (blockSize == 0) {
+        rollbackTo(uso);
+        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
+
+    if (openTransaction) {
+        size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
+        ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        m_currBlock->recordLastBeginTxnOffset();
+        m_currBlock->consumed(partialTxnLength);
+        ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
+        oldBlock->truncateTo(uso);
+        oldBlock->clearLastBeginTxnOffset();
+        // If the whole previous block has been moved to new block, discards the empty one.
+        if (oldBlock->offset() == 0) {
+            m_pendingBlocks.pop_back();
+            discardBlock(oldBlock);
+        }
+    }
 
     pushPendingBlocks();
 }
