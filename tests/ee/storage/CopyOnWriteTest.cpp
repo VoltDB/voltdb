@@ -204,6 +204,8 @@ public:
         m_showTuples = TUPLE_COUNT <= MAX_DETAIL_COUNT;
 
         strcpy(m_stage, "Initialize");
+
+        ExecutorContext::getExecutorContext()->setDrStreamForTest(&drStream);
     }
 
     ~CopyOnWriteTest() {

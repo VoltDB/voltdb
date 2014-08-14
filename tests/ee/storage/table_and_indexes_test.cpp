@@ -46,6 +46,10 @@
 using namespace voltdb;
 using namespace std;
 
+static int64_t addPartitionId(int64_t value) {
+    return (value << 14) | 44;
+}
+
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
@@ -300,6 +304,9 @@ class TableAndIndexTest : public Test {
  * Check that inserting, deleting and updating works and propagates via DR buffers
  */
 TEST_F(TableAndIndexTest, DrTest) {
+    //Prepare to insert in a new txn
+    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), addPartitionId(70));
+
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
@@ -326,7 +333,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.periodicFlush(-1, 42);
+    drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
@@ -356,7 +363,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, 100, 100, 99, 72, 72);
+    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72), addPartitionId(72));
 
     /*
      * Test that update propagates
@@ -369,7 +376,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->updateTuple( toUpdate, temp_tuple);
 
     //Flush to generate the log buffer
-    drStream.periodicFlush(-1, 101);
+    drStream.periodicFlush(-1, addPartitionId(101));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated block of log data
@@ -393,12 +400,12 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
 
     //Prep another transaction to test propagating a delete
-    engine->setupForPlanFragments( NULL, 102, 102, 101, 89, 89);
+    engine->setupForPlanFragments( NULL, addPartitionId(102), addPartitionId(102), addPartitionId(101), addPartitionId(89), addPartitionId(89));
 
     districtTable->deleteTuple( toDelete, true);
 
     //Flush to generate the buffer
-    drStream.periodicFlush(-1, 102);
+    drStream.periodicFlush(-1, addPartitionId(102));
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data

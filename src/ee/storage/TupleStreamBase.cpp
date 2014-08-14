@@ -268,7 +268,9 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         throwFatalException("Default capacity is less than required buffer size.");
     }
 
+    int64_t lastSpUniqueId = std::numeric_limits<int64_t>::max();
     if (m_currBlock) {
+        lastSpUniqueId = m_currBlock->lastSpUniqueId();
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
             m_currBlock = NULL;
@@ -287,6 +289,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    m_currBlock->startSpUniqueId(lastSpUniqueId);
 
     pushPendingBlocks();
 }

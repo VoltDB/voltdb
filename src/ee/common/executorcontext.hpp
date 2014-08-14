@@ -159,6 +159,10 @@ class ExecutorContext {
         return singleton->m_tempStringPool;
     }
 
+    void setDrStreamForTest(DRTupleStream *drStream) {
+        m_drStream = drStream;
+    }
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
