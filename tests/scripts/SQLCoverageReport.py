@@ -27,6 +27,7 @@ import cgi
 import os
 import cPickle
 import decimal
+import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
@@ -302,6 +303,7 @@ def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
     jni_file.close()
 
     topLine = getTopSummaryLine()
+    currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
     keyStats = createSummaryInHTML(count, failures, len(mismatches), seed)
     report = """
 <html>
@@ -315,8 +317,9 @@ h2 {text-transform: uppercase}
 <body>
     <h2>Test Suite Name: %s</h2>
     <h4>Random Seed: <b>%d</b></h4>
+    <p>This report was generated on <b>%s</b></p>
     <table border=1><tr>%s</tr>
-""" % (suite, seed, topLine)
+""" % (suite, seed, currentTime, topLine)
 
     report += """
 <tr>%s</tr>
