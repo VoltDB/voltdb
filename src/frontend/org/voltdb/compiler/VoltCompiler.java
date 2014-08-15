@@ -988,11 +988,9 @@ public class VoltCompiler {
         // Actually parse and handle all the partitions
         // this needs to happen before procedures are compiled
         String msg = "In database, ";
-        HashSet<String> allTables = new HashSet<String>();
         final CatalogMap<Table> tables = db.getTables();
         for (Table table: tables) {
             String tableName = table.getTypeName();
-            allTables.add(tableName);
             if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
                 String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
                 // A null column name indicates a replicated table. Ignore it here
@@ -1075,6 +1073,11 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
+        // process DRed tables
+        for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
+            compileDRTable(drNode, db);
+        }
+
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
@@ -1083,34 +1086,6 @@ public class VoltCompiler {
         // add extra classes from the DDL
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         addExtraClasses(jarOutput);
-
-        // process DRed tables
-        for (Entry<String, String> drTable: voltDdlTracker.getDRedTables().entrySet()) {
-            String drTableName = drTable.getKey();
-            // star wildcard
-            if (drTableName.equalsIgnoreCase("*")) {
-                for (String table : allTables) {
-                    Table t = tables.getIgnoreCase(table);
-                    if (drTable.getValue().equalsIgnoreCase("DISABLE")) {
-                        t.setIsdred(false);
-                    } else {
-                        t.setIsdred(true);
-                    }
-                }
-            }
-            // otherwise
-            else if (allTables.contains(drTableName.toUpperCase())) {
-                Table t = tables.getIgnoreCase(drTableName);
-                if (drTable.getValue().equalsIgnoreCase("DISABLE")) {
-                    t.setIsdred(false);
-                } else {
-                    t.setIsdred(true);
-                }
-            } else {
-                String exceptionMsg = "Cannot find the declaration for DR table: " + drTableName;
-                throw new VoltCompilerException(exceptionMsg);
-            }
-        }
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -1967,6 +1942,35 @@ public class VoltCompiler {
                     ));
         }
 
+    }
+
+    void compileDRTable(final Entry<String, String> drNode, final Database db)
+            throws VoltCompilerException
+    {
+        String tableName = drNode.getKey();
+        String action = drNode.getValue();
+
+        if (tableName.equalsIgnoreCase("*")) {
+            // star wildcard support
+            for (Table table : db.getTables()) {
+                if (action.equalsIgnoreCase("DISABLE")) {
+                    table.setIsdred(false);
+                } else {
+                    table.setIsdred(true);
+                }
+            }
+            return;
+        }
+
+        org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        }
+        if (action.equalsIgnoreCase("DISABLE")) {
+            tableref.setIsdred(false);
+        } else {
+            tableref.setIsdred(true);
+        }
     }
 
     // Usage messages for new and legacy syntax.
