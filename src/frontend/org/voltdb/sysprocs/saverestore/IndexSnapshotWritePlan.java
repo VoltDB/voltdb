@@ -49,6 +49,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
     public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
+                                         Map<Integer, Long> partitionUniqueIds,
                                          JSONObject jsData,
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,

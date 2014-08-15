@@ -178,7 +178,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     {
         super(initiatorHSId, coordinatorHSId, ftask);
 
-        setSpHandle(ftask.getSpHandle());
+        setSpHandleAndSpUniqueId(ftask.getSpHandle(), ftask.getSpUniqueId());
         m_taskType = ftask.m_taskType;
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;

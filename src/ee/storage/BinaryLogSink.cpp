@@ -35,6 +35,8 @@ BinaryLogSink::BinaryLogSink() {}
 void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
+    int64_t __attribute__ ((unused)) uniqueId = 0;
+    int64_t __attribute__ ((unused)) spUniqueId = 0;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -45,8 +47,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
 
         int64_t tableHandle = 0;
-        int64_t  __attribute__ ((unused)) txnId = 0;
-        int64_t  __attribute__ ((unused)) spHandle = 0;
+
         uint32_t checksum = 0;
         const char * rowData = NULL;
         switch (type) {
@@ -71,22 +72,24 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             tempTuple.deserializeFromDR(rowInput, pool);
 
             if (type == DR_RECORD_DELETE) {
+                //std::cout << "Deleting row id " << spUniqueId << std::endl;
                 TableTuple deleteTuple = table->lookupTuple(tempTuple);
                 table->deleteTuple(deleteTuple, false);
             } else {
+                //std::cout << "Inserting row id " << spUniqueId << std::endl;
                 table->insertPersistentTuple(tempTuple, false);
             }
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
-            txnId = taskInfo.readLong();
-            spHandle = taskInfo.readLong();
+            uniqueId = taskInfo.readLong();
+            spUniqueId = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_END_TXN: {
-            spHandle = taskInfo.readLong();
+            spUniqueId = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;

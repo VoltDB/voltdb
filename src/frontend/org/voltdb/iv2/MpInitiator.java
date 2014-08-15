@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -115,14 +116,17 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 Long txnid = Long.MIN_VALUE;
+                Long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
                 try {
-                    txnid = repair.start().get();
+                    Pair<Long, Long> p = repair.start().get();
+                    txnid = p.getFirst();
+                    uniqueId = p.getSecond();
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid);
+                    m_initiatorMailbox.setLeaderState(txnid, uniqueId);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn

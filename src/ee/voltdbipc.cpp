@@ -77,6 +77,7 @@ typedef struct {
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
+    int64_t spUniqueId;
     int64_t undoToken;
     int32_t numFragmentIds;
     char data[0];
@@ -97,6 +98,8 @@ typedef struct {
     int64_t txnId;
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
+    int64_t uniqueId;
+    int64_t spUniqueId;
     int64_t undoToken;
     int32_t undo;
     int32_t shouldDRStream;
@@ -596,6 +599,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                                 ntohll(queryCommand->spHandle),
                                                 ntohll(queryCommand->lastCommittedSpHandle),
                                                 ntohll(queryCommand->uniqueId),
+                                                ntohll(queryCommand->spUniqueId),
                                                 ntohll(queryCommand->undoToken));
     }
     catch (const FatalException &e) {
@@ -641,6 +645,8 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t spHandle = ntohll(loadTableCommand->spHandle);
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
+    const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
+    const int64_t spUniqueId = ntohll(loadTableCommand->spUniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     const bool undo = loadTableCommand->undo != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
@@ -651,7 +657,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
         m_engine->setUndoToken(undoToken);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, undo, shouldDRStream);
+        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, spUniqueId, undo, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
         } else {
