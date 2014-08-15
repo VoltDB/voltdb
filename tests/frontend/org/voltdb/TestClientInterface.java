@@ -177,6 +177,8 @@ public class TestClientInterface {
         doReturn(m_zk).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
+        doReturn(ReplicationRole.NONE).when(m_volt).getReplicationRole();
+        doReturn(m_context).when(m_volt).getCatalogContext();
         doAnswer(new Answer<Object>() {
             @Override
             public Object answer(InvocationOnMock invocation)
@@ -210,15 +212,16 @@ public class TestClientInterface {
         }
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
-        String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCat =
+            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
 
         String deploymentPath = builder.getPathToDeployment();
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true, false);
+        CatalogUtil.compileDeployment(catalog, deploymentPath, true, false);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
+        m_context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
@@ -455,7 +458,6 @@ public class TestClientInterface {
         catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
-        catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
@@ -478,7 +480,6 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
         assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
         assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
         assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
@@ -595,7 +596,7 @@ public class TestClientInterface {
         final ByteBuffer msg = createMsg("@Promote");
         m_ci.handleRead(msg, m_handler, m_cxn);
         // Verify that the truncation request node was not created.
-        verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
+        verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
                                      eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
     }
 
@@ -608,8 +609,8 @@ public class TestClientInterface {
             final ByteBuffer msg = createMsg("@Promote");
             m_ci.handleRead(msg, m_handler, m_cxn);
             // Verify that the truncation request node was created.
-            verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
-                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+            verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
+                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT_SEQUENTIAL));
         }
         finally {
             logConfig.setEnabled(wasEnabled);

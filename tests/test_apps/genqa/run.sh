@@ -26,7 +26,10 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
-CLASSPATH="$CLASSPATH:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar"
+# ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
+ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
+RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -83,6 +86,13 @@ function server-kafka() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function server-rabbitmq() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally with mysql connector
@@ -237,8 +247,12 @@ function export-on-server-verify() {
 
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
-        genqa.ExportKafkaOnServerVerifier kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
-        4 $CLIENTLOG
+        genqa.ExportKafkaOnServerVerifier kafka1:7181 voltdbexport
+}
+
+function export-rabbitmq-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
+        genqa.ExportRabbitMQVerifier kafka1 test test systest
 }
 
 function help() {

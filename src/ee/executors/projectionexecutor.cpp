@@ -130,7 +130,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // expression This will generate new tuple values that we will insert into
     // our output table
     //
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     assert (tuple.sizeInValues() == input_table->columnCount());
     while (iterator.next(tuple)) {
         //
@@ -155,15 +155,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         output_table->insertTupleNonVirtual(temp_tuple);
 
         VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
-
-        /*if (!output_table->insertTupleNonVirtual(temp_tuple)) {
-            // TODO: DEBUG
-            VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", input_table->name().c_str(), output_table->name().c_str());
-            return (false);
-        }*/
     }
 
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
+    cleanupInputTempTable(input_table);
 
     return (true);
 }

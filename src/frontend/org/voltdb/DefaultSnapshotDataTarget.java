@@ -55,6 +55,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -109,6 +110,33 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
     public static final int SNAPSHOT_FADVISE_BYTES = Integer.getInteger("SNAPSHOT_FADVISE_BYTES", 1024 * 1024 * 2);
+    public static final int SNAPSHOT_RATELIMIT_MEGABYTES;
+    public static final boolean USE_SNAPSHOT_RATELIMIT;
+
+    static {
+        int limit = Integer.getInteger("SNAPSHOT_RATELIMIT_MEGABYTES", Integer.MAX_VALUE);
+        if (limit < 1) {
+            SNAP_LOG.warn("Invalid snapshot rate limit " + limit + ", no limit will be applied");
+            SNAPSHOT_RATELIMIT_MEGABYTES = Integer.MAX_VALUE;
+        } else {
+            SNAPSHOT_RATELIMIT_MEGABYTES = limit;
+        }
+        if (SNAPSHOT_RATELIMIT_MEGABYTES < Integer.MAX_VALUE) {
+            USE_SNAPSHOT_RATELIMIT = true;
+            SNAP_LOG.info("Rate limiting snapshots to " + SNAPSHOT_RATELIMIT_MEGABYTES + " megabytes/second");
+        } else {
+            USE_SNAPSHOT_RATELIMIT = false;
+        }
+    }
+
+    public static final UnsynchronizedRateLimiter SNAPSHOT_RATELIMITER =
+            UnsynchronizedRateLimiter.create(SNAPSHOT_RATELIMIT_MEGABYTES * 1024.0 * 1024.0, 1, TimeUnit.SECONDS);
+
+    public static void enforceSnapshotRateLimit(int permits) {
+        if (USE_SNAPSHOT_RATELIMIT) {
+            SNAPSHOT_RATELIMITER.acquire(permits);
+        }
+    }
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -452,6 +480,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadBuffer.put(lengthPrefix);
                             payloadBuffer.position(0);
 
+                            enforceSnapshotRateLimit(payloadBuffer.remaining());
+
                             /*
                              * Write payload to file
                              */
@@ -531,5 +561,18 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public String toString() {
         return m_file.toString();
+    }
+
+    public static void setRate(final Integer megabytesPerSecond) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (megabytesPerSecond == null) {
+                    SNAPSHOT_RATELIMITER.setRate(SNAPSHOT_RATELIMIT_MEGABYTES * 1024.0 * 1024.0);
+                } else {
+                    SNAPSHOT_RATELIMITER.setRate(megabytesPerSecond * 1024.0 * 1024.0);
+                }
+            }
+        });
     }
 }

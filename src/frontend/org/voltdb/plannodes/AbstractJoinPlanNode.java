@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -38,16 +39,19 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         JOIN_TYPE,
         PRE_JOIN_PREDICATE,
         JOIN_PREDICATE,
-        WHERE_PREDICATE;
+        WHERE_PREDICATE,
+        OUTPUT_SCHEMA_PRE_AGG;
     }
 
     protected JoinType m_joinType = JoinType.INNER;
     // sortDirection is only used in handleOrderBy(),
     // and the sortDirection used in EE is from inlined IndexScan node for NLIJ
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
-    protected AbstractExpression m_preJoinPredicate;
-    protected AbstractExpression m_joinPredicate;
-    protected AbstractExpression m_wherePredicate;
+    protected AbstractExpression m_preJoinPredicate = null;
+    protected AbstractExpression m_joinPredicate = null;
+    protected AbstractExpression m_wherePredicate = null;
+
+    protected NodeSchema m_outputSchemaPreInlineAgg = null;
 
     protected AbstractJoinPlanNode() {
         super();
@@ -164,7 +168,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             child.generateOutputSchema(db);
         }
         // Join the schema together to form the output schema
-        m_outputSchema =
+        m_outputSchemaPreInlineAgg =
             m_children.get(0).getOutputSchema().
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
@@ -174,6 +178,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
         generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
+        generateRealOutputSchema();
+    }
+
+    protected void generateRealOutputSchema() {
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
+        if (aggNode != null) {
+            m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
+        } else {
+            m_outputSchema = m_outputSchemaPreInlineAgg;
+        }
     }
 
     // Given any non-inlined type of join, this method will resolve the column
@@ -190,17 +204,20 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         {
             child.resolveColumnIndexes();
         }
-        // for seq scan, child Table order in the EE is in child order in the plan.
-        // order our output columns by outer table then inner table
-        // I dislike this magically implied ordering, should be fixable --izzy
-        NodeSchema outer_schema = m_children.get(0).getOutputSchema();
-        NodeSchema inner_schema = m_children.get(1).getOutputSchema();
+
+        final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
+        final NodeSchema inner_schema = m_children.get(1).getOutputSchema();
+
+        // resolve predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
 
         // need to order the combined input schema coherently.  We make the
         // output schema ordered: [outer table columns][inner table columns]
         TreeMap<Integer, SchemaColumn> sort_cols =
             new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchema.getColumns())
+        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
         {
             // Right now these all need to be TVEs
             assert(col.getExpression() instanceof TupleValueExpression);
@@ -228,7 +245,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         {
             new_output_schema.addColumn(col);
         }
-        m_outputSchema = new_output_schema;
+        m_outputSchemaPreInlineAgg = new_output_schema;
         m_hasSignificantOutputSchema = true;
 
         // Finally, resolve predicates
@@ -241,6 +258,17 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
         resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
+        resolveRealOutputSchema();
+    }
+
+    protected void resolveRealOutputSchema() {
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
+        if (aggNode != null) {
+            aggNode.resolveColumnIndexesUsingSchema(m_outputSchemaPreInlineAgg);
+            m_outputSchema = aggNode.getOutputSchema().clone();
+        } else {
+            m_outputSchema = m_outputSchemaPreInlineAgg;
+        }
     }
 
     public SortDirectionType getSortDirection() {
@@ -269,6 +297,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
         stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
         stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);
+
+        if (m_outputSchemaPreInlineAgg != m_outputSchema) {
+            stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
+            stringer.array();
+            for (SchemaColumn column : m_outputSchemaPreInlineAgg.getColumns()) {
+                column.toJSONString(stringer, true);
+            }
+            stringer.endArray();
+        }
     }
 
     @Override
@@ -279,16 +316,33 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
         m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
+
+        if ( !jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name() ) ) {
+            m_outputSchemaPreInlineAgg = new NodeSchema();
+            m_hasSignificantOutputSchema = true;
+            JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
+            int size = jarray.length();
+            for( int i = 0; i < size; i++ ) {
+                m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
+            }
+        } else {
+            m_outputSchemaPreInlineAgg = m_outputSchema;
+        }
     }
 
+
     /**
-     * @param predicate the predicate to set
+     *
+     * @param expression
+     * @param outer_schema
+     * @param inner_schema
      */
-    protected void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
+    protected static void resolvePredicate(AbstractExpression expression,
+            NodeSchema outer_schema, NodeSchema inner_schema)
     {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(predicate);
+                ExpressionUtil.getTupleValueExpressions(expression);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
@@ -305,6 +359,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
             tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
+        }
+    }
+
+    protected static void resolvePredicate(List<AbstractExpression> expressions,
+            NodeSchema outer_schema, NodeSchema inner_schema)
+    {
+        for (AbstractExpression expr : expressions) {
+            resolvePredicate(expr, outer_schema, inner_schema);
         }
     }
 

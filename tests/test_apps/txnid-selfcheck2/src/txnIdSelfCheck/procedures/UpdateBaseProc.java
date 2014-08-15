@@ -47,6 +47,9 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_insert = new SQLStmt(
             "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    public final SQLStmt p_export = new SQLStmt(
+            "INSERT INTO partitioned_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
 
@@ -54,7 +57,7 @@ public class UpdateBaseProc extends VoltProcedure {
         return 0; // never called in base procedure
     }
 
-    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt getAdHocData,
+    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData,
                                  byte cid, long rid, byte[] value, byte shouldRollback)
     {
         voltQueueSQL(getCIDData, cid);
@@ -99,13 +102,14 @@ public class UpdateBaseProc extends VoltProcedure {
         }
 
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
         assert dim.getRowCount() == 1;
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.
-        data = retval[2];
+        data = retval[3];
         validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {
@@ -117,7 +121,7 @@ public class UpdateBaseProc extends VoltProcedure {
 
     @SuppressWarnings("deprecation")
     protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
-        voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
@@ -158,7 +162,7 @@ public class UpdateBaseProc extends VoltProcedure {
 
         voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
-        voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.

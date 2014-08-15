@@ -171,6 +171,9 @@ public abstract class VoltProcedure {
             if (t.getMessage() != null) {
                 message = t.getMessage();
             }
+            else if (t.getCause() != null) {
+                message = t.getCause().getMessage();
+            }
         }
 
         /**
@@ -340,9 +343,9 @@ public abstract class VoltProcedure {
      */
     @Deprecated
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations)
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
-        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations);
+        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
     }
 }

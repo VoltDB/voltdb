@@ -47,6 +47,7 @@
 #define HSTOREPARAMETERVALUEEXPRESSION_H
 
 #include "common/NValue.hpp"
+
 #include "expressions/abstractexpression.h"
 
 #include <vector>
@@ -91,6 +92,7 @@ public:
 
   private:
     int m_valueIdx;
+
     voltdb::NValue *m_paramValue;
 };
 

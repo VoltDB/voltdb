@@ -67,6 +67,7 @@
 #include "executors/seqscanexecutor.h"
 #include "executors/unionexecutor.h"
 #include "executors/updateexecutor.h"
+#include "executors/upsertexecutor.h"
 
 #include <cassert>
 
@@ -80,6 +81,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_PARTIALAGGREGATE: return new AggregatePartialExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
@@ -100,6 +102,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UPSERT: return new UpsertExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);
@@ -113,34 +116,23 @@ int executeExecutionVector(std::vector<AbstractExecutor*>& executorList,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = executorList.size();
-    Table *cleanUpTable = NULL;
 
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = executorList[ctr];
         assert (executor);
-
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
 
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(params)) {
                 VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
                 return ENGINE_ERRORCODE_ERROR;
             }
         } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
             throw;
         }
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
 
     return ENGINE_ERRORCODE_SUCCESS;
 }

@@ -151,9 +151,8 @@ public class SchemaColumn
         {
             new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setValueType(m_expression.getValueType());
-            new_exp.setValueSize(m_expression.getValueSize());
-            new_exp.setInBytes(m_expression.getInBytes());
+            new_exp.setTypeSizeBytes(m_expression.getValueType(), m_expression.getValueSize(),
+                    m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp);
@@ -177,6 +176,21 @@ public class SchemaColumn
     public String getColumnAlias()
     {
         return m_columnAlias;
+    }
+
+    public void reset(String tbName, String tbAlias, String colName, String colAlias) {
+        m_tableName = tbName;
+        m_tableAlias = tbAlias;
+        m_columnName = colName;
+        m_columnAlias = colAlias;
+
+        if (m_expression instanceof TupleValueExpression) {
+            TupleValueExpression tve = (TupleValueExpression) m_expression;
+            tve.setTableName(m_tableName);
+            tve.setTableAlias(m_tableAlias);
+            tve.setColumnName(m_columnName);
+            tve.setColumnAlias(m_columnAlias);
+        }
     }
 
     public AbstractExpression getExpression()

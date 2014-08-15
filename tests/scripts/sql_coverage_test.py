@@ -123,7 +123,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        tables = None
+        table = None
         if client.response == None:
             print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
@@ -134,14 +134,16 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        if client.response.tables != None:
+        if client.response.tables:
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
-            tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-        else:
-            print "DEBUG: returned no table(s) from ?", statement["SQL"] ,"?"
+            table = normalize(client.response.tables[0], statement["SQL"])
+            if len(client.response.tables) > 1:
+                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] ,"?"
+        # else:
+            # print "WARNING: returned no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
-                      "Result": tables,
+                      "Result": table,
                       "Exception": str(client.response.exception)},
                      results_file)
     results_file.close()
@@ -189,7 +191,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation, True)
+    generator = SQLGenerator(config["schema"], template, subversion_generation)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -212,20 +214,6 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     random.seed(random_seed)
     random.setstate(random_state)
-    # To get around the timestamp issue. Volt and HSQLDB use different units
-    # for timestamp (microsec vs. millisec), so we have to use different
-    # template file for regression test, since all the statements are not
-    # generated in this case.
-    if "template-hsqldb" in config:
-        template = config["template-hsqldb"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation, False)
-    counter = 0
-
-    statements_file = open(statements_path, "wb")
-    for i in generator.generate():
-        cPickle.dump({"id": counter, "SQL": i}, statements_file)
-        counter += 1
-    statements_file.close()
 
     if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
@@ -386,6 +374,8 @@ The following place holders are supported,
 """
 
 if __name__ == "__main__":
+    #print the whole command line, maybe useful for debugging
+    #print " ".join(sys.argv)
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")

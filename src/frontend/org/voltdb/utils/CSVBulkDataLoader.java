@@ -39,11 +39,16 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         m_errHandler = errHandler;
     }
 
+    @Override
+    public void setFlushInterval(int delay, int seconds) {
+        m_loader.setFlushInterval(delay, seconds);
+    }
+
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             m_failedInsertCount.incrementAndGet();
-            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response.getStatusString());
+            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response, response.getStatusString());
         }
     }
 
@@ -54,8 +59,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException
-    {
+    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException {
         m_loader.insertRow(metaData, values);
     }
 

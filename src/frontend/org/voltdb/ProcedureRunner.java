@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
@@ -238,6 +239,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
+    @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
@@ -336,11 +338,18 @@ public class ProcedureRunner {
                     } else {
                         error = true;
                     }
-                    if (ex instanceof Error) {
-                        m_statsCollector.endProcedure(false, true, null, null);
-                        throw (Error)ex;
+                    if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
+                        // If the stored procedure attempted to do something other than linklibraray or instantiate
+                        // a missing object that results in an error, throw the error and let the server deal with
+                        // the condition as best as it can (usually a crashLocalVoltDB).
+                        try {
+                            m_statsCollector.endProcedure(false, true, null, null);
+                        }
+                        finally {
+                            // Ensure that ex is always re-thrown even if endProcedure throws an exception.
+                            throw (Error)ex;
+                        }
                     }
-
                     retval = getErrorResponse(ex);
                 }
             }
@@ -557,7 +566,7 @@ public class ProcedureRunner {
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
-            throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
+            throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
@@ -628,13 +637,16 @@ public class ProcedureRunner {
             // supporting @AdHocSpForTest with queries that contain '?' parameters.
             if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
-                    throw new ExpectedProcedureException(
+                    throw new VoltAbortException(
                             "Number of arguments provided was " + args.length  +
                             " where 0 were expected for statement: " + sql);
                 }
                 argumentParams = plannedStatement.extractedParamArray();
                 if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
-                    String msg = String.format("Wrong number of params for parameterized statement: %s", sql);
+                    String msg = String.format(
+                            "The wrong number of arguments (" + argumentParams.length +
+                            " vs. the " + queuedSQL.stmt.statementParamJavaTypes.length +
+                            " expected) were passed for the parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
             }
@@ -750,16 +762,16 @@ public class ProcedureRunner {
     }
 
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations)
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId,
+            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, false);
+                             tableName, data, returnUniqueViolations, shouldDRStream, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -781,7 +793,7 @@ public class ProcedureRunner {
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
         if (inArgs.length != numParamTypes) {
-            throw new ExpectedProcedureException(
+            throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
                     " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
@@ -812,8 +824,9 @@ public class ProcedureRunner {
             } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
             } else {
-                throw new ExpectedProcedureException("Unknown type " + type +
-                 " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
+                throw new VoltAbortException("Unknown type " + type +
+                        " can not be converted to NULL representation for arg " + ii +
+                        " for SQL stmt: " + stmt.getText());
             }
         }
 
@@ -1017,8 +1030,8 @@ public class ProcedureRunner {
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
            if (isProcedureStackTraceElement(ste)) {
-            matches.add(ste);
-        }
+               matches.add(ste);
+           }
        }
 
        byte status = ClientResponse.UNEXPECTED_FAILURE;
@@ -1045,8 +1058,8 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null) {
-            e = e.getCause();
-        }
+               e = e.getCause();
+           }
        }
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
            status = ClientResponse.TXN_RESTART;
@@ -1057,11 +1070,10 @@ public class ProcedureRunner {
            expected_failure = false;
        }
 
-       // if the error is something we know can happen as part of normal
-       // operation, reduce the verbosity.  Otherwise, generate
-       // more output for debuggability
-       if (expected_failure)
-       {
+       // If the error is something we know can happen as part of normal operation,
+       // reduce the verbosity.
+       // Otherwise, generate more output for debuggability
+       if (expected_failure) {
            msg.append("  ").append(e.getMessage());
            for (StackTraceElement ste : matches) {
                msg.append("\n    at ");
@@ -1070,8 +1082,7 @@ public class ProcedureRunner {
                msg.append(ste.getLineNumber()).append(")");
            }
        }
-       else
-       {
+       else {
            Writer result = new StringWriter();
            PrintWriter pw = new PrintWriter(result);
            e.printStackTrace(pw);
@@ -1400,6 +1411,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
            m_isReadOnly);

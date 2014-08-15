@@ -456,30 +456,54 @@ public class TestSqlCmdInterface
         assertThis2(query, expected, 3, ID);
     }
 
-    // 28) To test select statement with FROM subquery
     @Test
-    public void testParseQuery28() {
-        String raw = "SELECT * FROM (SELECT * FROM table2)";
-        String expected = raw;
+    public void testParseCreateView()
+    {
         ID = 28;
-        assertThis(raw, expected, 1, ID);
+        String create = "create view foo (bas, as) as select bar, count(*) from foo group by val";
+        assertThis(create, create, 1, ID);
     }
 
-    // 29) To test select statement with IN subquery
     @Test
-    public void testParseQuery29() {
-        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2)";
-        String expected = raw;
+    public void testParseCreateStmtProcedure()
+    {
         ID = 29;
-        assertThis(raw, expected, 1, ID);
+        String create = "create procedure foo as select * from blat";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as insert into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as update into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as delete into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2";
+        assertThis(create, create, 1, ID);
     }
 
-    // 30) To test select statement with EXISTS subquery
+    // test select statement with FROM subquery
     @Test
     public void testParseQuery30() {
+        String raw = "SELECT * FROM (SELECT * FROM table2)";
+        String expected = raw;
+        ID = 30;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with IN subquery
+    @Test
+    public void testParseQuery31() {
+        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2)";
+        String expected = raw;
+        ID = 31;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with EXISTS subquery
+    @Test
+    public void testParseQuery32() {
         String raw = "SELECT * FROM table1 WHERE EXISTS( SELECT 1FROM table2)";
         String expected = raw;
-        ID = 29;
+        ID = 32;
         assertThis(raw, expected, 1, ID);
     }
 

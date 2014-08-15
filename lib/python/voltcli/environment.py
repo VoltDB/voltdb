@@ -72,7 +72,7 @@ if not java:
 java_opts = []
 
 #If this is a large memory system commit the full heap
-specify_minimum_heap = False
+specifyMinimumHeapSize = False
 if platform.system() == "Linux":
     memory = os.popen("free -m")
     try:
@@ -95,8 +95,9 @@ if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx2048m')
-    if specify_minimum_heap:
+    if specifyMinimumHeapSize:
         java_opts.append('-Xms2048m')
+        java_opts.append('-XX:+AlwaysPreTouch')
 
 # Set common options now.
 java_opts.append('-server')

@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
@@ -46,6 +45,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
+
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Create a snapshot write plan for a native snapshot.  This will attempt to
@@ -130,7 +131,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     "");
         }
 
-        if (replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (!tables.isEmpty() && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -279,6 +280,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             }
         }
         completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+        if (completionTask != null) {
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+        }
+        completionTask = SnapshotUtil.writeSnapshotCompletion(file_path, file_nonce, context.getHostId(), SNAP_LOG);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

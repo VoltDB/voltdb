@@ -286,14 +286,7 @@ public class AsyncBenchmark {
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
                 totalConnections.decrementAndGet();
-                if (config.recover) {
-                    try {
-                        connectThis(hostname, "Retry");
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                } else {
+                if (!config.recover) {
                     if (totalConnections.get() == 0) {
                         //totalConnections.set(-1);
                         System.exit(1);
@@ -313,6 +306,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.autotune) {
             clientConfig.enableAutoTune();
@@ -715,17 +709,6 @@ public class AsyncBenchmark {
         }
     }
 
-    private void connectThis(final String server, final String info) throws InterruptedException, NoConnectionsException, IOException {
-        System.out.println("Trying to reconnect this server: '" + server + "'");
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connectToOneServerWithRetry(server, info);
-            }
-        });
-        t.setDaemon(true);
-        t.start();
-    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.

@@ -169,8 +169,17 @@ OrderByExecutor::p_execute(const NValueArray &params)
     }
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                input_table->debug().c_str());
-    sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
-                                             node->getSortDirections()));
+
+
+    if (limit >= 0 && xs.begin() + limit + offset < xs.end()) {
+        // partial sort
+        partial_sort(xs.begin(), xs.begin() + limit + offset, xs.end(),
+                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+    } else {
+        // full sort
+        sort(xs.begin(), xs.end(),
+                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+    }
 
     int tuple_ctr = 0;
     int tuple_skipped = 0;
@@ -196,6 +205,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
         }
     }
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
+
+    cleanupInputTempTable(input_table);
 
     return true;
 }

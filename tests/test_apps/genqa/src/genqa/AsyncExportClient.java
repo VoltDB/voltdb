@@ -246,15 +246,6 @@ public class AsyncExportClient
     // Test startup time
     private static long benchmarkStartTS;
 
-    private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     // Statistics manager objects from the client
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
@@ -475,8 +466,8 @@ public class AsyncExportClient
     }
 
     static Client createClient() {
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
         if (config.autoTune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
@@ -491,34 +482,6 @@ public class AsyncExportClient
         fullStatsContext = client.createStatsContext();
 
         return client;
-    }
-
-    /**
-     * Remove the client from the list if connection is broken.
-     */
-    static class StatusListener extends ClientStatusListenerExt {
-
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            if (shutdown.get()) {
-                return;
-            }
-
-            // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-            }
-
-            // setup for retry
-            final String server = hostname;
-            final int finalPort = port;
-            es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server, finalPort);
-                }
-            });
-        }
     }
 
     /**
@@ -558,9 +521,19 @@ public class AsyncExportClient
         boolean passed = false;
 
         VoltTable stats = null;
-        System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        try {
+            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        } catch (Exception ex) {
+        }
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            try {
+                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            } catch (Exception ex) {
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");

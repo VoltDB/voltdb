@@ -189,6 +189,18 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
     }
 
+    // This is a regression test for ENG-6799
+    public void testUpdateFromInlineVarchar() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("STRINGPART.insert",
+                "aa", 1, 1, 0, "a potentially (but not really) very long string)");
+
+        // NAME is inlined varchar, DESC is not.
+        String update = "update STRINGPART set desc = name, num = -1 where val1 = 1";
+        executeAndTestUpdate("STRINGPART", update, 1);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

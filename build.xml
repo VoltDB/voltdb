@@ -61,6 +61,7 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
+<property name='build.testproc.dir'          location='${build.dir}/testprocs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
@@ -70,6 +71,7 @@
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
+<property name='src.testproc.dir'            location='tests/testprocs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
@@ -112,6 +114,11 @@
     <not><isset property="volt.client.memory"/></not>
 </condition>
 
+<!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<condition property="verifycatalogdebug" value="true">
+    <not><isset property="verifycatalogdebug"/></not>
+</condition>
+
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
@@ -120,6 +127,7 @@
     <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
+    <pathelement location='${build.testproc.dir}' />
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
@@ -735,9 +743,6 @@ CLEANING
     <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/DBBPool.java'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf src/frontend/org/voltcore/utils/.flagfile'"/>
-  </exec>
-  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf *.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
@@ -943,13 +948,14 @@ JAVA COMPILATION
 <target name="compile_core" depends="compile_client">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
+    <mkdir dir='${build.testproc.dir}' />
     <exec
         dir='${src.gpl.dir}/org/voltdb/utils'
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
-        destdir="${build.prod.dir}:${build.test.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
+        destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
     </depend>
@@ -995,10 +1001,21 @@ JAVA COMPILATION
             <include name="**/*.sql"/>
         </fileset>
     </copy>
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
+            <include name="**/*.sql"/>
+        </fileset>
+    </copy>
 
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
+            <include name="**/*.tar.gz"/>
+        </fileset>
+    </copy>
+
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
             <include name="**/*.tar.gz"/>
         </fileset>
     </copy>
@@ -1043,6 +1060,7 @@ JAVA COMPILATION
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
+    <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>
@@ -1333,6 +1351,7 @@ TEST CASES
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <jvmarg value="-XX:-UseSplitVerifier"/>
+            <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
@@ -1845,7 +1864,7 @@ TEST CASES
     <condition property="config_seed" value="-s ${sql_coverage_seed}" else="">
         <isset property="sql_coverage_seed"/>
     </condition>
-    <condition property="config_suite" value="${default_config}"
+    <condition property="config_suite" value="${test.example.dir}/${sql_coverage_suite}"
                else="${regression_config}">
         <isset property="sql_coverage_suite"/>
     </condition>
@@ -1853,9 +1872,6 @@ TEST CASES
         <isset property="sql_coverage_config"/>
     </condition>
     <condition property="config_verbose" value="-r" else="">
-        <isset property="sql_coverage_verbose"/>
-    </condition>
-    <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
     </condition>
     <condition property="config_genonly" value="-g" else="">
@@ -1891,10 +1907,10 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx640m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -XX:+HeapDumpOnOutOfMemoryError -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
-    ${debug_output}' />
+    ' />
     <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">
       <fileset dir="${test.example.dir}">
         <include name="**/*.sql"/>
@@ -2215,8 +2231,8 @@ DBBPool.java preprocessing
 ***************************************
 -->
 
-<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate">
-    <delete file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
+<target name="dbbpool_gen" depends="dbbpool_gen_check" unless="dbbpool_gen_uptodate"
+        description="Use the gcc preprocessor to generate DBBPool.java with features enabled/disabled.">
     <exec dir='${src.gpl.dir}/org/voltcore/utils'
           executable='gcc'
           failonerror='true'>
@@ -2224,18 +2240,18 @@ DBBPool.java preprocessing
           <arg value='-CC'/>
           <arg value='-xc' />
           <arg value='-Wp,-P' />
-          <arg value='-traditional-cpp' />
+          <!-- -ffreestanding prevents gcc 4.8 generating comments to violate our license standards. -->
+          <arg value='-ffreestanding' />
           <arg value='-D${jmemcheck}' />
           <arg value='-o' />
           <arg value='DBBPool.java' />
           <arg value='DBBPool.java.template' />
     </exec>
-    <touch file='${src.gpl.dir}/org/voltcore/utils/.flagfile'/>
 </target>
 
 <target name="dbbpool_gen_check" depends="">
     <uptodate property="dbbpool_gen_uptodate"
-              targetfile="${src.gpl.dir}/org/voltcore/utils/.flagfile">
+              targetfile="${src.gpl.dir}/org/voltcore/utils/DBBPool.java">
         <srcfiles file="${src.gpl.dir}/org/voltcore/utils/DBBPool.java.template" />
     </uptodate>
 </target>

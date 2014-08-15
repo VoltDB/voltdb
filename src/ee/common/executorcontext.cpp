@@ -37,12 +37,16 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 Topend* topend,
                 Pool* tempStringPool,
                 NValueArray* params,
+                VoltDBEngine* engine,
                 bool exportEnabled,
                 std::string hostname,
-                CatalogId hostId) :
+                CatalogId hostId,
+                DRTupleStream *drStream) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
-    m_undoQuantum(undoQuantum), m_staticParams(params),
-    m_executorsMap(), m_spHandle(0),
+    m_undoQuantum(undoQuantum),
+    m_staticParams(params), m_executorsMap(),
+    m_drStream(drStream), m_engine(engine),
+    m_txnId(0), m_spHandle(0),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),
@@ -52,12 +56,28 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     bindToThread();
 }
 
-void ExecutorContext::bindToThread()
+ExecutorContext::ExecutorContext(int64_t siteId,
+                CatalogId partitionId,
+                UndoQuantum *undoQuantum,
+                Topend* topend,
+                Pool* tempStringPool,
+                VoltDBEngine* engine,
+                bool exportEnabled,
+                std::string hostname,
+                CatalogId hostId,
+                DRTupleStream *drStream) :
+    m_topEnd(topend), m_tempStringPool(tempStringPool),
+    m_undoQuantum(undoQuantum),
+    m_executorsMap(),
+    m_drStream(drStream), m_engine(engine),
+    m_txnId(0), m_spHandle(0),
+    m_lastCommittedSpHandle(0),
+    m_siteId(siteId), m_partitionId(partitionId),
+    m_hostname(hostname), m_hostId(hostId),
+    m_exportEnabled(exportEnabled), m_epoch(0) // set later
 {
-    // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == NULL);
-    pthread_setspecific( static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    bindToThread();
 }
 
 ExecutorContext::~ExecutorContext() {
@@ -70,6 +90,15 @@ ExecutorContext::~ExecutorContext() {
 
     pthread_setspecific( static_key, NULL);
 }
+
+void ExecutorContext::bindToThread()
+{
+    // There can be only one (per thread).
+    assert(pthread_getspecific( static_key) == NULL);
+    pthread_setspecific( static_key, this);
+    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+}
+
 
 ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);

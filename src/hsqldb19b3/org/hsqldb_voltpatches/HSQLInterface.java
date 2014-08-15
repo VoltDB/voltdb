@@ -17,10 +17,11 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.TimeZone;
+
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
 
 /**
  * This class is built to create a single in-memory database
@@ -35,6 +36,18 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * </ul>
  */
 public class HSQLInterface {
+    /**
+     * Naming conventions for unnamed indexes and constraints
+     */
+    static public String AUTO_GEN_MATVIEW = "MATVIEW_PK_";
+    static public String AUTO_GEN_MATVIEW_IDX = AUTO_GEN_MATVIEW + "INDEX";
+    static public String AUTO_GEN_MATVIEW_CONST = AUTO_GEN_MATVIEW + "CONSTRAINT";
+    static public String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
+    static public String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
+    static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
+
     /**
      * The spacer to use for nested XML elements
      */
@@ -104,6 +117,11 @@ public class HSQLInterface {
         } catch (HsqlException e) {
             e.printStackTrace();
         }
+
+        // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
+        // This ensures that all VoltDB data paths use the same timezone for representing time.
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        sessionProxy.executeDirectStatement("SET SESSION TIME ZONE INTERVAL '00:00' HOUR TO MINUTE;");
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");

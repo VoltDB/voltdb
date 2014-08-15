@@ -49,7 +49,7 @@ public class QueryPlanner {
     Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
-    PartitioningForStatement m_partitioning;
+    StatementPartitioning m_partitioning;
     int m_maxTablesPerJoin;
     AbstractCostModel m_costModel;
     ScalarValueHints[] m_paramHints;
@@ -87,7 +87,7 @@ public class QueryPlanner {
                         String procName,
                         Cluster catalogCluster,
                         Database catalogDb,
-                        PartitioningForStatement partitioning,
+                        StatementPartitioning partitioning,
                         HSQLInterface HSQL,
                         DatabaseEstimates estimates,
                         boolean suppressDebugOutput,
@@ -183,8 +183,7 @@ public class QueryPlanner {
         if (m_paramzInfo == null) {
             return null;
         }
-        Object[] paramArray = m_paramzInfo.extractedParamValues(parameterTypes);
-        return ParameterSet.fromArrayNoCopy(paramArray);
+        return m_paramzInfo.extractedParamValues(parameterTypes);
     }
 
     /**
@@ -208,11 +207,8 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
-                    VoltType[] paramTypes = plan.parameterTypes();
-                    if (paramTypes.length <= CompiledPlan.MAX_PARAM_COUNT) {
-                        Object[] params = m_paramzInfo.extractedParamValues(paramTypes);
-                        plan.extractedParamValues = ParameterSet.fromArrayNoCopy(params);
-                        m_wasParameterizedPlan = true;
+                    m_wasParameterizedPlan = plan.extractParamValues(m_paramzInfo);
+                    if (m_wasParameterizedPlan) {
                         return plan;
                     }
                 } else {
@@ -259,12 +255,6 @@ public class QueryPlanner {
             m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql;
             return null;
         }
-        if ((parsedStmt.m_tableList.size() > m_maxTablesPerJoin) && (parsedStmt.m_joinOrder == null)) {
-            m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql + " because a join of > 5 tables was requested"
-                               + " without specifying a join order. See documentation for instructions on manually" +
-                                 " specifying a join order";
-            return null;
-        }
 
         m_planSelector.outputParsedStatement(parsedStmt);
 
@@ -272,7 +262,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, true);
 
         // This processing of bestPlan outside/after getBestCostPlan
         // allows getBestCostPlan to be called both here and
@@ -281,7 +271,7 @@ public class QueryPlanner {
         // make sure we got a winner
         if (bestPlan == null) {
             if (m_debuggingStaticModeToRetryOnError) {
-                assembler.getBestCostPlan(parsedStmt);
+                assembler.getBestCostPlan(parsedStmt, true);
             }
             m_recentErrorMsg = assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
@@ -290,7 +280,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly) {
+        if (bestPlan.getReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -314,18 +304,26 @@ public class QueryPlanner {
         bestPlan.resetPlanNodeIds(1);
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        fragmentize(bestPlan);
+        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+        if (receives.size() > 1) {
+            // Have too many receive node for two fragment plan limit
+            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. Consider simplifying its subqueries: " + m_sql;
+            return null;
+        }
+
+        if (receives.size() == 1) {
+        /*/ enable for debug ...
+        if (receives.size() > 1) {
+            System.out.println(plan.rootPlanGraph.toExplainPlanString());
+        }
+        // ... enable for debug */
+            ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+            fragmentize(bestPlan, recvNode);
+        }
         return bestPlan;
     }
 
-    private static void fragmentize(CompiledPlan plan) {
-        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
-
-        if (receives.isEmpty()) return;
-
-        assert (receives.size() == 1);
-
-        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+    private static void fragmentize(CompiledPlan plan, ReceivePlanNode recvNode) {
         assert(recvNode.getChildCount() == 1);
         AbstractPlanNode childNode = recvNode.getChild(0);
         assert(childNode instanceof SendPlanNode);
@@ -336,7 +334,6 @@ public class QueryPlanner {
         recvNode.clearChildren();
 
         plan.subPlanGraph = sendNode;
-
         return;
     }
 }

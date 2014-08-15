@@ -53,6 +53,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -114,8 +115,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.messaging.ForeignHost;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1240,9 +1239,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicy(new ParameterDeserializationPolicy(true));
         registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
 
+        // NOTE: These "policies" are really parameter correctness checks, not permissions
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
+        registerPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
@@ -1340,7 +1341,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
                     }
                 }
-            }, MoreExecutors.sameThreadExecutor());
+            }, CoreUtils.SAMETHREADEXECUTOR);
         }
     }
 
@@ -1497,7 +1498,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
-                task.type, task.originalTxnId, task.originalUniqueId,
+                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
@@ -1508,20 +1511,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn)
     {
         ParameterSet params = task.getParams();
+        // default catalogBytes to null, when passed along, will tell the
+        // catalog change planner that we want to use the current catalog.
         byte[] catalogBytes = null;
-        if (params.toArray()[0] instanceof String) {
-            catalogBytes = Encoder.hexDecode((String) params.toArray()[0]);
-        } else if (params.toArray()[0] instanceof byte[]) {
-            catalogBytes = (byte[]) params.toArray()[0];
-        } else {
-            // findbugs triggers a NPE alert here... and the
-            // policy check is pretty far away from here.
-            // assert and satisfy findbugs, and the casual reader.
-            assert false : "Expected to catch invalid parameters in UpdateCatalogAcceptancePolicy.";
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                    " Catalog content must be passed as string or byte[].",
-                    task.clientHandle);
+        Object catalogObj = params.toArray()[0];
+        if (catalogObj != null) {
+            if (catalogObj instanceof String) {
+                // treat an empty string as no catalog provided
+                String catalogString = (String) catalogObj;
+                if (!catalogString.isEmpty()) {
+                    catalogBytes = Encoder.hexDecode(catalogString);
+                }
+            } else if (catalogObj instanceof byte[]) {
+                // treat an empty array as no catalog provided
+                byte[] catalogArr = (byte[]) catalogObj;
+                if (catalogArr.length != 0) {
+                    catalogBytes = catalogArr;
+                }
+            }
         }
         String deploymentString = (String) params.toArray()[1];
         LocalObjectMessage work = new LocalObjectMessage(
@@ -1529,7 +1536,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
-                    task.type, task.originalTxnId, task.originalUniqueId,
+                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1760,6 +1769,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
+            else if (task.procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                catProc =
+                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+            }
         }
 
         if (user == null) {
@@ -1844,6 +1861,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // PRO SYSPROC SPECIAL HANDLING
 
             if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@UpdateClasses")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             }
             else if (task.procName.equals("@SnapshotSave")) {
@@ -2104,7 +2124,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.work.type;
+        task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info
@@ -2239,8 +2259,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.procName = "@UpdateApplicationCatalog";
                             task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0,
-                                           changeResult.worksWithElastic ? 1 : 0);
+                                           changeResult.requiresSnapshotIsolation ? 1 : 0,
+                                           changeResult.worksWithElastic ? 1 : 0,
+                                           changeResult.deploymentHash);
                             task.clientHandle = changeResult.clientHandle;
                             // DR stuff
                             task.type = changeResult.invocationType;
@@ -2325,7 +2346,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     c.writeStream().enqueue(buf);
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
 
         //Return the future task for test code
         return ft;
@@ -2446,7 +2467,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);

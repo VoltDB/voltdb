@@ -72,17 +72,25 @@ class AbstractExecutor {
     bool execute(const NValueArray& params);
 
     /**
-     * Returns true if the output table for the plannode must be cleaned up
-     * after p_execute().  <b>Default is false</b>. This should be overriden in
-     * the receive executor since this is the only place we need to clean up the
-     * output table.
-     */
-    virtual bool needsPostExecuteClear() { return false; }
-
-    /**
      * Returns the plannode that generated this executor.
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+
+    inline void cleanupTempOutputTable()
+    {
+        if (m_tmpOutputTable) {
+            VOLT_TRACE("Clearing output table...");
+            m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
+        }
+    }
 
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
@@ -97,15 +105,6 @@ class AbstractExecutor {
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
-
-    /**
-     * Returns true if the output table for the plannode must be
-     * cleared before p_execute().  <b>Default is true (clear each
-     * time)</b>. Override this method if the executor receives a
-     * plannode instance that must not be cleared.
-     * @return true if output table must be cleared; false otherwise.
-     */
-    virtual bool needsOutputTableClear() { return true; };
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
@@ -123,21 +122,15 @@ class AbstractExecutor {
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
 
-    // cache to avoid runtime virtual function call
-    bool needs_outputtable_clear_cached;
-
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
 };
+
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-    if (m_tmpOutputTable) {
-        VOLT_TRACE("Clearing output table...");
-        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    }
 
     // run the executor
     return p_execute(params);

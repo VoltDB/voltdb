@@ -43,7 +43,7 @@ SubqueryExpression::SubqueryExpression(
             m_tveParams(tveParams),
             m_parameterContainer(NULL) {
         VOLT_TRACE("SubqueryExpression %d", subqueryId);
-        m_parameterContainer = &ExecutorContext::getExecutorContext()->getParameterContainer();
+        m_parameterContainer = ExecutorContext::getExecutorContext()->getParameterContainer();
         assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
             (m_tveParams.get() != NULL && m_paramIdxs.size() == m_tveParams->size()));
         assert(subqueryType == EXPRESSION_TYPE_IN_SUBQUERY || subqueryType == EXPRESSION_TYPE_EXISTS_SUBQUERY);

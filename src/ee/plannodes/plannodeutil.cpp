@@ -66,6 +66,7 @@
 #include "plannodes/seqscannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
+#include "plannodes/upsertnode.h"
 
 #include <sstream>
 
@@ -140,10 +141,17 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::DeletePlanNode();
             break;
         // ------------------------------------------------------------------
+        // Upsert
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_UPSERT):
+            ret = new voltdb::UpsertPlanNode();
+            break;
+        // ------------------------------------------------------------------
         // Aggregate
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
         case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
+        case (voltdb::PLAN_NODE_TYPE_PARTIALAGGREGATE):
             ret = new voltdb::AggregatePlanNode(type);
             break;
         // ------------------------------------------------------------------

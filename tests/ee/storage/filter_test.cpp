@@ -64,7 +64,6 @@
 
 #define TUPLES 1000
 
-using namespace boost;
 using namespace voltdb;
 
 class FilterTest : public Test {

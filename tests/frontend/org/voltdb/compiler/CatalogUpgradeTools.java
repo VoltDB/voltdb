@@ -30,7 +30,6 @@ import java.io.UnsupportedEncodingException;
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -67,6 +66,16 @@ public class CatalogUpgradeTools
         memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
     }
 
+    public static void dorkDowngradeVersion(String srcJar, String dstJar, String buildstring)
+        throws Exception
+    {
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadFromPath(srcJar);
+        String[] bi = getBuildInfoLines(memCatalog);
+        bi[0] = buildstring;
+        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+        memCatalog.writeToFile(new File(dstJar));
+    }
+
     /**
      * Inject DDL statement.
      * @param memCatalog
@@ -76,7 +85,7 @@ public class CatalogUpgradeTools
     public static void dorkDDL(InMemoryJarfile memCatalog, String statement)
             throws UnsupportedEncodingException
     {
-        String key = new File(TPCCProjectBuilder.ddlURL.getPath()).getName();
+        String key = VoltCompiler.AUTOGEN_DDL_FILE_NAME;
         String ddl = String.format("%s;\n%s", statement, new String(memCatalog.get(key), "UTF-8"));
         memCatalog.put(key, ddl.getBytes());
     }

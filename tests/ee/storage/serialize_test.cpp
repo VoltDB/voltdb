@@ -65,7 +65,6 @@
 #define TUPLES 20
 
 using namespace std;
-using namespace boost;
 using namespace voltdb;
 
 #define NUM_OF_COLUMNS 6
@@ -135,7 +134,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     size_t size = serialize_out.size();
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
@@ -178,7 +177,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     table_->serializeTo(serialize_out);
 
     // Deserialize the table: verify that it matches the existing table
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);

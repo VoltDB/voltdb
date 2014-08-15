@@ -231,6 +231,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_EXTRACT_DAY_OF_WEEK:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_WEEK>((*arguments)[0]);
             break;
+        case FUNC_EXTRACT_WEEKDAY:
+            ret = new UnaryFunctionExpression<FUNC_EXTRACT_WEEKDAY>((*arguments)[0]);
+            break;
         case FUNC_EXTRACT_DAY_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_YEAR>((*arguments)[0]);
             break;
@@ -379,6 +382,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
         default:
             return NULL;

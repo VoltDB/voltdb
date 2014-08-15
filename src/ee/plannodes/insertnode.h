@@ -47,19 +47,23 @@
 #define HSTOREINSERTNODE_H
 
 #include <sstream>
+#include <vector>
 #include "abstractoperationnode.h"
 
 namespace voltdb {
+
+class Pool;
 
 /**
  *
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
     public:
-        InsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
+        InsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_multiPartition(false), m_fieldMap() {
             // Do nothing
         }
-        InsertPlanNode() : AbstractOperationPlanNode() {
+
+        InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() {
             // Do nothing
         }
 
@@ -67,10 +71,21 @@ class InsertPlanNode : public AbstractOperationPlanNode {
 
         bool isMultiPartition() { return m_multiPartition; }
 
+        void initTupleWithDefaultValues(VoltDBEngine* engine,
+                                        Pool* pool,
+                                        const std::set<int>& fieldsExplicitlySet,
+                                        TableTuple& templateTuple,
+                                        std::vector<int> &nowFields);
+
+        const std::vector<int>& getFieldMap() const {
+            return m_fieldMap;
+        }
+
     protected:
         virtual void loadFromJSONObject(PlannerDomValue obj);
 
         bool m_multiPartition;
+        std::vector<int> m_fieldMap;
 };
 
 }

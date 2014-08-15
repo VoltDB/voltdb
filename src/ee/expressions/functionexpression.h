@@ -163,6 +163,7 @@ static const int SQL_DAY_OF_MONTH     = 610;
 static const int SQL_DAY_OF_YEAR      = 611;
 static const int SQL_WEEK_OF_YEAR     = 592;
 static const int SQL_QUARTER          = 609;
+static const int SQL_WEEKDAY          = 741;
 
 // These are from Types.java.
 static const int SQL_INTERVAL_YEAR             = 101;
@@ -196,6 +197,7 @@ static const int FUNC_EXTRACT_INTERVAL_DAY              = SQL_EXTRACT_VOLT_FUNC_
 static const int FUNC_EXTRACT_INTERVAL_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_HOUR;
 static const int FUNC_EXTRACT_INTERVAL_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MINUTE;
 static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_SECOND;
+static const int FUNC_EXTRACT_WEEKDAY                   = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_WEEKDAY;
 
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
@@ -233,6 +235,7 @@ static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
 static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
 
 static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
+static const int FUNC_VOLT_FORMAT_CURRENCY             = 20024;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

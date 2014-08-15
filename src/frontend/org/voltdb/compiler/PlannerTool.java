@@ -34,8 +34,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.utils.Encoder;
@@ -100,11 +100,11 @@ public class PlannerTool {
     }
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
-        PartitioningForStatement infer = PartitioningForStatement.inferPartitioning();
+        StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer);
     }
 
-    AdHocPlannedStatement planSql(String sqlIn, PartitioningForStatement partitioning) {
+    AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
@@ -206,22 +206,18 @@ public class PlannerTool {
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             if (partitioning.isInferred()) {
+
+                // Note either the parameter index (per force to a user-provided parameter) or
+                // the actual constant value of the partitioning key inferred from the plan.
+                // Either or both of these two values may simply default
+                // to -1 and to null, respectively.
+                core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
+                core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
+
                 if (planner.compiledAsParameterizedPlan()) {
                     assert(parsedToken != null);
-                    // Note the parameter index of the partitioning key, so that the actual
-                    // parameter value can vary with each invocation.
-                    // It may default to -1 if single partitioning is not possible or for replicated DML.
-                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
-
                     // Again, plans with inferred partitioning are the only ones supported in the cache.
                     m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals);
-                } else {
-                    // Note either the parameter index (per force to a user-provided parameter) or
-                    // the actual constant value of the partitioning key inferred from the plan.
-                    // Either or both of these two values may simply default
-                    // to -1 and to null, respectively.
-                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
-                    core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
                 }
             }
             return ahps;

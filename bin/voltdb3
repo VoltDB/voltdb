@@ -77,6 +77,11 @@ if [ "$JAVA_HOME" != "" ]; then
   JAVA=$JAVA_HOME/bin/java
 fi
 
+if [ "$JAVA" = "" ]; then
+  echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
+  exit 1
+fi
+
 # JVM detection taken from Apache Cassandra
 # Determine the sort of JVM we'll be running on.
 

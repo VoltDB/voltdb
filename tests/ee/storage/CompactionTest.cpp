@@ -36,6 +36,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
 #include "common/DefaultTupleSerializer.h"
 #include "stx/btree_set.h"
 
@@ -154,7 +155,7 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, 0));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature, &drStream));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -202,7 +203,7 @@ public:
             }
         }
         m_engine->setUndoToken(++m_undoToken);
-        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+        ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -275,6 +276,8 @@ public:
     int64_t m_undoToken;
 
     CatalogId m_tableId;
+    MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(CompactionTest, BasicCompaction) {
@@ -399,7 +402,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
-    ReferenceSerializeInput input(config, 5);
+    ReferenceSerializeInputBE input(config, 5);
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
     for (int qq = 0; qq < 3; qq++) {
@@ -539,7 +542,7 @@ TEST_F(CompactionTest, TestENG897) {
     DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
-    ReferenceSerializeInput input(config, 5);
+    ReferenceSerializeInputBE input(config, 5);
 
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     for (int ii = 0; ii < 16130; ii++) {
@@ -581,7 +584,7 @@ TEST_F(CompactionTest, TestENG897) {
 
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
-    ReferenceSerializeInput input2(config, 5);
+    ReferenceSerializeInputBE input2(config, 5);
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();

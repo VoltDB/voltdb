@@ -74,31 +74,32 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      */
     @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
-
-        assert(stmtNode.children.size() > 1);
         m_tableList.clear();
+        assert(stmtNode.children.size() > 1);
+        AbstractParsedStmt childStmt = null;
+        boolean first = true;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
+                childStmt = new ParsedSelectStmt(m_paramValues, m_db);
                 // Assign every child a unique ID
                 childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
                 childStmt.m_parentStmt = m_parentStmt;
-                childStmt.parseTablesAndParams(childSQL);
-                m_children.add(childStmt);
 
-                // Add statement's tables to the consolidated list
-                m_tableList.addAll(childStmt.m_tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
+                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
-                childStmt.parseTablesAndParams(childSQL);
-                m_children.add(childStmt);
-                // Add statement's tables to the consolidated list
-                m_tableList.addAll(childStmt.m_tableList);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
+            childStmt.parseTablesAndParams(childSQL);
+            if (first) {
+                first = false;
+                promoteUnionParametersFromChild(childStmt);
+            }
+            m_children.add(childStmt);
+            // Add statement's tables to the consolidated list
+            m_tableList.addAll(childStmt.m_tableList);
         }
     }
 

@@ -82,10 +82,14 @@ public abstract class AbstractParsedStmt {
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
 
-    //User specified join order, null if none is specified
+    // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
     public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
+
+    // This list is used to identify the order of the table aliases returned by
+    // the parser for possible use as a default join order.
+    protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -155,27 +159,25 @@ public abstract class AbstractParsedStmt {
        return retval;
    }
 
-   /**
-   * @param parsedStmt
-   * @param sql
-   * @param xmlSQL
-   * @param db
-   * @param joinOrder
-   */
-  private static AbstractParsedStmt parse(AbstractParsedStmt parsedStmt, String sql,
-          VoltXMLElement stmtTypeElement,  Database db, String joinOrder) {
-      // parse tables and parameters
-      parsedStmt.parseTablesAndParams(stmtTypeElement);
+    /**
+     * @param parsedStmt
+     * @param sql
+     * @param xmlSQL
+     * @param db
+     * @param joinOrder
+     */
+    private static void parse(AbstractParsedStmt parsedStmt, String sql,
+            VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
+        // parse tables and parameters
+        parsedStmt.parseTablesAndParams(stmtTypeElement);
 
-      // parse specifics
-      parsedStmt.parse(stmtTypeElement);
+        // parse specifics
+        parsedStmt.parse(stmtTypeElement);
 
-      // post parse action
-      parsedStmt.postParse(sql, joinOrder);
+        // post parse action
+        parsedStmt.postParse(sql, joinOrder);
+    }
 
-      return parsedStmt;
-
-  }
     /**
      *
      * @param sql
@@ -191,7 +193,9 @@ public abstract class AbstractParsedStmt {
         NEXT_STMT_ID = 0;
         NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
-        return parse(retval, sql, stmtTypeElement, db, joinOrder);
+
+        parse(retval, sql, stmtTypeElement, db, joinOrder);
+        return retval;
     }
 
     /**
@@ -210,12 +214,18 @@ public abstract class AbstractParsedStmt {
             assert(name != null);
             Column col = table.getColumns().getExact(name.trim());
 
-            assert(child.children.size() == 1);
-            VoltXMLElement subChild = child.children.get(0);
-            AbstractExpression expr = parseExpressionTree(subChild);
-            assert(expr != null);
-            expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
-            ExpressionUtil.finalizeValueTypes(expr);
+            // May be no children of column node in the case of
+            //   INSERT INTO ... SELECT ...
+
+            AbstractExpression expr = null;
+            if (child.children.size() != 0) {
+                assert(child.children.size() == 1);
+                VoltXMLElement subChild = child.children.get(0);
+                expr = parseExpressionTree(subChild);
+                assert(expr != null);
+                expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                ExpressionUtil.finalizeValueTypes(expr);
+            }
             columns.put(col, expr);
         }
     }
@@ -482,7 +492,6 @@ public abstract class AbstractParsedStmt {
             if (subquery == null) {
                 tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias, m_stmtId);
             } else {
-                // Temp table always have name SYSTEM_SUBQUERY + hashCode.
                 tableScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
             }
             m_tableAliasMap.put(tableAlias, tableScan);
@@ -800,9 +809,9 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-*
-* @param tableNode
-*/
+     *
+     * @param tableNode
+     */
     private void parseTable(VoltXMLElement tableNode) {
         String tableName = tableNode.attributes.get("table");
         assert(tableName != null);
@@ -811,8 +820,22 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-        // Possible sub-query FROM (SELECT ...)
-        AbstractParsedStmt subquery = parseFromSubQuery(tableNode);
+        // Hsql rejects name conflicts in a single query
+        m_tableAliasList.add(tableAlias);
+
+        AbstractParsedStmt subquery = null;
+        // Possible sub-query
+        for (VoltXMLElement childNode : tableNode.children) {
+            if ( ! childNode.name.equals("tablesubquery")) {
+                continue;
+            }
+            if (childNode.children.isEmpty()) {
+                continue;
+            }
+            // sub-query FROM (SELECT ...)
+            subquery = parseFromSubQuery(childNode.children.get(0));
+            break;
+        }
 
         // add table to the query cache before processing the JOIN/WHERE expressions
         // The order is important because processing sub-query expressions assumes that
@@ -913,6 +936,31 @@ public abstract class AbstractParsedStmt {
         }
     }
 
+    /** Get a list of the subqueries used by this statement.  This method
+     * may be overridden by subclasses, e.g., insert statements have a subquery
+     * but does not use m_joinTree.
+     **/
+    public List<StmtSubqueryScan> getSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_joinTree != null) {
+          m_joinTree.extractSubQueries(subqueries);
+        }
+
+        return subqueries;
+    }
+
+    // The parser currently attaches the summary parameter list
+    // to each leaf (select) statement in a union, but not to the
+    // union statement itself. It is always the same parameter list,
+    // the one that applies globally to the entire set of leaf select
+    // statements each of which may or may not use each parameter.
+    // The list is required later at the top-level statement for
+    // proper cataloging, so promote it here to each parent union.
+    protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
+        m_paramList = childStmt.m_paramList;
+    }
+
     /**
      * Collect value equivalence expressions across the entire SQL statement
      * @return a map of tuple value expressions to the other expressions,
@@ -973,24 +1021,24 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    private AbstractParsedStmt parseFromSubQuery(VoltXMLElement tableScan) {
-        for (VoltXMLElement childNode : tableScan.children) {
-            if (childNode.name.equals("tablesubquery")) {
-                if (!childNode.children.isEmpty()) {
-                    return parseSubquery(childNode.children.get(0));
-                }
-            }
-        }
-        return null;
+    protected AbstractParsedStmt parseFromSubQuery(VoltXMLElement queryNode) {
+        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        subquery.m_paramsById.putAll(m_paramsById);
+        subquery.m_paramList = m_paramList;
+        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
+        return subquery;
     }
 
-    private AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
+    protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
         AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(suqueryElmt, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
         subQuery.m_paramList = m_paramList;
-        return AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+
+        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        return subQuery;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.

@@ -50,7 +50,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
      * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
         super(db, parsedStmt, partitioning);
 

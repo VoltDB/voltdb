@@ -117,6 +117,10 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
+        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20024;
+
+        static final int FUNC_CONCAT                      = 124;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -171,6 +175,17 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+            		Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -260,6 +275,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         switch(funcType) {
+        case FunctionId.FUNC_CONCAT:
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (nodes[ii].dataType == null && nodes[ii].isParam) {
+                    nodes[ii].dataType = Type.SQL_VARCHAR;
+                }
+            }
+            break;
         /*
          * The types to the FIELD functions parameters are VARCHAR
          */
@@ -404,9 +426,90 @@ public class FunctionForVoltDB extends FunctionSQL {
     @Override
     public String getSQL() {
 
+        StringBuffer sb = new StringBuffer();
+
         switch (funcType) {
+            case FunctionId.FUNC_VOLT_DECODE: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL());
+                for (int ii = 1; ii < nodes.length; ii++) {
+                    sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+                }
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_FIELD:
+            case FunctionId.FUNC_VOLT_ARRAY_ELEMENT: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL()).append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_ARRAY_LENGTH: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH: {
+                int timeUnit = ((Number) nodes[0].valueData).intValue();
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP: {
+                int timeUnit = ((Number) nodes[0].valueData).intValue();
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
+                int timeUnit = ((Number) nodes[0].valueData).intValue();
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_FROM_UNIXTIME: {
+                sb.append(name).append(Tokens.T_OPENBRACKET).append(nodes[0].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+            }
             default :
                 return super.getSQL();
+        }
+    }
+
+    // This function will be removed with a new attribute is added XML indicating Function Unit
+    public static boolean isUnitFunction(int functionType) {
+
+        switch (functionType) {
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND:
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND:
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_YEAR:
+            case FunctionId.FUNC_VOLT_TRUNCATE_QUARTER:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MONTH:
+            case FunctionId.FUNC_VOLT_TRUNCATE_DAY:
+            case FunctionId.FUNC_VOLT_TRUNCATE_HOUR:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MINUTE:
+            case FunctionId.FUNC_VOLT_TRUNCATE_SECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND:
+                return true;
+
+            default :
+                return false;
         }
     }
 

@@ -30,9 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -56,6 +53,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -231,7 +230,7 @@ public class SnapshotSaveAPI
                                 exportSequenceNumbers);
                     }
 
-                    if (m_deferredSetupFuture != null) {
+                    if (m_deferredSetupFuture != null && taskList != null) {
                         // Add a listener to the deferred setup so that it can kick off the snapshot
                         // task once the setup is done.
                         m_deferredSetupFuture.addListener(new Runnable() {
@@ -249,7 +248,7 @@ public class SnapshotSaveAPI
                                 context.getSiteSnapshotConnection().startSnapshotWithTargets(
                                         deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
-                        }, MoreExecutors.sameThreadExecutor());
+                        }, CoreUtils.SAMETHREADEXECUTOR);
                     }
                 }
             } finally {
