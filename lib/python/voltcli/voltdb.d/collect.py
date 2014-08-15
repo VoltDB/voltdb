@@ -49,9 +49,9 @@
         VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
                            default = False),
-        VOLT.StringOption (None, '--days', 'days',
+        VOLT.IntegerOption (None, '--days', 'days',
                            'number of days of file to collect',
-                           default = '14')
+                           default = 14)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True)
@@ -60,5 +60,5 @@
 
 def collect(runner):
     runner.args.extend(['--voltdbroot='+runner.opts.voltdbroot, '--prefix='+runner.opts.prefix, '--host='+runner.opts.host, '--username='+runner.opts.username, '--password='+runner.opts.password,
-    '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump), '--days='+runner.opts.days])
+    '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump), '--days='+str(runner.opts.days)])
     runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)

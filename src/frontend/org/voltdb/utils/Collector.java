@@ -135,21 +135,16 @@ public class Collector {
         m_skipHeapDump = config.skipheapdump;
         m_daysOfFileToCollect = config.days;
 
-        // To Do
-        // Fix the VEM call because the argument numbers has been changed
-
         // arguments only used when Collector is called from VEM
-        if (args.length > 9) {
-            m_calledFromVEM = true;
+        m_calledFromVEM = true;
 
-            // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
-            // so the resulting file is easier to be located and copied to VEM
-            m_copyToVEM = config.copyToVEM;
+        // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
+        // so the resulting file is easier to be located and copied to VEM
+        m_copyToVEM = config.copyToVEM;
 
-            // generate a list of information (server name, size, and path) of files rather than actually collect files
-            // used by files display panel in VEM UI
-            m_fileInfoOnly = config.fileInfoOnly;
-        }
+        // generate a list of information (server name, size, and path) of files rather than actually collect files
+        // used by files display panel in VEM UI
+        m_fileInfoOnly = config.fileInfoOnly;
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
