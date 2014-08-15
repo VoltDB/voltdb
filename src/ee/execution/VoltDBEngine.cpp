@@ -685,15 +685,14 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     }
 }
 
-static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
+static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
 {
     // covers column count
     if (t1->columns().size() != t2->columnCount()) {
         return true;
     }
 
-    PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(t2);
-    if (t1->isDRed() != persistenttable->isDREnabled()) {
+    if (t1->isDRed() != t2->isDREnabled()) {
         return true;
     }
 
