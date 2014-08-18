@@ -226,8 +226,8 @@ def abort(*msgs, **kwargs):
     return_code = kwargs.get('return_code', 1)
     error(*msgs)
     # Return code must be 0-255 for shell.
-    if return_code > 255 or return_code < 0:
-        return_code = 255
+    if return_code != 0:
+        return_code = 1
     sys.exit(return_code)
 
 #===============================================================================
