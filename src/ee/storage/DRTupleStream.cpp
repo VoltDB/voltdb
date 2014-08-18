@@ -41,8 +41,7 @@ DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
       m_partitionId(0),
-      m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
-      m_clusterId(0)
+      m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
