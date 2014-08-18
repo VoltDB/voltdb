@@ -41,6 +41,13 @@ public interface NodeDRGateway {
      */
     public abstract boolean offer(final Object ib);
 
+    /**
+     * Queues up a task to move all the InvocationBuffers to the PersistentBinaryDeque
+     * @param nofsync do not force the sync to disk (when True)
+     * @return the FutureTask indicating completion
+     */
+    public abstract Runnable forceAllBuffersToDisk(boolean nofsync);
+
     public abstract boolean isActive();
     public abstract void setActive(boolean active);
 

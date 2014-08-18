@@ -186,6 +186,11 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     task.setTarget(target);
                 }
 
+                // Only sync the DR Log on Native Snapshots
+                Runnable forceDrBuffersToDisk = context.forceAllDRNodeBuffersToDisk(false);
+                if (forceDrBuffersToDisk != null)
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(forceDrBuffersToDisk);
+
                 return true;
             }
 

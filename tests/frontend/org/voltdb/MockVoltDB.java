@@ -547,6 +547,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return null;
+    }
+
+    @Override
     public SiteTracker getSiteTrackerForSnapshot() {
         return m_siteTracker;
     }
