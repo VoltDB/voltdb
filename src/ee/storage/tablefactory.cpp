@@ -63,14 +63,14 @@ Table* TableFactory::getPersistentTable(
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
             char *signature,
-            bool drEnabled,
             bool tableIsMaterialized,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly,
             int tableAllocationTargetSize,
             int tupleLimit,
-            int32_t compactionThreshold)
+            int32_t compactionThreshold,
+            bool drEnabled)
 {
     Table *table = NULL;
 

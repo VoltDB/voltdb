@@ -82,14 +82,14 @@ public:
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
         char *signature,
-        bool drEnabled,
         bool tableIsMaterialized = false,
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95);
+        int32_t compactionThreshold = 95,
+        bool drEnabled = false);
 
     /**
     * Creates an empty temp table with given name and columns.
