@@ -75,7 +75,6 @@ public:
 private:
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
-    int8_t m_clusterId;
 };
 
 class MockDRTupleStream : public DRTupleStream {

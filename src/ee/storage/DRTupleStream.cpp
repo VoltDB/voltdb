@@ -40,7 +40,6 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0),
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
 {}
 
