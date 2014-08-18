@@ -376,13 +376,13 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     catalogTable.isDRed();
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, signatureHash,
-                                                    drEnabled,
                                                     materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold);
+                                                    compactionThreshold,
+                                                    drEnabled);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
