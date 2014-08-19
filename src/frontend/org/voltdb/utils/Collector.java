@@ -103,18 +103,21 @@ public class Collector {
         int days = 13;
 
         @Option(desc = "the voltdbroot path")
-        String voltdbroot = null;
+        String voltdbroot = "";
 
         @Option
-        boolean copyToVEM;
+        boolean calledFromVEM = false;
 
         @Option
-        boolean fileInfoOnly;
+        boolean copyToVEM=false;
+
+        @Option
+        boolean fileInfoOnly=false;
 
         @Override
         public void validate() {
             if (days < 0) exitWithMessageAndUsage("days must be >= 0");
-            if (voltdbroot == null) exitWithMessageAndUsage("voltdbroot cannot be null");
+            if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
         }
     }
 
@@ -134,9 +137,7 @@ public class Collector {
         m_dryRun = config.dryrun;
         m_skipHeapDump = config.skipheapdump;
         m_daysOfFileToCollect = config.days;
-
-        // arguments only used when Collector is called from VEM
-        m_calledFromVEM = true;
+        m_calledFromVEM = config.calledFromVEM;
 
         // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
         // so the resulting file is easier to be located and copied to VEM
