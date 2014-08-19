@@ -480,6 +480,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
                                            catalog::Table const &catalogTable,
                                            std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream());
+
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////
