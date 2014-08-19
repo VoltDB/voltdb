@@ -199,9 +199,12 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
 
+    @Override
     abstract public void deliver(VoltMessage message);
 
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
+
+    abstract public void setMaxSeenUniqueId(final long maxSeenUniqueId);
 }

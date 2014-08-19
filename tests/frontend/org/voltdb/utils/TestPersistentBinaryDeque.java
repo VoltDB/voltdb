@@ -38,13 +38,15 @@ import java.util.TreeSet;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 
 public class TestPersistentBinaryDeque {
 
     private final static File TEST_DIR = new File("/tmp/" + System.getProperty("user.name"));
+    private final static VoltLogger logger = new VoltLogger("EXPORT");
 
     private static final String TEST_NONCE = "pbd_nonce";
 
@@ -105,7 +107,7 @@ public class TestPersistentBinaryDeque {
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 4);
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
 
         listing = getSortedDirectoryListing();
@@ -113,7 +115,7 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
-            public ByteBuffer parse(ByteBuffer b) {
+            public ByteBuffer parse(BBContainer bbc) {
                 return ByteBuffer.allocate(0);
             }
 
@@ -134,7 +136,7 @@ public class TestPersistentBinaryDeque {
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 0);
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
 
         listing = getSortedDirectoryListing();
@@ -142,7 +144,7 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
-            public ByteBuffer parse(ByteBuffer b) {
+            public ByteBuffer parse(BBContainer bbc) {
                 fail();
                 return null;
             }
@@ -176,7 +178,7 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -184,7 +186,8 @@ public class TestPersistentBinaryDeque {
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
-            public ByteBuffer parse(ByteBuffer b) {
+            public ByteBuffer parse(BBContainer bbc) {
+                ByteBuffer b = bbc.b();
                 if (b.getLong(0) != m_objectsParsed) {
                     System.out.println("asd");
                 }
@@ -243,7 +246,7 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -251,7 +254,8 @@ public class TestPersistentBinaryDeque {
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
-            public ByteBuffer parse(ByteBuffer b) {
+            public ByteBuffer parse(BBContainer bbc) {
+                ByteBuffer b = bbc.b();
                 assertEquals(b.getLong(0), m_objectsParsed);
                 assertEquals(b.remaining(), 1024 * 1024 * 2 );
                 if (b.getLong(0) == 45) {
@@ -409,7 +413,7 @@ public class TestPersistentBinaryDeque {
         m_pbd.sync();
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
         ByteBuffer defaultBuffer = defaultBuffer();
         //Now poll all of it and make sure the data is correct
@@ -431,7 +435,7 @@ public class TestPersistentBinaryDeque {
         System.out.println("Running testInvalidDirectory");
         m_pbd.close();
         try {
-            m_pbd = new PersistentBinaryDeque( "foo", new File("/usr/bin"));
+            m_pbd = new PersistentBinaryDeque( "foo", new File("/usr/bin"), logger);
         } catch (IOException e) {
             return;
         }
@@ -449,7 +453,7 @@ public class TestPersistentBinaryDeque {
         assertTrue(toDelete.exists());
         assertTrue(toDelete.delete());
         try {
-            m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR);
+            m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
         } catch (IOException e) {
             return;
         }
@@ -564,23 +568,23 @@ public class TestPersistentBinaryDeque {
     public void testOverlappingNonces() throws Exception {
         System.out.println("Running testOverlappingNonces");
         for (int i = 0; i < 20; i++) {
-            PersistentBinaryDeque pbd = new PersistentBinaryDeque(Integer.toString(i), TEST_DIR);
+            PersistentBinaryDeque pbd = new PersistentBinaryDeque(Integer.toString(i), TEST_DIR, logger);
             pbd.offer(defaultContainer());
             pbd.close();
         }
 
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque("1", TEST_DIR);
+        PersistentBinaryDeque pbd = new PersistentBinaryDeque("1", TEST_DIR, logger);
         pbd.close();
     }
 
     @Test
     public void testNonceWithDots() throws Exception {
         System.out.println("Running testNonceWithDots");
-        PersistentBinaryDeque pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        PersistentBinaryDeque pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR, logger);
         pbd.offer(defaultContainer());
         pbd.close();
 
-        pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR, logger);
         BBContainer bb = pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         try {
             ByteBuffer defaultBuffer = defaultBuffer();
@@ -605,7 +609,7 @@ public class TestPersistentBinaryDeque {
         m_pbd.sync();
         m_pbd.close();
 
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
         int cnt = m_pbd.getNumObjects();
         assertEquals(cnt, 96);
 
@@ -636,7 +640,7 @@ public class TestPersistentBinaryDeque {
         System.out.println("Running testOfferCloseReopenOfferSmall");
         final String SMALL_TEST_NONCE = "asmall_pbd_nonce";
 
-        PersistentBinaryDeque small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        PersistentBinaryDeque small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
         //Keep in 1 segment.
         for (int ii = 0; ii < 10; ii++) {
             small_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(ii)));
@@ -650,7 +654,7 @@ public class TestPersistentBinaryDeque {
         System.gc();
         System.runFinalization();
 
-        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
         int cnt = small_pbd.getNumObjects();
         assertEquals(cnt, 10);
 
@@ -670,7 +674,7 @@ public class TestPersistentBinaryDeque {
         assertEquals(3, names.size());
         assertTrue(names.first().equals("asmall_pbd_nonce.0.pbd"));
 
-        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR);
+        small_pbd = new PersistentBinaryDeque(SMALL_TEST_NONCE, TEST_DIR, logger);
         //Now poll all of it and make sure the data is correct dont poll everything out.
         for (int ii = 0; ii < 10; ii++) {
             ByteBuffer defaultBuffer = getFilledSmallBuffer(ii);
@@ -700,7 +704,7 @@ public class TestPersistentBinaryDeque {
         m_pbd = null;
         System.gc();
         System.runFinalization();
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
         int cnt = m_pbd.getNumObjects();
         assertEquals(cnt, 96);
         for (int ii = 96; ii < 192; ii++) {
@@ -730,7 +734,7 @@ public class TestPersistentBinaryDeque {
         assertTrue(names.first().equals("pbd_nonce.3.pbd"));
 
         //Reload
-        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR);
+        m_pbd = new PersistentBinaryDeque(TEST_NONCE, TEST_DIR, logger);
         cnt = m_pbd.getNumObjects();
         assertEquals(cnt, 96);
         //Expect just the current write segment hole should be deleted.
@@ -797,7 +801,7 @@ public class TestPersistentBinaryDeque {
             TEST_DIR.delete();
         }
         TEST_DIR.mkdir();
-        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR );
+        m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
     }
 
     @After

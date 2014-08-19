@@ -47,11 +47,12 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+    private long m_maxSeenUniqueId = UniqueIdGenerator.makeZero(MpInitiator.MP_INIT_PID);
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -117,7 +118,7 @@ public class MpPromoteAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Long> start()
+    public Future<Pair<Long, Long>> start()
     {
         try {
             prepareForFaultRecovery();
@@ -167,6 +168,7 @@ public class MpPromoteAlgo implements RepairAlgo
             if (response.getTxnId() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
+            m_maxSeenUniqueId = Math.max(m_maxSeenUniqueId, response.getUniqueId());
 
             // Step 2: track hashinator versions
 
@@ -251,7 +253,7 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.set(m_maxSeenTxnId);
+        m_promotionResult.set(Pair.of(m_maxSeenTxnId, m_maxSeenUniqueId));
     }
 
     //

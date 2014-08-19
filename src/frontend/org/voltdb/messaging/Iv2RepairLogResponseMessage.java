@@ -38,6 +38,11 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private long m_handle = Long.MIN_VALUE;
     private long m_txnId;
 
+    /*
+     * The largest seen unique id from the MPI
+     */
+    private long m_uniqueId = Long.MIN_VALUE;
+
     // Only set when sequence is 0
     private long m_hashinatorVersion = Long.MIN_VALUE;
 
@@ -71,7 +76,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
-            Pair<Long, byte[]> versionedHashinatorConfig)
+            Pair<Long, byte[]> versionedHashinatorConfig,
+            long uniqueId)
     {
         super();
         m_requestId = requestId;
@@ -79,6 +85,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = ofTotal;
         m_handle = spHandle;
         m_txnId = txnId;
+        m_uniqueId = uniqueId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
         m_hashinatorConfig = versionedHashinatorConfig.getSecond();
     }
@@ -105,6 +112,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public long getUniqueId() {
+        return m_uniqueId;
     }
 
     public VoltMessage getPayload()
@@ -135,6 +146,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
+        msgsize += 8; // uniqueId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }
@@ -155,6 +167,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
         buf.putLong(m_txnId);
+        buf.putLong(m_uniqueId);
 
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
@@ -181,6 +194,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
         m_txnId = buf.getLong();
+        m_uniqueId = buf.getLong();
 
         // going inception.
         // The first message in the repair log response stream is always a null
@@ -213,6 +227,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(m_handle);
         sb.append(" TXNID: ");
         sb.append(m_txnId);
+        sb.append(" UNIQUEID: ");
+        sb.append(m_uniqueId);
         sb.append(" PAYLOAD: ");
         if (m_payload == null) {
             sb.append("null");

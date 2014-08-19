@@ -408,7 +408,9 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_INSERT);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -577,8 +579,10 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DR_RECORD_DELETE);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DR_RECORD_INSERT);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
     if (uq) {
@@ -703,7 +707,9 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_DELETE);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_DELETE);
     }
 
     if (fallible) {

@@ -768,6 +768,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
+            final long spUniqueId,
             final long undoToken)
     {
         // big endian, not direct
@@ -806,6 +807,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
+        m_data.putLong(spUniqueId);
         m_data.putLong(undoToken);
         m_data.putInt(numFragmentIds);
         for (int i = 0; i < numFragmentIds; ++i) {
@@ -836,10 +838,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
+            final long spUniqueId,
             final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
-                spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+                spHandle, lastCommittedSpHandle, uniqueId, spUniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
 
         while (true) {
@@ -911,7 +914,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+            final long lastCommittedSpHandle, final long uniqueId, final long spUniqueId,
+            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -923,6 +927,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
+        m_data.putLong(spUniqueId);
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
         m_data.putInt(shouldDRStream ? 1 : 0);

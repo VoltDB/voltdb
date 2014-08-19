@@ -257,6 +257,7 @@ public class TestRepairLog
     public void testFuzz()
     {
         TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator uig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         RepairLog dut = new RepairLog();
@@ -265,7 +266,7 @@ public class TestRepairLog
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
-            msg.setSpHandle(sphandle.getTxnId());
+            msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 dut.deliver(msg);

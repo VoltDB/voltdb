@@ -40,6 +40,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class RandomMsgGenerator
 {
     TxnEgo m_mpiTxnEgo;
+    UniqueIdGenerator m_mpiGenerator = new UniqueIdGenerator(MpInitiator.MP_INIT_PID, 0);
     Random m_rand;
     boolean m_mpInProgress = false;
     boolean m_currentMpReadOnly = false;

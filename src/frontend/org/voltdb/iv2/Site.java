@@ -211,6 +211,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Advanced in complete transaction.
     long m_lastCommittedSpHandle = 0;
     long m_spHandleForSnapshotDigest = 0;
+    long m_spUniqueIdForSnapshotDigest = 0;
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
@@ -252,6 +253,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public long getSpHandleForSnapshotDigest() {
             return m_spHandleForSnapshotDigest;
+        }
+
+        @Override
+        public long getSpUniqueIdForSnapshotDigest() {
+            return m_spUniqueIdForSnapshotDigest;
         }
 
         @Override
@@ -370,6 +376,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
         }
+
+        @Override
+        public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            return Site.this.m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
@@ -401,6 +413,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_startupConfig = new StartupConfig(context.catalog, context.m_uniqueId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
+        m_spUniqueIdForSnapshotDigest = UniqueIdGenerator.makeZero(partitionId);
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
@@ -754,7 +767,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, String clusterName, String databaseName,
             String tableName, VoltTable data,
             boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
     {
@@ -771,11 +784,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, spHandle, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
+        return loadTable(txnId, spHandle, uniqueId, spUniqueId, table.getRelativeIndex(), data, returnUniqueViolations, shouldDRStream, undo);
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, int tableId,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId,
             VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo)
     {
@@ -783,6 +796,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_ee.loadTable(tableId, data, txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
+                uniqueId, spUniqueId,
                 returnUniqueViolations,
                 shouldDRStream,
                 undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
@@ -802,14 +816,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setSpHandleForSnapshotDigest(long spHandle)
+    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
     {
+        assert(spUniqueId != 0);
         // During rejoin, the spHandle is updated even though the site is not executing the tasks. If it's a live
         // rejoin, all logged tasks will be replayed. So the spHandle may go backward and forward again. It should
         // stop at the same point after replay.
-        if (m_spHandleForSnapshotDigest < spHandle) {
-            m_spHandleForSnapshotDigest = spHandle;
+        m_spHandleForSnapshotDigest = Math.max(m_spHandleForSnapshotDigest, spHandle);
+
+        if (UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId) != m_partitionId) {
+            VoltDB.crashLocalVoltDB("Mismatch SpUniqueId partitiond id " +
+                                    m_partitionId + ", " +
+                                    UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId) +
+                                    " id is " + spUniqueId, true, null);
         }
+        m_spUniqueIdForSnapshotDigest = Math.max(m_spUniqueIdForSnapshotDigest, spUniqueId);
     }
 
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
@@ -824,23 +845,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    private void setLastCommittedSpHandle(long spHandle)
+    private void setLastCommittedSpHandleAndSpUniqueId(long spHandle, long spUniqueId)
     {
-        if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
+        if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != m_partitionId) {
             VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
                                     TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
                                     TxnEgo.getPartitionId(spHandle), true, null);
         }
         m_lastCommittedSpHandle = spHandle;
-        setSpHandleForSnapshotDigest(m_lastCommittedSpHandle);
+        setSpHandleAndSpUniqueIdForSnapshotDigest(m_lastCommittedSpHandle, spUniqueId);
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, List<UndoAction> undoLog)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, long spUniqueId, List<UndoAction> undoLog)
     {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
-            setLastCommittedSpHandle(spHandle);
+            setLastCommittedSpHandleAndSpUniqueId(spHandle, spUniqueId);
         }
 
         //Any new txnid will create a new undo quantum, including the same txnid again
@@ -1082,6 +1103,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long txnId,
                                             long spHandle,
                                             long uniqueId,
+                                            long spUniqueId,
                                             boolean readOnly)
             throws EEException
     {
@@ -1094,6 +1116,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
+                spUniqueId,
                 readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken());
     }
 

@@ -63,6 +63,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             String file_nonce,
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
+                                            Map<Integer, Long> partitionUniqueIds,
                                             JSONObject jsData,
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
@@ -71,7 +72,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
-        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData, context,
+        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, jsData, context,
                 result, exportSequenceNumbers, tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
     }
 
@@ -79,6 +80,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
+                                                    Map<Integer, Long> partitionUniqueIds,
                                                     JSONObject jsData,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
@@ -141,7 +143,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
+        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, context,
                 exportSequenceNumbers, tracker, hashinatorData, timestamp,
                 newPartitionCount, tables, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks);
@@ -151,6 +153,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final String file_nonce,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
+                                                  final Map<Integer, Long> partitionUniqueIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                                   final SiteTracker tracker,
@@ -171,7 +174,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, context, exportSequenceNumbers,
+                        txnId, partitionTransactionIds, partitionUniqueIds, context, exportSequenceNumbers,
                         hashinatorData,
                         timestamp,
                         newPartitionCount);
@@ -185,6 +188,11 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
                     task.setTarget(target);
                 }
+
+                // Only sync the DR Log on Native Snapshots
+                Runnable forceDrBuffersToDisk = context.forceAllDRNodeBuffersToDisk(false);
+                if (forceDrBuffersToDisk != null)
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(forceDrBuffersToDisk);
 
                 return true;
             }
@@ -250,6 +258,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     static void createFileBasedCompletionTasks(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Long> partitionUniqueIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             HashinatorSnapshotData hashinatorData,
@@ -266,6 +275,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 context.getHostId(),
                 exportSequenceNumbers,
                 partitionTransactionIds,
+                partitionUniqueIds,
                 instId,
                 timestamp,
                 newPartitionCount);

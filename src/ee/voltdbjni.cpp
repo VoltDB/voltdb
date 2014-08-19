@@ -407,6 +407,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
     jbyteArray serialized_table, jlong txnId, jlong spHandle, jlong lastCommittedSpHandle,
+    jlong uniqueId, jlong spUniqueId,
     jboolean returnUniqueViolations, jboolean shouldDRStream, jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -430,7 +431,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
-                                             spHandle, lastCommittedSpHandle,
+                                             spHandle, lastCommittedSpHandle, uniqueId, spUniqueId,
                                              returnUniqueViolations, shouldDRStream);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
@@ -550,6 +551,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jlong spHandle,
         jlong lastCommittedSpHandle,
         jlong uniqueId,
+        jlong spUniqueId,
         jlong undoToken)
 {
     //VOLT_DEBUG("nativeExecutePlanFragments() start");
@@ -586,6 +588,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     spHandle,
                                                     lastCommittedSpHandle,
                                                     uniqueId,
+                                                    spUniqueId,
                                                     undoToken);
 
         if (failures > 0) {

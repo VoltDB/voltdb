@@ -460,6 +460,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
+                                            long spUniqueId,
                                             long undoQuantumToken) throws EEException
     {
         try {
@@ -471,7 +472,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_logDuration = 1000;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, spUniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -492,6 +493,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
+                                                            long spUniqueId,
                                                             long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
@@ -501,7 +503,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+        long lastCommittedSpHandle, long uniqueId, long spUniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -697,7 +699,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long spUniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**
@@ -713,7 +715,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long spUniqueId,
+            long undoToken);
 
     /**
      * Serialize the result temporary table.

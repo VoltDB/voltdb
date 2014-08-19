@@ -249,6 +249,10 @@ public class UniqueIdGenerator {
         return lastUniqueId;
     }
 
+    public static long makeZero(int partitionId) {
+        return makeIdFromComponents(VOLT_EPOCH, 0, partitionId);
+    }
+
     public static long makeIdFromComponents(long ts, long seqNo, long partitionId) {
         // compute the time in millis since VOLT_EPOCH
         long uniqueId = ts - VOLT_EPOCH;
@@ -298,8 +302,8 @@ public class UniqueIdGenerator {
      * @param uniqueId The unique id value to examine.
      * @return The site id embedded within the unique id.
      */
-    public static long getPartitionIdFromUniqueId(long uniqueId) {
-        return uniqueId & PARTITIONID_MAX_VALUE;
+    public static int getPartitionIdFromUniqueId(long uniqueId) {
+        return (int)(uniqueId & PARTITIONID_MAX_VALUE);
     }
 
     public static long getSequenceNumberFromUniqueId(long uniqueId) {

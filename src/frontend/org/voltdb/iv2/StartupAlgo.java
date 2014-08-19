@@ -35,7 +35,7 @@ public class StartupAlgo implements RepairAlgo
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
 
     /**
      * Setup a new StartupAlgo but don't take any action to take responsibility.
@@ -53,7 +53,7 @@ public class StartupAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Long> start()
+    public Future<Pair<Long, Long>> start()
     {
         try {
             prepareForStartup();
@@ -82,7 +82,10 @@ public class StartupAlgo implements RepairAlgo
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
-        m_promotionResult.set(TxnEgo.makeZero(m_partitionId).getTxnId());
+        m_promotionResult.set(
+                Pair.of(
+                    TxnEgo.makeZero(m_partitionId).getTxnId(),
+                    new UniqueIdGenerator(m_partitionId, 0).getNextUniqueId()));
     }
 
     /** Process a new repair log response */

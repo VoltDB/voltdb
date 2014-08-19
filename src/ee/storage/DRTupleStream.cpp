@@ -40,8 +40,21 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_partitionId(0)
+      m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
 {}
+
+void DRTupleStream::setSecondaryCapacity(size_t capacity) {
+    assert (capacity > 0);
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
+    {
+        throwFatalException("setSecondaryCapacity only callable before "
+                            "TupleStreamBase is used");
+    }
+    m_secondaryCapacity = capacity;
+}
+
+const int64_t PARTITION_ID_MASK = (1 << 14) - 1;
 
 /*
  * If SpHandle represents a new transaction, commit previous data.
@@ -54,9 +67,14 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   char *tableHandle,
                                   int64_t txnId,
                                   int64_t spHandle,
+                                  int64_t uniqueId,
+                                  int64_t spUniqueId,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
+    assert((spUniqueId & PARTITION_ID_MASK) == m_partitionId);
+    assert((spHandle & PARTITION_ID_MASK) == m_partitionId);
+    assert((lastCommittedSpHandle & PARTITION_ID_MASK) == m_partitionId);
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
@@ -73,7 +91,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -86,10 +104,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     if (m_currBlock->remaining() < tupleMaxLength) {
         extendBufferChain(tupleMaxLength);
     }
-
-    //Set start sp handle if necessary
-    m_currBlock->startSpHandle(std::min(m_currBlock->startSpHandle(), spHandle));
-    m_currBlock->lastSpHandle(spHandle);
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
@@ -153,28 +167,39 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
+    if ((block->startSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+        throwFatalException("oops");
+    }
+    if ((block->lastSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+        throwFatalException("oops");
+    }
+//    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
+//    std::cout << "Pushing block with start " << (block->startSpUniqueId() & PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & PARTITION_ID_MASK) << std::endl;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
-//    std::cout << "Beginning txn " << txnId << " spHandle " << std::endl;
+void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
+//    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
+//    std::cout << "Beginning txn uniqueId " << (uniqueId & PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
+
+     m_currBlock->recordLastBeginTxnOffset();
 
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
 
-     //Set start sp handle if necessary
-     m_currBlock->startSpHandle(std::min(m_currBlock->startSpHandle(), spHandle));
+     //Set start sp handle if necessary, also sneakily updates last uniqueId
+     m_currBlock->startSpUniqueId(spUniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
-     io.writeLong(txnId);
-     io.writeLong(spHandle);
+     io.writeLong(uniqueId);
+     io.writeLong(spUniqueId);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), BEGIN_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
@@ -183,8 +208,8 @@ void DRTupleStream::beginTransaction(int64_t txnId, int64_t spHandle) {
      m_uso += io.position();
 }
 
-void DRTupleStream::endTransaction(int64_t spHandle) {
-//    std::cout << "Ending txn spHandle " << spHandle << std::endl;
+void DRTupleStream::endTransaction(int64_t spUniqueId) {
+//    std::cout << "Ending txn spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -193,19 +218,45 @@ void DRTupleStream::endTransaction(int64_t spHandle) {
          extendBufferChain(END_RECORD_SIZE);
      }
 
-     //Set last committed SP handle, may need to be reset on rollback
-     m_currBlock->lastSpHandle(spHandle);
-     m_currBlock->lastCommittedSpHandle(spHandle);
-
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
-     io.writeLong(spHandle);
+     io.writeLong(spUniqueId);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
      m_uso += io.position();
+}
+
+// If partial transaction is going to span multiple buffer, first time move it to
+// the next buffer, the next time move it to a 45 megabytes buffer, then after throw
+// an exception and rollback.
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+    if (sb && sb->remaining() < minLength   /* remain space is not big enough */
+            && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
+            && sb->lastDRBeginTxnOffset() != sb->offset() /* current txn is not a DR begin txn */) {
+        size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
+        if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
+            switch (sb->type()) {
+                case voltdb::NORMAL_STREAM_BLOCK:
+                {
+                    blockSize = m_secondaryCapacity;
+                    break;
+                }
+                case voltdb::LARGE_STREAM_BLOCK:
+                {
+                    blockSize = 0;
+                    break;
+                }
+            }
+        }
+        if (blockSize != 0) {
+            uso -= partialTxnLength;
+        }
+        return true;
+    }
+    return false;
 }
