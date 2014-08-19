@@ -61,6 +61,10 @@ const int BUFFER_BEGIN_SIZE = BUFFER_SIZE - MAGIC_END_SIZE;
 // roughly 22.5k
 const int LARGE_BUFFER_SIZE = 21375;
 
+static int64_t addPartitionId(int64_t value) {
+    return (value << 14) | 42;
+}
+
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
@@ -82,7 +86,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper.configure(1);
+        m_wrapper.configure(42);
 
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + 8);
@@ -106,9 +110,11 @@ public:
             int value = rand();
             m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
         }
+        lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
+        currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, *m_tuple,
+                               currentSpHandle, currentSpHandle, currentSpHandle, *m_tuple,
                                DR_RECORD_INSERT);
     }
 
@@ -189,7 +195,7 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper.periodicFlush(-1, 2);
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -207,13 +213,13 @@ TEST_F(DRTupleStreamTest, BasicOps)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 9);
+    m_wrapper.periodicFlush(-1, addPartitionId(9));
 
     for (int i = 10; i < 20; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 19);
+    m_wrapper.periodicFlush(-1, addPartitionId(19));
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -239,13 +245,13 @@ TEST_F(DRTupleStreamTest, FarFutureFlush)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 99);
+    m_wrapper.periodicFlush(-1, addPartitionId(99));
 
     for (int i = 100; i < 110; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper.periodicFlush(-1, 130);
+    m_wrapper.periodicFlush(-1, addPartitionId(130));
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -346,7 +352,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
     ASSERT_TRUE(m_topend.receivedDRBuffer);
 
     // Now, flush the buffer with the tick
-    m_wrapper.periodicFlush(-1, 2);
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
 
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -376,7 +382,7 @@ TEST_F(DRTupleStreamTest, TxnSpanTwoBuffers)
     {
         appendTuple(10, 11);
     }
-    m_wrapper.periodicFlush(-1, 11);
+    m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -410,7 +416,7 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
         appendTuple(tuples_to_fill_buffer, tuples_to_fill_buffer + 1);
     }
 
-    m_wrapper.periodicFlush(-1, tuples_to_fill_buffer + 1);
+    m_wrapper.periodicFlush(-1, addPartitionId(tuples_to_fill_buffer + 1));
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -473,7 +479,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     m_wrapper.rollbackTo(mark);
 
     // so flush and make sure we got something sane
-    m_wrapper.periodicFlush(-1, 1);
+    m_wrapper.periodicFlush(-1, addPartitionId(1));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
@@ -511,7 +517,7 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(2, 3);
-    m_wrapper.periodicFlush(-1, 3);
+    m_wrapper.periodicFlush(-1, addPartitionId(3));
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -539,7 +545,7 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
     // add another and roll it back and flush
     size_t mark = appendTuple(10, 11);
     m_wrapper.rollbackTo(mark);
-    m_wrapper.periodicFlush(-1, 11);
+    m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
@@ -574,7 +580,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
         }
     }
     m_wrapper.rollbackTo(mark);
-    m_wrapper.periodicFlush(-1, 11);
+    m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();

@@ -70,6 +70,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Long> partitionUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -158,7 +159,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
+        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, context,
                 exportSequenceNumbers, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
@@ -167,6 +168,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final String file_nonce,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
+                                                  final Map<Integer, Long> partitionUniqueIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                                   final long timestamp,
@@ -180,7 +182,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             public Boolean call() throws Exception
             {
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, context, exportSequenceNumbers, null, timestamp,
+                        txnId, partitionTransactionIds, partitionUniqueIds, context, exportSequenceNumbers, null, timestamp,
                         context.getNumberOfPartitions());
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {

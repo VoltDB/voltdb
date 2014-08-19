@@ -32,7 +32,7 @@ const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JA
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
-    //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
+    //Version(1), type(1), uniqueId(8), spUniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
     //Version(1), type(1), sphandle(8), checksum(4)
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
@@ -59,13 +59,15 @@ public:
                        char *tableHandle,
                        int64_t txnId,
                        int64_t spHandle,
+                       int64_t uniqueId,
+                       int64_t spUniqueId,
                        TableTuple &tuple,
                        DRRecordType type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t txnId, int64_t spHandle);
-    void endTransaction(int64_t spHandle);
+    void beginTransaction(int64_t uniqueId, int64_t spUniqueId);
+    void endTransaction(int64_t spUniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
@@ -82,6 +84,8 @@ public:
                            char *tableHandle,
                            int64_t txnId,
                            int64_t spHandle,
+                           int64_t uniqueId,
+                           int64_t spUniqueId,
                            TableTuple &tuple,
                            DRRecordType type) {
         return 0;

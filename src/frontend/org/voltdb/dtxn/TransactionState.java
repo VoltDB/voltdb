@@ -51,6 +51,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
     // IZZY: make me protected/private
     public final long m_spHandle;
+    public final long m_spUniqueId;
     private ArrayList<UndoAction> m_undoLog;
 
     /**
@@ -65,6 +66,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     {
         super(notice.getTxnId(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_spHandle = notice.getSpHandle();
+        m_spUniqueId = notice.getSpUniqueId();
         m_mbox = mbox;
         m_notice = notice;
         m_isReadOnly = notice.isReadOnly();

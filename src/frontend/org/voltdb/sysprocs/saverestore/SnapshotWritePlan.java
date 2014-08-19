@@ -135,6 +135,7 @@ public abstract class SnapshotWritePlan
     abstract public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Long> partitionUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,

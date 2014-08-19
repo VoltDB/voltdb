@@ -766,7 +766,7 @@ public class ProcedureRunner {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle,
+            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId, m_txnState.m_spUniqueId,
                              clusterName, databaseName,
                              tableName, data, returnUniqueViolations, shouldDRStream, false);
         }
@@ -1412,6 +1412,7 @@ public class ProcedureRunner {
            m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
+           m_txnState.m_spUniqueId,
            m_isReadOnly);
     }
 }

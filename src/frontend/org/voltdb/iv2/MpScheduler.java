@@ -542,4 +542,9 @@ public class MpScheduler extends Scheduler
         }
         return null;
     }
+
+    @Override
+    public void setMaxSeenUniqueId(final long maxSeenUniqueId) {
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(maxSeenUniqueId);
+    }
 }

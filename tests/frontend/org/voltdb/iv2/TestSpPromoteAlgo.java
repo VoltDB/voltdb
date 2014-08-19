@@ -302,6 +302,7 @@ public class TestSpPromoteAlgo
         // at random points to all but one.  Validate that promotion repair
         // results in identical, correct, repair streams to all replicas.
         TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator uig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         boolean[] stops = new boolean[3];
@@ -316,7 +317,7 @@ public class TestSpPromoteAlgo
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
-            msg.setSpHandle(sphandle.getTxnId());
+            msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {
@@ -345,7 +346,7 @@ public class TestSpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
-        Future<Long> result = dut.start();
+        Future<Pair<Long, Long>> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());

@@ -119,10 +119,10 @@ public class PartitionDRGateway {
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}
-    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
+    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, long spUniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public void onBinaryDR(int partitionId, long startSpHandle, long lastSpHandle, long lastCommittedSpHandle, ByteBuffer buf) {
+    public void onBinaryDR(int partitionId, long startSpUniqueId, long lastSpUniqueId, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -147,9 +147,8 @@ public class PartitionDRGateway {
 
     public static synchronized void pushDRBuffer(
             int partitionId,
-            long startSpHandle,
-            long lastSpHandle,
-            long lastCommittedSpHandle,
+            long startSpUniqueId,
+            long lastSpUniqueId,
             ByteBuffer buf) {
         if (logDebug) {
             System.out.println("Received DR buffer size " + buf.remaining());
@@ -237,7 +236,7 @@ public class PartitionDRGateway {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        pdrg.onBinaryDR(partitionId,  startSpHandle, lastSpHandle, lastCommittedSpHandle, buf);
+        pdrg.onBinaryDR(partitionId,  startSpUniqueId, lastSpUniqueId, buf);
     }
 
     public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync) {
