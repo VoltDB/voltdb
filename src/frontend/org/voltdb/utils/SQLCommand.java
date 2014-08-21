@@ -74,6 +74,16 @@ public class SQLCommand
     private static final Pattern Subquery =
             Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+
+    private static String quotedIdPattern = "\"(?:[^\"]|\"\")+\""; // double-quoted ID, " escaped with ""
+                                                                   // question: is 0-length name allowed?
+    private static String unquotedIdPattern = "[a-z][a-z0-9_]*";
+    private static String idPattern = "(?:" + unquotedIdPattern + "|" + quotedIdPattern + ")";
+
+    // This pattern consumes no input itself but ensures that the next character is either
+    // whitespace or a double quote.
+    private static String followedBySpaceOrQuote = "(?=\\\"|\\s)";
+
     // Ugh, these are all fragile.
     private static final Pattern CreateView =
         Pattern.compile(
@@ -145,6 +155,18 @@ public class SQLCommand
                 ")" + // end group 2
                 "delete",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+    private static String optionalColumnList = "(?:\\((?:" + idPattern + "|[^\\\")])+\\))?";
+    private static final Pattern InsertIntoSelect =
+            Pattern.compile(
+                    "(" + // start capturing group
+                    "\\s*" + // leading whitespace
+                    "insert\\s+into" + followedBySpaceOrQuote + "\\s*" +
+                    idPattern + "\\s*" +   // <tablename>
+                    optionalColumnList +   // (column, ")))))", ...)
+                    "[(\\s]*" +            // 0 or more spaces/left parenthesis
+                    ")" +                  // end capturing group
+                    "select",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -178,11 +200,11 @@ public class SQLCommand
         }
 
         /*
-         * Mark any parser string keyword matches by interposing the #SQL_PARDER_STRING_KEYWORD#
+         * Mark any parser string keyword matches by interposing the #SQL_PARSER_STRING_KEYWORD#
          * tag. Which is later stripped at the end of this procedure. This tag is here to
          * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
          * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
-         * is prefixed with the #SQL_PARDER_STRING_KEYWORD#
+         * is prefixed with the #SQL_PARSER_STRING_KEYWORD#
          *
          * For example
          *     'explain select foo from bar'
@@ -225,6 +247,7 @@ public class SQLCommand
         query = CreateProcedureInsert.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEINSERT");
         query = CreateProcedureUpdate.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEUPDATE");
         query = CreateProcedureDelete.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEDELETE");
+        query = InsertIntoSelect.matcher(query).replaceAll("$1SQL_PARSER_SAME_INSERTINTOSELECT");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
@@ -232,6 +255,7 @@ public class SQLCommand
         query = query.replaceAll("SQL_PARSER_SAME_CREATEINSERT", "insert");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEUPDATE", "update");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEDELETE", "delete");
+        query = query.replaceAll("SQL_PARSER_SAME_INSERTINTOSELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
