@@ -63,13 +63,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getUniqueId(), notice.getInitiatorHSId());
-        m_spHandle = notice.getSpHandle();
-        m_mbox = mbox;
-        m_notice = notice;
-        m_isReadOnly = notice.isReadOnly();
-        m_beginUndoToken = Site.kInvalidUndoToken;
-        m_isForReplay = notice.isForReplay();
+        this(mbox, notice, notice.isReadOnly());
     }
 
     /**
@@ -89,8 +83,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         m_isReadOnly = readOnly;
         m_beginUndoToken = Site.kInvalidUndoToken;
         m_isForReplay = notice.isForReplay();
-
-        assert(m_isReadOnly == true);
     }
 
 
