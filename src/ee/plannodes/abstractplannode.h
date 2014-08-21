@@ -205,6 +205,10 @@ protected:
 
     virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
 
+    // Common code for use by the public generateTupleSchema() overload
+    // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
+    static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
+
     static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,

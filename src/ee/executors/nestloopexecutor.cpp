@@ -81,6 +81,8 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    assert(m_tmpOutputTable);
+
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
         Table* inner_table = node->getInputTable(1);
@@ -102,12 +104,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     assert(node);
     assert(node->getInputTableCount() == 2);
 
-    Table* output_table_ptr = node->getOutputTable();
-    assert(output_table_ptr);
-
     // output table must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
-    assert(output_table);
+    assert(m_tmpOutputTable);
 
     Table* outer_table = node->getInputTable();
     assert(outer_table);
@@ -167,10 +165,11 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {
+        VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
-        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, output_table);
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable);
     } else {
-        join_tuple = output_table->tempTuple();
+        join_tuple = m_tmpOutputTable->tempTuple();
     }
 
     bool earlyReturned = false;
@@ -214,7 +213,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                                 break;
                             }
                         } else {
-                            output_table->insertTupleNonVirtual(join_tuple);
+                            m_tmpOutputTable->insertTempTuple(join_tuple);
                             pmp.countdownProgress();
                         }
                     }
@@ -240,7 +239,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                         earlyReturned = true;
                     }
                 } else {
-                    output_table->insertTupleNonVirtual(join_tuple);
+                    m_tmpOutputTable->insertTempTuple(join_tuple);
                     pmp.countdownProgress();
                 }
             }

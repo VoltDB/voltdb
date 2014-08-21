@@ -221,9 +221,6 @@ public:
         return bytes;
     }
 
-<<<<<<< HEAD
-    void setNValue(const int idx, voltdb::NValue value) const;
-=======
     /*
      * This will put the NValue into this tuple at the idx-th field.
      *
@@ -233,8 +230,7 @@ public:
      * the temp string pool.  So, don't use this to update a tuple in
      * a persistent table!
      */
-    void setNValue(const int idx, voltdb::NValue value);
->>>>>>> master
+    void setNValue(const int idx, voltdb::NValue value) const;
     /*
      * Copies range of NValues from one tuple to another.
      */

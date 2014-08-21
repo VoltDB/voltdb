@@ -200,6 +200,11 @@ TupleSchema* AbstractPlanNode::generateTupleSchema() const
     // Get the effective output schema.
     // In general, this may require a search.
     const vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    return generateTupleSchema(outputSchema);
+}
+
+TupleSchema* AbstractPlanNode::generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema)
+{
     int schema_size = static_cast<int>(outputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
@@ -311,7 +316,7 @@ void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
         PlannerDomValue obj, std::vector<int>& result)
 {
     if (obj.hasNonNullKey(label)) {
-        PlannerDomValue intArray = obj.valueForKey("PARTIAL_GROUPBY_COLUMNS");
+        PlannerDomValue intArray = obj.valueForKey(label);
         for (int i = 0; i < intArray.arrayLen(); i++) {
             result.push_back(intArray.valueAtIndex(i).asInt());
         }

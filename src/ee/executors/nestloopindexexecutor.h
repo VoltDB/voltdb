@@ -76,7 +76,6 @@ class NestLoopIndexExecutor : public AbstractExecutor
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node)
-        , m_node(NULL)
         , m_indexNode(NULL)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
     { }
@@ -88,7 +87,6 @@ protected:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    NestLoopIndexPlanNode* m_node;
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
     JoinType m_joinType;

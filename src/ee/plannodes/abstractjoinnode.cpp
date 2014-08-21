@@ -113,24 +113,15 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 
     if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
-        int schema_size = outputSchemaArray.arrayLen();
-        std::vector<voltdb::ValueType> columnTypes;
-        std::vector<int32_t> columnSizes;
-        std::vector<bool> columnAllowNull(schema_size, true);
-        std::vector<bool> columnInBytes;
-
-        for (int i = 0; i < schema_size; i++) {
-            PlannerDomValue colObject = outputSchemaArray.valueAtIndex(i);
-            AbstractExpression* expr = loadExpressionFromJSONObject("EXPRESSION", colObject);
-            assert(expr);
-            columnTypes.push_back(expr->getValueType());
-            columnSizes.push_back(expr->getValueSize());
-            columnInBytes.push_back(expr->getInBytes());
-            delete expr;
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
         }
-
-        m_tupleSchemaPreAgg =
-            TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, columnInBytes);
+        m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
+    }
+    else {
+        m_tupleSchemaPreAgg = NULL;
     }
 
 }
