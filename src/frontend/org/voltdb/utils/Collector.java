@@ -26,13 +26,11 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -99,7 +97,7 @@ public class Collector {
         @Option(desc = "exclude heap dump file from collection")
         boolean skipheapdump = false;
 
-        @Option(desc = "number of days of file to collect")
+        @Option(desc = "number of days of files to collect (files included are log, crash files)")
         int days = 13;
 
         @Option(desc = "the voltdbroot path")
@@ -323,7 +321,7 @@ public class Collector {
             File varlogDir = new File("/var/log");
             if (varlogDir.canRead()) {
                 for (File file: varlogDir.listFiles()) {
-                    if (file.getName().startsWith("syslog") || file.getName().equals("dmesg")
+                    if ((file.getName().startsWith("syslog") || file.getName().equals("dmesg"))
                             && checkToIncludeFile(file)) {
                         if (file.canRead()) {
                             collectionFilesList.add(file.getCanonicalPath());
@@ -339,12 +337,9 @@ public class Collector {
     }
 
     private static boolean checkToIncludeFile(File file){
-        Date modifiedDate = new Date(file.lastModified());
-        SimpleDateFormat formatter = new SimpleDateFormat("D");
-        int modifyDay = Integer.parseInt(formatter.format(modifiedDate));
-        int currentDay = Integer.parseInt(formatter.format(Calendar.getInstance().getTime()));
-        int diff = currentDay - modifyDay;
-        return   diff <= m_daysOfFileToCollect;
+        long currentDay = System.currentTimeMillis();
+        long diff = currentDay - file.lastModified();
+        return TimeUnit.MILLISECONDS.toDays(diff) <= m_daysOfFileToCollect;
     }
 
     private static void generateCollection(List<String> paths, boolean copyToVEM) {
@@ -368,6 +363,7 @@ public class Collector {
             String collectionFilePath = rootpath + File.separator + m_prefix + timestamp + ".tgz";
             File collectionFile = new File(collectionFilePath);
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
+            String folderPath= m_prefix + timestamp + File.separator;
 
             // Collect files with paths indicated in the list
             for (String path: paths) {
@@ -394,15 +390,15 @@ public class Collector {
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    tarGenerator.queueEntry(m_prefix + timestamp + File.separator + entryPath, file);
+                    tarGenerator.queueEntry(folderPath + entryPath, file);
                 }
             }
 
             String[] sarCmd = {"bash", "-c", "sar -A"};
-            cmd(tarGenerator, sarCmd, m_prefix + timestamp + File.separator + "sardata");
+            cmd(tarGenerator, sarCmd, folderPath + "sardata");
 
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
-            cmd(tarGenerator, dmesgCmd, m_prefix + timestamp + File.separator + "dmesgdata");
+            cmd(tarGenerator, dmesgCmd, folderPath + "dmesgdata");
 
             tarGenerator.write(m_calledFromVEM ? null : System.out);
 

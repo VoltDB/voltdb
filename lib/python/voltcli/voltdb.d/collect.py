@@ -49,8 +49,8 @@
         VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
                            default = False),
-        VOLT.IntegerOption (None, '--days', 'days',
-                           'number of days of file to collect',
+        VOLT.IntegerOption(None, '--days', 'days',
+                           'number of days of files to collect (files included are log, crash files)',
                            default = 14)
     ),
     arguments = (
