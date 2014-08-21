@@ -28,6 +28,11 @@ public class ParticipantTransactionState extends TransactionState
         super(null, notice);
     }
 
+    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
+    {
+        super(null, notice, readOnly);
+    }
+
     @Override
     public boolean isSinglePartition()
     {
