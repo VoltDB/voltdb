@@ -373,7 +373,6 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1_Init(&shaCTX);
     SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
     SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
-    catalogTable.isDRed();
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, signatureHash,
                                                     materialized,
