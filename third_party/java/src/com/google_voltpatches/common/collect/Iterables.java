@@ -114,8 +114,7 @@ public final class Iterables {
    * Returns {@code true} if {@code iterable} contains any object for which {@code equals(element)}
    * is true.
    */
-  public static boolean contains(Iterable<?> iterable, @Nullable Object element)
-  {
+  public static boolean contains(Iterable<?> iterable, @Nullable Object element) {
     if (iterable instanceof Collection) {
       Collection<?> collection = (Collection<?>) iterable;
       return Collections2.safeContains(collection, element);
@@ -268,8 +267,12 @@ public final class Iterables {
   }
 
   /**
-   * Returns a string representation of {@code iterable}, with the format
-   * {@code [e1, e2, ..., en]}.
+   * Returns a string representation of {@code iterable}, with the format {@code
+   * [e1, e2, ..., en]} (that is, identical to {@link java.util.Arrays
+   * Arrays}{@code .toString(Iterables.toArray(iterable))}). Note that for
+   * <i>most</i> implementations of {@link Collection}, {@code
+   * collection.toString()} also gives the same result, but that behavior is not
+   * generally guaranteed.
    */
   public static String toString(Iterable<?> iterable) {
     return Iterators.toString(iterable.iterator());
@@ -894,12 +897,12 @@ public final class Iterables {
   /**
    * Creates an iterable with the first {@code limitSize} elements of the given
    * iterable. If the original iterable does not contain that many elements, the
-   * returned iterator will have the same behavior as the original iterable. The
+   * returned iterable will have the same behavior as the original iterable. The
    * returned iterable's iterator supports {@code remove()} if the original
    * iterator does.
    *
    * @param iterable the iterable to limit
-   * @param limitSize the maximum number of elements in the returned iterator
+   * @param limitSize the maximum number of elements in the returned iterable
    * @throws IllegalArgumentException if {@code limitSize} is negative
    * @since 3.0
    */
@@ -941,6 +944,11 @@ public final class Iterables {
         public Iterator<T> iterator() {
           return new ConsumingQueueIterator<T>((Queue<T>) iterable);
         }
+
+        @Override
+        public String toString() {
+          return "Iterables.consumingIterable(...)";
+        }
       };
     }
 
@@ -950,6 +958,11 @@ public final class Iterables {
       @Override
       public Iterator<T> iterator() {
         return Iterators.consumingIterator(iterable.iterator());
+      }
+
+      @Override
+      public String toString() {
+        return "Iterables.consumingIterable(...)";
       }
     };
   }

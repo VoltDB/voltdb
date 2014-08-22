@@ -33,7 +33,6 @@ import com.google_voltpatches.common.hash.HashFunction;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -137,59 +136,10 @@ public final class Files {
 
     @Override
     public byte[] read() throws IOException {
-      long size = file.length();
-      // some special files may return size 0 but have content
-      // read normally to be sure
-      if (size == 0) {
-        return super.read();
-      }
-
-      // can't initialize a large enough array
-      // technically, this could probably be Integer.MAX_VALUE - 5
-      if (size > Integer.MAX_VALUE) {
-        // OOME is what would be thrown if we tried to initialize the array
-        throw new OutOfMemoryError("file is too large to fit in a byte array: "
-            + size + " bytes");
-      }
-
-      // initialize the array to the current size of the file
-      byte[] bytes = new byte[(int) size];
-
       Closer closer = Closer.create();
       try {
-        InputStream in = closer.register(openStream());
-        int off = 0;
-        int read = 0;
-
-        // read until we've read size bytes or reached EOF
-        while (off < size
-            && ((read = in.read(bytes, off, (int) size - off)) != -1)) {
-          off += read;
-        }
-
-        if (off < size) {
-          // encountered EOF early; truncate the result
-          return Arrays.copyOf(bytes, off);
-        }
-
-        // otherwise, exactly size bytes were read
-
-        int b = in.read(); // check for EOF
-        if (b == -1) {
-          // EOF; the file did not change size, so return the original array
-          return bytes;
-        }
-
-        // the file got larger, so read the rest normally
-        InternalByteArrayOutputStream out
-            = new InternalByteArrayOutputStream();
-        out.write(b); // write the byte we read when testing for EOF
-        ByteStreams.copy(in, out);
-
-        byte[] result = new byte[bytes.length + out.size()];
-        System.arraycopy(bytes, 0, result, 0, bytes.length);
-        out.writeTo(result, bytes.length);
-        return result;
+        FileInputStream in = closer.register(openStream());
+        return readFile(in, in.getChannel().size());
       } catch (Throwable e) {
         throw closer.rethrow(e);
       } finally {
@@ -204,17 +154,23 @@ public final class Files {
   }
 
   /**
-   * BAOS subclass for direct access to its internal buffer.
+   * Reads a file of the given expected size from the given input stream, if
+   * it will fit into a byte array. This method handles the case where the file
+   * size changes between when the size is read and when the contents are read
+   * from the stream.
    */
-  private static final class InternalByteArrayOutputStream
-      extends ByteArrayOutputStream {
-    /**
-     * Writes the contents of the internal buffer to the given array starting
-     * at the given offset. Assumes the array has space to hold count bytes.
-     */
-    void writeTo(byte[] b, int off) {
-      System.arraycopy(buf, 0, b, off, count);
+  static byte[] readFile(
+      InputStream in, long expectedSize) throws IOException {
+    if (expectedSize > Integer.MAX_VALUE) {
+      throw new OutOfMemoryError("file is too large to fit in a byte array: "
+          + expectedSize + " bytes");
     }
+
+    // some special files may return size 0 but have content, so read
+    // the file normally in that case
+    return expectedSize == 0
+        ? ByteStreams.toByteArray(in)
+        : ByteStreams.toByteArray(in, (int) expectedSize);
   }
 
   /**
@@ -282,7 +238,10 @@ public final class Files {
    *
    * @param file the file to read from
    * @return the factory
+   * @deprecated Use {@link #asByteSource(File)}. This method is scheduled for
+   *     removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<FileInputStream> newInputStreamSupplier(
       final File file) {
     return ByteStreams.asInputSupplier(asByteSource(file));
@@ -294,7 +253,10 @@ public final class Files {
    *
    * @param file the file to write to
    * @return the factory
+   * @deprecated Use {@link #asByteSink(File)}. This method is scheduled for
+   *     removal in Guava 18.0.
    */
+  @Deprecated
   public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
       File file) {
     return newOutputStreamSupplier(file, false);
@@ -308,7 +270,11 @@ public final class Files {
    * @param append if true, the encoded characters will be appended to the file;
    *     otherwise the file is overwritten
    * @return the factory
+   * @deprecated Use {@link #asByteSink(File, FileWriteMode...)}, passing
+   *     {@link FileWriteMode#APPEND} for append. This method is scheduled for
+   *     removal in Guava 18.0.
    */
+  @Deprecated
   public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
       final File file, final boolean append) {
     return ByteStreams.asOutputSupplier(asByteSink(file, modes(append)));
@@ -328,7 +294,10 @@ public final class Files {
    * @param charset the charset used to decode the input stream; see {@link
    *     Charsets} for helpful predefined constants
    * @return the factory
+   * @deprecated Use {@link #asCharSource(File, Charset)}. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<InputStreamReader> newReaderSupplier(File file,
       Charset charset) {
     return CharStreams.asInputSupplier(asCharSource(file, charset));
@@ -342,7 +311,10 @@ public final class Files {
    * @param charset the charset used to encode the output stream; see {@link
    *     Charsets} for helpful predefined constants
    * @return the factory
+   * @deprecated Use {@link #asCharSink(File, Charset)}. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
       Charset charset) {
     return newWriterSupplier(file, charset, false);
@@ -358,7 +330,11 @@ public final class Files {
    * @param append if true, the encoded characters will be appended to the file;
    *     otherwise the file is overwritten
    * @return the factory
+   * @deprecated Use {@link #asCharSink(File, Charset, FileWriteMode...)},
+   *     passing {@link FileWriteMode#APPEND} for append. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
       Charset charset, boolean append) {
     return CharStreams.asOutputSupplier(asCharSink(file, charset, modes(append)));
@@ -398,7 +374,11 @@ public final class Files {
    * @param from the input factory
    * @param to the destination file
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@code from.copyTo(Files.asByteSink(to))} after changing
+   *     {@code from} to a {@code ByteSource} if necessary. This method is
+   *     scheduled to be removed in Guava 18.0.
    */
+  @Deprecated
   public static void copy(InputSupplier<? extends InputStream> from, File to)
       throws IOException {
     ByteStreams.asByteSource(from).copyTo(asByteSink(to));
@@ -422,7 +402,11 @@ public final class Files {
    * @param from the source file
    * @param to the output factory
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@code Files.asByteSource(from).copyTo(to)} after changing
+   *     {@code to} to a {@code ByteSink} if necessary. This method is
+   *     scheduled to be removed in Guava 18.0.
    */
+  @Deprecated
   public static void copy(File from, OutputSupplier<? extends OutputStream> to)
       throws IOException {
     asByteSource(from).copyTo(ByteStreams.asByteSink(to));
@@ -468,7 +452,11 @@ public final class Files {
    * @param charset the charset used to encode the output stream; see {@link
    *     Charsets} for helpful predefined constants
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@code from.copyTo(Files.asCharSink(to, charset))} after
+   *     changing {@code from} to a {@code CharSource} if necessary. This
+   *     method is scheduled to be removed in Guava 18.0.
    */
+  @Deprecated
   public static <R extends Readable & Closeable> void copy(
       InputSupplier<R> from, File to, Charset charset) throws IOException {
     CharStreams.asCharSource(from).copyTo(asCharSink(to, charset));
@@ -530,7 +518,11 @@ public final class Files {
    *     Charsets} for helpful predefined constants
    * @param to the appendable supplier
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@code Files.asCharSource(from, charset).copyTo(to)} after
+   *     changing {@code to} to a {@code CharSink} if necessary. This method is
+   *     scheduled to be removed in Guava 18.0.
    */
+  @Deprecated
   public static <W extends Appendable & Closeable> void copy(File from,
       Charset charset, OutputSupplier<W> to) throws IOException {
     asCharSource(from, charset).copyTo(CharStreams.asCharSink(to));
@@ -655,8 +647,10 @@ public final class Files {
   }
 
   /**
-   * Moves the file from one path to another. This method can rename a file or
-   * move it to a different directory, like the Unix {@code mv} command.
+   * Moves a file from one path to another. This method can rename a file
+   * and/or move it to a different directory. In either case {@code to} must
+   * be the target path for the file itself; not just the new name for the
+   * file or the path to the new parent directory.
    *
    * @param from the source file
    * @param to the destination file

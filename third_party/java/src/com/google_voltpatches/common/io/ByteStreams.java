@@ -61,7 +61,10 @@ public final class ByteStreams {
    *
    * @param b the input buffer
    * @return the factory
+   * @deprecated Use {@link ByteSource#wrap(byte[])} instead. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
       byte[] b) {
     return asInputSupplier(ByteSource.wrap(b));
@@ -75,22 +78,13 @@ public final class ByteStreams {
    * @param off the offset in the buffer of the first byte to read
    * @param len the maximum number of bytes to read from the buffer
    * @return the factory
+   * @deprecated Use {@code ByteSource.wrap(b).slice(off, len)} instead. This
+   *     method is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
       final byte[] b, final int off, final int len) {
     return asInputSupplier(ByteSource.wrap(b).slice(off, len));
-  }
-
-  /**
-   * Returns a new {@link ByteSource} that reads bytes from the given byte array.
-   *
-   * @since 14.0
-   * @deprecated Use {@link ByteSource#wrap(byte[])} instead. This method is
-   *     scheduled to be removed in Guava 16.0.
-   */
-  @Deprecated
-  public static ByteSource asByteSource(byte[] b) {
-    return ByteSource.wrap(b);
   }
 
   /**
@@ -99,7 +93,10 @@ public final class ByteStreams {
    * @param from the bytes to write
    * @param to the output supplier
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSink#write(byte[])} instead. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static void write(byte[] from,
       OutputSupplier<? extends OutputStream> to) throws IOException {
     asByteSink(to).write(from);
@@ -113,7 +110,10 @@ public final class ByteStreams {
    * @param to the output factory
    * @return the number of bytes copied
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSource#copyTo(ByteSink)} instead. This method
+   *     is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static long copy(InputSupplier<? extends InputStream> from,
       OutputSupplier<? extends OutputStream> to) throws IOException {
     return asByteSource(from).copyTo(asByteSink(to));
@@ -128,7 +128,10 @@ public final class ByteStreams {
    * @param to the output stream to write to
    * @return the number of bytes copied
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSource#copyTo(OutputStream)} instead. This
+   *      method is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static long copy(InputSupplier<? extends InputStream> from,
       OutputStream to) throws IOException {
     return asByteSource(from).copyTo(to);
@@ -144,7 +147,10 @@ public final class ByteStreams {
    * @return the number of bytes copied
    * @throws IOException if an I/O error occurs
    * @since 10.0
+   * @deprecated Use {@link ByteSink#writeFrom(InputStream)} instead. This
+   *     method is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static long copy(InputStream from,
       OutputSupplier<? extends OutputStream> to) throws IOException {
     return asByteSink(to).writeFrom(from);
@@ -216,11 +222,67 @@ public final class ByteStreams {
   }
 
   /**
+   * Reads all bytes from an input stream into a byte array. The given
+   * expected size is used to create an initial byte array, but if the actual
+   * number of bytes read from the stream differs, the correct result will be
+   * returned anyway.
+   */
+  static byte[] toByteArray(
+      InputStream in, int expectedSize) throws IOException {
+    byte[] bytes = new byte[expectedSize];
+    int remaining = expectedSize;
+
+    while (remaining > 0) {
+      int off = expectedSize - remaining;
+      int read = in.read(bytes, off, remaining);
+      if (read == -1) {
+        // end of stream before reading expectedSize bytes
+        // just return the bytes read so far
+        return Arrays.copyOf(bytes, off);
+      }
+      remaining -= read;
+    }
+
+    // bytes is now full
+    int b = in.read();
+    if (b == -1) {
+      return bytes;
+    }
+
+    // the stream was longer, so read the rest normally
+    FastByteArrayOutputStream out = new FastByteArrayOutputStream();
+    out.write(b); // write the byte we read when testing for end of stream
+    copy(in, out);
+
+    byte[] result = new byte[bytes.length + out.size()];
+    System.arraycopy(bytes, 0, result, 0, bytes.length);
+    out.writeTo(result, bytes.length);
+    return result;
+  }
+
+  /**
+   * BAOS that provides limited access to its internal byte array.
+   */
+  private static final class FastByteArrayOutputStream
+      extends ByteArrayOutputStream {
+    /**
+     * Writes the contents of the internal buffer to the given array starting
+     * at the given offset. Assumes the array has space to hold count bytes.
+     */
+    void writeTo(byte[] b, int off) {
+      System.arraycopy(buf, 0, b, off, count);
+    }
+  }
+
+  /**
    * Returns the data from a {@link InputStream} factory as a byte array.
    *
    * @param supplier the factory
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSource#read()} instead. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static byte[] toByteArray(
       InputSupplier<? extends InputStream> supplier) throws IOException {
     return asByteSource(supplier).read();
@@ -231,7 +293,7 @@ public final class ByteStreams {
    * bytes} array from the beginning.
    */
   public static ByteArrayDataInput newDataInput(byte[] bytes) {
-    return new ByteArrayDataInputStream(bytes);
+    return newDataInput(new ByteArrayInputStream(bytes));
   }
 
   /**
@@ -243,19 +305,27 @@ public final class ByteStreams {
    */
   public static ByteArrayDataInput newDataInput(byte[] bytes, int start) {
     checkPositionIndex(start, bytes.length);
-    return new ByteArrayDataInputStream(bytes, start);
+    return newDataInput(
+        new ByteArrayInputStream(bytes, start, bytes.length - start));
+  }
+
+  /**
+   * Returns a new {@link ByteArrayDataInput} instance to read from the given
+   * {@code ByteArrayInputStream}. The given input stream is not reset before
+   * being read from by the returned {@code ByteArrayDataInput}.
+   *
+   * @since 17.0
+   */
+  public static ByteArrayDataInput newDataInput(
+      ByteArrayInputStream byteArrayInputStream) {
+    return new ByteArrayDataInputStream(checkNotNull(byteArrayInputStream));
   }
 
   private static class ByteArrayDataInputStream implements ByteArrayDataInput {
     final DataInput input;
 
-    ByteArrayDataInputStream(byte[] bytes) {
-      this.input = new DataInputStream(new ByteArrayInputStream(bytes));
-    }
-
-    ByteArrayDataInputStream(byte[] bytes, int start) {
-      this.input = new DataInputStream(
-          new ByteArrayInputStream(bytes, start, bytes.length - start));
+    ByteArrayDataInputStream(ByteArrayInputStream byteArrayInputStream) {
+      this.input = new DataInputStream(byteArrayInputStream);
     }
 
     @Override public void readFully(byte b[]) {
@@ -385,7 +455,7 @@ public final class ByteStreams {
    * Returns a new {@link ByteArrayDataOutput} instance with a default size.
    */
   public static ByteArrayDataOutput newDataOutput() {
-    return new ByteArrayDataOutputStream();
+    return newDataOutput(new ByteArrayOutputStream());
   }
 
   /**
@@ -396,7 +466,26 @@ public final class ByteStreams {
    */
   public static ByteArrayDataOutput newDataOutput(int size) {
     checkArgument(size >= 0, "Invalid size: %s", size);
-    return new ByteArrayDataOutputStream(size);
+    return newDataOutput(new ByteArrayOutputStream(size));
+  }
+
+  /**
+   * Returns a new {@link ByteArrayDataOutput} instance which writes to the
+   * given {@code ByteArrayOutputStream}. The given output stream is not reset
+   * before being written to by the returned {@code ByteArrayDataOutput} and
+   * new data will be appended to any existing content.
+   *
+   * <p>Note that if the given output stream was not empty or is modified after
+   * the {@code ByteArrayDataOutput} is created, the contract for
+   * {@link ByteArrayDataOutput#toByteArray} will not be honored (the bytes
+   * returned in the byte array may not be exactly what was written via calls to
+   * {@code ByteArrayDataOutput}).
+   *
+   * @since 17.0
+   */
+  public static ByteArrayDataOutput newDataOutput(
+      ByteArrayOutputStream byteArrayOutputSteam) {
+    return new ByteArrayDataOutputStream(checkNotNull(byteArrayOutputSteam));
   }
 
   @SuppressWarnings("deprecation") // for writeBytes
@@ -405,14 +494,6 @@ public final class ByteStreams {
 
     final DataOutput output;
     final ByteArrayOutputStream byteArrayOutputSteam;
-
-    ByteArrayDataOutputStream() {
-      this(new ByteArrayOutputStream());
-    }
-
-    ByteArrayDataOutputStream(int size) {
-      this(new ByteArrayOutputStream(size));
-    }
 
     ByteArrayDataOutputStream(ByteArrayOutputStream byteArrayOutputSteam) {
       this.byteArrayOutputSteam = byteArrayOutputSteam;
@@ -645,7 +726,13 @@ public final class ByteStreams {
     }
   }
 
-  /** Returns the length of a supplied input stream, in bytes. */
+  /**
+   * Returns the length of a supplied input stream, in bytes.
+   *
+   * @deprecated Use {@link ByteSource#size()} instead. This method is
+   *     scheduled for removal in Guava 18.0.
+   */
+  @Deprecated
   public static long length(
       InputSupplier<? extends InputStream> supplier) throws IOException {
     return asByteSource(supplier).size();
@@ -655,7 +742,10 @@ public final class ByteStreams {
    * Returns true if the supplied input streams contain the same bytes.
    *
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSource#contentEquals(ByteSource)} instead. This
+   *     method is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static boolean equal(InputSupplier<? extends InputStream> supplier1,
       InputSupplier<? extends InputStream> supplier2) throws IOException {
     return asByteSource(supplier1).contentEquals(asByteSource(supplier2));
@@ -736,7 +826,10 @@ public final class ByteStreams {
    * @param processor the object to which to pass the bytes of the stream
    * @return the result of the byte processor
    * @throws IOException if an I/O error occurs
+   * @deprecated Use {@link ByteSource#read(ByteProcessor)} instead. This
+   *     method is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static <T> T readBytes(
       InputSupplier<? extends InputStream> supplier,
       ByteProcessor<T> processor) throws IOException {
@@ -785,7 +878,10 @@ public final class ByteStreams {
    * @return the {@link HashCode} of all of the bytes in the input stream
    * @throws IOException if an I/O error occurs
    * @since 12.0
+   * @deprecated Use {@link ByteSource#hash(HashFunction)} instead. This method
+   *     is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static HashCode hash(
       InputSupplier<? extends InputStream> supplier, HashFunction hashFunction)
       throws IOException {
@@ -844,7 +940,10 @@ public final class ByteStreams {
    *     the returned streams will start
    * @param length the maximum length of the returned streams
    * @throws IllegalArgumentException if offset or length are negative
+   * @deprecated Use {@link ByteSource#slice(int, int)} instead. This method is
+   *     scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<InputStream> slice(
       final InputSupplier<? extends InputStream> supplier,
       final long offset,
@@ -866,7 +965,10 @@ public final class ByteStreams {
    * @param suppliers the suppliers to concatenate
    * @return a supplier that will return a stream containing the concatenated
    *     stream data
+   * @deprecated Use {@link ByteSource#concat(Iterable)} instead. This method
+   *     is scheduled for removal in Guava 18.0.
    */
+  @Deprecated
   public static InputSupplier<InputStream> join(
       final Iterable<? extends InputSupplier<? extends InputStream>> suppliers) {
     checkNotNull(suppliers);
@@ -880,7 +982,13 @@ public final class ByteStreams {
     return asInputSupplier(ByteSource.concat(sources));
   }
 
-  /** Varargs form of {@link #join(Iterable)}. */
+  /**
+   * Varargs form of {@link #join(Iterable)}.
+   *
+   * @deprecated Use {@link ByteSource#concat(ByteSource[])} instead. This
+   *     method is scheduled for removal in Guava 18.0.
+   */
+  @Deprecated
   @SuppressWarnings("unchecked") // suppress "possible heap pollution" warning in JDK7
   public static InputSupplier<InputStream> join(
       InputSupplier<? extends InputStream>... suppliers) {
@@ -897,7 +1005,12 @@ public final class ByteStreams {
    * suppliers to sources and sinks.
    *
    * @since 15.0
+   * @deprecated Convert all {@code InputSupplier<? extends InputStream>}
+   *     implementations to extend {@link ByteSource} or provide a method for
+   *     viewing the object as a {@code ByteSource}. This method is scheduled
+   *     for removal in Guava 18.0.
    */
+  @Deprecated
   public static ByteSource asByteSource(
       final InputSupplier<? extends InputStream> supplier) {
     checkNotNull(supplier);
@@ -922,7 +1035,12 @@ public final class ByteStreams {
    * suppliers to sources and sinks.
    *
    * @since 15.0
+   * @deprecated Convert all {@code OutputSupplier<? extends OutputStream>}
+   *     implementations to extend {@link ByteSink} or provide a method for
+   *     viewing the object as a {@code ByteSink}. This method is scheduled
+   *     for removal in Guava 18.0.
    */
+  @Deprecated
   public static ByteSink asByteSink(
       final OutputSupplier<? extends OutputStream> supplier) {
     checkNotNull(supplier);
