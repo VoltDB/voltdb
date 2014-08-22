@@ -75,14 +75,18 @@ public class SQLCommand
             Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static String quotedIdPattern = "\"(?:[^\"]|\"\")+\""; // double-quoted ID, " escaped with ""
+    private static final String quotedIdPattern = "\"(?:[^\"]|\"\")+\""; // double-quoted ID, " escaped with ""
                                                                    // question: is 0-length name allowed?
-    private static String unquotedIdPattern = "[a-z][a-z0-9_]*";
-    private static String idPattern = "(?:" + unquotedIdPattern + "|" + quotedIdPattern + ")";
+    private static final String unquotedIdPattern = "[a-z][a-z0-9_]*";
+    private static final String idPattern = "(?:" + unquotedIdPattern + "|" + quotedIdPattern + ")";
 
-    // This pattern consumes no input itself but ensures that the next character is either
-    // whitespace or a double quote.
-    private static String followedBySpaceOrQuote = "(?=\\\"|\\s)";
+    // This pattern consumes no input itself but ensures that the next
+    // character is either whitespace or a double quote. This is handy
+    // when a keyword is followed by an identifier:
+    //   INSERT INTO"Foo"SELECT ...
+    // HSQL doesn't require whitespace between keywords and quoted
+    // identifiers.
+    private static String followedBySpaceOrQuote = "(?=\"|\\s)";
 
     // Ugh, these are all fragile.
     private static final Pattern CreateView =
@@ -155,15 +159,25 @@ public class SQLCommand
                 ")" + // end group 2
                 "delete",
                 Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static String optionalColumnList = "(?:\\((?:" + idPattern + "|[^\\\")])+\\))?";
+
+    // For HSQL's purposes, the optional column list that may appear
+    // in an INSERT statement is recognized as:
+    // - a left parenthesis
+    // - 1 or more of the following items:
+    //   - quoted identifiers (which may contain right parentheses)
+    //   - characters which are not double quotes or right parentheses
+    // - a right parenthesis
+    // This should recognize whatever may appear inside the column
+    // list, including quoted column names with embedded parentheses.
+    private static final String optionalColumnList = "(?:\\((?:" + quotedIdPattern + "|[^\")])+\\))?";
     private static final Pattern InsertIntoSelect =
             Pattern.compile(
-                    "(" + // start capturing group
-                    "\\s*" + // leading whitespace
+                    "(" +                  // start capturing group
+                    "\\s*" +               // leading whitespace
                     "insert\\s+into" + followedBySpaceOrQuote + "\\s*" +
                     idPattern + "\\s*" +   // <tablename>
-                    optionalColumnList +   // (column, ")))))", ...)
-                    "[(\\s]*" +            // 0 or more spaces/left parenthesis
+                    optionalColumnList +   // (column, "anotherColumn", ...)
+                    "[(\\s]*" +            // 0 or more spaces or left parentheses
                     ")" +                  // end capturing group
                     "select",
                     Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
