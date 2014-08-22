@@ -159,10 +159,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
 
     /**
-    * Class constructor
-    * @param paramValues
-    * @param db
-    */
+     * Class constructor
+     * @param paramValues
+     * @param db
+     */
     public ParsedSelectStmt(String[] paramValues, Database db) {
         super(paramValues, db);
     }
@@ -664,7 +664,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.alias == null) {
                 col.alias = col.columnName;
             }
-           // This index calculation is only used for sanity checking
+            // This index calculation is only used for sanity checking
             // materialized views (which use the parsed select statement but
             // don't go through the planner pass that does more involved
             // column index resolution).
@@ -801,8 +801,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if ((child.name.equals("operation") == false) &&
                     (child.name.equals("aggregation") == false) &&
                     (child.name.equals("function") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
+                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
+            }
         }
 
         // Mark the order by column if it is in displayColumns
@@ -967,14 +967,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
 
     /**
-    * Converts an IN expression into the equivalent EXISTS one
-    * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) ==
-    * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
-    *
-    * @param selectStmt select subquery from the IN expression
-    * @param inListExpr TVE for the columns from the IN list
-    * @return modified subquery
-    */
+     * Converts an IN expression into the equivalent EXISTS one
+     * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) ==
+     * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
+     *
+     * @param selectStmt select subquery from the IN expression
+     * @param inListExpr TVE for the columns from the IN list
+     * @return modified subquery
+     */
     protected static void rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
@@ -1076,7 +1076,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         aggrExpressions.addAll(selectStmt.m_aggResultColumns);
         selectStmt.m_aggResultColumns = aggrExpressions;
 
-       // Replace the display schema with the single dummy column
+        // Replace the display schema with the single dummy column
         selectStmt.m_displayColumns.clear();
         ParsedColInfo col = new ParsedColInfo();
         ConstantValueExpression colExpr = new ConstantValueExpression();
@@ -1124,6 +1124,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Add LIMIT 1
         selectStmt.m_limit = 1;
 
+        selectStmt.prepareLimitPlanNode();
     }
 
     /**
@@ -1645,11 +1646,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 if (jsonExpr.isEmpty()) {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            orderedAlias.getKey(),
-                                                                            col.getName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
+                        TupleValueExpression tve = new TupleValueExpression(
+                                table.getTypeName(),
+                                orderedAlias.getKey(),
+                                col.getName(),
+                                col.getName(),
+                                col.getIndex());
                         indexExpressions.add(tve);
                     }
                 }
@@ -1693,9 +1695,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // Round up the usual suspects -- if there were uncooperative GROUP BY expressions,
                 // they will often also be uncooperative display column expressions.
                 for (AbstractExpression nonStarter : nonOrdered) {
-                     if (displayExpr.equals(nonStarter)) {
-                         return false;
-                     }
+                    if (displayExpr.equals(nonStarter)) {
+                        return false;
+                    }
                 }
                 // A GROUP BY expression that was not nonOrdered must be covered.
                 continue;
@@ -1706,7 +1708,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
-                                                      ArrayList<AbstractExpression> outNonOrdered) {
+            ArrayList<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.

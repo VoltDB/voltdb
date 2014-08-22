@@ -178,12 +178,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
         generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
-        generateRealOutputSchema();
+        generateRealOutputSchema(db);
     }
 
-    protected void generateRealOutputSchema() {
+    protected void generateRealOutputSchema(Database db) {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
+            // generate its subquery output schema
+            aggNode.generateOutputSchema(db);
+
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
         } else {
             m_outputSchema = m_outputSchemaPreInlineAgg;

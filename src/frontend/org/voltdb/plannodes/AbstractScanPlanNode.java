@@ -328,6 +328,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
+            // generate its subquery output schema
+            aggNode.generateOutputSchema(db);
+
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = true;
         }

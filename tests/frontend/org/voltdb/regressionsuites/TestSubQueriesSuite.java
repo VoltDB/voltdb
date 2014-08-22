@@ -38,13 +38,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
         super(name);
     }
 
+    private final String[] procs = {"R1.insert", "R2.insert", "P1.insert", "P2.insert", "P3.insert"};
+    private final String [] tbs =  {"R1","R2","P1","P2","P3"};
+    private final String [] replicated_tbs =  {"R1","R2"};
+
     private void loadData(Client client) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = null;
 
-        String [] tbsData =  {"R1","R2","P1","P2","P3"};
-
         // Empty data from table.
-        for (String tb: tbsData) {
+        for (String tb: tbs) {
             cr = client.callProcedure("@AdHoc", "delete from " + tb);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -58,9 +60,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
             cr = client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
         }
     }
-
-    private final String[] procs = {"R1.insert", "R2.insert", "P1.insert", "P2.insert", "P3.insert"};
-    private final String [] tbs =  {"R1","R2","P1","P2","P3"};
 
     /**
      * Simple sub-query
@@ -125,9 +124,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // derived aggregated table + aggregation on subselect
             vt = client.callProcedure("@AdHoc",
                     " select a4, sum(wage) " +
-                    " from (select wage, sum(id)+1 as a1, sum(id+1) as a2, sum(dept+3)/count(distinct dept) as a4 " +
-                    "       from " + tb +
-                    "       GROUP BY wage ORDER BY wage ASC LIMIT 4) T1" +
+                            " from (select wage, sum(id)+1 as a1, sum(id+1) as a2, sum(dept+3)/count(distinct dept) as a4 " +
+                            "       from " + tb +
+                            "       GROUP BY wage ORDER BY wage ASC LIMIT 4) T1" +
                     " Group by a4 order by a4;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{4, 60}, {10, 40}});
 
@@ -140,8 +139,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // groupby from groupby + limit
             vt = client.callProcedure("@AdHoc",
                     "select dept_count, count(*) " +
-                    "from (select dept, count(*) as dept_count " +
-                    "       from (select dept, id from " + tb + " order by dept limit 6) T1 group by dept) T2 " +
+                            "from (select dept, count(*) as dept_count " +
+                            "       from (select dept, id from " + tb + " order by dept limit 6) T1 group by dept) T2 " +
                     "group by dept_count order by dept_count").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3, 2}});
         }
@@ -164,16 +163,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc",
                     "select newid, id  " +
-                    "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
+                            "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
                     "WHERE T1.id = T2.dept ORDER BY newid").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{4, 2}, {5, 2}});
 
             vt = client.callProcedure("@AdHoc",
                     "select id, wage, dept_count " +
-                    "FROM R1, (select dept, count(*) as dept_count " +
-                    "          from (select dept, id " +
-                    "                from "+tb+" order by dept limit 5) T1 " +
-                    "          group by dept) T2 " +
+                            "FROM R1, (select dept, count(*) as dept_count " +
+                            "          from (select dept, id " +
+                            "                from "+tb+" order by dept limit 5) T1 " +
+                            "          group by dept) T2 " +
                     "WHERE R1.wage / T2.dept_count > 10 ORDER BY wage,dept_count").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3, 30, 2}, {4, 40, 2}, {4, 40, 3},{5, 50, 2},{5, 50, 3}});
 
@@ -191,7 +190,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc",
                 "select T2.id " +
-                "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
+                        "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
                 "ORDER BY T2.id").getResults()[0];
         validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
                 {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
@@ -232,14 +231,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltTable vt = null;
 
         String sqlArray =
-            "INSERT INTO P4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);" +
-            "INSERT INTO P4 VALUES (1, 'EPOJbVcUPlDghTEMs', NULL, 6.95147507397556374542e-01);" +
-            "INSERT INTO P4 VALUES (2, 'EPOJbVcUPlDghTEMs', -27645, 9.49225716086843585018e-01);" +
-            "INSERT INTO P4 VALUES (3, 'EPOJbVcUPlDghTEMs', -27645, 3.41233435850314625881e-01);" +
-            "INSERT INTO P4 VALUES (4, 'baYqQXVHBZHVlDRlu', 8130, 7.10103786492815025611e-01);" +
-            "INSERT INTO P4 VALUES (5, 'baYqQXVHBZHVlDRlu', 8130, 7.24543183451542227580e-01);" +
-            "INSERT INTO P4 VALUES (6, 'baYqQXVHBZHVlDRlu', 23815, 4.49837414257097889525e-01);" +
-            "INSERT INTO P4 VALUES (7, 'baYqQXVHBZHVlDRlu', 23815, 4.91748197919483431839e-01);" +
+                "INSERT INTO P4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);" +
+                        "INSERT INTO P4 VALUES (1, 'EPOJbVcUPlDghTEMs', NULL, 6.95147507397556374542e-01);" +
+                        "INSERT INTO P4 VALUES (2, 'EPOJbVcUPlDghTEMs', -27645, 9.49225716086843585018e-01);" +
+                        "INSERT INTO P4 VALUES (3, 'EPOJbVcUPlDghTEMs', -27645, 3.41233435850314625881e-01);" +
+                        "INSERT INTO P4 VALUES (4, 'baYqQXVHBZHVlDRlu', 8130, 7.10103786492815025611e-01);" +
+                        "INSERT INTO P4 VALUES (5, 'baYqQXVHBZHVlDRlu', 8130, 7.24543183451542227580e-01);" +
+                        "INSERT INTO P4 VALUES (6, 'baYqQXVHBZHVlDRlu', 23815, 4.49837414257097889525e-01);" +
+                        "INSERT INTO P4 VALUES (7, 'baYqQXVHBZHVlDRlu', 23815, 4.91748197919483431839e-01);" +
 
             "INSERT INTO R4 VALUES (0, 'EPOJbVcUPlDghTEMs', NULL, 2.90574307197424275273e-01);" +
             "INSERT INTO R4 VALUES (1, 'EPOJbVcUPlDghTEMs', NULL, 6.95147507397556374542e-01);" +
@@ -260,9 +259,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
 
         String query =
-            "SELECT -8, A.NUM " +
-            "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
-            "WHERE (A.NUM + 5 ) > 44";
+                "SELECT -8, A.NUM " +
+                        "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
+                        "WHERE (A.NUM + 5 ) > 44";
 
         vt = client.callProcedure("@Explain", query).getResults()[0];
         System.err.println(vt);
@@ -286,7 +285,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         loadData(client);
         VoltTable vt;
 
-        for (String tb: tbs) {
+        for (String tb: replicated_tbs) {
             vt = client.callProcedure("@AdHoc", "select ID, DEPT FROM "+ tb +" where ID in " +
                     " (select ID from " + tb + " WHERE ID > 3);").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {4,2}, {5,2}});
@@ -320,229 +319,229 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from " + tbs[0] + " T1 where exists " +
                         "(SELECT 1 FROM " + tbs[1] + " T2 where exists " +
-                            "(SELECT ID FROM "+ tbs[1] +" T3 WHERE T1.ID * T3.ID  = 9))").getResults()[0];
+                        "(SELECT ID FROM "+ tbs[1] +" T3 WHERE T1.ID * T3.ID  = 9))").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{3}});
 
     }
 
-  /**
-  * Join two sub queries
-  * @throws NoConnectionsException
-  * @throws IOException
-  * @throws ProcCallException
-  */
- public void testExists_Joins() throws NoConnectionsException, IOException, ProcCallException
- {
-     Client client = getClient();
-     loadData(client);
+    /**
+     * Join two sub queries
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testExists_Joins() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
 
-     VoltTable vt;
+        VoltTable vt;
 
-     for (String tb: tbs) {
-         vt = client.callProcedure("@AdHoc",
-                 "select T1.id from R1 T1, " + tb +" T2 where " +
-                         "T1.id = T2.id and exists ( " +
-                 " select 1 from R1 where R1.dept * 2 = T2.dept)").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{4}, {5}});
+        for (String tb: replicated_tbs) {
+            vt = client.callProcedure("@AdHoc",
+                    "select T1.id from R1 T1, " + tb +" T2 where " +
+                            "T1.id = T2.id and exists ( " +
+                    " select 1 from R1 where R1.dept * 2 = T2.dept)").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
-         // Core dump
-         if (!isHSQL()) {
-             vt = client.callProcedure("@AdHoc",
-                     "select id, newid  " +
-                             "FROM (SELECT id, wage FROM R1) T1 " +
-                             "   LEFT OUTER JOIN " +
-                             "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
-                             "   ON T1.id = T2.dept and EXISTS( " +
-                             "      select 1 from R1 where R1.ID =  T2.newid ) " +
-                     "ORDER BY id, newid").getResults()[0];
-             System.out.println(vt.toString());
-             validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
-                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
-         }
+            // Core dump
+            if (!isHSQL()) {
+                vt = client.callProcedure("@AdHoc",
+                        "select id, newid  " +
+                                "FROM (SELECT id, wage FROM R1) T1 " +
+                                "   LEFT OUTER JOIN " +
+                                "   (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
+                                "   ON T1.id = T2.dept and EXISTS( " +
+                                "      select 1 from R1 where R1.ID =  T2.newid ) " +
+                        "ORDER BY id, newid").getResults()[0];
+                System.out.println(vt.toString());
+                validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
+                        {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
+            }
+        }
+
     }
 
- }
 
+    /**
+     * SELECT FROM SELECT FROM SELECT
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
 
- /**
-  * SELECT FROM SELECT FROM SELECT
-  * @throws NoConnectionsException
-  * @throws IOException
-  * @throws ProcCallException
-  */
- public void testSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
- {
-     Client client = getClient();
-     loadData(client);
-     VoltTable vt;
+        for (String tb: procs) {
+            client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
+        }
 
-     for (String tb: procs) {
-         client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-         client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
-     }
+        for (String tb: replicated_tbs) {
+            vt = client.callProcedure("@AdHoc",
+                    "select dept, sum(wage) as sw1 from " + tb + " where (id, dept + 2) in " +
+                            "( SELECT dept, count(dept) " +
+                            "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{1,10}});
 
-     for (String tb: tbs) {
-         vt = client.callProcedure("@AdHoc",
-                 "select dept, sum(wage) as sw1 from " + tb + " where (id, dept + 2) in " +
-                         "( SELECT dept, count(dept) " +
-                         "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{1,10}});
+            // having with subquery
+            vt = client.callProcedure("@AdHoc",
+                    "select dept from " + tb + " group by dept " +
+                    " having max(wage) in (select wage from R1) order by dept desc").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{2}, {1}});
 
-         // having with subquery
-         vt = client.callProcedure("@AdHoc",
-                 "select dept from " + tb + " group by dept " +
-                 " having max(wage) in (select wage from R1) order by dept desc").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{2}, {1}});
+            // subquery with having
+            vt = client.callProcedure("@AdHoc",
+                    "select id from " + tb + " TBA where exists " +
+                            " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
+                    " min(wage) = TBA.wage)").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
 
-         // subquery with having
-         vt = client.callProcedure("@AdHoc",
-                 "select id from " + tb + " TBA where exists " +
-                         " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
-                 " min(wage) = TBA.wage)").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
+            // having with subquery with having
+            String sql = "select id from " + tb + " where wage " +
+                    " in (select max(wage) from R1 group by dept " +
+                    " having max(wage) > 10)";
+            System.out.println(sql);
+            vt = client.callProcedure("@AdHoc",
+                    "select id from " + tb + " where wage " +
+                            " in (select max(wage) from R1 group by dept " +
+                    " having max(wage) > 30) ").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{5}});
 
-         // having with subquery with having
-         String sql = "select id from " + tb + " where wage " +
-                 " in (select max(wage) from R1 group by dept " +
-                 " having max(wage) > 10)";
-         System.out.println(sql);
-         vt = client.callProcedure("@AdHoc",
-                 "select id from " + tb + " where wage " +
-                         " in (select max(wage) from R1 group by dept " +
-                 " having max(wage) > 30) ").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{5}});
+            // subquery with group by but no having
+            vt = client.callProcedure("@AdHoc",
+                    "select id from " + tb + " TBA where exists " +
+                    " (select max(dept) from R1 where TBA.id = R1.id group by dept )").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
 
-         // subquery with group by but no having
-         vt = client.callProcedure("@AdHoc",
-                 "select id from " + tb + " TBA where exists " +
-                         " (select max(dept) from R1 where TBA.id = R1.id group by dept )").getResults()[0];
-         System.out.println(vt.toString());
-         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
+        }
 
-     }
+    }
 
- }
+    /**
+     * SELECT FROM SELECT UNION SELECT
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testSubExpressions_Unions() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
 
- /**
- * SELECT FROM SELECT UNION SELECT
- * @throws NoConnectionsException
- * @throws IOException
- * @throws ProcCallException
- */
-public void testSubExpressions_Unions() throws NoConnectionsException, IOException, ProcCallException
-{
-    Client client = getClient();
-    loadData(client);
-    VoltTable vt;
+        for (String tb: replicated_tbs) {
+            vt = client.callProcedure("@AdHoc",
+                    "select ID from " + tb + " where ID in " +
+                            "( (SELECT ID from R1 WHERE ID > 2 LIMIT 3 OFFSET 1) " +
+                            " UNION SELECT ID from R2 WHERE ID <= 2"
+                            + " INTERSECT SELECT ID from R1 WHERE ID =1);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{1}, {4}, {5}});
+        }
+    }
 
-    for (String tb: tbs) {
+    /**
+     * SELECT FROM WHERE OUTER IN (SELECT INNER ...) returning inner NULL.
+     * If there is a match, IN evalueates to TRUE
+     * If there is no match, IN evaluates to FASLE if the INNER result set is empty
+     * If there is no match, IN evaluates to NULL if the INNER result set is not empty
+     *       and there are inner NULLs
+     * Need to keep OFFSET for the IN expressions
+     * to prevent IN-to-EXISTS optimization
+     *
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt;
+        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+
+        // There is an exact match, IN extression evaluates to TRUE
         vt = client.callProcedure("@AdHoc",
-                "select ID from " + tb + " where ID in " +
-                "( (SELECT ID from R1 WHERE ID > 2 LIMIT 3 OFFSET 1) " +
-                  " UNION SELECT ID from R2 WHERE ID <= 2"
-                + " INTERSECT SELECT ID from R1 WHERE ID =1);").getResults()[0];
+                "select ID from R1 where (WAGE, DEPT) in " +
+                "( select WAGE, DEPT from R2 limit 6 offset 1) is true;").getResults()[0];
         System.out.println(vt.toString());
-        validateTableOfLongs(vt, new long[][] {{1}, {4}, {5}});
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // There is no match and inner result set is empty, , IN extression evaluates to FALSE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) in " +
+                "( select WAGE, DEPT from R2 where ID = 0 limit 6 offset 1) is false;").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // There is no match, IN extression evaluates to NULL (non-empty inner result set)
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) in " +
+                "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {});
+
+        // There is an exact match, NOT IN evaluates to FALSE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) not in " +
+                "( select WAGE, DEPT from R2 limit 4 offset 1);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {});
+
+        // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
+        // HSQL gets it wrong
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                    "select ID from R1 where (WAGE, DEPT) not in " +
+                    "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {});
+        }
+
+        // There is no match, the inner result set doesn't have NULLs
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where WAGE in " +
+                "( select WAGE from R2 where WAGE != 1000 limit 4 offset 1);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {});
+
+        // There is a match, the inner result set doesn't have NULLs, The IN expression evaluates to FALSE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where WAGE in " +
+                "( select WAGE from R2 where WAGE != 1000 limit 6 offset 1) is false;").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // NULL row exists
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where exists " +
+                "( select WAGE from R2 where WAGE is NULL);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // Rows exist
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where not exists " +
+                "( select WAGE, DEPT from R2 );").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {});
+
     }
-}
-
-/**
-* SELECT FROM WHERE OUTER IN (SELECT INNER ...) returning inner NULL.
-* If there is a match, IN evalueates to TRUE
-* If there is no match, IN evaluates to FASLE if the INNER result set is empty
-* If there is no match, IN evaluates to NULL if the INNER result set is not empty
-*       and there are inner NULLs
-* Need to keep OFFSET for the IN expressions
-* to prevent IN-to-EXISTS optimization
-*
-* @throws NoConnectionsException
-* @throws IOException
-* @throws ProcCallException
-*/
-public void testSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
-{
-   Client client = getClient();
-   VoltTable vt;
-   client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
-   client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
-
-   // There is an exact match, IN extression evaluates to TRUE
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where (WAGE, DEPT) in " +
-                   "( select WAGE, DEPT from R2 limit 6 offset 1) is true;").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {{100}});
-
-   // There is no match and inner result set is empty, , IN extression evaluates to FALSE
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where (WAGE, DEPT) in " +
-                   "( select WAGE, DEPT from R2 where ID = 0 limit 6 offset 1) is false;").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {{100}});
-
-   // There is no match, IN extression evaluates to NULL (non-empty inner result set)
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where (WAGE, DEPT) in " +
-                   "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {});
-
-   // There is an exact match, NOT IN evaluates to FALSE
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where (WAGE, DEPT) not in " +
-                   "( select WAGE, DEPT from R2 limit 4 offset 1);").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {});
-
-   // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
-   // HSQL gets it wrong
-   if (!isHSQL()) {
-       vt = client.callProcedure("@AdHoc",
-               "select ID from R1 where (WAGE, DEPT) not in " +
-               "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
-       System.out.println(vt.toString());
-       validateTableOfLongs(vt, new long[][] {});
-   }
-
-   // There is no match, the inner result set doesn't have NULLs
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where WAGE in " +
-               "( select WAGE from R2 where WAGE != 1000 limit 4 offset 1);").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {});
-
-   // There is a match, the inner result set doesn't have NULLs, The IN expression evaluates to FALSE
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where WAGE in " +
-               "( select WAGE from R2 where WAGE != 1000 limit 6 offset 1) is false;").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {{100}});
-
-   // NULL row exists
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where exists " +
-                   "( select WAGE from R2 where WAGE is NULL);").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {{100}});
-
-   // Rows exist
-   vt = client.callProcedure("@AdHoc",
-           "select ID from R1 where not exists " +
-                   "( select WAGE, DEPT from R2 );").getResults()[0];
-   System.out.println(vt.toString());
-   validateTableOfLongs(vt, new long[][] {});
-
-}
 
     /**
      * SELECT FROM WHERE OUTER IN (SELECT INNER ...). The OUTER is NULL.
@@ -603,31 +602,31 @@ public void testSubExpressions_InnerNull() throws NoConnectionsException, IOExce
 
         // R2.202 and R1.101 have the same WAGE
         vt = client.callProcedure("@AdHoc",
-                 "select ID from R2 where exists " +
-                           "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
+                "select ID from R2 where exists " +
+                "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{202}});
 
         // R2.202 and R1.101 have the same WAGE
         vt = client.callProcedure("@AdHoc",
-                 "select ID from R2 where not exists " +
-                           "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
+                "select ID from R2 where not exists " +
+                "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{200}, {201}, {203}});
 
         // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 RR2 where exists " +
-                          "( select 1 from R2 where RR2.WAGE = R2.WAGE);").getResults()[0];
-       System.out.println(vt.toString());
-       validateTableOfLongs(vt, new long[][] {{201}, {202}});
+                "( select 1 from R2 where RR2.WAGE = R2.WAGE);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
-       // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
-       vt = client.callProcedure("@AdHoc",
-               "select ID from R2 RR2 where RR2.WAGE in " +
-                         "( select WAGE from R2 limit 4 offset 1);").getResults()[0];
-      System.out.println(vt.toString());
-      validateTableOfLongs(vt, new long[][] {{201}, {202}});
+        // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 RR2 where RR2.WAGE in " +
+                "( select WAGE from R2 limit 4 offset 1);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
         // HSQL parsing error - unexpected token NULL
         //   vt = client.callProcedure("@AdHoc",
@@ -658,16 +657,16 @@ public void testSubExpressions_InnerNull() throws NoConnectionsException, IOExce
 
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, T1.DEPT " +
-                "FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, " +
-                "       (SELECT DEPT FROM P2 ) T2,  " +
-                "       (SELECT ID FROM P3 ) T3  " +
+                        "FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, " +
+                        "       (SELECT DEPT FROM P2 ) T2,  " +
+                        "       (SELECT ID FROM P3 ) T3  " +
                 "where T1.ID = T2.DEPT and T2.DEPT = T3.ID order by T1.ID;").getResults()[0];
         validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}});
 
 
         vt = client.callProcedure("@AdHoc",
                 "select T1.ID, T1.DEPT " +
-                "FROM (SELECT P1.ID, P1.DEPT FROM P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
+                        "FROM (SELECT P1.ID, P1.DEPT FROM P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
                 "where T1.ID = P2.DEPT and P2.DEPT = 2 order by T1.ID;").getResults()[0];
 
         validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}, {2, 1}, {2, 1}});
@@ -700,11 +699,11 @@ public void testSubExpressions_InnerNull() throws NoConnectionsException, IOExce
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                        "ID INTEGER DEFAULT 0 NOT NULL, " +
+                        "WAGE INTEGER, " +
+                        "DEPT INTEGER, " +
+                        "TM TIMESTAMP DEFAULT NULL, " +
+                        "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
