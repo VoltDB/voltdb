@@ -273,7 +273,7 @@
     <xs:restriction base="xs:normalizedString">
       <xs:maxLength value="256"/>
       <xs:minLength value="1"/>
-      <xs:pattern value="\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
+      <xs:pattern value="\??\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -282,6 +282,7 @@
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
