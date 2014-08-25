@@ -552,10 +552,6 @@ if __name__ == "__main__":
     time1 = time.time()
     generate_summary(output_dir, statistics)
 
-    if not success:
-        print >> sys.stderr, "SQL coverage has errors."
-        exit(1)
-
     # Print the elapsed time, and the current system time
     print_seconds(gensql_time, "for generating ALL statements")
     print_seconds(voltdb_time, "for running ALL VoltDB (JNI) statements")
@@ -563,4 +559,8 @@ if __name__ == "__main__":
     print_seconds(compar_time, "for comparing ALL DB results")
     print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
     print_elapsed_seconds("for the entire run", time0, "Total   time: ")
+
+    if not success:
+        print >> sys.stderr, "SQL coverage has errors."
+        exit(1)
 
