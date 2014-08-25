@@ -63,7 +63,7 @@ __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR
           FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR,
           FastSerializer.VOLTTYPE_STRING: FastSerializer.NULL_STRING_INDICATOR}
 
-SIGNIFICANT_DIGITS = 13
+SIGNIFICANT_DIGITS = 12
 
 def normalize_value(v, vtype):
     global __NULL
