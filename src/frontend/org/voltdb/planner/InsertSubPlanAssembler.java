@@ -42,7 +42,6 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
     InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning) {
         super(db, parsedStmt, partitioning);
-        // TODO Auto-generated constructor stub
     }
 
     @Override
@@ -59,7 +58,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
-        String targetTableName = targetTable.getTypeName();
+        targetTable.getTypeName();
         StmtSubqueryScan subquery = insertStmt.getSubqueries().get(0);
 
         if (targetTable.getIsreplicated()) {

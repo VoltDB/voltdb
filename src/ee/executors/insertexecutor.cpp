@@ -75,13 +75,13 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    assert(m_node->getInputTableCount() == 1);
 
     Table* targetTable = m_node->getTargetTable();
 
     setDMLCountOutputTable(limits);
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
@@ -119,7 +119,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
+    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable()));
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL

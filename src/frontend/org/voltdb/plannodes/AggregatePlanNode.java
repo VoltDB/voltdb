@@ -401,7 +401,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+            if (jobj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
                 m_aggregateExpressions.add(null);
             }
             else {
@@ -411,6 +411,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
                                                   Members.GROUPBY_EXPRESSIONS.name(), null);
+
+        if ( ! jobj.isNull(Members.PARTIAL_GROUPBY_COLUMNS.name())) {
+            JSONArray jarray2 = jobj.getJSONArray(Members.PARTIAL_GROUPBY_COLUMNS.name());
+            int numCols = jarray2.length();
+            m_partialGroupByColumns = new ArrayList<>(numCols);
+            for (int ii = 0; ii < numCols; ++ii) {
+                m_partialGroupByColumns.add(jarray2.getInt(ii));
+            }
+        }
+
         m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
