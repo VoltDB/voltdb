@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -37,18 +38,24 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -126,12 +133,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private AbstractExpression m_avgPushdownHaving = null;
     private NodeSchema m_avgPushdownNewAggSchema;
     private boolean m_hasPartitionColumnInGroupby = false;
+    private boolean m_hasAggregateDistinct = false;
 
-    public long m_limit = -1;
-    public long m_offset = 0;
-
+    // Limit plan node information.
+    private LimitPlanNode m_limitNodeTop = null;
+    private LimitPlanNode m_limitNodeDist = null;
+    public boolean m_limitCanPushdown;
+    private long m_limit = -1;
+    private long m_offset = 0;
     private long m_limitParameterId = -1;
     private long m_offsetParameterId = -1;
+
     private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
@@ -139,6 +151,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasAverage = false;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
+
+    private boolean m_hasLargeNumberOfTableJoins = false;
+    // this list is the join order either from the user or parser if it has large number of table joins.
+    private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
 
     /**
     * Class constructor
@@ -206,6 +222,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_aggResultColumns = m_displayColumns;
         }
         placeTVEsinColumns();
+
+        // prepare the limit plan node if it needs one.
+        prepareLimitPlanNode();
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
@@ -652,6 +671,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             insertAggExpressionsToAggResultColumns(m_aggregationList, col);
             if (m_aggregationList.size() >= 1) {
                 m_hasAggregateExpression = true;
+
+                for (AbstractExpression agg: m_aggregationList) {
+                    assert(agg instanceof AggregateExpression);
+                    if (! m_hasAggregateDistinct &&
+                            ((AggregateExpression)agg).isDistinct() ) {
+                        m_hasAggregateDistinct = true;
+                        break;
+                    }
+                }
             }
 
             m_displayColumns.add(col);
@@ -687,12 +715,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 org.voltdb.catalog.Column catalogColumn =
                         tb.getColumns().getExact(groupbyCol.columnName);
                 groupbyCol.index = catalogColumn.getIndex();
-
-                Column partitionColumn = tb.getPartitioncolumn();
-                if (partitionColumn != null &&
-                    partitionColumn.getTypeName().equals(groupbyCol.columnName)) {
-                    m_hasPartitionColumnInGroupby = true;
-                }
             }
         }
         else
@@ -849,6 +871,68 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    private void prepareLimitPlanNode () {
+        if (!hasLimitOrOffset()) {
+            return;
+        }
+
+        int limitParamIndex = parameterCountIndexById(m_limitParameterId);
+        int offsetParamIndex = parameterCountIndexById(m_offsetParameterId);;
+
+        // The coordinator's top limit graph fragment for a MP plan.
+        // If planning "order by ... limit", getNextSelectPlan()
+        // will have already added an order by to the coordinator frag.
+        // This is the only limit node in a SP plan
+        m_limitNodeTop = new LimitPlanNode();
+        m_limitNodeTop.setLimit((int) m_limit);
+        m_limitNodeTop.setOffset((int) m_offset);
+        m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
+        m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
+
+        // check if limit can be pushed down
+        m_limitCanPushdown = !m_distinct;
+        if (m_limitCanPushdown) {
+            for (ParsedColInfo col : m_displayColumns) {
+                AbstractExpression rootExpr = col.expression;
+                if (rootExpr instanceof AggregateExpression) {
+                    if (((AggregateExpression)rootExpr).isDistinct()) {
+                        m_limitCanPushdown = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (m_limitCanPushdown) {
+            m_limitNodeDist = new LimitPlanNode();
+            // Offset on a pushed-down limit node makes no sense, just defaults to 0
+            // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
+            if (m_limit != -1) {
+                m_limitNodeDist.setLimit((int) (m_limit + m_offset));
+            }
+
+            if (hasLimitOrOffsetParameters()) {
+                AbstractExpression left = getParameterOrConstantAsExpression(m_offsetParameterId, m_offset);
+                assert (left != null);
+                AbstractExpression right = getParameterOrConstantAsExpression(m_limitParameterId, m_limit);
+                assert (right != null);
+                OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_PLUS, left, right);
+                expr.setValueType(VoltType.INTEGER);
+                expr.setValueSize(VoltType.INTEGER.getLengthInBytesForFixedTypes());
+                m_limitNodeDist.setLimitExpression(expr);
+            }
+            // else let the parameterized forms of offset/limit default to unused/invalid.
+        }
+    }
+
+    public LimitPlanNode getLimitNodeTop() {
+        return new LimitPlanNode(m_limitNodeTop);
+    }
+
+    public LimitPlanNode getLimitNodeDist() {
+        return new LimitPlanNode(m_limitNodeDist);
+    }
+
     @Override
     public String toString() {
         String retval = super.toString() + "\n";
@@ -879,8 +963,222 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return retval;
     }
 
+    public boolean hasJoinOrder() {
+        return m_joinOrder != null || m_hasLargeNumberOfTableJoins;
+    }
+
+    public ArrayList<JoinNode> getJoinOrder() {
+        return m_joinOrderList;
+    }
+
+    @Override
+    void postParse(String sql, String joinOrder) {
+        super.postParse(sql, joinOrder);
+
+        if (m_joinOrder != null) {
+            // User indicates a join order already
+            tryAddOneJoinOrder(m_joinOrder);
+            return;
+        }
+
+        // prepare the join order if needed
+        if (m_joinOrder == null &&
+                m_tableAliasList.size() > StatementCompiler.DEFAULT_MAX_JOIN_TABLES) {
+            // When there are large number of table joins, give up the all permutations.
+            // By default, try the join order with the SQL query table order first.
+            m_hasLargeNumberOfTableJoins = true;
+
+            StringBuilder sb = new StringBuilder();
+            String separator = "";
+            for (int ii = 0; ii < m_tableAliasList.size(); ii++) {
+                String tableAlias = m_tableAliasList.get(ii);
+                sb.append(separator).append(tableAlias);
+                separator = ",";
+            }
+            if (tryAddOneJoinOrder(sb.toString())) {
+                return;
+            }
+
+            // The input join order is not vailid
+            // Find one valid join order to run, which may not be the most efficient.
+            ArrayDeque<JoinNode> joinOrderQueue =
+                    SelectSubPlanAssembler.queueJoinOrders(m_joinTree, false);
+
+            // Currently, we get one join order, but it is easy to change the hard coded number
+            // to get more join orders for large table joins.
+            assert(joinOrderQueue.size() == 1);
+            assert(m_joinOrderList.size() == 0);
+            m_joinOrderList.addAll(joinOrderQueue);
+        }
+    }
+
+    private boolean tryAddOneJoinOrder(String joinOrder) {
+        ArrayList<String> tableAliases = new ArrayList<String>();
+        //Don't allow dups for now since self joins aren't supported
+        HashSet<String> dupCheck = new HashSet<String>();
+        // Calling trim() up front is important only in the case of a trailing comma.
+        // It allows a trailing comma followed by whitespace as in "A,B, " to be ignored
+        // like a normal trailing comma as in "A,B,". The alternatives would be to treat
+        // these as different cases (strange) or to complain about both -- which could be
+        // accomplished by appending an additional space to the join order here
+        // instead of calling trim.
+        for (String element : joinOrder.trim().split(",")) {
+            String alias = element.trim().toUpperCase();
+            tableAliases.add(alias);
+            if (!dupCheck.add(alias)) {
+                if (m_hasLargeNumberOfTableJoins) return false;
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("The specified join order \"").append(joinOrder);
+                sb.append("\" contains a duplicate element \"").append(alias).append("\".");
+                throw new PlanningErrorException(sb.toString());
+            }
+        }
+
+        //TODO: now that the table aliases list is built, the remaining validations
+        // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
+        // that generates a JoinNode tree or throws an exception.
+        if (m_tableAliasMap.size() != tableAliases.size()) {
+            if (m_hasLargeNumberOfTableJoins) return false;
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("The specified join order \"");
+            sb.append(joinOrder).append("\" does not contain the correct number of elements\n");
+            sb.append("Expected ").append(m_tableList.size());
+            sb.append(" but found ").append(tableAliases.size()).append(" elements.");
+            throw new PlanningErrorException(sb.toString());
+        }
+
+        Set<String> aliasSet = m_tableAliasMap.keySet();
+        Set<String> specifiedNames = new HashSet<String>(tableAliases);
+        specifiedNames.removeAll(aliasSet);
+        if (specifiedNames.isEmpty() == false) {
+            if (m_hasLargeNumberOfTableJoins) return false;
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("The specified join order \"");
+            sb.append(joinOrder).append("\" contains ");
+            int i = 0;
+            for (String name : specifiedNames) {
+                sb.append(name);
+                if (++i != specifiedNames.size()) {
+                    sb.append(',');
+                }
+            }
+            sb.append(" which ");
+            if (specifiedNames.size() == 1) {
+                sb.append("doesn't ");
+            } else {
+                sb.append("don't ");
+            }
+            sb.append("exist in the FROM clause");
+            throw new PlanningErrorException(sb.toString());
+        }
+
+        // Now check whether the specified join order is valid or not
+        if ( ! isValidJoinOrder(tableAliases)) {
+            if (m_hasLargeNumberOfTableJoins) return false;
+            throw new PlanningErrorException("The specified join order is invalid for the given query");
+        }
+
+        // Inserted one join tree to the list
+        assert(m_joinOrderList.size() > 0);
+        m_joinTree = m_joinOrderList.get(0);
+        return true;
+    }
+
+    /**
+     * Validate the specified join order against the join tree.
+     * In general, outer joins are not associative and commutative. Not all orders are valid.
+     * In case of a valid join order, the initial join tree is rebuilt to match the specified order
+     * @param tables list of table aliases(or tables) to join
+     * @return true if the join order is valid
+     */
+    private boolean isValidJoinOrder(List<String> tableAliases)
+    {
+        assert(m_joinTree != null);
+
+        // Split the original tree into the sub-trees having the same join type for all nodes
+        List<JoinNode> subTrees = m_joinTree.extractSubTrees();
+
+        // For a sub-tree with inner joins only any join order is valid. The only requirement is that
+        // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
+        // The outer joins are associative but changing the join order precedence
+        // includes moving ON clauses to preserve the initial SQL semantics. For example,
+        // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
+        // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
+        // At the moment, such transformations are not supported. The specified joined order must
+        // match the SQL order
+        int tableNameIdx = 0;
+        List<JoinNode> finalSubTrees = new ArrayList<JoinNode>();
+        // we need to process the sub-trees last one first because the top sub-tree is the first one on the list
+        for (int i = subTrees.size() - 1; i >= 0; --i) {
+            JoinNode subTree = subTrees.get(i);
+            // Get all tables for the subTree
+            List<JoinNode> subTableNodes = subTree.generateLeafNodesJoinOrder();
+            JoinNode joinOrderSubTree;
+            if ((subTree instanceof BranchNode) && ((BranchNode)subTree).getJoinType() != JoinType.INNER) {
+                // add the sub-tree as is
+                joinOrderSubTree = subTree;
+                for (JoinNode tableNode : subTableNodes) {
+                    if (tableNode.getId() >= 0) {
+                        String tableAlias = tableNode.getTableAlias();
+                        if ( ! tableAliases.get(tableNameIdx++).equals(tableAlias)) {
+                            return false;
+                        }
+                    }
+                }
+            } else {
+                // Collect all the "real" tables from the sub-tree skipping the nodes representing
+                // the sub-trees with the different join type (id < 0)
+                Map<String, JoinNode> nodeNameMap = new HashMap<String, JoinNode>();
+                for (JoinNode tableNode : subTableNodes) {
+                    if (tableNode.getId() >= 0) {
+                        nodeNameMap.put(tableNode.getTableAlias(), tableNode);
+                    }
+                }
+
+                // rearrange the sub tree to match the order
+                List<JoinNode> joinOrderSubNodes = new ArrayList<JoinNode>();
+                for (int j = 0; j < subTableNodes.size(); ++j) {
+                    if (subTableNodes.get(j).getId() >= 0) {
+                        assert(tableNameIdx < tableAliases.size());
+                        String tableAlias = tableAliases.get(tableNameIdx);
+                        if (tableAlias == null || ! nodeNameMap.containsKey(tableAlias)) {
+                            return false;
+                        }
+                        joinOrderSubNodes.add(nodeNameMap.get(tableAlias));
+                        ++tableNameIdx;
+                    } else {
+                        // It's dummy node
+                        joinOrderSubNodes.add(subTableNodes.get(j));
+                    }
+                }
+                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                //Collect all the join/where conditions to reassign them later
+                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
+                if (combinedWhereExpr != null) {
+                    joinOrderSubTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
+                }
+                // The new tree root node id must match the original one to be able to reconnect the
+                // subtrees
+                joinOrderSubTree.setId(subTree.getId());
+            }
+            finalSubTrees.add(0, joinOrderSubTree);
+        }
+        // if we got there the join order is OK. Rebuild the whole tree
+        JoinNode newNode = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
+        m_joinOrderList.add(newNode);
+        return true;
+    }
+
+
     public boolean hasAggregateExpression () {
         return m_hasAggregateExpression;
+    }
+
+    public boolean hasAggregateOrGroupby() {
+        return m_hasAggregateExpression || isGrouped();
     }
 
     public NodeSchema getFinalProjectionSchema () {
@@ -903,12 +1201,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_hasPartitionColumnInGroupby;
     }
 
+    public void setHasPartitionColumnInGroupby() {
+        m_hasPartitionColumnInGroupby = true;
+    }
+
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }
 
     public boolean hasDistinct() {
         return m_distinct;
+    }
+
+    public boolean hasAggregateDistinct() {
+        return m_hasAggregateDistinct;
     }
 
     public List<ParsedColInfo> displayColumns() {
@@ -981,13 +1287,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return constant;
     }
 
-    public AbstractExpression getLimitExpression() {
-        return getParameterOrConstantAsExpression(m_limitParameterId, m_limit);
-    }
-
-    public AbstractExpression getOffsetExpression() {
-        return getParameterOrConstantAsExpression(m_offsetParameterId, m_offset);
-    }
 
     @Override
     public boolean isOrderDeterministic()

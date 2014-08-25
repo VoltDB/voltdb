@@ -386,6 +386,62 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    public void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
+        assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
+                expectedRows.getColumnCount(), actualRows.getColumnCount());
+
+        int i = 0;
+        while(expectedRows.advanceRow()) {
+            assertTrue(prefix + "too few actual rows; expected more than " + (i + 1), actualRows.advanceRow());
+
+            for (int j = 0; j < actualRows.getColumnCount(); j++) {
+                String columnName = actualRows.getColumnName(j);
+                String colPrefix = prefix + "row " + i + ": column: " + columnName + ": ";
+                VoltType actualTy = actualRows.getColumnType(j);
+                VoltType expectedTy = expectedRows.getColumnType(j);
+                assertEquals(colPrefix + "type mismatch", expectedTy, actualTy);
+
+                Object expectedObj = expectedRows.get(j,  expectedTy);
+                Object actualObj = expectedRows.get(j,  actualTy);
+                assertEquals(colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj,
+                        expectedObj, actualObj);
+            }
+
+            i++;
+        }
+        assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
+    }
+
+    static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        verifyProcFails(client, expectedMsg, "@AdHoc", stmt);
+    }
+
+    static public void verifyProcFails(Client client, String expectedMsg, String storedProc, Object... args) throws IOException {
+
+        String what;
+        if (storedProc.compareTo("@AdHoc") == 0) {
+            what = "the statement \"" + args[0] + "\"";
+        }
+        else {
+            what = "the stored procedure \"" + storedProc + "\"";
+        }
+
+        try {
+            client.callProcedure(storedProc, args);
+        }
+        catch (ProcCallException pce) {
+            String msg = pce.getMessage();
+            String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                    expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
+            assertTrue(diagnostic, msg.contains(expectedMsg));
+            return;
+        }
+
+        String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                expectedMsg + "\", but instead it threw nothing.";
+        fail(diagnostic);
+    }
+
 
     // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
     // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.

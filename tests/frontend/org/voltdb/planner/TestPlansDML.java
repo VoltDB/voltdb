@@ -117,6 +117,71 @@ public class TestPlansDML extends PlannerTestCase {
         }
     }
 
+    public void testInsertIntoSelectPlan() {
+        System.out.println("\n\n\nRUNNING testInsertIntoSelectPlan\n\n");
+
+        // This should be inferred as single-partition
+        pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2 WHERE A = ?");
+
+        // One fragment means a single-partition plan
+        assertEquals(1, pns.size());
+
+        // But this should be multi-partition
+        pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2");
+        assertEquals(2, pns.size());
+
+        // Single-partition
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT P2.A, P3.F " +
+                "FROM P2 INNER JOIN P3 ON P2.A = P3.A " +
+                "WHERE P3.A = ?");
+        assertEquals(1, pns.size());
+
+        // Multi-partition
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT P2.A, P3.F " +
+                "FROM P2 INNER JOIN P3 ON P2.A = P3.A ");
+        assertEquals(2, pns.size());
+
+
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT sq.sqa, 7 " +
+                "FROM (SELECT P2.A AS sqa FROM P2) AS sq;");
+        assertEquals(2, pns.size());
+
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT sq.sqa, 9 " +
+                "FROM (SELECT P2.A AS sqa FROM P2 WHERE P2.A = 9) AS sq;");
+        assertEquals(1, pns.size());
+
+        pns = compileToFragments("INSERT INTO P1 " +
+                "SELECT sq.sqa, 9 " +
+                "FROM (SELECT P2.A AS sqa FROM P2) AS sq " +
+                "WHERE sq.sqa = 10;");
+        assertEquals(1, pns.size());
+
+        pns = compileToFragments(
+                "INSERT INTO P1 " +
+                "select P2_subq.Asq, P3_subq.Fsq  " +
+                "from (select 7, P2_subq_subq.Esqsq as Esq, P2_subq_subq.Asqsq as Asq from " +
+                "   (select P2.E as Esqsq, P2.A as Asqsq from P2) as P2_subq_subq) as P2_subq " +
+                "inner join " +
+                "(select P3.A as Asq, P3.F as Fsq from P3) as P3_subq " +
+                "on P3_subq.Asq = P2_subq.Asq;");
+        assertEquals(2, pns.size());
+
+        pns = compileToFragments(
+                "INSERT INTO P1 " +
+                "select P2_subq.Asq, P3_subq.Fsq  " +
+                "from (select 7, P2_subq_subq.Esqsq as Esq, P2_subq_subq.Asqsq as Asq from " +
+                "   (select P2.E as Esqsq, P2.A as Asqsq from P2 " +
+                "     where P2.A = ?) as P2_subq_subq) as P2_subq " +
+                "inner join " +
+                "(select P3.A as Asq, P3.F as Fsq from P3) as P3_subq " +
+                "on P3_subq.Asq = P2_subq.Asq;");
+        assertEquals(1, pns.size());
+    }
+
     private void checkTruncateFlag() {
         assertTrue(pns.size() == 2);
 

@@ -43,6 +43,7 @@ public class VoltDDLElementTracker {
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
+    final Set<String> m_importLines = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -82,6 +83,10 @@ public class VoltDDLElementTracker {
         m_extraClassses.addAll(classNames);
     }
 
+    void addImportLine(String importLine) {
+        m_importLines.add(importLine);
+    }
+
     /**
      * Tracks the given procedure descriptor if it is not already tracked
      * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
@@ -102,6 +107,26 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+    }
+
+    /**
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
+     */
+    void removeProcedure(String procName) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
     }
 
     /**

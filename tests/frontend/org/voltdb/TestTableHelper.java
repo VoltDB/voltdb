@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 public class TestTableHelper extends TestCase {
 
     public void testShorthand() {
-        VoltTable t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(2,BAR)");
+        VoltTable t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR)");
         assertEquals("C0", t.getColumnName(0));
         assertEquals("BAR", t.getColumnName(1));
         assertEquals("A", t.getColumnName(2));
@@ -47,8 +47,29 @@ public class TestTableHelper extends TestCase {
         assertEquals(true, t.getColumnNullable(1));
         assertEquals(true, t.getColumnNullable(2));
         assertEquals(12, t.getColumnMaxSize(2));
+        assertEquals(-1, t.m_extraMetadata.partitionColIndex);
 
         System.out.println(TableHelper.ddlForTable(t));
+
+        // try the same thing, but partitioned
+        t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(A) PK(2,BAR)");
+        assertEquals("C0", t.getColumnName(0));
+        assertEquals("BAR", t.getColumnName(1));
+        assertEquals("A", t.getColumnName(2));
+        assertEquals(VoltType.BIGINT, t.getColumnType(0));
+        assertEquals(VoltType.TINYINT, t.getColumnType(1));
+        assertEquals(VoltType.STRING, t.getColumnType(2));
+        assertEquals(false, t.getColumnUniqueness(0));
+        assertEquals(false, t.getColumnUniqueness(1));
+        assertEquals(true, t.getColumnUniqueness(2));
+        assertEquals(VoltTable.ColumnInfo.NO_DEFAULT_VALUE, t.getColumnDefaultValue(0));
+        assertEquals(VoltTable.ColumnInfo.NO_DEFAULT_VALUE, t.getColumnDefaultValue(1));
+        assertEquals("foo", t.getColumnDefaultValue(2));
+        assertEquals(false, t.getColumnNullable(0));
+        assertEquals(true, t.getColumnNullable(1));
+        assertEquals(true, t.getColumnNullable(2));
+        assertEquals(12, t.getColumnMaxSize(2));
+        assertEquals(2, t.m_extraMetadata.partitionColIndex);
 
         t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD')");
         assertEquals("likes", t.getColumnName(0));
@@ -67,6 +88,29 @@ public class TestTableHelper extends TestCase {
         assertEquals(true, t.getColumnNullable(1));
         assertEquals(true, t.getColumnNullable(2));
         assertEquals(255, t.getColumnMaxSize(2));
+        assertEquals(-1, t.m_extraMetadata.partitionColIndex);
+
+        System.out.println(TableHelper.ddlForTable(t));
+
+        // try the same thing, but partitioned
+        t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD') P(0)");
+        assertEquals("likes", t.getColumnName(0));
+        assertEquals("C1", t.getColumnName(1));
+        assertEquals("A", t.getColumnName(2));
+        assertEquals(VoltType.SMALLINT, t.getColumnType(0));
+        assertEquals(VoltType.TINYINT, t.getColumnType(1));
+        assertEquals(VoltType.VARBINARY, t.getColumnType(2));
+        assertEquals(false, t.getColumnUniqueness(0));
+        assertEquals(false, t.getColumnUniqueness(1));
+        assertEquals(false, t.getColumnUniqueness(2));
+        assertEquals(VoltTable.ColumnInfo.NO_DEFAULT_VALUE, t.getColumnDefaultValue(0));
+        assertEquals("8", t.getColumnDefaultValue(1));
+        assertEquals("ABCD", t.getColumnDefaultValue(2));
+        assertEquals(true, t.getColumnNullable(0));
+        assertEquals(true, t.getColumnNullable(1));
+        assertEquals(true, t.getColumnNullable(2));
+        assertEquals(255, t.getColumnMaxSize(2));
+        assertEquals(0, t.m_extraMetadata.partitionColIndex);
 
         System.out.println(TableHelper.ddlForTable(t));
     }
@@ -82,11 +126,11 @@ public class TestTableHelper extends TestCase {
         VoltTable t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD')");
         TableHelper.randomFill(t, 10, 128, r);
 
-        t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(2,BAR)");
+        t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR)");
         TableHelper.randomFill(t, 10, 128, r);
         System.out.println(t.toString());
 
-        VoltTable t2 = TableHelper.quickTable("FOO (BAR:DOUBLE, C0:BIGINT-N, A:VARCHAR14/'foo') P(2,BAR)");
+        VoltTable t2 = TableHelper.quickTable("FOO (BAR:DOUBLE, C0:BIGINT-N, A:VARCHAR14/'foo') PK(2,BAR)");
 
         TableHelper.migrateTable(t, t2);
         System.out.println(t2.toString());
@@ -95,11 +139,16 @@ public class TestTableHelper extends TestCase {
     /**
      * Create and mutate random tables. Just try to not crash here.
      * TestLiveTableSchemaMigration does more *real* stuff.
+     * @throws Exception
      */
-    public void testRandomTables() {
+    public void testRandomTables() throws Exception {
+        Random r = new Random(0);
         for (int i = 0; i < 1000; i++) {
-            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", new Random());
-            /*VoltTable t2 =*/ TableHelper.mutateTable(t1, true, new Random());
+            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", r);
+            VoltTable t2 = TableHelper.mutateTable(t1, true, r);
+            TableHelper.getAlterTableDDLToMigrate(t1, t2);
+            TableHelper.randomFill(t1, 50, 32, r);
+            TableHelper.migrateTable(t1, t2);
         }
     }
 

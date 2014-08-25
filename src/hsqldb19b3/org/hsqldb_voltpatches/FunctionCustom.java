@@ -169,6 +169,10 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.LTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.RTRIM, FUNC_TRIM_CHAR);
         customRegularFuncMap.put(Tokens.LEFT, FUNC_LEFT);
+        // A VoltDB extension to support WEEKOFYEAR, WEEKDAY function
+        customRegularFuncMap.put(Tokens.WEEKOFYEAR, FUNC_EXTRACT);
+        customRegularFuncMap.put(Tokens.WEEKDAY, FUNC_EXTRACT);
+        // End of VoltDB extension
 
         //
         customRegularFuncMap.put(Tokens.IDENTITY, FUNC_IDENTITY);
@@ -311,6 +315,13 @@ public class FunctionCustom extends FunctionSQL {
                     // End of VoltDB extension
                     break;
 
+                 // A VoltDB extension to customize the SQL function set support
+                case Tokens.WEEK :
+                case Tokens.WEEKOFYEAR:
+                	function.extractSpec = Tokens.WEEK_OF_YEAR;
+                	break;
+                // case Tokens.WEEKDAY is handled by default case
+                // End of VoltDB extension
                 case Tokens.DAYOFMONTH :
                     function.extractSpec = Tokens.DAY_OF_MONTH;
                     break;
@@ -352,6 +363,11 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
+            	// A VoltDB extension to let CONCAT support more than 2 parameters
+            	// this line should be never called because volt check FunctionForVoltDB first
+            	voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+            	break;
+            	// End of VoltDB extension
             case FUNC_LEFT :
                 parseList = doubleParamList;
                 break;

@@ -51,7 +51,7 @@ TEMPLATE = r"""
         },
 
         "AWSRegionArch2AMI": {
-            "us-east-1"     : { "64": "ami-ba28c7d2", "64HVM": "NOT YET SUPPORTED" }
+            "us-east-1"     : { "64": "$amiid", "64HVM": "NOT YET SUPPORTED" }
         }
     },
 
@@ -277,7 +277,7 @@ SERVER_TEMPLATE = r"""
                                                                      "# Sync clocks so that they are close enough to start a cluster\n",
                                                                      "service ntp stop\n",
                                                                      "a=\"1.0\"\n",
-                                                                     "while [ $$(echo \"$${a#-}>0.08\" | bc) -eq 1 ];\n",
+                                                                     "while [ $$(echo \"$${a#-}>0.05\" | bc) -eq 1 ];\n",
                                                                      "do a=`ntpdate -p 8 ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, " | awk '{ print $$10 }'`; done\n",
                                                                      "\n",
 
@@ -297,12 +297,13 @@ SERVER_TEMPLATE = r"""
 """
 
 def main():
-    if (len(sys.argv) != 3):
-        print "Usage: %s HOSTCOUNT KSAFETY" % (sys.argv[0])
+    if (len(sys.argv) != 4):
+        print "Usage: %s HOSTCOUNT KSAFETY AMI-ID" % (sys.argv[0])
         return -1
 
     params = dict(hosts=int(sys.argv[1]),
                   ksafety=int(sys.argv[2]),
+                  amiid=sys.argv[3],
                   zone="",
                   zone_ref="")
 

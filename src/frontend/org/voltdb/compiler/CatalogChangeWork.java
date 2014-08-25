@@ -22,32 +22,67 @@ import org.voltdb.client.ProcedureInvocationType;
 public class CatalogChangeWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -5257248292283453286L;
 
-    final byte[] catalogBytes;
-    final String deploymentString;
-    final long originalTxnId;
-    final long originalUniqueId;
-    final ProcedureInvocationType invocationType;
+    // The bytes for the catalog operation, if any.  May be null in all cases
+    // For @UpdateApplicationCatalog, this will contain the compiled catalog jarfile bytes
+    // For @UpdateClasses, this will contain the class jarfile bytes
+    // For @AdHoc DDL work, this will be null
+    final byte[] operationBytes;
+    // The string for the catalog operation, if any.  May be null in all cases
+    // For @UpdateApplicationCatalog, this will contain the deployment string to apply
+    // For @UpdateClasses, this will contain the class deletion patterns
+    // For @AdHoc DDL work, this will be null
+    final String operationString;
+    final String[] adhocDDLStmts;
 
     public CatalogChangeWork(
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
-            Object clientData, byte[] catalogBytes, String deploymentString,
-            ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
+            Object clientData, byte[] operationBytes, String operationString,
+            String invocationName, ProcedureInvocationType type,
+            long originalTxnId, long originalUniqueId,
+            boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData,
+              adminConnection, clientData, invocationName, type,
+              originalTxnId, originalUniqueId,
+              onReplica, useAdhocDDL,
               completionHandler);
-        if (catalogBytes != null) {
-            this.catalogBytes = catalogBytes.clone();
+        if (operationBytes != null) {
+            this.operationBytes = operationBytes.clone();
         }
         else {
-            this.catalogBytes = null;
+            this.operationBytes = null;
         }
-        this.deploymentString = deploymentString;
-        this.invocationType = type;
-        this.originalTxnId = originalTxnId;
-        this.originalUniqueId = originalUniqueId;
+        this.operationString = operationString;
+        adhocDDLStmts = null;
     }
 
+    /**
+     * To process adhoc DDL, we want to convert the AdHocPlannerWork we received from the
+     * ClientInterface into a CatalogChangeWork object for the AsyncCompilerAgentHelper to
+     * grind on.
+     */
+    public CatalogChangeWork(AdHocPlannerWork adhocDDL)
+    {
+        super(adhocDDL.replySiteId,
+              adhocDDL.shouldShutdown,
+              adhocDDL.clientHandle,
+              adhocDDL.connectionId,
+              adhocDDL.hostname,
+              adhocDDL.adminConnection,
+              adhocDDL.clientData,
+              adhocDDL.invocationName,
+              adhocDDL.invocationType,
+              adhocDDL.originalTxnId,
+              adhocDDL.originalUniqueId,
+              adhocDDL.onReplica,
+              adhocDDL.useAdhocDDL,
+              adhocDDL.completionHandler);
+        // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
+        this.operationBytes = null;
+        // Ditto for deployment string
+        this.operationString = null;
+        this.adhocDDLStmts = adhocDDL.sqlStatements;
+    }
 }

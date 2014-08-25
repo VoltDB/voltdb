@@ -89,6 +89,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class SnapshotUtil {
 
     public final static String HASH_EXTENSION = ".hash";
+    public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
     public static final String JSON_NONCE = "nonce";
@@ -432,6 +433,29 @@ public class SnapshotUtil {
             throw new IOException("Unable to write snapshot catalog to file: " +
                                   path + File.separator + filename, ioe);
         }
+    }
+
+    /**
+     * Write the .complete file for finished snapshot
+     */
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
+
+        final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
+        if (f.exists()) {
+            if (!f.delete()) {
+                throw new IOException("Failed to replace existing " + f.getName());
+            }
+        }
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
     }
 
     /**
@@ -1168,6 +1192,10 @@ public class SnapshotUtil {
      */
     public static final String constructHashinatorConfigFilenameForNonce(String nonce, int hostId) {
         return (nonce + "-host_" + hostId + HASH_EXTENSION);
+    }
+
+    public static final String constructCompletionFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + COMPLETION_EXTENSION);
     }
 
     /**

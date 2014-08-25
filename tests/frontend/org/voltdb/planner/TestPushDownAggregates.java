@@ -235,22 +235,76 @@ public class TestPushDownAggregates extends PlannerTestCase {
     }
 
     public void testMultiPartLimitPushdown() {
-        List<AbstractPlanNode> pn =
-                compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
+        List<AbstractPlanNode> pns;
+        // push down the limit because of the order by
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
+        checkLimitPushedDown(pns, true);
 
-        for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
-        }
+        // order by does not cover all group by columns
+        pns = compileToFragments("select B3, C3, count(*) as tag from T3 group by B3, C3 order by B3 limit 1");
+        printExplainPlan(pns);
+        checkLimitPushedDown(pns, false);
+
+
+        // T1 is partitioned on PKEY column
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, count(*)+1 limit 1");
+        checkLimitPushedDown(pns, false);
+
+        pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1, ABS(count(*)+1) limit 1");
+        checkLimitPushedDown(pns, false);
+
+        //
+        // T3 is partitioned on A3 column: group by partition column is another story
+        //
+        pns = compileToFragments("select A3, count(*) as tag from T3 group by A3 order by tag limit 1");
+        checkLimitPushedDown(pns, true);
+
+        // function on partition column
+        pns = compileToFragments("select ABS(A3), count(*) as tag from T3 group by ABS(A3) order by tag limit 1");
+        checkLimitPushedDown(pns, false);
+
+
+        // Add a replicate table to test
+        pns = compileToFragments("select A1, count(*) as tag from R1 group by A1 order by tag limit 1");
+        assertEquals(1, pns.size());
+        assertTrue(pns.get(0).toExplainPlanString().contains("LIMIT"));
+
+        //
+        // Partition table join, limit push down
+        //
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pns, true);
+
+        pns = compileToFragments("select A3, B4, count(A3) as tag from T3, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag+1 desc limit 10");
+        checkLimitPushedDown(pns, true);
+
+        // One of the partition table is from sub-query
+        pns = compileToFragments("select A3, B4, count(CT) as tag " +
+                " from (select A3, count(*) CT from T3 GROUP BY A3) TEMP, T4 WHERE A3 = A4 " +
+                "group by A3, B4 order by tag desc limit 10");
+        checkLimitPushedDown(pns, true);
+
     }
 
-    public void testMultiPartLimitPushdownByOne() {
-        List<AbstractPlanNode> pn =
-                compileToFragments("select A1, count(*) as tag from T1 group by A1 order by 1 limit 1");
-
-        for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+    private void checkLimitPushedDown(List<AbstractPlanNode> pn, boolean pushdown) {
+        assertEquals(2, pn.size());
+        // inline limit with order by node
+        assertTrue(pn.get(0).toExplainPlanString().contains("inline LIMIT"));
+        if (pushdown) {
+            assertTrue(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
+        } else {
+            assertFalse(pn.get(1).toExplainPlanString().contains("inline LIMIT"));
         }
     }
 
@@ -283,25 +337,29 @@ public class TestPushDownAggregates extends PlannerTestCase {
      *
      * @param np
      *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
+     * @param isAggInlined
+     *            Whether or not the aggregate node can be inlined
      * @param aggTypes
      *            The expected aggregate types for the original aggregate node.
      * @param pushDownTypes
      *            The expected aggregate types for the top aggregate node after
      *            pushing the original aggregate node down.
      */
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
-        checkPushedDown(pn, isMultiPart, aggTypes, pushDownTypes, false);
+        checkPushedDown(pn, isAggInlined, aggTypes, pushDownTypes, false);
     }
 
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
-            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes, boolean hasProjectionNode) {
-        assertTrue(pn.size() > 0);
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isAggInlined,
+            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes,
+            boolean hasProjectionNode) {
+
+        // Aggregate push down check has to run on two fragments
+        assertTrue(pn.size() == 2);
 
         AbstractPlanNode p = pn.get(0).getChild(0);;
         if (hasProjectionNode) {
+            // Complex aggregation or optimized AVG
             assertTrue(p instanceof ProjectionPlanNode);
             p = p.getChild(0);
         }
@@ -313,18 +371,28 @@ public class TestPushDownAggregates extends PlannerTestCase {
             assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));
         }
 
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-        } else {
-            p = p.getChild(0);
-        }
+        // Check the pushed down aggregation
+        p = pn.get(1).getChild(0);
 
         if (pushDownTypes == null) {
             assertTrue(p instanceof AbstractScanPlanNode);
             return;
         }
-        assertTrue(p instanceof AggregatePlanNode);
+
+        if (isAggInlined) {
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+            if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
+                p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);
+            } else {
+                p  = p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+            }
+
+        } else {
+            assertTrue(p instanceof AggregatePlanNode);
+        }
         fragmentString = p.toJSONString();
         for (ExpressionType type : aggTypes) {
             assertTrue(fragmentString.contains("\"AGGREGATE_TYPE\":\"" + type.toString() + "\""));

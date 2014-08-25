@@ -35,6 +35,7 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 
 using namespace std;
@@ -90,7 +91,7 @@ public:
         vector<TableIndexScheme> indexes;
 
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -108,11 +109,13 @@ public:
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
+    MockDRTupleStream drStream;
     vector<string> m_columnNames;
     vector<ValueType> m_tableSchemaTypes;
     vector<int32_t> m_tableSchemaColumnSizes;
     vector<bool> m_tableSchemaAllowNull;
     vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
 };
 
 TEST_F(PersistentTableMemStatsTest, InsertTest) {
@@ -134,7 +137,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -164,7 +167,7 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -213,7 +216,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -262,7 +265,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -297,7 +300,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 
@@ -325,7 +328,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 

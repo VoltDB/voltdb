@@ -67,6 +67,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 
 using namespace std;
 using namespace voltdb;
@@ -92,11 +93,13 @@ bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
 
 class TableTest : public Test {
 public:
-    TableTest() : m_table(NULL), temp_table(NULL), persistent_table(NULL) {
+    TableTest() : m_table(NULL), temp_table(NULL), persistent_table(NULL), limits(1024 * 1024)
+    {
         srand(0);
         init(false); // default is temp_table. call init(true) to make it transactional
     }
-    ~TableTest() {
+    ~TableTest()
+    {
         delete m_table;
     }
 
@@ -119,10 +122,9 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature, &drStream, false);
             m_table = persistent_table;
         } else {
-            limits.setMemoryLimit(1024 * 1024);
             temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
             m_table = temp_table;
         }
@@ -133,7 +135,8 @@ protected:
     Table* temp_table;
     Table* persistent_table;
     TempTableLimits limits;
-    int tempTableMemory;
+    MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(TableTest, ValueTypes) {

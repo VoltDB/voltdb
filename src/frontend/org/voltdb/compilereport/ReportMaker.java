@@ -103,15 +103,21 @@ public class ReportMaker {
         sb.append(StringUtils.join(columnNames, ", "));
         sb.append("</td>");
 
-        // uniqueness column
+        // attribute column
         sb.append("<td>");
         if (index.getAssumeunique()) {
-            tag(sb, "important", "AssumeUnique");
+            tag(sb, "success", "AssumeUnique");
         } else if (index.getUnique()) {
-            tag(sb, "important", "Unique");
+            tag(sb, "success", "Unique");
         } else {
             tag(sb, "info", "Nonunique");
         }
+        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
+        if(annotation == null) {
+            sb.append(" ");
+            tag(sb, "important", "Unused");
+        }
+
         sb.append("</td>");
 
         sb.append("</tr>\n");
@@ -120,7 +126,6 @@ public class ReportMaker {
         sb.append("<tr class='dropdown2'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
                 "-" + index.getTypeName().toLowerCase() + "--dropdown'>\n");
 
-        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
         if (annotation != null) {
             if (annotation.proceduresThatUseThis.size() > 0) {
                 sb.append("<p>Used by procedures: ");
@@ -144,14 +149,14 @@ public class ReportMaker {
                   "<th>Index Name</th>" +
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
-                  "<th>Uniqueness</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "<th>Attributes</th>" +
+                  "</tr>\n");
 
         for (Index index : table.getIndexes()) {
             sb.append(genrateIndexRow(table, index));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
@@ -208,6 +213,18 @@ public class ReportMaker {
         // column 5: index count
         sb.append("<td>");
         sb.append(table.getIndexes().size());
+
+        // computing unused indexes
+        int unusedIndexes = 0;
+        for (Index index : table.getIndexes()) {
+            IndexAnnotation indexAnnotation = (IndexAnnotation) index.getAnnotation();
+               if(indexAnnotation == null) {
+                   unusedIndexes++;
+               }
+        }
+        if(unusedIndexes !=0 ) {
+            sb.append(" (" + unusedIndexes +" unused)");
+        }
         sb.append("</td>");
 
         // column 6: has pkey
@@ -399,13 +416,13 @@ public class ReportMaker {
                   "<th>Params</th>" +
                   "<th>R/W</th>" +
                   "<th>Attributes</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "</tr>\n");
 
         for (Statement statement : procedure.getStatements()) {
             sb.append(genrateStatementRow(procedure, statement));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
@@ -851,7 +868,7 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -890,6 +907,8 @@ public class ReportMaker {
         contents = contents.replace("##PLATFORM##", platformData);
 
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
+
+        contents = contents.replace("##DDL##", autoGenDDL);
 
         DateFormat df = new SimpleDateFormat("d MMM yyyy HH:mm:ss z");
         contents = contents.replace("##TIMESTAMP##", df.format(m_timestamp));

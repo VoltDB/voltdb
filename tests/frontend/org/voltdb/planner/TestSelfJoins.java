@@ -29,7 +29,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -226,7 +226,8 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select B.C, MAX(A.C) FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.C ORDER BY B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -252,8 +253,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         pn = apn.getChild(0).getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -276,7 +276,8 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 GROUP BY B.A, B.C ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -304,8 +305,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         pn = apn.getChild(0).getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof HashAggregatePlanNode);
-        pn = pn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -330,7 +330,8 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 GROUP BY B.C, B.A ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());

@@ -581,6 +581,9 @@ class Distributer {
                 e1.printStackTrace();
             }
 
+            // track the timestamp of the most recent read on this connection
+            m_lastResponseTimeNanos = nowNanos;
+
             final long handle = response.getClientHandle();
 
             // handle ping response and get out
@@ -602,9 +605,6 @@ class Distributer {
 
                 return;
             }
-
-            // track the timestamp of the most recent read on this connection
-            m_lastResponseTimeNanos = nowNanos;
 
             //Race with expiration thread to be the first to remove the callback
             //from the map and process it

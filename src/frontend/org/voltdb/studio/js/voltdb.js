@@ -110,11 +110,11 @@ var IVoltDB = (function(){
         {
             var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/' 
             var params = this.BuildParamSet(procedure, parameters);
-            if (typeof(uri) == 'string' && typeof(uri) == 'string')
+            if (typeof(params) == 'string')
                 jQuery.postJSON(uri, params, callback);
             else
                 if (callback != null)
-                    callback({"status":-1,"statusstring":"PrepareStatement error: " + uri[0],"results":[]});
+                    callback({"status":-1,"statusstring":"PrepareStatement error: " + params[0],"results":[]});
         }
         var CallbackWrapper = function(userCallback)
         {
@@ -323,6 +323,7 @@ var IVoltDB = (function(){
                                                   , '@Promote': { '0' : ['Returns bit'] }
                                                   , '@ValidatePartitioning': { '2' : ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                                                   , '@GetPartitionKeys': { '1' : ['VoltType (varchar)', 'Returns Table[]'] }
+                                                  , '@ApplyBinaryLogSP': { '2' : ['Partition (varbinary)', 'log (varbinary)', 'Returns Table[]'] }
                                                   };
 
                 /*
@@ -390,8 +391,7 @@ var IVoltDB = (function(){
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
         var conn = new Connection(server, port, admin, user, password, isHashedPassword);
-        var timeout = setTimeout(function() {onConnectionTested(false);}, 5000);
-        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) {clearTimeout(timeout); onConnectionTested(true); } else onConnectionTested(false);} catch(x) {clearTimeout(timeout); onConnectionTested(true);} });
+        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) { onConnectionTested(true); } else onConnectionTested(false);} catch(x) {onConnectionTested(true);} });
     }
     this.AddConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionAdded)
     {

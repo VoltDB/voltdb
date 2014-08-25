@@ -669,23 +669,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException {
+    protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
-        try {
-            final byte catalogBytes[] = serializedCatalog.getBytes("UTF-8");
-            if (m_data.capacity() < catalogBytes.length + 100) {
-                m_data = ByteBuffer.allocate(catalogBytes.length + 100);
-            }
-            m_data.putInt(Commands.LoadCatalog.m_id);
-            m_data.putLong(timestamp);
-            m_data.put(catalogBytes);
-            m_data.put((byte)'\0');
-        } catch (final UnsupportedEncodingException ex) {
-            Logger.getLogger(ExecutionEngineIPC.class.getName()).log(
-                    Level.SEVERE, null, ex);
+        if (m_data.capacity() < catalogBytes.length + 100) {
+            m_data = ByteBuffer.allocate(catalogBytes.length + 100);
         }
+        m_data.putInt(Commands.LoadCatalog.m_id);
+        m_data.putLong(timestamp);
+        m_data.put(catalogBytes);
+        m_data.put((byte)'\0');
 
         try {
             m_data.flip();
@@ -770,6 +764,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -807,6 +802,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(cmd.m_id);
+        m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
@@ -836,12 +832,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
             final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
 
@@ -865,7 +862,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String lastAccessedTable = m_connection.readString(size);
                     long lastAccessedTableSize = m_connection.readLong();
                     long tuplesFound = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
+                    long currMemoryInBytes = m_connection.readLong();
+                    long peakMemoryInBytes = m_connection.readLong();
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
+                            currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
                     m_data.putLong(nextStep);
                     m_data.flip();
@@ -910,8 +910,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
+            final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -920,10 +920,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);
+        m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
+        m_data.putInt(shouldDRStream ? 1 : 0);
 
         final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
         if (m_data.remaining() < tableBytes.remaining()) {
@@ -1443,11 +1445,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
         m_data.clear();
         m_data.putInt(Commands.executeTask.m_id);
         m_data.putLong(taskType.taskId);
-        m_data.put(task);
+        m_data.put(task.array());
         try {
             m_data.flip();
             m_connection.write();
@@ -1474,5 +1476,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             Throwables.propagate(e);
         }
         throw new RuntimeException("Failed to executeTask in IPC client");
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+        return ByteBuffer.allocate(requiredCapacity);
     }
 }

@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -29,31 +28,20 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -69,6 +57,7 @@ import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -78,9 +67,6 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.utils.NotImplementedException;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Text;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -94,6 +80,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class VoltProjectBuilder {
 
     final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
+    private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
         private final String groups[];
@@ -131,7 +118,12 @@ public class VoltProjectBuilder {
             this.groups = groups;
             this.cls = null;
             this.name = name;
-            this.sql = sql;
+            if (sql.endsWith(";")) {
+                this.sql = sql;
+            }
+            else {
+                this.sql = sql + ";";
+            }
             this.partitionInfo = partitionInfo;
             this.joinOrder = joinOrder;
             assert(this.name != null);
@@ -225,13 +217,8 @@ public class VoltProjectBuilder {
         }
     }
 
-    final ArrayList<String> m_exportTables = new ArrayList<String>();
-
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
-    final LinkedHashSet<GroupInfo> m_groups = new LinkedHashSet<GroupInfo>();
-    final LinkedHashSet<ProcedureInfo> m_procedures = new LinkedHashSet<ProcedureInfo>();
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
-    final LinkedHashMap<String, String> m_partitionInfos = new LinkedHashMap<String, String>();
 
     String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
@@ -280,6 +267,8 @@ public class VoltProjectBuilder {
     private Integer m_elasticTargetThroughput = null;
     private Integer m_elasticTargetPauseTime = null;
 
+    private boolean m_useAdhocSchema = false;
+
     public VoltProjectBuilder setElasticTargetThroughput(int target) {
         m_elasticTargetThroughput = target;
         return this;
@@ -292,6 +281,10 @@ public class VoltProjectBuilder {
 
     public void setDeadHostTimeout(Integer deadHostTimeout) {
         m_deadHostTimeout = deadHostTimeout;
+    }
+
+    public void setUseAdhocSchema(boolean useIt) {
+        m_useAdhocSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -344,9 +337,22 @@ public class VoltProjectBuilder {
 
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
-            final boolean added = m_groups.add(info);
-            if (!added) {
-                assert(added);
+            transformer.append("CREATE ROLE " + info.name);
+            if(info.adhoc || info.defaultproc || info.sysproc) {
+                transformer.append(" WITH ");
+                if(info.adhoc) {
+                    transformer.append("adhoc,");
+                }
+                if(info.defaultproc) {
+                    transformer.append("defaultproc,");
+                }
+                if(info.sysproc) {
+                    transformer.append("sysproc,");
+                }
+                transformer.replace(transformer.length() - 1, transformer.length(), ";");
+            }
+            else {
+                transformer.append(";");
             }
         }
     }
@@ -425,13 +431,39 @@ public class VoltProjectBuilder {
         final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
-            assert(m_procedures.contains(procedure) == false);
             newProcs.add(procedure);
         }
 
         // add the procs
         for (final ProcedureInfo procedure : procedures) {
-            m_procedures.add(procedure);
+
+            // ALLOW clause in CREATE PROCEDURE stmt
+            StringBuffer roleInfo = new StringBuffer();
+            if(procedure.groups.length != 0) {
+                roleInfo.append(" ALLOW ");
+                for(int i = 0; i < procedure.groups.length; i++) {
+                    roleInfo.append(procedure.groups[i] + ",");
+                }
+                int length = roleInfo.length();
+                roleInfo.replace(length - 1, length, " ");
+            }
+
+            if(procedure.cls != null) {
+                transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
+            }
+            else if(procedure.sql != null) {
+                transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
+            }
+
+            if(procedure.partitionInfo != null) {
+                String[] parameter = procedure.partitionInfo.split(":");
+                String[] token = parameter[0].split("\\.");
+                String position = "";
+                if(Integer.parseInt(parameter[1].trim()) > 0) {
+                    position = " PARAMETER " + parameter[1];
+                }
+                transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
+            }
         }
     }
 
@@ -457,8 +489,7 @@ public class VoltProjectBuilder {
     }
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
-        assert(m_partitionInfos.containsKey(tableName) == false);
-        m_partitionInfos.put(tableName, partitionColumnName);
+        transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
     }
 
     public void setHTTPDPort(int port) {
@@ -523,7 +554,7 @@ public class VoltProjectBuilder {
 
     public void setTableAsExportOnly(String name) {
         assert(name != null);
-        m_exportTables.add(name);
+        transformer.append("Export TABLE " + name + ";");
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -549,14 +580,14 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, null);
+        return compile(jarPath, 1, 1, 0, null) != null;
     }
 
     public boolean compile(final String jarPath,
             final int sitesPerHost,
             final int replication) {
         return compile(jarPath, sitesPerHost, 1,
-                replication, null);
+                replication, null) != null;
     }
 
     public boolean compile(final String jarPath,
@@ -564,18 +595,22 @@ public class VoltProjectBuilder {
             final int hostCount,
             final int replication) {
         return compile(jarPath, sitesPerHost, hostCount,
-                replication, null);
+                replication, null) != null;
     }
 
-    public boolean compile(final String jarPath,
+    public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
             final int replication,
             final String voltRoot) {
         VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, voltRoot,
+        if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false),
-                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix);
+                       m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
+            return compiler.getCatalog();
+        } else {
+            return null;
+        }
     }
 
     public boolean compile(
@@ -638,66 +673,30 @@ public class VoltProjectBuilder {
         }
         m_voltRootPath = deploymentVoltRoot;
 
-        // this stuff could all be converted to org.voltdb.compiler.projectfile.*
-        // jaxb objects and (WE ARE!) marshaled to XML. Just needs some elbow grease.
-        // (see the deployment file code below, which has been converted).
-
-        DocumentBuilderFactory docFactory;
-        DocumentBuilder docBuilder;
-        Document doc;
+        // Add the DDL in the transformer to the schema files before compilation
         try {
-            docFactory = DocumentBuilderFactory.newInstance();
-            docBuilder = docFactory.newDocumentBuilder();
-            doc = docBuilder.newDocument();
-        }
-        catch (final ParserConfigurationException e) {
+            addLiteralSchema(transformer.toString());
+            transformer = new StringBuffer();
+        } catch (IOException e) {
             e.printStackTrace();
             return false;
         }
 
-        // <project>
-        final Element project = doc.createElement("project");
-        doc.appendChild(project);
+        String[] schemaPath = m_schemas.toArray(new String[0]);
 
-        // <database>
-        final Element database = doc.createElement("database");
-        database.setAttribute("name", "database");
-        project.appendChild(database);
-        buildDatabaseElement(doc, database);
-
-        // boilerplate to write this DOM object to file.
-        StreamResult result;
-        try {
-            final Transformer transformer = TransformerFactory.newInstance().newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            result = new StreamResult(new StringWriter());
-            final DOMSource domSource = new DOMSource(doc);
-            transformer.transform(domSource, result);
-        }
-        catch (final TransformerConfigurationException e) {
-            e.printStackTrace();
-            return false;
-        }
-        catch (final TransformerFactoryConfigurationError e) {
-            e.printStackTrace();
-            return false;
-        }
-        catch (final TransformerException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        /*String xml = result.getWriter().toString();
-        System.out.println(xml);*/
-
-        final File projectFile =
-            writeStringToTempFile(result.getWriter().toString());
-        final String projectPath = projectFile.getPath();
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
-        boolean success = compiler.compileWithProjectXML(projectPath, jarPath);
+
+        boolean success = false;
+        try {
+            success = compiler.compileFromDDL(jarPath, schemaPath);
+        } catch (VoltCompilerException e1) {
+            e1.printStackTrace();
+            return false;
+        }
+
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
@@ -758,144 +757,6 @@ public class VoltProjectBuilder {
         }
     }
 
-    private void buildDatabaseElement(Document doc, final Element database) {
-
-        // /project/database/groups
-        final Element groups = doc.createElement("groups");
-        database.appendChild(groups);
-
-        // groups/group
-        if (m_groups.isEmpty()) {
-            final Element group = doc.createElement("group");
-            group.setAttribute("name", "default");
-            group.setAttribute("sysproc", "true");
-            group.setAttribute("defaultproc", "true");
-            group.setAttribute("adhoc", "true");
-            groups.appendChild(group);
-        }
-        else {
-            for (final GroupInfo info : m_groups) {
-                final Element group = doc.createElement("group");
-                group.setAttribute("name", info.name);
-                group.setAttribute("sysproc", info.sysproc ? "true" : "false");
-                group.setAttribute("defaultproc", info.defaultproc ? "true" : "false");
-                group.setAttribute("adhoc", info.adhoc ? "true" : "false");
-                groups.appendChild(group);
-            }
-        }
-
-        // /project/database/schemas
-        final Element schemas = doc.createElement("schemas");
-        database.appendChild(schemas);
-
-        // schemas/schema
-        for (final String schemaPath : m_schemas) {
-            final Element schema = doc.createElement("schema");
-            schema.setAttribute("path", schemaPath);
-            schemas.appendChild(schema);
-        }
-
-        // /project/database/procedures
-        final Element procedures = doc.createElement("procedures");
-        database.appendChild(procedures);
-
-        // procedures/procedure
-        for (final ProcedureInfo procedure : m_procedures) {
-            if (procedure.cls == null)
-                continue;
-            assert(procedure.sql == null);
-
-            final Element proc = doc.createElement("procedure");
-            proc.setAttribute("class", procedure.cls.getName());
-            // build up @groups. This attribute should be redesigned
-            if (procedure.groups.length > 0) {
-                final StringBuilder groupattr = new StringBuilder();
-                for (final String group : procedure.groups) {
-                    if (groupattr.length() > 0)
-                        groupattr.append(",");
-                    groupattr.append(group);
-                }
-                proc.setAttribute("groups", groupattr.toString());
-            }
-            procedures.appendChild(proc);
-        }
-
-        // procedures/procedures (that are stmtprocedures)
-        for (final ProcedureInfo procedure : m_procedures) {
-            if (procedure.sql == null)
-                continue;
-            assert(procedure.cls == null);
-
-            final Element proc = doc.createElement("procedure");
-            proc.setAttribute("class", procedure.name);
-            if (procedure.partitionInfo != null);
-            proc.setAttribute("partitioninfo", procedure.partitionInfo);
-            // build up @groups. This attribute should be redesigned
-            if (procedure.groups.length > 0) {
-                final StringBuilder groupattr = new StringBuilder();
-                for (final String group : procedure.groups) {
-                    if (groupattr.length() > 0)
-                        groupattr.append(",");
-                    groupattr.append(group);
-                }
-                proc.setAttribute("groups", groupattr.toString());
-            }
-
-            final Element sql = doc.createElement("sql");
-            if (procedure.joinOrder != null) {
-                sql.setAttribute("joinorder", procedure.joinOrder);
-            }
-            proc.appendChild(sql);
-
-            final Text sqltext = doc.createTextNode(procedure.sql);
-            sql.appendChild(sqltext);
-
-            procedures.appendChild(proc);
-        }
-
-        if (m_partitionInfos.size() > 0) {
-            // /project/database/partitions
-            final Element partitions = doc.createElement("partitions");
-            database.appendChild(partitions);
-
-            // partitions/table
-            for (final Entry<String, String> partitionInfo : m_partitionInfos.entrySet()) {
-                final Element table = doc.createElement("partition");
-                table.setAttribute("table", partitionInfo.getKey());
-                table.setAttribute("column", partitionInfo.getValue());
-                partitions.appendChild(table);
-            }
-        }
-
-        // /project/database/classdependencies
-        final Element classdeps = doc.createElement("classdependencies");
-        database.appendChild(classdeps);
-
-        // classdependency
-        for (final Class<?> supplemental : m_supplementals) {
-            final Element supp= doc.createElement("classdependency");
-            supp.setAttribute("class", supplemental.getName());
-            classdeps.appendChild(supp);
-        }
-
-        // project/database/export
-        if (m_elloader != null) {
-            final Element export = doc.createElement("export");
-            database.appendChild(export);
-
-            if (m_exportTables.size() > 0) {
-                final Element tables = doc.createElement("tables");
-                export.appendChild(tables);
-
-                for (String exportTableName : m_exportTables) {
-                    final Element table = doc.createElement("table");
-                    table.setAttribute("name", exportTableName);
-                    tables.appendChild(table);
-                }
-            }
-        }
-    }
-
     /**
      * Utility method to take a string and put it in a file. This is used by
      * this class to write the project file to a temp file, but it also used
@@ -949,6 +810,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
+        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();

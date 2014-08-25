@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "common/debuglog.h"
+#include "common/StreamBlock.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -97,7 +98,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJ)J");
+    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJJJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_fragmentProgressUpdateMID != 0);
@@ -156,12 +157,38 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
+    if (m_partitionDRGatewayClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_partitionDRGatewayClass != NULL);
+        throw std::exception();
+    }
+
+    m_partitionDRGatewayClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_partitionDRGatewayClass));
+    if (m_partitionDRGatewayClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_partitionDRGatewayClass != NULL);
+        throw std::exception();
+    }
+
+    m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "pushDRBuffer",
+            "(ILjava/nio/ByteBuffer;)V");
+    if (m_pushDRBufferMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_pushDRBufferMID != NULL);
+        throw std::exception();
+    }
+
     if (m_nextDependencyMID == 0 ||
         m_crashVoltDBMID == 0 ||
         m_pushExportBufferMID == 0 ||
         m_getQueuedExportBytesMID == 0 ||
         m_exportManagerClass == 0 ||
-        m_fallbackToEEAllocatedBufferMID == 0)
+        m_fallbackToEEAllocatedBufferMID == 0 ||
+        m_partitionDRGatewayClass == 0 ||
+        m_pushDRBufferMID == 0)
     {
         throw std::exception();
     }
@@ -212,7 +239,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // Add the dependency buffer info to the stack object
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
-        ReferenceSerializeInput serialize_in(bytes, length);
+        ReferenceSerializeInputBE serialize_in(bytes, length);
         destination->loadTuplesFrom(serialize_in, stringPool);
         return 1;
     }
@@ -225,7 +252,9 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
                 std::string planNodeName,
                 std::string targetTableName,
                 int64_t targetTableSize,
-                int64_t tuplesProcessed) {
+                int64_t tuplesProcessed,
+                int64_t currMemoryInBytes,
+                int64_t peakMemoryInBytes) {
         JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
         if (jni_frame.checkResult() < 0) {
                 VOLT_ERROR("Unable to load dependency: jni frame error.");
@@ -244,10 +273,10 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
         }
 
     jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
-                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed);
+                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed,
+                currMemoryInBytes, peakMemoryInBytes);
     return (int64_t)nextStep;
 }
-
 
 std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);
@@ -391,6 +420,23 @@ void JNITopend::pushExportBuffer(
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();
+    }
+}
+
+void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+    if (block != NULL) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        //std::cout << "Block is length " << block->rawLength() << std::endl;
+        m_jniEnv->CallStaticVoidMethod(
+                m_partitionDRGatewayClass,
+                m_pushDRBufferMID,
+                partitionId,
+                buffer);
+        m_jniEnv->DeleteLocalRef(buffer);
     }
 }
 }

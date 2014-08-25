@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -68,11 +67,13 @@ public interface SiteProcedureConnection {
      */
     public byte[] loadTable(
             long txnId,
+            long spHandle,
             String clusterName,
             String databaseName,
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo)
     throws VoltAbortException;
 
@@ -81,9 +82,11 @@ public interface SiteProcedureConnection {
      */
     public byte[] loadTable(
             long txnId,
+            long spHandle,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo);
 
     /**
@@ -96,6 +99,7 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            long txnId,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;
@@ -181,4 +185,5 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
+    public void applyBinaryLog(byte logData[]);
 }

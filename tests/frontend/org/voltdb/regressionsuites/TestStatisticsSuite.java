@@ -48,7 +48,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
+import org.voltdb.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
