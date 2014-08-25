@@ -260,7 +260,8 @@ public class QueryPlanner {
 
         // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
         // to keep track of the best plan
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning,
+                (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, true);
 
@@ -280,7 +281,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.getReadOnly()) {
+        if (bestPlan.isReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -288,9 +289,10 @@ public class QueryPlanner {
             bestPlan.rootPlanGraph = sendNode;
         }
 
-        // Execute the generateOutputSchema and resolveColumnIndexes Once from the top plan node for only best plan
+        // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
+
         if (parsedStmt instanceof ParsedSelectStmt) {
             List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
@@ -307,16 +309,17 @@ public class QueryPlanner {
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit
-            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. Consider simplifying its subqueries: " + m_sql;
+            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
+                    + "Consider simplifying its subqueries: " + m_sql;
             return null;
         }
 
         if (receives.size() == 1) {
-        /*/ enable for debug ...
-        if (receives.size() > 1) {
-            System.out.println(plan.rootPlanGraph.toExplainPlanString());
-        }
-        // ... enable for debug */
+            /*/ enable for debug ...
+            if (receives.size() > 1) {
+                System.out.println(plan.rootPlanGraph.toExplainPlanString());
+            }
+            // ... enable for debug */
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }

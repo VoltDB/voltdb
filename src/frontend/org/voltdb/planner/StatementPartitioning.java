@@ -320,7 +320,6 @@ public class StatementPartitioning implements Cloneable{
     {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
-        Set<Object> tempPartitioningValues = new HashSet<Object>();
         int unfilteredPartitionKeyCount = 0;
 
         // reset this flag to forget the last result of the multiple partition access path.

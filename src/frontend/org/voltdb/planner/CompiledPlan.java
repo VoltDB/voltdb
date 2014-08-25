@@ -288,7 +288,7 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
-    public boolean getReadOnly() {
+    public boolean isReadOnly() {
         return m_readOnly;
     }
 

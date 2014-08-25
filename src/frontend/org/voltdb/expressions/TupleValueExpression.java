@@ -230,14 +230,14 @@ public class TupleValueExpression extends AbstractValueExpression {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
-        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
-            // Implying both sides have statement id set
-            // If one of the ids is not set it is considered to be a wild card
-            // matching any other id.
-            if (m_origStmtId != expr.m_origStmtId) {
-                return false;
-            }
-        }
+//        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
+//            // Implying both sides have statement id set
+//            // If one of the ids is not set it is considered to be a wild card
+//            // matching any other id.
+//            if (m_origStmtId != expr.m_origStmtId) {
+//                return false;
+//            }
+//        }
         if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
         }
@@ -268,7 +268,9 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = (m_origStmtId == -1) ? 0 : m_origStmtId;
+//        int result = (m_origStmtId == -1) ? 0 : m_origStmtId;
+
+        int result = 0;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
         }
