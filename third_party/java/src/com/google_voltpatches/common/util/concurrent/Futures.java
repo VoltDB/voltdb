@@ -32,6 +32,8 @@ import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Ordering;
+import com.google_voltpatches.common.collect.Queues;
+import com.google_voltpatches.common.collect.Sets;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -39,7 +41,9 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -786,9 +790,19 @@ public final class Futures {
    * Once the passed-in {@code ListenableFuture} is complete, it calls the
    * passed-in {@code Function} to generate the result.
    *
-   * <p>If the function throws any checked exceptions, they should be wrapped
-   * in a {@code UndeclaredThrowableException} so that this class can get
-   * access to the cause.
+   * <p>For historical reasons, this class has a special case in its exception
+   * handling: If the given {@code AsyncFunction} throws an {@code
+   * UndeclaredThrowableException}, {@code ChainingListenableFuture} unwraps it
+   * and uses its <i>cause</i> as the output future's exception, rather than
+   * using the {@code UndeclaredThrowableException} itself as it would for other
+   * exception types. The reason for this is that {@code Futures.transform} used
+   * to require a {@code Function}, whose {@code apply} method is not allowed to
+   * throw checked exceptions. Nowadays, {@code Futures.transform} has an
+   * overload that accepts an {@code AsyncFunction}, whose {@code apply} method
+   * <i>is</i> allowed to throw checked exception. Users who wish to throw
+   * checked exceptions should use that overload instead, and <a
+   * href="http://code.google.com/p/guava-libraries/issues/detail?id=1548">we
+   * should remove the {@code UndeclaredThrowableException} special case</a>.
    */
   private static class ChainingListenableFuture<I, O>
       extends AbstractFuture<O> implements Runnable {
@@ -847,7 +861,8 @@ public final class Futures {
         }
 
         final ListenableFuture<? extends O> outputFuture = this.outputFuture =
-            function.apply(sourceResult);
+            Preconditions.checkNotNull(function.apply(sourceResult),
+                "AsyncFunction may not return null.");
         if (isCancelled()) {
           outputFuture.cancel(wasInterrupted());
           this.outputFuture = null;
@@ -903,8 +918,9 @@ public final class Futures {
    * #transform(ListenableFuture, AsyncFunction)}, in that the returned {@code
    * Future} attempts to keep its cancellation state in sync with both the
    * input {@code Future} and the nested {@code Future}.  The transformation
-   * is very lightweight and therefore takes place in the thread that called
-   * {@code dereference}.
+   * is very lightweight and therefore takes place in the same thread (either
+   * the thread that called {@code dereference}, or the thread in which the
+   * dereferenced future completes).
    *
    * @param nested The nested future to transform.
    * @return A future that holds result of the inner future.
@@ -1055,6 +1071,52 @@ public final class Futures {
   }
 
   /**
+   * Returns a list of delegate futures that correspond to the futures received in the order
+   * that they complete. Delegate futures return the same value or throw the same exception
+   * as the corresponding input future returns/throws.
+   *
+   * <p>Cancelling a delegate future has no effect on any input future, since the delegate future
+   * does not correspond to a specific input future until the appropriate number of input
+   * futures have completed. At that point, it is too late to cancel the input future.
+   * The input future's result, which cannot be stored into the cancelled delegate future,
+   * is ignored.
+   *
+   * @since 17.0
+   */
+  @Beta
+  public static <T> ImmutableList<ListenableFuture<T>> inCompletionOrder(
+      Iterable<? extends ListenableFuture<? extends T>> futures) {
+    // A CLQ may be overkill here.  We could save some pointers/memory by synchronizing on an
+    // ArrayDeque
+    final ConcurrentLinkedQueue<AsyncSettableFuture<T>> delegates =
+        Queues.newConcurrentLinkedQueue();
+    ImmutableList.Builder<ListenableFuture<T>> listBuilder = ImmutableList.builder();
+    // Using SerializingExecutor here will ensure that each CompletionOrderListener executes
+    // atomically and therefore that each returned future is guaranteed to be in completion order.
+    // N.B. there are some cases where the use of this executor could have possibly surprising
+    // effects when input futures finish at approximately the same time _and_ the output futures
+    // have sameThreadExecutor listeners. In this situation, the listeners may end up running on a
+    // different thread than if they were attached to the corresponding input future.  We believe
+    // this to be a negligible cost since:
+    // 1. Using the sameThreadExecutor implies that your callback is safe to run on any thread.
+    // 2. This would likely only be noticeable if you were doing something expensive or blocking on
+    //    a sameThreadExecutor listener on one of the output futures which is an antipattern anyway.
+    SerializingExecutor executor = new SerializingExecutor(MoreExecutors.sameThreadExecutor());
+    for (final ListenableFuture<? extends T> future : futures) {
+      AsyncSettableFuture<T> delegate = AsyncSettableFuture.create();
+      // Must make sure to add the delegate to the queue first in case the future is already done
+      delegates.add(delegate);
+      future.addListener(new Runnable() {
+        @Override public void run() {
+          delegates.remove().setFuture(future);
+        }
+      }, executor);
+      listBuilder.add(delegate);
+    }
+    return listBuilder.build();
+  }
+
+  /**
    * Registers separate success and failure callbacks to be run when the {@code
    * Future}'s computation is {@linkplain java.util.concurrent.Future#isDone()
    * complete} or, if the computation is already complete, immediately.
@@ -1121,7 +1183,7 @@ public final class Futures {
    * Example: <pre> {@code
    * ListenableFuture<QueryResult> future = ...;
    * Executor e = ...
-   * addCallback(future, e,
+   * addCallback(future,
    *     new FutureCallback<QueryResult> {
    *       public void onSuccess(QueryResult result) {
    *         storeInCache(result);
@@ -1129,7 +1191,7 @@ public final class Futures {
    *       public void onFailure(Throwable t) {
    *         reportError(t);
    *       }
-   *     });}</pre>
+   *     }, e);}</pre>
    *
    * <p>When the callback is fast and lightweight, consider {@linkplain
    * #addCallback(ListenableFuture, FutureCallback) omitting the executor} or
@@ -1464,6 +1526,8 @@ public final class Futures {
     final AtomicInteger remaining;
     FutureCombiner<V, C> combiner;
     List<Optional<V>> values;
+    final Object seenExceptionsLock = new Object();
+    Set<Throwable> seenExceptions;
 
     CombinedFuture(
         ImmutableCollection<? extends ListenableFuture<? extends V>> futures,
@@ -1540,17 +1604,27 @@ public final class Futures {
     /**
      * Fails this future with the given Throwable if {@link #allMustSucceed} is
      * true. Also, logs the throwable if it is an {@link Error} or if
-     * {@link #allMustSucceed} is {@code true} and the throwable did not cause
-     * this future to fail.
+     * {@link #allMustSucceed} is {@code true}, the throwable did not cause
+     * this future to fail, and it is the first time we've seen that particular Throwable.
      */
     private void setExceptionAndMaybeLog(Throwable throwable) {
-      boolean result = false;
+      boolean visibleFromOutputFuture = false;
+      boolean firstTimeSeeingThisException = true;
       if (allMustSucceed) {
         // As soon as the first one fails, throw the exception up.
         // The result of all other inputs is then ignored.
-        result = super.setException(throwable);
+        visibleFromOutputFuture = super.setException(throwable);
+
+        synchronized (seenExceptionsLock) {
+          if (seenExceptions == null) {
+            seenExceptions = Sets.newHashSet();
+          }
+          firstTimeSeeingThisException = seenExceptions.add(throwable);
+        }
       }
-      if (throwable instanceof Error || (allMustSucceed && !result)) {
+
+      if (throwable instanceof Error
+          || (allMustSucceed && !visibleFromOutputFuture && firstTimeSeeingThisException)) {
         logger.log(Level.SEVERE, "input future failed.", throwable);
       }
     }

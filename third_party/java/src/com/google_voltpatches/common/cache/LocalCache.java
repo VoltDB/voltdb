@@ -58,12 +58,14 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractQueue;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
@@ -2292,7 +2294,7 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
         throw new AssertionError();
       }
 
-      checkState(!Thread.holdsLock(e), "Recursive load");
+      checkState(!Thread.holdsLock(e), "Recursive load of: %s", key);
       // don't consider expiration as we're concurrent with loading
       try {
         V value = valueReference.waitForValue();
@@ -4474,10 +4476,23 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
     }
   }
 
-  final class Values extends AbstractCacheSet<V> {
+  final class Values extends AbstractCollection<V> {
+    private final ConcurrentMap<?, ?> map;
 
     Values(ConcurrentMap<?, ?> map) {
-      super(map);
+      this.map = map;
+    }
+
+    @Override public int size() {
+      return map.size();
+    }
+
+    @Override public boolean isEmpty() {
+      return map.isEmpty();
+    }
+
+    @Override public void clear() {
+      map.clear();
     }
 
     @Override
