@@ -97,7 +97,7 @@ public class Collector {
         @Option(desc = "exclude heap dump file from collection")
         boolean skipheapdump = false;
 
-        @Option(desc = "number of days of files to collect (files included are log, crash files)")
+        @Option(desc = "number of days of files to collect (files included are log, crash files), Current day value is 0")
         int days = 13;
 
         @Option(desc = "the voltdbroot path")
@@ -109,7 +109,7 @@ public class Collector {
         @Option
         boolean copyToVEM=false;
 
-        @Option
+        @Option(desc = "generate a list of information (server name, size, and path) of files rather than actually collect files")
         boolean fileInfoOnly=false;
 
         @Override

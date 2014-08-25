@@ -72,6 +72,7 @@ public class TestCollector {
         assert (success);
         cluster.startUp(true);
 
+
         String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
         File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
@@ -83,13 +84,14 @@ public class TestCollector {
 
     private File collect(String voltDbRootPath, boolean skipHeapDump) throws Exception {
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
-        Collector.main(new String[]{voltDbRootPath, prefix,
-                                    "", "", "", // host, username, password
-                                    "true",  // noPrompt
-                                    "false", // dryRun
-                                    String.valueOf(skipHeapDump),
-                                    "true",  // calledFromVem (set to true so that resulting collection can be easily located)
-                                    "false"  // fileInfoOnly
+        Collector.main(new String[]{"--voltdbroot="+voltDbRootPath, "--prefix="+prefix,
+                                    "--host=\"\"", "--username=\"\"", "--password=\"\"", // host, username, password
+                                    "--noprompt=true",  // noPrompt
+                                    "--dryrun=false", // dryRun
+                                    "--skipheapdump="+String.valueOf(skipHeapDump),
+                                    "--copyToVEM=true",
+                                    "--calledFromVEM=true",  // calledFromVem (set to true so that resulting collection can be easily located)
+                                    "--fileInfoOnly=false"  // fileInfoOnly
                                     });
         assertTrue(collectionTgz.exists());
 
@@ -97,7 +99,6 @@ public class TestCollector {
         TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionDecompressed);
         tarReader.read();
         assertTrue(collectionDecompressed.exists());
-
         return collectionDecompressed;
     }
 
@@ -166,21 +167,21 @@ public class TestCollector {
 
         File collectionDecompressed = collect(voltDbRootPath, false);
 
-
-        File heapdumpFile = new File(collectionDecompressed, "java_pid" + pid + ".hprof");
+        String subFolderPath = "voltdb_logs"+ File.separator;
+        File heapdumpFile = new File(collectionDecompressed, subFolderPath + "java_pid" + pid + ".hprof");
         assertTrue(heapdumpFile.exists());
 
-        File catalogJar = new File(collectionDecompressed, "catalog.jar");
+        File catalogJar = new File(collectionDecompressed, subFolderPath + "catalog.jar");
         assertTrue(catalogJar.exists());
 
-        File deploymentXml = new File(collectionDecompressed, "deployment.xml");
+        File deploymentXml = new File(collectionDecompressed, subFolderPath + "deployment.xml");
         assertTrue(deploymentXml.exists());
 
 
-        File dmesgdata = new File(collectionDecompressed, "dmesgdata");
+        File dmesgdata = new File(collectionDecompressed, subFolderPath + "dmesgdata");
         assertTrue(dmesgdata.exists());
 
-        File logDir = new File(collectionDecompressed, "log");
+        File logDir = new File(collectionDecompressed, subFolderPath + "log");
         assertTrue(logDir.exists());
         assertTrue(logDir.listFiles().length > 0);
         List<String> logPaths = getLogPaths(voltDbRootPath);
@@ -196,7 +197,7 @@ public class TestCollector {
             assertTrue(match);
         }
 
-        File voltdbCrashDir = new File(collectionDecompressed, "voltdb_crash");
+        File voltdbCrashDir = new File(collectionDecompressed, subFolderPath + "voltdb_crash");
         assertTrue(voltdbCrashDir.exists());
         assertTrue(voltdbCrashDir.listFiles().length > 0);
 
@@ -224,8 +225,8 @@ public class TestCollector {
         String workingDir = getWorkingDir(voltDbRootPath);
         File jvmCrashGenerated = new File(workingDir, "hs_err_pid" + pid + ".log");
         jvmCrashGenerated.deleteOnExit();
-
-        File jvmCrashFile = new File(collectionDecompressed, "hs_err_pid" + pid + ".log");
+        String subFolderPath = "voltdb_logs"+ File.separator;
+        File jvmCrashFile = new File(collectionDecompressed, subFolderPath + "hs_err_pid" + pid + ".log");
         assertTrue(jvmCrashFile.exists());
     }
 }
