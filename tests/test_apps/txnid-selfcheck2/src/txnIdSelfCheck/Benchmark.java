@@ -492,13 +492,23 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
-        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
-        partitionedLoader.start();
-        if (config.mpratio > 0.0) {
-            BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                             (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
-            replicatedLoader.start();
+        boolean runBigTableLoader = true;
+        boolean runTruncateTable = true;
+        boolean runLoadTable = true;
+        boolean runAdhocMayhem = true;
+        boolean runDroppedProcedure = true;
+        boolean runWriteThreads = true;
+        boolean runReadThreads = true;
+
+        if (runBigTableLoader) {
+            BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
+                             (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
+            partitionedLoader.start();
+            if (config.mpratio > 0.0) {
+                BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+                                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
+                replicatedLoader.start();
+            }
         }
 
         // wait for the filler tables to load up
@@ -526,42 +536,56 @@ public class Benchmark {
         }
 
 
-        TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
-        partitionedTruncater.start();
-        if (config.mpratio > 0.0) {
-            TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
-                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
-            replicatedTruncater.start();
+        if (runTruncateTable) {
+            TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
+                    (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+            partitionedTruncater.start();
+            if (config.mpratio > 0.0) {
+                TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
+                        (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+                replicatedTruncater.start();
+            }
         }
 
-        LoadTableLoader plt = new LoadTableLoader(client, "loadp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-        plt.start();
-        if (config.mpratio > 0.0) {
-        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-        rlt.start();
+        if (runLoadTable) {
+            LoadTableLoader plt = new LoadTableLoader(client, "loadp",
+                    (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
+            plt.start();
+            if (config.mpratio > 0.0) {
+            LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
+            rlt.start();
+            }
         }
 
-        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc, config.mpratio, permits);
-        readThread.start();
-
-        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
-        if (!config.disableadhoc) {
-            adHocMayhemThread.start();
+        if (runAdhocMayhem) {
+            AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
+            if (!config.disableadhoc) {
+                adHocMayhemThread.start();
+            }
         }
 
-        InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
-        idpt.start();
+
+        if (runDroppedProcedure) {
+            InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
+            idpt.start();
+        }
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
+        List<ReadThread> readThreads = new ArrayList<ReadThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                    config.allowinprocadhoc, config.mpratio);
-            clientThread.start();
-            clientThreads.add(clientThread);
+            if (runWriteThreads) {
+                ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
+                        config.allowinprocadhoc, config.mpratio);
+                clientThread.start();
+                clientThreads.add(clientThread);
+            }
+            if (runReadThreads) {
+                ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
+                        config.allowinprocadhoc, config.mpratio, permits);
+                readThread.start();
+                readThreads.add(readThread);
+            }
         }
         log.info("All threads started...");
 
