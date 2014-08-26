@@ -659,7 +659,8 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subquery = subqueryExpr.getSubquery();
         if (subquery instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
-            ParsedSelectStmt.simplifyExistsExpression(selectSubquery);
+
+            selectSubquery.simplifyExistsExpression();
         }
         return existsExpr;
     }

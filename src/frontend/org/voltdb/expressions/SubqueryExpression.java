@@ -30,7 +30,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -204,7 +203,7 @@ public class SubqueryExpression extends AbstractExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
         if (obj.has(Members.PARAM_IDX.name())) {
@@ -221,11 +220,6 @@ public class SubqueryExpression extends AbstractExpression {
             for (int i = 0; i < paramSize; ++i) {
                 m_allParameterIdxList.add(allParamIdxArray.getInt(i));
             }
-        }
-
-        if (tableScan instanceof StmtSubqueryScan) {
-            m_subquery = (StmtSubqueryScan) tableScan;
-            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
         }
     }
 
@@ -259,8 +253,9 @@ public class SubqueryExpression extends AbstractExpression {
      */
     public void moveUpTVE() {
         AbstractParsedStmt subqueryStmt = m_subquery.getSubqueryStmt();
-        AbstractParsedStmt parentStmt = m_subquery.getSubqueryStmt().m_parentStmt;
-        // we must have a parent -it's a subquery statement
+        AbstractParsedStmt parentStmt = subqueryStmt.m_parentStmt;
+
+        // we must have a parent - it's a subquery statement
         assert(parentStmt != null);
         // Preserve indexes of all parameters this subquery depends on.
         // It includes parameters from the child subqueries.

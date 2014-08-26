@@ -220,9 +220,6 @@ public class PlanNodeTree implements JSONString {
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
 
             if (subqueryNodes == null) {
-                // TODO(xin): subquery can also be contained in inlined nodes, which the map
-                // currently does not contain it.
-                // This is a bug of EXPLAIN on the IN/EXISTS for Agg HAVING clause.
                 return;
             }
 
@@ -276,6 +273,7 @@ public class PlanNodeTree implements JSONString {
                 apn.loadFromJSONObject(jobj, db);
                 planNodes.add(apn);
             }
+
             //link children and parents
             for( int i = 0; i < size; i++ ) {
                 JSONObject jobj;
@@ -311,6 +309,7 @@ public class PlanNodeTree implements JSONString {
      *  - NestLoopInPlan
      *  - AbstractScanPlanNode predicate
      *  - AbstractJoinPlanNode predicates
+     *  - Aggregate post-predicate(HAVING clause)
      * @param node
      * @throws Exception
      */
@@ -323,22 +322,24 @@ public class PlanNodeTree implements JSONString {
             extractSubqueriesFromExpression(joinNode.getPreJoinPredicate());
             extractSubqueriesFromExpression(joinNode.getJoinPredicate());
             extractSubqueriesFromExpression(joinNode.getWherePredicate());
-            AbstractPlanNode inlineScan = joinNode.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-            if (inlineScan != null) {
-                assert(inlineScan instanceof AbstractScanPlanNode);
-                extractSubqueriesFromExpression(((AbstractScanPlanNode)inlineScan).getPredicate());
-            }
         } else if (node instanceof AggregatePlanNode) {
             AggregatePlanNode aggNode = (AggregatePlanNode) node;
             extractSubqueriesFromExpression(aggNode.getPostPredicate());
         }
+
+        // also check the inlined plan nodes
+        for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
+            extractSubqueries(inlineNode);
+        }
     }
+
     private void extractSubqueriesFromExpression(AbstractExpression expr)  throws Exception {
         if (expr == null) {
             return;
         }
         List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfClass(
                 SubqueryExpression.class);
+
         for(AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof SubqueryExpression);
             SubqueryExpression subqueryExpr = (SubqueryExpression) nextexpr;

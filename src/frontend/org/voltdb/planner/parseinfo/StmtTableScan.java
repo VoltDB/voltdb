@@ -35,7 +35,7 @@ public abstract class StmtTableScan {
     public static final int NULL_ALIAS_INDEX = -1;
 
     // The statement id this table belongs to
-    protected int m_stmtId;
+    protected int m_stmtId = 0;
 
     // table alias
     protected String m_tableAlias = null;

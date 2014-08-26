@@ -1058,26 +1058,26 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param selectStmt
      * @return existsExpr
      */
-    protected static void simplifyExistsExpression(ParsedSelectStmt selectStmt) {
+    protected void simplifyExistsExpression() {
         // Collect having, group by column names
         Set<String> havingColumnNamesSet = new HashSet<String>();
         Set<String> groupByColumnNamesSet = new HashSet<String>();
-        if (selectStmt.m_having != null) {
-            List<TupleValueExpression> havingTves = ExpressionUtil.getTupleValueExpressions(selectStmt.m_having);
+        if (m_having != null) {
+            List<TupleValueExpression> havingTves = ExpressionUtil.getTupleValueExpressions(m_having);
             for (TupleValueExpression tve : havingTves) {
                 havingColumnNamesSet.add(tve.getColumnAlias());
             }
         }
-        for (ParsedSelectStmt.ParsedColInfo colInfo: selectStmt.m_groupByColumns) {
+        for (ParsedSelectStmt.ParsedColInfo colInfo: m_groupByColumns) {
             groupByColumnNamesSet.add(colInfo.alias);
         }
 
         ArrayList<ParsedColInfo> aggrExpressions = new ArrayList<ParsedColInfo>();
-        aggrExpressions.addAll(selectStmt.m_aggResultColumns);
-        selectStmt.m_aggResultColumns = aggrExpressions;
+        aggrExpressions.addAll(m_aggResultColumns);
+        m_aggResultColumns = aggrExpressions;
 
         // Replace the display schema with the single dummy column
-        selectStmt.m_displayColumns.clear();
+        m_displayColumns.clear();
         ParsedColInfo col = new ParsedColInfo();
         ConstantValueExpression colExpr = new ConstantValueExpression();
         colExpr.setValueType(VoltType.NUMERIC);
@@ -1090,19 +1090,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         col.columnName = "$$_EXISTS_$$";
         col.alias = "$$_EXISTS_$$";
         col.index = 0;
-        selectStmt.m_projectSchema = null;
-        selectStmt.m_displayColumns.add(col);
-        selectStmt.placeTVEsinColumns();
+        m_projectSchema = null;
+        m_displayColumns.add(col);
+        placeTVEsinColumns();
 
         // If HAVING clause is missing we can drop GROUP BY and ORDER BY
-        if (selectStmt.m_having == null) {
-            selectStmt.m_aggResultColumns.clear();
-            selectStmt.m_orderColumns.clear();
-            selectStmt.m_groupByColumns.clear();
+        if (m_having == null) {
+            m_aggResultColumns.clear();
+            m_orderColumns.clear();
+            m_groupByColumns.clear();
         } else {
             // Iterate over the aggregate columns and delete all columns that are not
             // part of the HAVING or GROUP BY expressions (used to be in the original display schema
-            Iterator<ParsedColInfo> aggColumnIt = selectStmt.m_aggResultColumns.iterator();
+            Iterator<ParsedColInfo> aggColumnIt = m_aggResultColumns.iterator();
             while (aggColumnIt.hasNext()) {
                 ParsedColInfo aggrColumn = aggColumnIt.next();
                 boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
@@ -1112,19 +1112,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
             }
         }
-        if (selectStmt.m_aggResultColumns.isEmpty()) {
-            selectStmt.m_hasAggregateExpression = false;
-            selectStmt.m_hasAverage = false;
+        if (m_aggResultColumns.isEmpty()) {
+            m_hasAggregateExpression = false;
+            m_hasAverage = false;
         }
-        selectStmt.needComplexAggregation();
+        needComplexAggregation();
 
         // Drop DISTINCT expression
-        selectStmt.m_distinct = false;
+        m_distinct = false;
 
         // Add LIMIT 1
-        selectStmt.m_limit = 1;
+        m_limit = 1;
 
-        selectStmt.prepareLimitPlanNode();
+        prepareLimitPlanNode();
     }
 
     /**
@@ -1139,6 +1139,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     public static AbstractExpression replaceExpressionsWithPve(AbstractParsedStmt stmt, AbstractExpression expr,
             boolean processParentTveOnly) {
+
         assert(expr != null);
         boolean needToReplace = false;
         if (processParentTveOnly == true) {

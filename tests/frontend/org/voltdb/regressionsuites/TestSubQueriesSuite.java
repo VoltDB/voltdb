@@ -370,11 +370,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void notestSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
+    public void testSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);
         VoltTable vt;
+        String sql;
 
         for (String tb: procs) {
             client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
@@ -386,14 +387,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select dept, sum(wage) as sw1 from " + tb + " where (id, dept + 2) in " +
                             "( SELECT dept, count(dept) " +
                             "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{1,10}});
 
+
+            sql = "select dept from " + tb + " group by dept " +
+                    " having max(wage) in (select wage from R1) order by dept desc";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
+
             // having with subquery
-            vt = client.callProcedure("@AdHoc",
-                    "select dept from " + tb + " group by dept " +
-                    " having max(wage) in (select wage from R1) order by dept desc").getResults()[0];
-            System.out.println(vt.toString());
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{2}, {1}});
 
             // subquery with having
@@ -401,26 +404,19 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select id from " + tb + " TBA where exists " +
                             " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
                     " min(wage) = TBA.wage)").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
 
             // having with subquery with having
-            String sql = "select id from " + tb + " where wage " +
-                    " in (select max(wage) from R1 group by dept " +
-                    " having max(wage) > 10)";
-            System.out.println(sql);
             vt = client.callProcedure("@AdHoc",
                     "select id from " + tb + " where wage " +
                             " in (select max(wage) from R1 group by dept " +
                     " having max(wage) > 30) ").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{5}});
 
             // subquery with group by but no having
             vt = client.callProcedure("@AdHoc",
                     "select id from " + tb + " TBA where exists " +
                     " (select max(dept) from R1 where TBA.id = R1.id group by dept )").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}, {6}, {7}});
 
         }
