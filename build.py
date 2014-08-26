@@ -216,6 +216,7 @@ CTX.INPUT['common'] = """
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp
+ Topend.cpp
  TupleOutputStream.cpp
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp
@@ -249,6 +250,7 @@ CTX.INPUT['executors'] = """
  seqscanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
+ upsertexecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -257,6 +259,7 @@ CTX.INPUT['expressions'] = """
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
+ parametervalueexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -286,6 +289,7 @@ CTX.INPUT['plannodes'] = """
  seqscannode.cpp
  unionnode.cpp
  updatenode.cpp
+ upsertnode.cpp
 """
 
 CTX.INPUT['indexes'] = """
@@ -314,7 +318,10 @@ CTX.INPUT['storage'] = """
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp
- TupleStreamWrapper.cpp
+ TupleStreamBase.cpp
+ ExportTupleStream.cpp
+ DRTupleStream.cpp
+ BinaryLogSink.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
@@ -346,6 +353,11 @@ CTX.THIRD_PARTY_INPUT['crc'] = """
 CTX.THIRD_PARTY_INPUT['murmur3'] = """
  MurmurHash3.cpp
 """
+
+CTX.THIRD_PARTY_INPUT['sha1'] = """
+ sha1.cpp
+"""
+
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -401,6 +413,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_scripted_test
      index_test
      compacting_hash_index
+     CompactingTreeMultiIndexTest
     """
 
 if whichtests in ("${eetestsuite}", "storage"):
@@ -417,7 +430,8 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_test
      tabletuple_export_test
      TempTableLimitsTest
-     TupleStreamWrapper_test
+     ExportTupleStream_test
+     DRTupleStream_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):

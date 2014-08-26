@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -46,6 +45,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -53,15 +53,16 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -415,6 +416,12 @@ public class SnapshotSiteProcessor {
      */
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        //Basically asserts that there are no tasks with null targets at this point
+        //getTarget checks and crashes
+        for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
+            t.getTarget();
+        }
+
         ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
@@ -581,12 +588,17 @@ public class SnapshotSiteProcessor {
                             writeFutures.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                if (t instanceof StreamSnapshotTimeoutException ||
+                                        t.getCause() instanceof StreamSnapshotTimeoutException) {
+                                    //This error is already logged by the watchdog when it generates the exception
+                                } else {
+                                    SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                }
                                 m_lastSnapshotSucceded = false;
                             }
                         }
                     }
-                }, MoreExecutors.sameThreadExecutor());
+                }, CoreUtils.SAMETHREADEXECUTOR);
             }
 
             /**
@@ -768,7 +780,6 @@ public class SnapshotSiteProcessor {
                 jsonObj.put("hostCount", remainingHosts);
                 jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
-                    SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
@@ -879,19 +890,27 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context)
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
-        while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context, true);
-            if (result != null) {
-                try {
-                    result.get();
-                } catch (ExecutionException e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
-                } catch (Exception e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
+        //Set to 10 gigabytes/sec, basically unlimited
+        //Does nothing if rate limiting is not enabled
+        DefaultSnapshotDataTarget.setRate(1024 * 10);
+        try {
+            while (m_snapshotTableTasks != null) {
+                Future<?> result = doSnapshotWork(context, true);
+                if (result != null) {
+                    try {
+                        result.get();
+                    } catch (ExecutionException e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    } catch (Exception e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    }
                 }
             }
+        } finally {
+            //Request default rate again
+            DefaultSnapshotDataTarget.setRate(null);
         }
 
         /**

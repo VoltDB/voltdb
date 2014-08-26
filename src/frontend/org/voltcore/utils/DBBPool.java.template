@@ -29,6 +29,11 @@ import org.voltcore.logging.VoltLogger;
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
+#ifndef NO_MEMCHECK
+import java.util.List;
+import java.util.ArrayList;
+#endif
+
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
  * allocated with
@@ -67,6 +72,7 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
+        private List<String> m_tags = null;
 #endif
 
         public BBContainer(ByteBuffer b) {
@@ -107,6 +113,11 @@ public final class DBBPool {
                 System.err.println("Use was by:");
                 Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                 t.printStackTrace();
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
+                }
                 HOST.fatal("Use after free in DBBPool");
                 HOST.fatal("Free was by:", m_freeThrowable);
                 HOST.fatal("Use was by:", t);
@@ -125,6 +136,11 @@ public final class DBBPool {
                     System.err.println("Current free was by:");
                     Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                     t.printStackTrace();
+                    if (isTagged()) {
+                        for (String tag: m_tags) {
+                            System.err.println(tag);
+                        }
+                    }
                     HOST.fatal("Double free in DBBPool");
                     HOST.fatal("Original free was by:", m_freeThrowable);
                     HOST.fatal("Current free was by:", t);
@@ -136,12 +152,47 @@ public final class DBBPool {
             return b;
         }
 
+        public final void tag(final String tag) {
+#ifndef NO_MEMCHECK
+            StringBuilder sb = new StringBuilder(1024);
+            sb.append("<<TAG:").append(m_tags.size()).append(">> ");
+            sb.append(tag).append("\n");
+            sb.append(CoreUtils.throwableToString(new Throwable()));
+            synchronized(this) {
+                if (m_tags == null) {
+                    m_tags = new ArrayList<String>();
+                }
+                m_tags.add(sb.toString());
+            }
+#endif
+        }
+
+        public final void addToTagTrail(final String tag) {
+#ifndef NO_MEMCHECK
+            if (isTagged()) tag(tag);
+#endif
+        }
+
+        public boolean isTagged() {
+#ifndef NO_MEMCHECK
+            return m_tags != null && !m_tags.isEmpty();
+#else
+            return false;
+#endif
+        }
+
 #ifndef NO_MEMCHECK
         @Override
         public void finalize() {
             if (m_freeThrowable == null) {
                 System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
                 m_allocationThrowable.printStackTrace();
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
+                }
+                HOST.fatal("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:", m_allocationThrowable);
                 System.exit(-1);
             }
         }

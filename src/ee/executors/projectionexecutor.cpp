@@ -96,7 +96,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     output_table = dynamic_cast<TempTable*>(node->getOutputTable()); //output table should be temptable
 
     if (!node->isInline()) {
-        input_table = node->getInputTables()[0];
+        Table* input_table = node->getInputTable();
         tuple = TableTuple(input_table->schema());
     }
     return true;
@@ -111,7 +111,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
                                 // called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert (output_table);
-    assert (input_table == node->getInputTables()[0]);
+    Table* input_table = m_abstractNode->getInputTable();
     assert (input_table);
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
@@ -125,7 +125,6 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
-            expression_array[ctr]->substitute(params);
             VOLT_TRACE("predicate[%d]: %s", ctr,
                        expression_array[ctr]->debug(true).c_str());
         }
@@ -136,7 +135,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // expression This will generate new tuple values that we will insert into
     // our output table
     //
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     assert (tuple.sizeInValues() == input_table->columnCount());
     while (iterator.next(tuple)) {
         //
@@ -161,15 +160,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         output_table->insertTupleNonVirtual(temp_tuple);
 
         VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
-
-        /*if (!output_table->insertTupleNonVirtual(temp_tuple)) {
-            // TODO: DEBUG
-            VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", input_table->name().c_str(), output_table->name().c_str());
-            return (false);
-        }*/
     }
 
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
+    cleanupInputTempTable(input_table);
 
     return (true);
 }

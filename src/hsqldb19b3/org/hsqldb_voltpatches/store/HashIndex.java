@@ -65,7 +65,9 @@ class HashIndex {
     // A VoltDB extension to diagnose ArrayOutOfBounds.
     int voltDBresetCount = 0;
     int voltDBresetCapacity = -1;
+    int voltDBlastResetEvent = 0;
     int voltDBclearCount = 0;
+    int voltDBlastClearEvent = 0;
     int voltDBclearCapacity = -1;
     int voltDBhistoryDepth = 0;
     final int voltDBhistoryMinCapacity = 75;
@@ -98,6 +100,7 @@ class HashIndex {
             voltDBresetCapacity = linkTable.length;
         }
         ++voltDBresetCount;
+        voltDBlastResetEvent = voltDBhistoryDepth;
         voltDBhistoryCapacity = Math.min(voltDBhistoryMaxCapacity, 
                                          Math.max(voltDBhistoryMinCapacity, voltDBhistoryDepth));
         voltDBhistory = new int[voltDBhistoryCapacity];
@@ -137,6 +140,7 @@ class HashIndex {
             voltDBclearCapacity = linkTable.length;
         }
         ++voltDBclearCount;
+        voltDBlastClearEvent = voltDBhistoryDepth;
         // End of VoltDB extension
 
         int   to       = linkTable.length;
@@ -235,23 +239,24 @@ class HashIndex {
             int depth = 0;
             for (int look : voltDBhistory) {
                 ++depth;
-                if (depth == voltDBhistoryDepth) {
-                    report.append("/* <- history ends here and/or starts here -> */ ");
+                if (depth == (voltDBhistoryDepth % voltDBhistoryCapacity)) {
+                    report.append(" /* <- history ends here and/or starts here -> */ ");
                 }
                 if (look < 0) {
-                    report.append(look+1).append(" unlinked, ");
+                    report.append(-(look+1)).append(" unlnkd, ");
                 } else if (look > 1000000) {
-                    report.append(look-1000000).append(" removed lookup, ");
+                    report.append(look-1000000).append(" rmdlkp, ");
                 } else {
                     report.append(look).append(" linked, ");
                 }
             }
             report.append("]\n");
+            report.append(" lost history length is ").append(voltDBhistoryDepth / voltDBhistoryCapacity * voltDBhistoryCapacity);
             report.append("next reclaimedPointer is ").append(reclaimedNodePointer);
             report.append(" next newNodePointer is ").append(newNodePointer);
-            report.append(" last reset was #").append(voltDBresetCount);
+            report.append(" last reset was #").append(voltDBresetCount).append(" after event ").append(voltDBlastResetEvent);
             report.append(" from ").append(voltDBresetCapacity);
-            report.append(" last clear was #").append(voltDBclearCount);
+            report.append(" last clear was #").append(voltDBclearCount).append(" after event ").append(voltDBlastClearEvent);
             report.append(" from ").append(voltDBclearCapacity);
             throw new ArrayIndexOutOfBoundsException(report.toString());
         }

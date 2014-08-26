@@ -403,6 +403,14 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public String getJavaProperty(String property)
+    {
+        if (javaProperties == null) {
+            return null;
+        }
+        return javaProperties.get(property);
+    }
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
@@ -440,6 +448,7 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
+        cmdline.add("-DUSE_DR_V2=" + Boolean.getBoolean("USE_DR_V2"));
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
@@ -492,6 +501,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
             cmdline.add("-ea");
             cmdline.add("-XX:MaxDirectMemorySize=2g");
+            cmdline.add("-XX:-UseSplitVerifier");
         }
         else
         {

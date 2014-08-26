@@ -82,6 +82,13 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
+function nohup_server() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar > nohup.log 2>&1 &
+}
+
 # run the voltdb server locally
 function rejoin() {
     # if a catalog doesn't exist, build one
@@ -106,7 +113,7 @@ function async-benchmark-help() {
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
-    srccompile
+    if [ ! -d obj ]; then srccompile; fi
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
@@ -162,6 +169,25 @@ function jdbc-benchmark() {
         --servers=localhost:21212 \
         --contestants=6 \
         --threads=40
+}
+
+# The following two demo functions are used by the Docker package. Don't remove.
+# compile the catalog and client code
+function demo-compile() {
+    catalog
+}
+
+function demo() {
+    echo "starting server in background..."
+    nohup_server
+    sleep 10
+    echo "starting client..."
+    client
+
+    echo
+    echo When you are done with the demo database, \
+        remember to use \"$VOLTDB_BIN/voltadmin shutdown\" to stop \
+        the server process.
 }
 
 function help() {

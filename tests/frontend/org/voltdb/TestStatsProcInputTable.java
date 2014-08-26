@@ -169,4 +169,19 @@ public class TestStatsProcInputTable {
         loadEmUpNoDedup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
+
+    @Test
+    public void testRounding() throws Exception {
+        ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
+            new ProcInputRow("A", 0L, 12345L, 10000000*mB, 3L, 5L, 4L),
+            new ProcInputRow("B", 0L, 12345L, 1*mB, 1L, 4L, 2L)
+        };
+        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
+            new ResultRow(12345L, "A", 100L, 10000000*mB, 3L, 5L, 4L, 40000000L),
+            new ResultRow(12345L, "B", 0L, 1*mB, 1L, 4L, 2L, 2L)
+        };
+        StatsProcInputTable dut = new StatsProcInputTable();
+        loadEmUp(dut, data);
+        validateEmGood("testRounding", dut, result);
+    }
 }

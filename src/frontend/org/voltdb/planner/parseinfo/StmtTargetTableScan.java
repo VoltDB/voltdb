@@ -24,6 +24,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -39,6 +40,8 @@ public class StmtTargetTableScan extends StmtTableScan {
         super(tableAlias);
         assert (table != null);
         m_table = table;
+
+        findPartitioningColumns();
     }
 
     @Override
@@ -56,8 +59,11 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_table.getIsreplicated();
     }
 
-    @Override
-    public String getPartitionColumnName() {
+    private List<SchemaColumn> findPartitioningColumns() {
+        if (m_partitioningColumns != null) {
+            return m_partitioningColumns;
+        }
+
         if (getIsReplicated()) {
             return null;
         }
@@ -71,8 +77,18 @@ public class StmtTargetTableScan extends StmtTableScan {
         if (partitionCol == null) {
             return null;
         }
-        String colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
-        return colName;
+
+        String tbName = m_table.getTypeName();
+        String colName = partitionCol.getTypeName();
+
+        TupleValueExpression tve = new TupleValueExpression(
+                tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
+        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
+
+        SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
+        m_partitioningColumns = new ArrayList<SchemaColumn>();
+        m_partitioningColumns.add(scol);
+        return m_partitioningColumns;
     }
 
     @Override
@@ -98,4 +114,6 @@ public class StmtTargetTableScan extends StmtTableScan {
     public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
     }
+
+
 }

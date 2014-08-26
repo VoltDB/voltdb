@@ -33,7 +33,6 @@ from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
 
 COUNT = 2                       # number of random values to generate by default
-IS_VOLT = False
 ALLOW_SELF_JOIN = True
 
 def field_name_generator():
@@ -153,7 +152,7 @@ class StringValueGenerator:
     def set_nullpct(self, nullpct):
         self.__nullpct = nullpct
 
-    def generate_values(self, count, length = 17):
+    def generate_values(self, count, length = 14):
         for i in xrange(count):
             list = [random.choice(StringValueGenerator.ALPHABET) for y in xrange(length)]
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
@@ -184,10 +183,15 @@ class VarbinaryValueGenerator:
 
 
 class TimestampValueGenerator:
-    """This generates timestamps.
+    """This generates timestamps in a reasonable range.
     """
 
-    MAX_MILLIS_SINCE_EPOCH = 1999999999999
+    #The MIN_MILLIS_SINCE_EPOCH is the lower bound of the generator, and its timestamp is
+    #1843-03-31 11:57:18.000000. The MAX_MILLIS_SINCE_EPOCH is the upper bound of the generator,
+    #and its timestamp is 2027-01-15 03:00:00.000000. Negative number is to generate timestamp
+    #prior to the unix epoch.
+    MIN_MILLIS_SINCE_EPOCH = -3000000000
+    MAX_MILLIS_SINCE_EPOCH = 1800000000
 
     def __init__(self):
         self.__nullpct = 0
@@ -197,12 +201,23 @@ class TimestampValueGenerator:
 
     def generate_values(self, count):
         for i in xrange(count):
-            # HSQL doesn't support microsecond, generate a 13 digit number of milliseconds
-            # this gets scaled to microseconds later for VoltDB backends
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
-                yield random.randint(0, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
+                r = random.uniform(TimestampValueGenerator.MIN_MILLIS_SINCE_EPOCH, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
+                ts = datetime.datetime.fromtimestamp(r)
+                #The format is YYYY-MM-DD HH:MM:SS.mmmmmm
+                s = ts.isoformat(' ')
+                #According to the python document, the datetime.isoformat() will not show
+                #microsecond "mmmmmm" if datetime.microsecond is 0. So here we manually add
+                #trailing zeros if datetime.microsecond is 0.
+                #(https://docs.python.org/2/library/datetime.html)
+                if ts.microsecond == 0:
+                    s += '.000000'
+                #HSQL's resolution is millisecond while VoltDB's is microsecond. We rounded
+                #the timestamp down to millisecond so that both databases store the same data.
+                s = s[:-3]+'000'
+                yield s
 
 
 class BaseGenerator:
@@ -235,17 +250,17 @@ class BaseGenerator:
     #                   |       |
     LABEL_PATTERN_GROUP =                    "label" # optional label for variables
     #                   |       |             |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" \
-                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                       |                      |              |                        |                   |
-    #                       |                      |              |                        |       end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                                             "nullpct" # optional null percentage
-    #                       |                      |              |
-    MAX_VALUE_PATTERN_GROUP =                                    "max" # optional max (only for numeric values)
-    #                       |                      |
-    MIN_VALUE_PATTERN_GROUP =                     "min" # optional min (only for numeric values)
-    #                       |
-    TYPE_PATTERN_GROUP =   "type" # optional type for columns, values
+    TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
+    #                   |       |             |                      |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+                      r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                |                             |                   |
+    #                         |                |                             |       end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                               "nullpct" # optional null percentage
+    #                         |                |
+    MAX_VALUE_PATTERN_GROUP =                 "max" # optional max (only for numeric values)
+    #                         |
+    MIN_VALUE_PATTERN_GROUP ="min" # optional min (only for numeric values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
@@ -292,6 +307,7 @@ class BaseGenerator:
                 if rewrite:
                     prior_generators = another_gen.configure_from_schema(schema, prior_generators)
                     field_map[field_name] = another_gen
+                    ### print "DEBUG field_map[" + field_name + "] got " + another_gen.debug_gen_to_string()
                     new_generators.append(another_gen)
                     statement = rewrite
                 else:
@@ -376,6 +392,14 @@ class BaseGenerator:
         if not self.prior_generator:
             return False
         return self.prior_generator.has_reserved(name)
+
+    def debug_gen_to_string(self):
+        result = "generator: " + self.__token + " VALUES: "
+        for val in self.values:
+            result += val + ", "
+        if self.reserved_value:
+            result += "reserved: " + self.reserved_value
+        return result
 
 
 class TableGenerator(BaseGenerator):
@@ -473,9 +497,6 @@ class ConstantGenerator(BaseGenerator):
         for i in self.__value_generator.generate_values(COUNT):
             if i == None:
                 i = u"NULL"
-            elif IS_VOLT and self.__type == "timestamp":
-                # convert millis to micros when relying on VoltDB's int-to-timestamp conversion.
-                i = i * 1000
             elif isinstance(i, basestring):
                 i = u"'%s'" % (i)
             elif isinstance(i, float):
@@ -608,6 +629,17 @@ class Schema:
 
     def get_typed_columns(self, supertype):
         return self.__col_by_type[supertype].keys()
+
+    def debug_schema_to_string(self):
+        result = "TABLES: "
+        for table in self.get_tables():
+            result += table + ", "
+
+        result += "COLUMNS: "
+        for code, supertype in Schema.TYPE_NAMES.iteritems():
+            for column_name in self.get_typed_columns(supertype):
+                result += supertype + " " + column_name + ", "
+        return result
 
 
 class Template:
@@ -743,10 +775,7 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, subversion_generation, is_volt):
-        global IS_VOLT
-        IS_VOLT = is_volt
-
+    def __init__(self, catalog, template, subversion_generation):
         self.__subversion_generation = subversion_generation
         # Reset the counters
         IdGenerator.initialize(0)
@@ -788,6 +817,7 @@ class SQLGenerator:
                  not SQLGenerator.LIKELY_FALSE_ALARMS.search(statement))):
                 print ('WARNING: final statement contains suspicious unresolved symbol(s): "' +
                        statement + '"')
+                print ('with schema "' + self.__schema.debug_schema_to_string() + '"')
             for generated_stmt in BaseGenerator.generate_statements_from_list(statement,
                                                                               generators,
                                                                               field_map):
@@ -838,4 +868,3 @@ if __name__ == "__main__":
     generator = SQLGenerator(catalog, template, True, False)
     for i in generator.generate(True):
         print 'STATEMENT: ' + i
-

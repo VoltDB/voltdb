@@ -12,9 +12,9 @@
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
--- reducing the random values to int16 until overflow detection works
---{@insertvals = "_id, _value[byte], _value[int32], _value[int64]"}
-{@insertvals = "_id, _value[byte], _value[int16 null30], _value[int16]"}
+-- scaling down the random values until overflow detection works in VoltDB AND HSQL
+--{@insertvals = "_id, _value[byte], _value[int16], _value[int64]"}
+{@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[int16]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "BIG"}

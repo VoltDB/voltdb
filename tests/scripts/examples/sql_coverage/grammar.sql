@@ -22,6 +22,10 @@
 {_numagg |= "AVG"}
 {_numagg |= "_genericagg"}
 
+{_distinctableagg |= "COUNT"}
+{_distinctableagg |= "SUM"}
+--HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
+
 {_maybe |= ""}
 {_maybe |= " NOT "}
 

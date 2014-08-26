@@ -21,7 +21,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.voltcore.logging.VoltLogger;
 
 import javax.annotation_voltpatches.Nullable;
 import javax.annotation_voltpatches.concurrent.GuardedBy;
@@ -46,7 +46,7 @@ import javax.annotation_voltpatches.concurrent.GuardedBy;
  */
 public final class ExecutionList {
   // Logger to log exceptions caught when running runnables.
-  @VisibleForTesting static final Logger log = Logger.getLogger(ExecutionList.class.getName());
+  @VisibleForTesting static final VoltLogger voltLog = new VoltLogger("HOST");
 
   /**
    * The runnable, executor pairs to execute.  This acts as a stack threaded through the 
@@ -158,7 +158,7 @@ public final class ExecutionList {
       // Log it and keep going, bad runnable and/or executor.  Don't
       // punish the other runnables if we're given a bad one.  We only
       // catch RuntimeException because we want Errors to propagate up.
-      log.log(Level.SEVERE, "RuntimeException while executing runnable "
+      voltLog.error("RuntimeException while executing runnable "
           + runnable + " with executor " + executor, e);
     }
   }

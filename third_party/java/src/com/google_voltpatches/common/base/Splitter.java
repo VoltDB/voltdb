@@ -176,12 +176,12 @@ public final class Splitter {
           Splitter splitter, CharSequence toSplit) {
         return new SplittingIterator(splitter, toSplit) {
           @Override public int separatorStart(int start) {
-            int delimeterLength = separator.length();
+            int separatorLength = separator.length();
 
             positions:
-            for (int p = start, last = toSplit.length() - delimeterLength;
+            for (int p = start, last = toSplit.length() - separatorLength;
                 p <= last; p++) {
-              for (int i = 0; i < delimeterLength; i++) {
+              for (int i = 0; i < separatorLength; i++) {
                 if (toSplit.charAt(i + p) != separator.charAt(i)) {
                   continue positions;
                 }
@@ -387,7 +387,7 @@ public final class Splitter {
 
     return new Iterable<String>() {
       @Override public Iterator<String> iterator() {
-        return spliterator(sequence);
+        return splittingIterator(sequence);
       }
       @Override public String toString() {
         return Joiner.on(", ")
@@ -398,7 +398,7 @@ public final class Splitter {
     };
   }
 
-  private Iterator<String> spliterator(CharSequence sequence) {
+  private Iterator<String> splittingIterator(CharSequence sequence) {
     return strategy.iterator(this, sequence);
   }
 
@@ -415,7 +415,7 @@ public final class Splitter {
   public List<String> splitToList(CharSequence sequence) {
     checkNotNull(sequence);
 
-    Iterator<String> iterator = spliterator(sequence);
+    Iterator<String> iterator = splittingIterator(sequence);
     List<String> result = new ArrayList<String>();
 
     while (iterator.hasNext()) {
@@ -499,7 +499,7 @@ public final class Splitter {
     public Map<String, String> split(CharSequence sequence) {
       Map<String, String> map = new LinkedHashMap<String, String>();
       for (String entry : outerSplitter.split(sequence)) {
-        Iterator<String> entryFields = entrySplitter.spliterator(entry);
+        Iterator<String> entryFields = entrySplitter.splittingIterator(entry);
 
         checkArgument(entryFields.hasNext(), INVALID_ENTRY_MESSAGE, entry);
         String key = entryFields.next();

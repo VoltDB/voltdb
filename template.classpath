@@ -2,6 +2,7 @@
 <classpath>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="tests/frontend"/>
+    <classpathentry kind="src" path="tests/testprocs"/>
     <classpathentry kind="src" path="tests/hsqldb"/>
     <classpathentry kind="src" path="doc/tutorials/auction/procedures"/>
     <classpathentry kind="src" path="doc/tutorials/auction/src"/>
@@ -48,7 +49,7 @@
     <classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/javaee-api-6.0.jar"/>
     <classpathentry kind="lib" path="lib/groovy-all-2.1.7-indy.jar"/>
-    <classpathentry kind="lib" path="lib/kafka_2.8.0-0.8.0.jar"/>
+    <classpathentry kind="lib" path="lib/kafka_2.8.0-0.8.1.jar"/>
     <classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
     <classpathentry kind="lib" path="lib/scala-library.jar"/>
 

@@ -39,9 +39,7 @@ public class EstTimeUpdater {
                 if (pause) continue;
                 Long delta = EstTimeUpdater.update(System.currentTimeMillis());
                 if ( delta != null ) {
-                    new VoltLogger("HOST").warn("A VoltDB thread has not run for more than " + delta +
-                            " milliseconds. System resource contention could be" +
-                            " impacting VoltDB operations.");
+                    new VoltLogger("HOST").info(delta +" estimated time update.");
                 }
             }
         }

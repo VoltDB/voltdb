@@ -1178,16 +1178,6 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY && tableAlias == null) {
-            scan.attributes.put("table", rangeTable.getName().name + rangeTable.getName().hashCode());
-        } else {
-            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
-        }
-
-        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
-        }
-
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             if (rangeTable instanceof TableDerived) {
                 if (tableAlias == null || tableAlias.name == null) {
@@ -1195,10 +1185,17 @@ final class RangeVariable {
                     throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                             "SQL Syntax error: Every derived table must have its own alias.");
                 }
+                scan.attributes.put("table", tableAlias.name.toUpperCase());
 
                 VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
                 scan.children.add(subQuery);
             }
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
+        }
+
+        if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
         }
 
         // note if this is an outer join

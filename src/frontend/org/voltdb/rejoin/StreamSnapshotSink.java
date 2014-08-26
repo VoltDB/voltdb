@@ -107,10 +107,10 @@ public class StreamSnapshotSink {
         public void restore(SiteProcedureConnection connection) {
             VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
 
-            // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
-            // doesn't yet care about export, just use Long.MIN_VALUE.
+            // Currently, only export cares about this TXN ID.  Since we don't have one handy,
+            // just use Long.MIN_VALUE to match how m_openSpHandle is initialized in ee/storage/TupleStreamWrapper
 
-            connection.loadTable(Long.MIN_VALUE, tableId, table, false, false);
+            connection.loadTable(Long.MIN_VALUE, Long.MIN_VALUE, tableId, table, false, false, false);
         }
     }
 

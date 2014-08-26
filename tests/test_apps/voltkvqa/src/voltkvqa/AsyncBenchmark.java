@@ -286,14 +286,7 @@ public class AsyncBenchmark {
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
                 totalConnections.decrementAndGet();
-                if (config.recover) {
-                    try {
-                        connectThis(hostname, "Retry");
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                } else {
+                if (!config.recover) {
                     if (totalConnections.get() == 0) {
                         //totalConnections.set(-1);
                         System.exit(1);
@@ -313,6 +306,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.autotune) {
             clientConfig.enableAutoTune();
@@ -474,7 +468,7 @@ public class AsyncBenchmark {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
         }
-        if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
+        if (lastSuccessfulResponse > 0  && (System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
             prt("Not making any progress, last at " +
                     (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
             printJStack();
@@ -715,17 +709,6 @@ public class AsyncBenchmark {
         }
     }
 
-    private void connectThis(final String server, final String info) throws InterruptedException, NoConnectionsException, IOException {
-        System.out.println("Trying to reconnect this server: '" + server + "'");
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connectToOneServerWithRetry(server, info);
-            }
-        });
-        t.setDaemon(true);
-        t.start();
-    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.

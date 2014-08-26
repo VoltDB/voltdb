@@ -66,6 +66,12 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.index.IndexAVL;
@@ -83,8 +89,8 @@ import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.LobData;
+import org.hsqldb_voltpatches.types.Type;
 
 // fredt@users 20020130 - patch 491987 by jimbag@users - made optional
 // fredt@users 20020405 - patch 1.7.0 by fredt - quoted identifiers
@@ -2653,9 +2659,11 @@ public class Table extends TableBase implements SchemaObject {
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
+        Map<String, String> autoGenNameMap = new HashMap<String, String>();
 
         // add table metadata
-        table.attributes.put("name", getName().name);
+        String tableName = getName().name;
+        table.attributes.put("name", tableName);
 
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
@@ -2672,7 +2680,8 @@ public class Table extends TableBase implements SchemaObject {
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         table.children.add(indexes);
         for (Index index : indexList) {
-            VoltXMLElement indexChild = index.voltGetIndexXML(session);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName);
+            autoGenNameMap.put(index.getName().name, indexChild.attributes.get("name"));
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -2680,11 +2689,46 @@ public class Table extends TableBase implements SchemaObject {
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
+        List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
         for (Constraint constraint : getConstraints()) {
             VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             if (constraintChild != null) {
+                String constraintName = constraintChild.attributes.get("index");
+                String autoGenName = autoGenNameMap.get(constraintName);
+                if (autoGenName != null) {
+                    constraintChild.attributes.put("index", autoGenName);
+                    String constName;
+                    if (autoGenName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
+                        constName = autoGenName.substring(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX.length());
+                    }
+                    else {
+                        constName = autoGenName;
+                    }
+                    autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
+                    constraintChild.attributes.put("name", constName);
+                }
+                else {
+                    int const_type = constraint.getConstraintType();
+                    if (const_type == Constraint.PRIMARY_KEY || const_type == Constraint.UNIQUE
+                            || const_type == Constraint.LIMIT || const_type == Constraint.FOREIGN_KEY) {
+                        revisitList.add(constraintChild);
+                        continue;
+                    }
+                }
                 constraints.children.add(constraintChild);
             }
+        }
+
+        for (VoltXMLElement constraintChild : revisitList) {
+            String constraintName = constraintChild.attributes.get("index");
+            String autoGenName = autoGenNameMap.get(constraintName);
+            if (autoGenName != null) {
+                constraintChild.attributes.put("index", autoGenName);
+                String constName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
+                        autoGenName.substring(HSQLInterface.AUTO_GEN_PREFIX.length());
+                autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
+            }
+            constraints.children.add(constraintChild);
         }
 
         return table;

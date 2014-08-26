@@ -55,17 +55,21 @@ namespace voltdb
 {
     class UndoLog;
     class ReadWriteSet;
+    class AggregateExecutorBase;
 
     class SeqScanExecutor : public AbstractExecutor {
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
+            , m_aggExec(NULL)
         {}
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
-        bool needsOutputTableClear();
+
+    private:
+        AggregateExecutorBase* m_aggExec;
     };
 }
 

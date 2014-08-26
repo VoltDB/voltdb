@@ -24,7 +24,6 @@ import java.util.Set;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -42,6 +41,9 @@ public abstract class StmtTableScan {
     protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
     protected Set<String> m_scanColumnNameSet = new HashSet<>();
 
+    // Partitioning column info
+    protected List<SchemaColumn> m_partitioningColumns = null;
+
     protected StmtTableScan(String tableAlias) {
         m_tableAlias = tableAlias;
     }
@@ -54,15 +56,15 @@ public abstract class StmtTableScan {
         return m_scanColumnsList;
     }
 
+    public List<SchemaColumn> getPartitioningColumns() {
+        return m_partitioningColumns;
+    }
+
     abstract public String getTableName();
 
     abstract public boolean getIsReplicated();
 
-    abstract public String getPartitionColumnName();
-
     abstract public List<Index> getIndexes();
-
-    public void setPartitioning(PartitioningForStatement partitioning) {}
 
     abstract public String getColumnName(int m_columnIndex);
 
@@ -81,5 +83,4 @@ public abstract class StmtTableScan {
             m_scanColumnsList.add(scol);
         }
     }
-
 }

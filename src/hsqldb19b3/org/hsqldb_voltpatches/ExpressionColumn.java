@@ -486,7 +486,12 @@ public class ExpressionColumn extends Expression {
                     }
                 }
 
+                // A VoltDB extension to allow toSQL on expressions in DDL
+                if (rangeVariable == null || rangeVariable.tableAlias == null) {
+                /* disable 1 line ...
                 if (rangeVariable.tableAlias == null) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     return column.getName().getSchemaQualifiedStatementName();
                 } else {
                     StringBuffer sb = new StringBuffer();
@@ -819,9 +824,9 @@ public class ExpressionColumn extends Expression {
     {
         if (tableName != null) {
             if (rangeVariable != null && rangeVariable.rangeTable != null &&
-                    rangeVariable.tableAlias == null &&
+                    rangeVariable.tableAlias != null &&
                     rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-                exp.attributes.put("table", tableName.toUpperCase() + rangeVariable.rangeTable.getName().hashCode());
+                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
             } else {
                 exp.attributes.put("table", tableName.toUpperCase());
             }

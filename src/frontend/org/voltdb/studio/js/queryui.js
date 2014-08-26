@@ -1,99 +1,211 @@
-var QueryUI = (function(queryTab){
+function QueryUI(queryTab) {
+    "use strict";
+    var CommandParser,
+        QueryTab = queryTab,
+        DataSource = queryTab.find('select.datasource');
 
-var QueryTab = queryTab;
-var DataSource = queryTab.find('select.datasource');
-var ISQLParser = (function()
-{
-    var SingleLineComments = /^\s*(\/\/|--).*$/gm;
-    var Extract = new RegExp(/'[^']*'/m);
-    var AutoSplit = /\s(select|insert|update|delete|exec|execute|explain|explainproc)\s/gim;
-    var AutoSplitParameters = /[\s,]+/gm;
-    var ParserStringKeywords = /\s*(exec|execute|explain|explainproc)\s+(select|insert|update|delete)\s+/gim;
-    this.parse = function(src)
-    {
-        src = src.replace(ParserStringKeywords, " $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-        src = src.replace(SingleLineComments,'');
-        src = src.replace(/''/g, '$(SQL_PARSER_ESCAPE_SINGLE_QUOTE)');
-        var k = Extract.exec(src);
-        var i = 0;
-        var frag = new Array();
-        while(k != null)
-        {
-            frag.push(k);
-            src = src.replace(k,'$(SQL_PARSER_STRING_FRAGMENT#' + (i++) + ')');
-            k = Extract.exec(src);
-        }
-        src = src.replace(AutoSplit,';$1 ');
-        var sqlFrag = src.split(';');
-        var statements = new Array();
-        for(var i = 0; i< sqlFrag.length; i++)
-        {
-            var sql = sqlFrag[i].replace(/^\s+|\s+$/g,"");
-            if (sql != '')
-            {
-                if(sql.indexOf('$(SQL_PARSER_STRING_FRAGMENT#') > -1)
-                    for(var j = 0; j< frag.length; j++)
-                        sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
-                sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
-                sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
-                sql = sql.replace(/\"/g, '\\"');
-                statements.push(sql);
-            }
-        }
-        return statements;
-    }
-    this.parseProcedureCallParameters = function(src)
-    {
-        src = src.replace(/''/g, '$(SQL_PARSER_ESCAPE_SINGLE_QUOTE)');
-        var k = Extract.exec(src);
-        var i = 0;
-        var frag = new Array();
-        while(k != null)
-        {
-            frag.push(k);
-            src = src.replace(k,'$(SQL_PARSER_STRING_FRAGMENT#' + (i++) + ')');
-            k = Extract.exec(src);
-        }
-        src = src.replace(AutoSplitParameters,',');
-        var sqlFrag = src.split(',');
-        var statements = new Array();
-        for(var i = 0; i< sqlFrag.length; i++)
-        {
-            var sql = sqlFrag[i].replace(/^\s+|\s+$/g,'');
-            if (sql != '')
-            {
-                if (sql.toLowerCase() == "null")
-                {
-                    statements.push(null);
+    function ICommandParser() {
+        var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
+            MatchOneQuotedString = /'[^']*'/m,
+            MatchQuotedQuotes = /''/g,
+            QuotedQuoteLiteral = "''",
+            MatchDoubleQuotes = /\"/g,
+            EscapedDoubleQuoteLiteral = '\\"',
+            MatchDisguisedQuotedQuotes = /#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#/g,
+            DisguisedQuotedQuoteLiteral = "#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#",
+            QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
+            // Generate fixed-length 5-digit nonce values from 100000 - 999999.
+            // That's 900000 strings per statement batch -- that should be enough.
+            MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
+            QuotedStringNonceBase = 100000,
+
+            // TODO: drop the remaining vars when semi-colon injection is no longer supported
+
+            // Normally, statement boundaries are guessed by the parser, which inserts semicolons as needed.
+            // The guessing is based on the assumption that the user is smart enough to not use SQL statement
+            // keywords as schema names.  To err on the safe side, avoid splitting (require a semicolon) before
+            // VoltDB proprietary non-SQL statement keywords, ("partition", "explain", "explainproc", "exec",
+            // and "execute") because they could theoretically occur mid-statement as (legacy?) names in user
+            // schema. Take a chance that they are not using SQL statement keywords like "select" and "delete"
+            // as unquoted names in queries.
+            // Similarly, do not enable statement splitting before "alter" or "drop" because it would be more
+            // trouble than it is worth to disable it when these keywords occur in the
+            // middle of an "alter table ... alter|drop column ..." statement.
+            // The intent is to avoid writing another full sql parser, here.
+            // Any statement keyword that does not get listed here simply requires an explicit semicolon before
+            // it to mark the end of the preceding statement.
+            MatchStatementStarts =
+                /\s((?:(?:\s\()*select)|insert|update|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
+            //     ($1-------------------------------------------------------------------------------------------------)
+            GenerateSplitStatements = ';$1 ',
+            // Stored procedure parameters can be separated by commas or whitespace.
+            // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
+            MatchParameterSeparators = /[\s,]+/g,
+
+            // There are some easily recognizable patterns that contain statement keywords mid-statement.
+            // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
+            // always ignored by the statement splitter -- the user must separate them from the prior
+            // statement with a semicolon.
+            // For these other keywords, the usual statement splitting can be easily disabled in special
+            // cases:
+            // - Any SQL statement keyword after "explain ".
+            // - Any "select " that follows open parentheses (with optional whitespace)
+            //   -- these could either be subselects or the select statement arguments to a setop
+            //      (e.g. union).
+            // - Any "select " that follows a trailing setop keyword:
+            //   "union", "intersect", "except", or "all"
+            //   -- actually for ease of implementation (pattern simplicity) also disable command
+            //      splitting for the unlikely case of a setop followed by other statements:
+            //      "insert", "update", "delete", "truncate"
+            //
+            // The pattern grouping uses "(?:" anonymous pattern groups to preserve $1 as the prefix
+            // pattern and $2 as the suffix keyword. The intent is to temporarily disguise the suffix
+            // keyword to prevent a statement-splitting semicolon from getting inserted before it.
+            // If "explain" on ddl statements (?) (create|partition) is ever supported,
+            // add them as options to the $2 suffix keyword pattern.
+            MatchNonBreakingCompoundKeywords =
+                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|delete|truncate)\s+/gim,
+            //   ($1------------------------------------------------)   ($2-----------------------------------------------)
+            MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
+            GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
+
+        // Avoid false positives for statement grammar inside quoted strings by
+        // substituting a nonce for each string.
+        function disguiseQuotedStrings(src, stringBankOut) {
+            var nonceNum, nextString;
+            // Temporarily disguise quoted quotes as non-quotes to simplify the work of
+            // extracting quoted strings.
+            src = src.replace(MatchQuotedQuotes, DisguisedQuotedQuoteLiteral);
+
+            // Extract quoted strings to keep their content from getting confused with interesting
+            // statement syntax.
+            nonceNum = QuotedStringNonceBase;
+            while (true) {
+                nextString = MatchOneQuotedString.exec(src);
+                if (nextString === null) {
+                    break;
                 }
-                else
-                {
-                    if(sql.indexOf('$(SQL_PARSER_STRING_FRAGMENT#') > -1)
-                        for(var j = 0; j< frag.length; j++)
-                            sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
-                    sql = sql.replace(/^\s+|\s+$/g,'');
-                    sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
-                    statements.push(sql);
+                stringBankOut.push(nextString);
+                src = src.replace(nextString, QuotedStringNonceLiteral + nonceNum);
+                nonceNum += 1;
+            }
+            return src;
+        }
+
+        // Restore quoted strings by replcaing each nonce with its original quoted string.
+        function undisguiseQuotedStrings(src, stringBank) {
+            var nextNonce, nonceNum;
+            // Clean up by restoring the replaced quoted strings.
+            while (true) {
+                nextNonce = MatchOneQuotedStringNonce.exec(src);
+                if (nextNonce === null) {
+                    break;
+                }
+                nonceNum = parseInt(nextNonce[1], 10);
+                src = src.replace(QuotedStringNonceLiteral + nonceNum,
+                                  stringBank[nonceNum - QuotedStringNonceBase]);
+            }
+            // Clean up by restoring the replaced quoted quotes.
+            src = src.replace(MatchDisguisedQuotedQuotes, QuotedQuoteLiteral);
+            return src;
+        }
+
+        // break down a multi-statement string into a statement array.
+        function parseUserInputMethod(src) {
+            var splitStmts, stmt, ii, len,
+                stringBank = [],
+                statementBank = [];
+            // Eliminate line comments permanently.
+            src = src.replace(MatchEndOfLineComments, '');
+
+            // Extract quoted strings to keep their content from getting confused with interesting
+            // statement syntax. This is required for statement splitting even if only at explicit
+            // semi-colon boundaries -- semi-colns might appear in quoted text.
+            src = disguiseQuotedStrings(src, stringBank);
+
+            // TODO: drop the following section when semi-colon injection is no longer supported
+
+            // Disguise compound keywords temporarily to avoid triggering statement splits.
+            src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
+
+            // Start a new statement before each remaining statement keyword.
+            src = src.replace(MatchStatementStarts, GenerateSplitStatements);
+
+            // Restore disguised compound keywords post-statement-split.
+            src = src.replace(MatchCompoundKeywordDisguise, '');
+
+            // TODO: drop the preceding section when semi-colon injection is no longer supported
+
+            // Finally, get to work -- break the input into separate statements for processing.
+            splitStmts = src.split(';');
+
+            statementBank = [];
+            for (ii = 0, len = splitStmts.length; ii < len; ii += 1) {
+                stmt = splitStmts[ii].trim();
+                if (stmt !== '') {
+                    // Clean up by restoring the replaced quoted strings.
+                    stmt = undisguiseQuotedStrings(stmt, stringBank);
+
+                    // Prepare double-quotes for HTTP request formatting by \-escaping them.
+                    // NOTE: This is NOT a clean up of any mangling done inside this function.
+                    // It just needs doing at some point, so why not here?
+                    stmt = stmt.replace(MatchDoubleQuotes, EscapedDoubleQuoteLiteral);
+
+                    statementBank.push(stmt);
                 }
             }
+            return statementBank;
         }
-        return statements;
+
+        // break down a multi-parameter proc call into an array of (1) proc name and any parameters.
+        function parseProcedureCallParametersMethod(src) {
+            // Extract quoted strings to keep their content from getting confused with interesting
+            // statement syntax.
+            var splitParams, param, ii, len,
+                stringBank = [],
+                parameterBank = [];
+            src = disguiseQuotedStrings(src, stringBank);
+
+            splitParams = src.split(MatchParameterSeparators);
+
+            for (ii = 0, len = splitParams.length; ii < len; ii += 1) {
+                param = splitParams[ii].trim();
+                if (param !== '') {
+                    if (param.toLowerCase() === 'null') {
+                        parameterBank.push(null);
+                    } else {
+                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
+                            // Clean up by restoring the replaced quoted strings.
+                            param = undisguiseQuotedStrings(param, stringBank);
+                        }
+                        parameterBank.push(param);
+                    }
+                }
+            }
+            return parameterBank;
+        }
+
+        this.parseProcedureCallParameters = parseProcedureCallParametersMethod
+        this.parseUserInput = parseUserInputMethod;
     }
-});
-var SQLParser = new ISQLParser();
+
+    CommandParser = new ICommandParser();
+
+    //TODO: Apply reasonable coding standards to the code below...
 
 function executeCallback(format, target, id)
 {
     var Format = format;
     var Target = target;
     var Id = id;
-    this.Callback = function(response)
+    function callback(response)
     {
         processResponse(Format, Target, Id, response);
     }
+    this.Callback = callback;
 }
 
-this.execute = function()
+function executeMethod()
 {
     var statusBar = QueryTab.find('.workspacestatusbar span.status');
     if (DataSource.val() == 'Disconnected')
@@ -133,7 +245,7 @@ this.execute = function()
         target.html('<div class="wrapper"><textarea></textarea></div>');
         target = target.find('textarea');
     }
-    var statements = SQLParser.parse(source);
+    var statements = CommandParser.parseUserInput(source);
     var start = (new Date()).getTime();
     var connectionQueue = connection.getQueue();
     connectionQueue.Start();
@@ -145,7 +257,7 @@ this.execute = function()
             statements[i] = 'exec ' + statements[i].substr(8);
         if (/^exec /i.test(statements[i]))
         {
-            var params = SQLParser.parseProcedureCallParameters(statements[i].substr(5));
+            var params = CommandParser.parseProcedureCallParameters(statements[i].substr(5));
             var procedure = params.splice(0,1)[0];
             connectionQueue.BeginExecute(procedure, params, callback.Callback);
         }
@@ -164,7 +276,8 @@ this.execute = function()
             connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
         }
     }
-    connectionQueue.End(function(state,success) {
+    function atEnd(state,success)
+    {
         var totalDuration = (new Date()).getTime() - state;
         if (success)
             statusBar.text('Query Duration: ' + (totalDuration/1000.0) + 's');
@@ -174,7 +287,8 @@ this.execute = function()
             statusBar.text('Query error | Query Duration: ' + (totalDuration/1000.0) + 's');
         }
         $("#execute-query").button("enable");
-    }, start);
+    }
+    connectionQueue.End(atEnd, start);
 }
 
 function processResponse(format, target, id, response)
@@ -224,6 +338,7 @@ function applyFormat(val)
     }
     return val;
 }
+
 function lPadZero(v, len)
 {
     // return a string left padded with zeros to length 'len'
@@ -386,4 +501,5 @@ function printCSV(target, id, table)
     $(target).append(src);
 }
 
-});
+    this.execute = executeMethod;
+}

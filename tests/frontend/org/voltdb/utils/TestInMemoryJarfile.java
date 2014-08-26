@@ -41,6 +41,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 
 public class TestInMemoryJarfile extends TestCase {
 
@@ -158,18 +159,6 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile(m_jarPath).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
-
-        // Check the modification times and make sure
-        // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPath));
-        JarEntry entry = j_in.getNextJarEntry();
-        long time1 = entry.getTime();
-        j_in.close();
-
-        j_in = new JarInputStream(new FileInputStream("testout-dupe.jar"));
-        entry = j_in.getNextJarEntry();
-        long time2 = entry.getTime();
-        assertFalse(time1 == time2);
     }
 
     public void testDifferentJarContentsDontMatchCRCs()
@@ -199,17 +188,25 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile(m_jarPathWithGroupInsteadOfRole).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe-groups.jar").getCRC();
         assertEquals(crc1, crc2);
+    }
 
-        // Check the modification times and make sure
-        // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPathWithGroupInsteadOfRole));
-        JarEntry entry = j_in.getNextJarEntry();
-        long time1 = entry.getTime();
-        j_in.close();
+    public void testJarfileRemoveClassRemovesInnerClasses() throws Exception
+    {
+        InMemoryJarfile dut = new InMemoryJarfile();
+        // Add a class file that we know has inner classes
+        // Someday this seems like it should be an operation directly on InMemoryJarfile
+        VoltCompiler comp = new VoltCompiler();
+        // This will pull in all the inner classes (currently 4 of them), but check anyway
+        comp.addClassToJar(dut, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+        JarLoader loader = dut.getLoader();
+        assertEquals(5, loader.getClassNames().size());
+        System.out.println(loader.getClassNames());
+        assertTrue(loader.getClassNames().contains("org.voltdb_testprocs.updateclasses.InnerClassesTestProc$InnerNotPublic"));
+        assertTrue(dut.get("org/voltdb_testprocs/updateclasses/InnerClassesTestProc$InnerNotPublic.class") != null);
 
-        j_in = new JarInputStream(new FileInputStream("testout-dupe-groups.jar"));
-        entry = j_in.getNextJarEntry();
-        long time2 = entry.getTime();
-        assertFalse(time1 == time2);
+        // Now, remove the outer class and verify that all the inner classes go away.
+        dut.removeClassFromJar("org.voltdb_testprocs.updateclasses.InnerClassesTestProc");
+        assertTrue(loader.getClassNames().isEmpty());
+        assertTrue(dut.get("org/voltdb_testprocs/updateclasses/InnerClassesTestProc$InnerNotPublic.class") == null);
     }
 }

@@ -372,7 +372,7 @@ string planNodeToString(PlanNodeType type)
         return "UPDATE";
     }
     case PLAN_NODE_TYPE_INSERT: {
-        return "DELETE";
+        return "INSERT";
     }
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
@@ -389,11 +389,14 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_HASHAGGREGATE: {
         return "HASHAGGREGATE";
     }
+    case PLAN_NODE_TYPE_PARTIALAGGREGATE: {
+        return "PARTIALAGGREGATE";
+    }
     case PLAN_NODE_TYPE_UNION: {
         return "UNION";
     }
     case PLAN_NODE_TYPE_ORDERBY: {
-        return "RECEIVE";
+        return "ORDERBY";
     }
     case PLAN_NODE_TYPE_PROJECTION: {
         return "PROJECTION";
@@ -409,6 +412,9 @@ string planNodeToString(PlanNodeType type)
     }
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
+    }
+    case PLAN_NODE_TYPE_UPSERT: {
+        return "UPSERT";
     }
     }
     return "UNDEFINED";
@@ -444,6 +450,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
         return PLAN_NODE_TYPE_HASHAGGREGATE;
+    } else if (str == "PARTIALAGGREGATE") {
+        return PLAN_NODE_TYPE_PARTIALAGGREGATE;
     } else if (str == "UNION") {
         return PLAN_NODE_TYPE_UNION;
     } else if (str == "ORDERBY") {
@@ -458,6 +466,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
+    } else if (str == "UPSERT") {
+        return PLAN_NODE_TYPE_UPSERT;
     }
     return PLAN_NODE_TYPE_INVALID;
 }

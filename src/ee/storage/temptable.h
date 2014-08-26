@@ -91,6 +91,12 @@ class TempTable : public Table {
         return new TableIterator(this, m_data.begin());
     }
 
+    TableIterator& iteratorDeletingAsWeGo() {
+        m_iter.reset(m_data.begin());
+        m_iter.setTempTableDeleteAsGo(true);
+        return m_iter;
+    }
+
     virtual ~TempTable();
 
     // ------------------------------------------------------------------
@@ -158,6 +164,9 @@ class TempTable : public Table {
     TBPtr allocateNextBlock();
     void nextFreeTuple(TableTuple *tuple);
 
+    void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator);
+    std::vector<TBPtr>::iterator getDataEndBlockIterator();
+
     virtual void onSetColumns() {
         m_data.clear();
     };
@@ -223,8 +232,11 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
 
     m_tupleCount = 0;
     while (m_data.size() > 1) {
+        // This block of temp table may have been clean up already
+        // because of delete as we go feature.
+        TBPtr blockPtr = m_data.back();
         m_data.pop_back();
-        if (m_limits) {
+        if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
@@ -263,6 +275,18 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
     return;
 }
 
+inline void TempTable::freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+    if (m_data.begin() != nextBlockIterator) {
+        nextBlockIterator--;
+        // somehow we preserve the first block
+        if (m_data.begin() != nextBlockIterator) {
+            *nextBlockIterator = NULL;
+            if (m_limits) {
+                m_limits->reduceAllocated(m_tableAllocationSize);
+            }
+        }
+    }
+}
 
 }
 

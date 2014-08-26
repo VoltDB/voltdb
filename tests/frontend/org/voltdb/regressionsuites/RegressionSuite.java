@@ -135,6 +135,10 @@ public class RegressionSuite extends TestCase {
         return getClient(1000 * 60 * 10); // 10 minute default
     }
 
+    public Client getClientToHostId(int hostId) throws IOException {
+        return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
+    }
+
     public Client getFullyConnectedClient() throws IOException {
         return getFullyConnectedClient(1000 * 60 * 10); // 10 minute default
     }
@@ -164,6 +168,30 @@ public class RegressionSuite extends TestCase {
         // retry once
         catch (ConnectException e) {
             listener = listeners.get(r.nextInt(listeners.size()));
+            client.createConnection(listener);
+        }
+        m_clients.add(client);
+        return client;
+    }
+
+    /**
+     * Get a VoltClient instance connected to a specific server driven by the
+     * VoltServerConfig instance. Find the server by the config's HostId.
+     *
+     * @return A VoltClient instance connected to the server driven by the
+     * VoltServerConfig instance.
+     */
+    public Client getClientToHostId(int hostId, long timeout) throws IOException {
+        final String listener = m_config.getListenerAddress(hostId);
+        ClientConfig config = new ClientConfigForTest(m_username, m_password);
+        config.setConnectionResponseTimeout(timeout);
+        config.setProcedureCallTimeout(timeout);
+        final Client client = ClientFactory.createClient(config);
+        try {
+            client.createConnection(listener);
+        }
+        // retry once
+        catch (ConnectException e) {
             client.createConnection(listener);
         }
         m_clients.add(client);
@@ -277,14 +305,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+    public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, expected);
     }
 
-    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -293,7 +321,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
@@ -302,7 +330,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+    public void validateRowOfLongs(VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -329,11 +357,17 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
+            // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
                 assertEquals(expected[i], actual);
             } else {
-                VoltType type = vt.getColumnType(i);
-                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                if (isHSQL()) {
+                    // Hsql return 0 for NULL
+                    assertEquals(0, actual);
+                } else {
+                    VoltType type = vt.getColumnType(i);
+                    assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                }
             }
         }
     }
@@ -350,6 +384,62 @@ public class RegressionSuite extends TestCase {
             assertTrue(vt.advanceRow());
             assertEquals(expected[i], vt.getString(col));
         }
+    }
+
+    public void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
+        assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
+                expectedRows.getColumnCount(), actualRows.getColumnCount());
+
+        int i = 0;
+        while(expectedRows.advanceRow()) {
+            assertTrue(prefix + "too few actual rows; expected more than " + (i + 1), actualRows.advanceRow());
+
+            for (int j = 0; j < actualRows.getColumnCount(); j++) {
+                String columnName = actualRows.getColumnName(j);
+                String colPrefix = prefix + "row " + i + ": column: " + columnName + ": ";
+                VoltType actualTy = actualRows.getColumnType(j);
+                VoltType expectedTy = expectedRows.getColumnType(j);
+                assertEquals(colPrefix + "type mismatch", expectedTy, actualTy);
+
+                Object expectedObj = expectedRows.get(j,  expectedTy);
+                Object actualObj = expectedRows.get(j,  actualTy);
+                assertEquals(colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj,
+                        expectedObj, actualObj);
+            }
+
+            i++;
+        }
+        assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
+    }
+
+    static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        verifyProcFails(client, expectedMsg, "@AdHoc", stmt);
+    }
+
+    static public void verifyProcFails(Client client, String expectedMsg, String storedProc, Object... args) throws IOException {
+
+        String what;
+        if (storedProc.compareTo("@AdHoc") == 0) {
+            what = "the statement \"" + args[0] + "\"";
+        }
+        else {
+            what = "the stored procedure \"" + storedProc + "\"";
+        }
+
+        try {
+            client.callProcedure(storedProc, args);
+        }
+        catch (ProcCallException pce) {
+            String msg = pce.getMessage();
+            String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                    expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
+            assertTrue(diagnostic, msg.contains(expectedMsg));
+            return;
+        }
+
+        String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                expectedMsg + "\", but instead it threw nothing.";
+        fail(diagnostic);
     }
 
 

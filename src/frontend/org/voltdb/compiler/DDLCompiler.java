@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -71,6 +72,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -82,6 +84,7 @@ public class DDLCompiler {
 
     static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+    static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     /**
      * Regex Description:
@@ -223,10 +226,7 @@ public class DDLCompiler {
             "\\s+" +                                // one or more spaces
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
-            "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
-            "\\s+" +                                //   one or more spaces
-            ".+)" +                                 //   end SELECT or DML statement
+            "(.+)" +                                // (3) SELECT or DML statement
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of DDL statement
             );
@@ -261,6 +261,22 @@ public class DDLCompiler {
             ";" +                                   // semi-colon terminator
             "\\z",                                  // end of DDL statement
             Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL
+            );
+
+    /**
+     * DROP PROCEDURE  statement regex
+     */
+    static final Pattern procedureDropPattern = Pattern.compile(
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "DROP" +                                // DROP token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (1) class name or procedure name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
             );
 
     /**
@@ -306,6 +322,16 @@ public class DDLCompiler {
             "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
             "([\\w.$]+)"                        // (2) <table name>
             );
+
+    /**
+     * Regex to match ALTER or DROP TABLE statements. Capture group (1) is operator, (2) is TABLE, but (3) is used.
+     */
+    static final Pattern alterOrDropTablePattern = Pattern.compile(
+            "(?i)" + // (ignore case)
+            "\\A" + // (start statement)
+            "(ALTER|DROP)\\s+(TABLE)\\s+" + // (1) ALTER or DROP TABLE
+            "([\\w.$]+)" // (3) <table name>
+    );
 
     /**
      * NB supports only unquoted table and column names
@@ -371,7 +397,8 @@ public class DDLCompiler {
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "(?:PROCEDURE|ROLE)|" +
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -400,6 +427,9 @@ public class DDLCompiler {
     final VoltDDLElementTracker m_tracker;
 
     // used to match imported class with those in the classpath
+    // For internal cluster compilation, this will point to the
+    // InMemoryJarfile for the current catalog, so that we can
+    // find classes provided as part of the application.
     ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
@@ -461,7 +491,7 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE or CREATE VIEW.
+                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
                     // We sometimes choke at parsing statements with newlines, so
                     // check against a newline free version of the stmt.
                     String oneLinerStmt = stmt.statement.replace("\n", " ");
@@ -469,6 +499,22 @@ public class DDLCompiler {
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    } else {
+                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
+                        if (atableMatcher.find()) {
+                            String op = atableMatcher.group(1);
+                            String tableName = atableMatcher.group(3);
+                            if (op.equalsIgnoreCase("DROP")) {
+                                m_tableNameToDDL.remove(tableName.toUpperCase());
+                            } else {
+                                //ALTER - Append the statement
+                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
+                                if (prevStmt != null) {
+                                    //Append the SQL for report...else would blow up compilation.
+                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
+                                }
+                            }
+                        }
                     }
 
                     // kind of ugly.  We hex-encode each statement so we can
@@ -614,14 +660,23 @@ public class DDLCompiler {
             Class<?> clazz;
             try {
                 clazz = Class.forName(className, true, m_classLoader);
-            } catch (ClassNotFoundException e) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Cannot load class for procedure: %s",
-                        className));
+            }
+            catch (Throwable cause) {
+                // We are here because either the class was not found or the class was found and
+                // the initializer of the class threw an error we can't anticipate. So we will
+                // wrap the error with a runtime exception that we can trap in our code.
+                if (CoreUtils.isStoredProcThrowableFatalToServer(cause)) {
+                    throw (Error)cause;
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Cannot load class for procedure: %s",
+                            className), cause);
+                }
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), Language.JAVA, clazz);
+                    new ArrayList<String>(), Language.JAVA, null, clazz);
 
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
@@ -644,10 +699,10 @@ public class DDLCompiler {
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(3);
+            String sqlStatement = statementMatcher.group(3) + ";";
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -689,7 +744,7 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), language, scriptClass);
+                    new ArrayList<String>(), language, codeBlock, scriptClass);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -699,6 +754,15 @@ public class DDLCompiler {
             }
             // track the defined procedure
             m_tracker.add(descriptor);
+
+            return true;
+        }
+
+        // Matches if it is DROP PROCEDURE <proc-name or classname>
+        statementMatcher = procedureDropPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
+            m_tracker.removeProcedure(classOrProcName);
 
             return true;
         }
@@ -784,23 +848,35 @@ public class DDLCompiler {
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-                // Only process the statement if this is not for the StatementPlanner
-                String classNameStr = statementMatcher.group(1);
+                // Semi-hacky way of determining if we're doing a cluster-internal compilation.
+                // Command-line compilation will never have an InMemoryJarfile.
+                if (!(m_classLoader instanceof InMemoryJarfile.JarLoader)) {
+                    // Only process the statement if this is not for the StatementPlanner
+                    String classNameStr = statementMatcher.group(1);
 
-                // check that the match pattern is a valid match pattern
-                checkIdentifierWithWildcard(classNameStr, statement);
+                    // check that the match pattern is a valid match pattern
+                    checkIdentifierWithWildcard(classNameStr, statement);
 
-                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
-                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "IMPORT CLASS not found: '%s'",
-                            classNameStr)); // remove trailing semicolon
+                    ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                    if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                                    "IMPORT CLASS not found: '%s'",
+                                    classNameStr)); // remove trailing semicolon
+                    }
+                    else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                        m_compiler.addWarn(String.format(
+                                    "IMPORT CLASS no match for wildcarded class: '%s'",
+                                    classNameStr), ddlStatement.lineNo);
+                    }
                 }
-                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
-                    m_compiler.addWarn(String.format(
-                            "IMPORT CLASS no match for wildcarded class: '%s'",
-                            classNameStr), ddlStatement.lineNo);
+                else {
+                    m_compiler.addInfo("Internal cluster recompilation ignoring IMPORT CLASS line: " +
+                            statement);
                 }
+                // Need to track the IMPORT CLASS lines even on internal compiles so that
+                // we don't lose them from the DDL source.  When the @UAC path goes away,
+                // we could change this.
+                m_tracker.addImportLine(statement);
             }
 
             return true;
@@ -1239,7 +1315,6 @@ public class DDLCompiler {
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
-        annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
 
         // handle the case where this is a materialized view
         String query = node.attributes.get("query");
@@ -1279,7 +1354,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1288,7 +1363,7 @@ public class DDLCompiler {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
                         addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
@@ -1311,17 +1386,35 @@ public class DDLCompiler {
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if ((t == VoltType.STRING) || (t == VoltType.VARBINARY)) {
+            if ((t == VoltType.STRING && c.getInbytes()) || (t == VoltType.VARBINARY)) {
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
-                            " has a maximum size of " + c.getSize() + " bytes" +
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
                             " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
                 }
                 maxRowSize += 4 + c.getSize();
+            }
+            else if (t == VoltType.STRING) {
+                if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " characters" +
+                            " but the maximum supported size is " +
+                            VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / MAX_BYTES_PER_UTF8_CHARACTER) +
+                            " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
+                }
+                maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
             } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
+        // Temporarily assign the view Query to the annotation so we can use when we build
+        // the DDL statement for the VIEW
+        if (query != null) {
+            annotation.ddl = query;
+        } else {
+            annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
+        }
+
         if (maxRowSize > MAX_ROW_SIZE) {
             throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
                     " but the maximum supported row size is " + MAX_ROW_SIZE);
@@ -1424,7 +1517,7 @@ public class DDLCompiler {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
                         String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
                                 "will be enforced as byte counts rather than UTF8 character counts. " +
-                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)",
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
                                 name, table.getTypeName(),
                                 VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
                         m_compiler.addWarn(msg);
@@ -1681,7 +1774,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // if the index is a user-named index...
-                if (index.getTypeName().startsWith("SYS_IDX_") == false) {
+                if (index.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) == false) {
                     // on dup-detection, add a warning but don't fail
                     String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
@@ -1878,7 +1971,7 @@ public class DDLCompiler {
 
             if (stmt.hasComplexGroupby()) {
                 groupbyExprs = new ArrayList<AbstractExpression>();
-                for (ParsedColInfo col: stmt.groupByColumns) {
+                for (ParsedColInfo col: stmt.m_groupByColumns) {
                     groupbyExprs.add(col.expression);
                 }
                 // Parse group by expressions to json string
@@ -1893,8 +1986,8 @@ public class DDLCompiler {
 
             } else {
                 // add the group by columns from the src table
-                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
                     Column srcCol = srcColumnArray.get(gbcol.index);
                     ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
                     // groupByColumns is iterating in order of groups. Store that grouping order
@@ -1906,8 +1999,8 @@ public class DDLCompiler {
                 }
 
                 // parse out the group by columns into the dest table
-                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
@@ -1915,25 +2008,25 @@ public class DDLCompiler {
             }
 
             // Set up COUNT(*) column
-            ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
+            ParsedSelectStmt.ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
             processMaterializedViewColumn(matviewinfo, srcTable,
-                    destColumnArray.get(stmt.groupByColumns.size()),
+                    destColumnArray.get(stmt.m_groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
-            Index pkIndex = destTable.getIndexes().add("MATVIEW_PK_INDEX");
+            Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
             pkIndex.setType(IndexType.BALANCED_TREE.getValue());
             pkIndex.setUnique(true);
             // add the group by columns from the src table
             // assume index 1 throuh #grpByCols + 1 are the cols
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+            for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
                 ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
                 c.setColumn(destColumnArray.get(i));
                 c.setIndex(i);
             }
-            Constraint pkConstraint = destTable.getConstraints().add("MATVIEW_PK_CONSTRAINT");
+            Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
@@ -1942,8 +2035,8 @@ public class DDLCompiler {
             boolean hasAggregationExprs = false;
             boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
-            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
                 if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     hasAggregationExprs = true;
@@ -1986,8 +2079,8 @@ public class DDLCompiler {
             }
 
             // parse out the aggregation columns into the dest table
-            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
@@ -2091,8 +2184,8 @@ public class DDLCompiler {
      * @throws VoltCompilerException
      */
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
-        int groupColCount = stmt.groupByColumns.size();
-        int displayColCount = stmt.displayColumns.size();
+        int groupColCount = stmt.m_groupByColumns.size();
+        int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
         if (stmt.m_tableList.size() != 1) {
@@ -2115,8 +2208,8 @@ public class DDLCompiler {
 
         int i;
         for (i = 0; i < groupColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
@@ -2125,14 +2218,14 @@ public class DDLCompiler {
             checkExpressions.add(outcol.expression);
         }
 
-        AbstractExpression coli = stmt.displayColumns.get(i).expression;
+        AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
             msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 
         for (i++; i < displayColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
+            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
