@@ -806,7 +806,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             drMasterHost,
                             m_clientInterface,
                             true);
-                    m_replicaDRGateway.initializeReplicaCluster(m_cartographer);
                     m_globalServiceElector.registerService(m_replicaDRGateway);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
@@ -2576,6 +2575,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_nodeDRGateway;
     }
 
+    @Override
     public ReplicaDRGateway getReplicaDRGateway() {
         return m_replicaDRGateway;
     }

@@ -17,14 +17,11 @@
 
 package org.voltdb;
 
-import org.voltdb.iv2.Cartographer;
 
 // Interface through which the outside world can interact with the replica-side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
 public abstract class ReplicaDRGateway extends Thread implements Promotable {
-
-    public abstract void initializeReplicaCluster(Cartographer cartographer);
 
     public abstract void updateCatalog(CatalogContext catalog);
 
