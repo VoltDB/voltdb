@@ -64,7 +64,7 @@ def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
     seconds, preceded by the 'message_begin' and followed by "seconds, " and
     the 'message_end'; if the number of seconds is greater than or equal to 60,
     it also prints the minutes and seconds in parentheses, e.g., 61.9 seconds
-    would be printed as "61.9 seconds (1:02), ". Optionally, if
+    would be printed as "61.9 seconds (01:02), ". Optionally, if
     'include_current_time' is True, the current time (in seconds since January
     1, 1970) is also printed, in brackets, e.g.,
     "61.9 seconds (1:02) [at 1408645826.68], ", which is useful for debugging
@@ -73,13 +73,7 @@ def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
 
     time_msg = str(seconds) + " seconds"
     if (seconds >= 60):
-        minutes = int(seconds / 60)
-        remainder = int(round(seconds - (60 * minutes)))
-        if (remainder < 10):
-            colon = ":0"
-        else:
-            colon = ":"
-        time_msg += " (" + str(minutes) + colon + str(remainder) + ")"
+        time_msg += " (" + re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1) + ")"
     if (include_current_time):
         time_msg += " [at " + str(time.time()) + "]"
 
@@ -88,8 +82,7 @@ def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
     return message
 
 def print_elapsed_seconds(message_end="", prev_time=-1,
-                          message_begin="Elapsed time: ",
-                          include_current_time=False):
+                          message_begin="Elapsed time: "):
     """Computes, returns and prints the difference (in seconds) between the
     current system time and a previous time, which is either the specified
     'prev_time' or, if that is negative (or unspecified), the previous time
@@ -97,10 +90,7 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     'message_begin' and followed by "seconds, " and 'message_end'; if the
     elapsed time is greater than or equal to 60 seconds, it also includes the
     minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
-    as "61.9 seconds (1:02), ". Optionally, if 'include_current_time' is True,
-    the current time (in seconds since January 1, 1970) is also printed, in
-    brackets, e.g., "61.9 seconds (1:02) [at 1408645826.68], ", which is useful
-    for debugging purposes.
+    as "61.9 seconds (01:02), ".
     """
 
     now = time.time()
@@ -110,7 +100,7 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     save_prev_time = now
 
     diff_time = now - prev_time
-    print_seconds(diff_time, message_end, message_begin, include_current_time)
+    print_seconds(diff_time, message_end, message_begin)
     return diff_time
 
 def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
