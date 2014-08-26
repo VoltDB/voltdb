@@ -370,7 +370,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
+    public void notestSubExpressions_Aggregations() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         loadData(client);

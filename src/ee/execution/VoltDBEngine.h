@@ -353,6 +353,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        void cleanupExecutorList(std::vector<AbstractExecutor*>& executorList);
+
+        ExecutorVector * getCurrentExecutorVector() {
+            return m_currExecutorVec;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -398,7 +404,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void cleanupExecutors(ExecutorVector * execsForFrag);
+        void resetCurrentExecutorVec();
+
+        void cleanupExecutors();
 
         // -------------------------------------------------
         // Data Members

@@ -174,9 +174,61 @@ public class PlanNodeTree implements JSONString {
             JSONArray jplanNodes = jobj.getJSONArray(Members.PLAN_NODES.name());
             loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
         }
+
         // Connect the parent and child statements
         for (List<AbstractPlanNode> nextPlanNodes : m_planNodesListMap.values()) {
-            connectParentChildStmt(nextPlanNodes);
+            for(AbstractPlanNode node : nextPlanNodes) {
+                findPlanNodeWithPredicate(node);
+            }
+        }
+    }
+
+    /**
+     * Scan node, join node can have predicate, so does the Aggregate node (Having clause).
+     */
+    private void findPlanNodeWithPredicate(AbstractPlanNode node) {
+        if (node instanceof AbstractScanPlanNode) {
+            AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
+            connectPredicateStmt(scanNode.getPredicate());
+        } else if (node instanceof AbstractJoinPlanNode) {
+            AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode)node;
+            connectPredicateStmt(joinNode.getPreJoinPredicate());
+            connectPredicateStmt(joinNode.getJoinPredicate());
+            connectPredicateStmt(joinNode.getWherePredicate());
+        } else if (node instanceof AggregatePlanNode) {
+            AggregatePlanNode aggNode = (AggregatePlanNode)node;
+            connectPredicateStmt(aggNode.getPostPredicate());
+        }
+
+        for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
+            findPlanNodeWithPredicate(inlineNode);
+        }
+    }
+
+    private void connectPredicateStmt(AbstractExpression predicate) {
+        if (predicate == null) {
+            return;
+        }
+        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
+                SubqueryExpression.class);
+
+        for (AbstractExpression expr : subquerysExprs) {
+            assert(expr instanceof SubqueryExpression);
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            int subqueryId = subqueryExpr.getSubqueryId();
+            int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
+            List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
+
+            if (subqueryNodes == null) {
+                // TODO(xin): subquery can also be contained in inlined nodes, which the map
+                // currently does not contain it.
+                // This is a bug of EXPLAIN on the IN/EXISTS for Agg HAVING clause.
+                return;
+            }
+
+            AbstractPlanNode subqueryNode = getNodeofId(subqueryNodeId, subqueryNodes);
+            assert(subqueryNode != null);
+            subqueryExpr.setSubqueryNode(subqueryNode);
         }
     }
 
@@ -187,7 +239,7 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadPlanNodesFromJSONArrays( JSONArray jArray, Database db )  {
+    public void loadPlanNodesFromJSONArrays(JSONArray jArray, Database db) {
         loadPlanNodesFromJSONArrays(0, jArray, db);
     }
 
@@ -199,7 +251,7 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadPlanNodesFromJSONArrays( int stmtId, JSONArray jArray, Database db)  {
+    public void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
         List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
         int size = jArray.length();
 
@@ -243,42 +295,10 @@ public class PlanNodeTree implements JSONString {
         return;
     }
 
-    private void connectParentChildStmt(List<AbstractPlanNode> planNodes) {
-        for(AbstractPlanNode node : planNodes) {
-            if (node instanceof AbstractScanPlanNode) {
-                AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
-                connectPredicateStmt(scanNode.getPredicate());
-            } else if (node instanceof AbstractJoinPlanNode) {
-                AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode) node;
-                connectPredicateStmt(joinNode.getPreJoinPredicate());
-                connectPredicateStmt(joinNode.getJoinPredicate());
-                connectPredicateStmt(joinNode.getWherePredicate());
-            }
-        }
-    }
-
-    private void connectPredicateStmt(AbstractExpression predicate) {
-        if (predicate == null) {
-            return;
-        }
-        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
-        for (AbstractExpression expr : subquerysExprs) {
-            assert(expr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
-            int subqueryId = subqueryExpr.getSubqueryId();
-            int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
-            List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
-            AbstractPlanNode subqueryNode = getNodeofId(subqueryNodeId, subqueryNodes);
-            assert(subqueryNode != null);
-            subqueryExpr.setSubqueryNode(subqueryNode);
-        }
-    }
-
-    public AbstractPlanNode getNodeofId (int ID, List<AbstractPlanNode> planNodes) {
+    public AbstractPlanNode getNodeofId (int id, List<AbstractPlanNode> planNodes) {
         int size = planNodes.size();
-        for( int i = 0; i < size; i++ ) {
-            if( planNodes.get(i).getPlanNodeId() == ID ) {
+        for (int i = 0; i < size; i++) {
+            if (planNodes.get(i).getPlanNodeId() == id) {
                 return planNodes.get(i);
             }
         }

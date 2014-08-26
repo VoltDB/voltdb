@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -203,7 +204,7 @@ public class SubqueryExpression extends AbstractExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj) throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException {
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
         if (obj.has(Members.PARAM_IDX.name())) {
@@ -221,6 +222,11 @@ public class SubqueryExpression extends AbstractExpression {
                 m_allParameterIdxList.add(allParamIdxArray.getInt(i));
             }
         }
+
+        if (tableScan instanceof StmtSubqueryScan) {
+            m_subquery = (StmtSubqueryScan) tableScan;
+            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
+        }
     }
 
     @Override
@@ -230,8 +236,10 @@ public class SubqueryExpression extends AbstractExpression {
             // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString() + SUBQUERY_TAG +
-            m_subqueryId + ")";
+
+            String result = "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString()
+                    + SUBQUERY_TAG + m_subqueryId + ")";
+            return result;
         } else {
             return "(Subquery: null)";
         }

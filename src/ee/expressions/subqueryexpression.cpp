@@ -62,10 +62,15 @@ SubqueryExpression::SubqueryExpression(
     SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
         // Get the subquery context with the last evaluation result and parameters used to obtain that result
-        SubqueryContext* context = ExecutorContext::getExecutorContext()->getSubqueryContext(m_subqueryId);
+
+        ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
+
+        SubqueryContext* context = exeContext->getSubqueryContext(m_subqueryId);
+
         bool hasPriorResult = context != NULL;
         bool paramsChanged = !hasPriorResult;
         VOLT_TRACE ("Running subquery: %d", m_subqueryId);
+
         // Substitute parameters.
         if (m_tveParams.get() != NULL) {
             size_t paramsCnt = m_tveParams->size();
@@ -77,7 +82,7 @@ SubqueryExpression::SubqueryExpression(
                 // save its value on a side for future comparisons.
                 NValue& prevParam = (*m_parameterContainer)[m_paramIdxs[i]];
                 if (hasPriorResult) {
-                    if (param.compare(prevParam) != 0) {
+                    if (param.compare(prevParam) != VALUE_COMPARE_EQUAL) {
                         prevParam = NValue::copyNValue(param);
                         paramsChanged = true;
                     }
@@ -93,7 +98,7 @@ SubqueryExpression::SubqueryExpression(
             assert(lastParams.size() == m_otherParamIdxs.size());
             for (size_t i = 0; i < lastParams.size(); ++i) {
                 NValue& prevParam = (*m_parameterContainer)[m_otherParamIdxs[i]];
-                bool paramChanged = lastParams[i].compare(prevParam) != 0;
+                bool paramChanged = lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL;
                 if (paramChanged) {
                     lastParams[i] = NValue::copyNValue(prevParam);
                     paramsChanged = true;
@@ -106,11 +111,12 @@ SubqueryExpression::SubqueryExpression(
             return context->getResult();
         }
         // Out of luck. Need to run the executors
-        std::vector<AbstractExecutor*>* executionStack =
-            &ExecutorContext::getExecutorContext()->getExecutorList(m_subqueryId);
+        std::vector<AbstractExecutor*>* executionStack = &exeContext->getExecutorList(m_subqueryId);
         assert(executionStack != NULL);
         assert(!executionStack->empty());
+
         int status = executeExecutionVector(*executionStack, *m_parameterContainer);
+
         if (status != ENGINE_ERRORCODE_SUCCESS) {
             char message[256];
             snprintf(message, 256, "Failed to execute the subquery '%d'", m_subqueryId);
@@ -135,7 +141,7 @@ SubqueryExpression::SubqueryExpression(
         TableIterator& it = outputTable->iterator();
         TableTuple tuple(outputTable->schema());
         if (it.next(tuple)) {
-                if (m_type == EXPRESSION_TYPE_IN_SUBQUERY) {
+            if (m_type == EXPRESSION_TYPE_IN_SUBQUERY) {
                 // This subquery is part of the IN expression, its top plan node will be a
                 // special purpose seqscan node which inserts a tuple with all columns set to NULL
                 // to indicate NULL result, so we can try any (the first one) index.
@@ -164,6 +170,9 @@ SubqueryExpression::SubqueryExpression(
             SubqueryContext newContext(m_subqueryId, retval, lastParams);
             ExecutorContext::getExecutorContext()->setSubqueryContext(m_subqueryId, newContext);
         }
+
+        exeContext->getEngine()->cleanupExecutorList(*executionStack);
+
         return retval;
     }
 

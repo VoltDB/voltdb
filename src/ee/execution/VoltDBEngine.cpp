@@ -507,9 +507,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
 
-        // set this back to -1 for error handling
-        m_currentInputDepId = -1;
-        m_currExecutorVec = NULL;
+        resetCurrentExecutorVec();
 
         return ENGINE_ERRORCODE_ERROR;
     }
@@ -526,20 +524,20 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
             resetReusedResultOutputBuffer();
             VOLT_TRACE("The Executor's execution failed for PlanFragment '%jd'",
                     (intmax_t)planfragmentId);
-            cleanupExecutors(execsForFrag);
+            cleanupExecutors();
             return status;
         }
     } catch (const SerializableEEException &e) {
         VOLT_TRACE("The Executor's execution failed for PlanFragment '%jd'",
                 (intmax_t)planfragmentId);
-        cleanupExecutors(execsForFrag);
+        cleanupExecutors();
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
 
         return ENGINE_ERRORCODE_ERROR;
     }
     // Clean up all the tempTable when each plan finishes and reset current InputDepId
-    cleanupExecutors(execsForFrag);
+    cleanupExecutors();
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -570,24 +568,34 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-/**
- * Function that clean up the temp table the executors used and reset other metadata.
- */
-void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
-    // Clean up all the tempTable when each plan finishes
-    std::vector<AbstractExecutor*> executorList = execsForFrag->getExecutorList();
+void VoltDBEngine::resetCurrentExecutorVec() {
+    // set this back to -1 for error handling
+    m_currentInputDepId = -1;
+    m_currExecutorVec = NULL;
+}
 
+void VoltDBEngine::cleanupExecutorList(std::vector<AbstractExecutor*>& executorList) {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
         assert (executor);
         executor->cleanupTempOutputTable();
     }
-    // set this back to -1 for error handling
-    m_currentInputDepId = -1;
-    m_currExecutorVec = NULL;
-    if (execsForFrag != NULL) {
-        execsForFrag->limits.resetPeakMemory();
-    }
 }
+
+/**
+ * Function that clean up the temp table the executors used and reset other metadata.
+ */
+void VoltDBEngine::cleanupExecutors() {
+    // Clean up all the tempTable when each plan finishes
+    cleanupExecutorList(m_currExecutorVec->getExecutorList());
+
+    if (m_currExecutorVec != NULL) {
+        m_currExecutorVec->limits.resetPeakMemory();
+    }
+
+    // reset the current executor vector at last
+    resetCurrentExecutorVec();
+}
+
 
 // -------------------------------------------------
 // RESULT FUNCTIONS

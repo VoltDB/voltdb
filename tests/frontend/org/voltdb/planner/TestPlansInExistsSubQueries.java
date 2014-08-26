@@ -52,7 +52,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
         // Check param indexes
-        AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
+        AbstractExpression e = nps.getPredicate();
         AbstractExpression le = e.getLeft();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
         AbstractExpression pve = le.getRight();
@@ -141,7 +141,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
-        AbstractExpression e = ((AbstractScanPlanNode) nps).getPredicate();
+        AbstractExpression e = nps.getPredicate();
         assertEquals(ExpressionType.OPERATOR_NOT, e.getExpressionType());
         AbstractExpression le = e.getLeft();
         assertEquals(ExpressionType.EXISTS_SUBQUERY, le.getExpressionType());
@@ -154,6 +154,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     public void testExistsJoin() {
         AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
                 "exists ( select 1 from r3 where r1.a = r3.a)");
+
         pn = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         pn = pn.getChild(0);
@@ -167,9 +168,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractPlanNode pn = compile("select a, sum(c) as sc1 from r1 where (a, c) in " +
                 "( SELECT a, count(c) as sc2 " +
                 "from  r1  GROUP BY a ORDER BY a DESC) GROUP BY A;");
-
-        System.out.println(pn.toExplainPlanString());
-
         pn = pn.getChild(0);
         assertTrue(pn instanceof AbstractScanPlanNode);
 
@@ -220,7 +218,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression p = ((SeqScanPlanNode)pn).getPredicate();
         assertEquals(ExpressionType.EXISTS_SUBQUERY, p.getExpressionType());
-        AbstractExpression subquery = (SubqueryExpression)p;
+        AbstractExpression subquery = p;
         pn = ((SubqueryExpression)subquery).getSubqueryNode();
         pn = pn.getChild(0);
         assertTrue(pn instanceof LimitPlanNode);
