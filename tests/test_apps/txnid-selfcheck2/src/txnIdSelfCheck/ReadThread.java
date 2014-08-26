@@ -122,7 +122,8 @@ public class ReadThread extends Thread {
             }
 
             // 1/5 of all reads are MP
-            boolean replicated = (counter % 100) < (this.mpRatio * 100.);
+            // MP read ratio is not tied to config.mpratio since MP reads only operate on one local partition
+            boolean replicated = (counter % 100) < 20;
             // 1/23th of all SP reads are in-proc adhoc
             boolean inprocAdhoc = (counter % 23) == 0;
             counter++;
