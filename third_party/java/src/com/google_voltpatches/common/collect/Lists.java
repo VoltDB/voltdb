@@ -22,6 +22,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Preconditions.checkPositionIndex;
 import static com.google_voltpatches.common.base.Preconditions.checkPositionIndexes;
 import static com.google_voltpatches.common.base.Preconditions.checkState;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkRemove;
 
 import com.google_voltpatches.common.annotations.Beta;
@@ -105,7 +106,7 @@ public final class Lists {
   }
 
   @VisibleForTesting static int computeArrayListCapacity(int arraySize) {
-    checkArgument(arraySize >= 0);
+    checkNonnegative(arraySize, "arraySize");
 
     // TODO(kevinb): Figure out the right behavior, and document it
     return Ints.saturatedCast(5L + arraySize + (arraySize / 10));
@@ -170,7 +171,7 @@ public final class Lists {
   @GwtCompatible(serializable = true)
   public static <E> ArrayList<E> newArrayListWithCapacity(
       int initialArraySize) {
-    checkArgument(initialArraySize >= 0);  // for GWT.
+    checkNonnegative(initialArraySize, "initialArraySize"); // for GWT.
     return new ArrayList<E>(initialArraySize);
   }
 
@@ -570,6 +571,17 @@ public final class Lists {
     }
     @Override public T get(int index) {
       return function.apply(fromList.get(index));
+    }
+    @Override public Iterator<T> iterator() {
+      return listIterator();
+    }
+    @Override public ListIterator<T> listIterator(int index) {
+      return new TransformedListIterator<F, T>(fromList.listIterator(index)) {
+        @Override
+        T transform(F from) {
+          return function.apply(from);
+        }
+      };
     }
     @Override public boolean isEmpty() {
       return fromList.isEmpty();

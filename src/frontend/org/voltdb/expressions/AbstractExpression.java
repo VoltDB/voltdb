@@ -265,8 +265,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return m_inBytes;
     }
 
-    public void setInBytes(boolean bytes) {
-        m_inBytes = bytes;
+    public void setInBytes(boolean inBytes) {
+        m_inBytes = inBytes;
     }
 
     @Override
@@ -636,8 +636,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             ParsedColInfo col = indexToColumnMap.get(ii);
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias, col.columnName, col.alias, ii);
-            tve.setValueType(getValueType());
-            tve.setValueSize(getValueSize());
+            tve.setTypeSizeBytes(getValueType(), getValueSize(), getInBytes());
+
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);

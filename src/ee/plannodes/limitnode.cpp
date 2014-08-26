@@ -42,24 +42,21 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "limitnode.h"
+
+#include "common/SQLException.h"
+#include "common/ValuePeeker.hpp"
 
 #include <sstream>
-#include <stdexcept>
-#include "limitnode.h"
-#include "common/serializeio.h"
-#include "common/ValuePeeker.hpp"
-#include "common/FatalException.hpp"
-#include "storage/table.h"
 
 namespace voltdb {
 
-LimitPlanNode::~LimitPlanNode() {
+LimitPlanNode::~LimitPlanNode()
+{
     delete limitExpression;
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
 }
+
+PlanNodeType LimitPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_LIMIT; }
 
 /*
  * This code is needed in the limit executor as well as anywhere limit
@@ -101,14 +98,16 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
     }
 }
 
-std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
+std::string LimitPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << spacer << "Limit[" << this->limit << "]\n";
     buffer << spacer << "Offset[" << this->offset << "]\n";
     return (buffer.str());
 }
 
-void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     limit = obj.valueForKey("LIMIT").asInt();
     offset = obj.valueForKey("OFFSET").asInt();
 
@@ -128,4 +127,4 @@ void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     }
 }
 
-}
+} // namespace voltdb

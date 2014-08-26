@@ -22,10 +22,12 @@ import static com.google_voltpatches.common.base.Predicates.compose;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.in;
 import static com.google_voltpatches.common.base.Predicates.not;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.common.base.Converter;
 import com.google_voltpatches.common.base.Equivalence;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner.MapJoiner;
@@ -200,7 +202,7 @@ public final class Maps {
    */
   static int capacity(int expectedSize) {
     if (expectedSize < 3) {
-      checkArgument(expectedSize >= 0);
+      checkNonnegative(expectedSize, "expectedSize");
       return expectedSize + 1;
     }
     if (expectedSize < Ints.MAX_POWER_OF_TWO) {
@@ -315,8 +317,8 @@ public final class Maps {
    * @param comparator the comparator to sort the keys with
    * @return a new, empty {@code TreeMap}
    */
-  public static <K, V> TreeMap<K, V> newTreeMap(
-      @Nullable Comparator<? super K> comparator) {
+  public static <C, K extends C, V> TreeMap<K, V> newTreeMap(
+      @Nullable Comparator<C> comparator) {
     // Ideally, the extra type parameter "C" shouldn't be necessary. It is a
     // work-around of a compiler type inference quirk that prevents the
     // following code from being compiled:
@@ -1295,6 +1297,68 @@ public final class Maps {
     @Override public int hashCode() {
       return Sets.hashCodeImpl(this);
     }
+  }
+
+  /**
+   * Returns a {@link Converter} that converts values using {@link BiMap#get bimap.get()},
+   * and whose inverse view converts values using
+   * {@link BiMap#inverse bimap.inverse()}{@code .get()}.
+   *
+   * <p>To use a plain {@link Map} as a {@link Function}, see
+   * {@link com.google_voltpatches.common.base.Functions#forMap(Map)} or
+   * {@link com.google_voltpatches.common.base.Functions#forMap(Map, Object)}.
+   *
+   * @since 16.0
+   */
+  @Beta
+  public static <A, B> Converter<A, B> asConverter(final BiMap<A, B> bimap) {
+    return new BiMapConverter<A, B>(bimap);
+  }
+
+  private static final class BiMapConverter<A, B> extends Converter<A, B> implements Serializable {
+    private final BiMap<A, B> bimap;
+
+    BiMapConverter(BiMap<A, B> bimap) {
+      this.bimap = checkNotNull(bimap);
+    }
+
+    @Override
+    protected B doForward(A a) {
+      return convert(bimap, a);
+    }
+
+    @Override
+    protected A doBackward(B b) {
+      return convert(bimap.inverse(), b);
+    }
+
+    private static <X, Y> Y convert(BiMap<X, Y> bimap, X input) {
+      Y output = bimap.get(input);
+      checkArgument(output != null, "No non-null mapping present for input: %s", input);
+      return output;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object object) {
+      if (object instanceof BiMapConverter) {
+        BiMapConverter<?, ?> that = (BiMapConverter<?, ?>) object;
+        return this.bimap.equals(that.bimap);
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return bimap.hashCode();
+    }
+
+    // There's really no good way to implement toString() without printing the entire BiMap, right?
+    @Override
+    public String toString() {
+      return "Maps.asConverter(" + bimap + ")";
+    }
+
+    private static final long serialVersionUID = 0L;
   }
 
   /**

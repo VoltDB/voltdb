@@ -22,6 +22,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.util.Arrays;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -51,6 +52,7 @@ public final class Objects {
    * <p>This assumes that any non-null objects passed to this function conform
    * to the {@code equals()} contract.
    */
+  @CheckReturnValue
   public static boolean equal(@Nullable Object a, @Nullable Object b) {
     return a == b || (a != null && a.equals(b));
   }
@@ -171,10 +173,11 @@ public final class Objects {
    * Returns the first of two given parameters that is not {@code null}, if
    * either is, or otherwise throws a {@link NullPointerException}.
    *
-   * <p><b>Note:</b> if {@code first} is represented as an {@code Optional<T>},
-   * this can be accomplished with {@code first.or(second)}. That approach also
-   * allows for lazy evaluation of the fallback instance, using
-   * {@code first.or(Supplier)}.
+   * <p><b>Note:</b> if {@code first} is represented as an {@link Optional},
+   * this can be accomplished with
+   * {@linkplain Optional#or(Object) first.or(second)}.
+   * That approach also allows for lazy evaluation of the fallback instance,
+   * using {@linkplain Optional#or(Supplier) first.or(Supplier)}.
    *
    * @return {@code first} if {@code first} is not {@code null}, or
    *     {@code second} if {@code first} is {@code null} and {@code second} is

@@ -408,8 +408,9 @@ public class TestUnionSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations5() throws NoConnectionsException, IOException, ProcCallException {
-        Client client = this.getClient();
+    public void testMultipleSetOperations5()
+    throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
         client.callProcedure("InsertA", 0, 0); // in A and B and C, not in D. Eliminated by inner EXCEPT, so IN final result.
         client.callProcedure("InsertA", 1, 1); // in A and B, not in C and D. Eliminated by the first outer EXCEPT.
         client.callProcedure("InsertA", 2, 2); // in A and has no effect in C and not in D. IN final result set.
@@ -428,6 +429,20 @@ public class TestUnionSuite extends RegressionSuite {
         assertEquals(2, result.getRowCount());
     }
 
+    public void testStoredProcUnionWithParams()
+    throws NoConnectionsException, IOException, ProcCallException {
+        // Test that parameterized query with union can be invoked.
+        Client client = getClient();
+        client.callProcedure("InsertB", 2, 2);
+        client.callProcedure("InsertC", 3, 3);
+        client.callProcedure("InsertD", 4, 4);
+        VoltTable result;
+        result = client.callProcedure("UnionBCD", 2, "XYZ", 4).getResults()[0];
+        assertEquals(3, result.getRowCount());
+        result = client.callProcedure("UnionBCD", 4, "ABC", 2).getResults()[0];
+        assertEquals(1, result.getRowCount());
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
@@ -439,10 +454,17 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
         project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
+        // Test that parameterized query with union compiles properly.
+        project.addStmtProcedure("UnionBCD",
+                "((SELECT I FROM B WHERE PKEY = ?) UNION " +
+                "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
+                "        SELECT I FROM D WHERE PKEY = ?");
 
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        if (!config.compile(project)) {
+            fail();
+        }
         builder.addServerConfig(config);
 
         // Cluster

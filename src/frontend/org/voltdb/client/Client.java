@@ -31,7 +31,18 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
  *  <p>
  *  A <code>Client</code> that connects to one or more nodes in a volt cluster
  *  and provides methods for invoking stored procedures and receiving
- *  responses.
+ *  responses.</p>
+ *
+ *  <p>Each client instance is backed by a single thread that is responsible for writing requests and reading responses
+ *  from the network as well as invoking callbacks for stored procedures that are invoked asynchronously. There is
+ *  an upper limit on the capacity of a single client instance and it may be necessary to use a pool of instances
+ *  to get the best throughput and latency. If a heavyweight client instance is requested it will be backed by
+ *  multiple threads, but under the current implementation it is better to us multiple single threaded instances</p>
+ *
+ *  <p>Because callbacks are invoked directly on the network thread the performance of the client is sensitive to the
+ *  amount of work and blocking done in callbacks. If there is any question about whether callbacks will block
+ *  or take a long time then an application should have callbacks hand off processing to an application controlled
+ *  thread pool.
  *  </p>
  */
 public interface Client {
@@ -82,7 +93,10 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * <p>Asynchronously invoke a replicated procedure. If there is backpressure
+     * <p>Asynchronously invoke a replicated procedure, by providing a callback that will be invoked by the single
+     * thread backing the client instance when the procedure invocation receives a response.
+     * See the {@link Client} class documentation for information on the negative performance impact of slow or
+     * blocking callbacks. If there is backpressure
      * this call will block until the invocation is queued. If configureBlocking(false) is invoked
      * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
      *

@@ -151,9 +151,8 @@ public class SchemaColumn
         {
             new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setValueType(m_expression.getValueType());
-            new_exp.setValueSize(m_expression.getValueSize());
-            new_exp.setInBytes(m_expression.getInBytes());
+            new_exp.setTypeSizeBytes(m_expression.getValueType(), m_expression.getValueSize(),
+                    m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp);

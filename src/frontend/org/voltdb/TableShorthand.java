@@ -87,73 +87,62 @@ public class TableShorthand {
         }
     }
 
-    /**
-     * Extend VoltTable.ColumnInfo with code to move to parse shorthand
-     */
-    static class ColMeta extends VoltTable.ColumnInfo {
+    static VoltTable.ColumnInfo parseColumnShorthand(String colShorthand, int index) {
+        String name;
+        VoltType type = VoltType.BIGINT;
+        int size = 255;
+        boolean unique = false;
+        boolean nullable = true;
+        String defaultValue = VoltTable.ColumnInfo.NO_DEFAULT_VALUE; // stupid reserved work
 
-        ColMeta(String name, VoltType type) {
-            super(name, type);
-        }
+        try {
+            String[] parts = colShorthand.trim().split(":", 2);
+            if (parts.length > 2) throw new Exception();
 
-        static ColMeta parse(String colShorthand, int index) {
-            String name;
-            VoltType type = VoltType.BIGINT;
-            int size = 255;
-            boolean unique = false;
-            boolean nullable = true;
-            String defaultValue = VoltTable.ColumnInfo.NO_DEFAULT_VALUE; // stupid reserved work
+            // name
+            if (parts.length == 2) name = parts[0].trim();
+            else name = "C" + String.valueOf(index);
+            String rest = parts[parts.length - 1].trim();
 
-            try {
-                String[] parts = colShorthand.trim().split(":", 2);
-                if (parts.length > 2) throw new Exception();
+            // type (required)
+            Matcher typeMatcher = m_colTypePattern.matcher(rest);
+            typeMatcher.find();
+            type = VoltType.typeFromString(typeMatcher.group());
 
-                // name
-                if (parts.length == 2) name = parts[0].trim();
-                else name = "C" + String.valueOf(index);
-                String rest = parts[parts.length - 1].trim();
-
-                // type (required)
-                Matcher typeMatcher = m_colTypePattern.matcher(rest);
-                typeMatcher.find();
-                type = VoltType.typeFromString(typeMatcher.group());
-
-                // size
-                Matcher sizeMatcher = m_colSizePattern.matcher(rest);
-                if (sizeMatcher.find()) {
-                    String val = sizeMatcher.group();
-                    if (val.length() > 0) {
-                        size = Integer.parseInt(sizeMatcher.group());
-                    }
-                }
-
-                // flags
-                Matcher metaMatcher = m_colMetaPattern.matcher(rest);
-                if (metaMatcher.find()) {
-                    String meta = metaMatcher.group().toUpperCase();
-                    if (meta.contains("N")) nullable = false;
-                    if (meta.contains("U")) unique = true;
-                }
-
-                // default value
-                Matcher defaultMatcher = m_colDefaultPattern.matcher(rest);
-                if (defaultMatcher.find()) {
-                    defaultValue = defaultMatcher.group();
+            // size
+            Matcher sizeMatcher = m_colSizePattern.matcher(rest);
+            if (sizeMatcher.find()) {
+                String val = sizeMatcher.group();
+                if (val.length() > 0) {
+                    size = Integer.parseInt(sizeMatcher.group());
                 }
             }
-            catch (Exception e) {
-                String msg = String.format("Parse error while parsing column %d", index);
-                throw new RuntimeException(msg, e);
+
+            // flags
+            Matcher metaMatcher = m_colMetaPattern.matcher(rest);
+            if (metaMatcher.find()) {
+                String meta = metaMatcher.group().toUpperCase();
+                if (meta.contains("N")) nullable = false;
+                if (meta.contains("U")) unique = true;
             }
 
-            ColMeta column = new ColMeta(name, type);
-            column.defaultValue = defaultValue;
-            column.nullable = nullable;
-            column.size = size;
-            column.unique = unique;
-
-            return column;
+            // default value
+            Matcher defaultMatcher = m_colDefaultPattern.matcher(rest);
+            if (defaultMatcher.find()) {
+                defaultValue = defaultMatcher.group();
+            }
         }
+        catch (Exception e) {
+            String msg = String.format("Parse error while parsing column %d", index);
+            throw new RuntimeException(msg, e);
+        }
+
+        return new VoltTable.ColumnInfo(name,
+                                        type,
+                                        size,
+                                        nullable,
+                                        unique,
+                                        defaultValue);
     }
 
     /**
@@ -163,7 +152,7 @@ public class TableShorthand {
     public static VoltTable tableFromShorthand(String schema) {
 
         String name = "T";
-        ColMeta[] columns = null;
+        VoltTable.ColumnInfo[] columns = null;
 
         // get a name
         Matcher nameMatcher = m_namePattern.matcher(schema);
@@ -179,27 +168,29 @@ public class TableShorthand {
         String[] columnData = columnDataMatcher.group().trim().split("\\s*,\\s*");
         int columnCount = columnData.length;
 
-        columns = new ColMeta[columnCount];
+        columns = new VoltTable.ColumnInfo[columnCount];
 
         for (int i = 0; i < columnCount; i++) {
-            columns[i] = ColMeta.parse(columnData[i], i);
+            columns[i] = parseColumnShorthand(columnData[i], i);
         }
 
         // get the pkey
         Matcher pkeyMatcher = m_pkeyPattern.matcher(schema);
+        int[] pkeyIndexes = new int[0]; // default no pkey
         if (pkeyMatcher.find()) {
             String[] pkeyColData = pkeyMatcher.group().trim().split("\\s*,\\s*");
+            pkeyIndexes = new int[pkeyColData.length];
             for (int pkeyIndex = 0; pkeyIndex < pkeyColData.length; pkeyIndex++) {
                 String pkeyCol = pkeyColData[pkeyIndex];
                 // numeric means index of column
                 if (Character.isDigit(pkeyCol.charAt(0))) {
                     int colIndex = Integer.parseInt(pkeyCol);
-                    columns[colIndex].pkeyIndex = pkeyIndex;
+                    pkeyIndexes[pkeyIndex] = colIndex;
                 }
                 else {
                     for (int colIndex = 0; colIndex < columnCount; colIndex++) {
                         if (columns[colIndex].name.equals(pkeyCol)) {
-                            columns[colIndex].pkeyIndex = pkeyIndex;
+                            pkeyIndexes[pkeyIndex] = colIndex;
                             break;
                         }
                     }
@@ -227,9 +218,10 @@ public class TableShorthand {
             assert(partitionColumnIndex != -1) : "Regex match here means there is a partitioning column";
         }
 
-        VoltTable table = new VoltTable(columns);
-        table.m_name = name;
-        table.m_partitionColIndex = partitionColumnIndex;
+        VoltTable table = new VoltTable(
+                new VoltTable.ExtraMetadata(name, partitionColumnIndex, pkeyIndexes, columns),
+                columns,
+                columns.length);
         return table;
     }
 }

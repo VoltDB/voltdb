@@ -16,8 +16,6 @@
 
 package com.google_voltpatches.common.collect;
 
-import com.google_voltpatches.common.annotations.GwtCompatible;
-
 /**
  * "Overrides" the {@link ImmutableSet} static methods that lack
  * {@link ImmutableSortedSet} equivalents with deprecated, exception-throwing
@@ -34,7 +32,6 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
  *
  * @author Chris Povirk
  */
-@GwtCompatible
 abstract class ImmutableSortedSetFauxverideShim<E> extends ImmutableSet<E> {
   /**
    * Not supported. Use {@link ImmutableSortedSet#naturalOrder}, which offers

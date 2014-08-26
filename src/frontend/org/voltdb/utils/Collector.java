@@ -30,8 +30,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.varia.NullAppender;
@@ -41,7 +41,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
@@ -480,7 +479,6 @@ public class Collector {
         files.put(src, dest);
 
         try {
-            sftp.ensureDirectoriesExistFor(files.values());
             sftp.copyOverFiles(files);
         } finally {
             if (sftp != null) {
