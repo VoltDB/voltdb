@@ -204,6 +204,7 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMPInProcAd
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSP;
 PARTITION PROCEDURE ReadSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPRw;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
 PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;

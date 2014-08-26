@@ -52,6 +52,7 @@ public class ReadThread extends Thread {
     final boolean allowInProcAdhoc;
     final float mpRatio;
     final Semaphore m_permits;
+    final String[] readProcs = {"ReadMP", "ReadMPRw", "ReadSP"};
 
     public ReadThread(Client client, int threadCount, int threadOffset,
             boolean allowInProcAdhoc, float mpRatio, Semaphore permits)
@@ -121,13 +122,12 @@ public class ReadThread extends Thread {
                 return;
             }
 
-            // 1/5 of all reads are MP
-            // MP read ratio is not tied to config.mpratio since MP reads only operate on one local partition
-            boolean replicated = (counter % 100) < 20;
+            // round robin the read procedures
+            // note: MP reads operate on one local partition, so don't derive from config.mpratio
+            String procName = readProcs[(int)(counter % 3)];
             // 1/23th of all SP reads are in-proc adhoc
             boolean inprocAdhoc = (counter % 23) == 0;
             counter++;
-            String procName = replicated ? "ReadMP" : "ReadSP";
             if (inprocAdhoc && allowInProcAdhoc) procName += "InProcAdHoc";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
