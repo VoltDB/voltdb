@@ -67,7 +67,8 @@ def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
     would be printed as "61.9 seconds (1:02), ". Optionally, if
     'include_current_time' is True, the current time (in seconds since January
     1, 1970) is also printed, in brackets, e.g.,
-    "61.9 seconds (1:02) [at 1408645826.68], ".
+    "61.9 seconds (1:02) [at 1408645826.68], ", which is useful for debugging
+    purposes.
     """
 
     time_msg = str(seconds) + " seconds"
@@ -98,7 +99,8 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
     as "61.9 seconds (1:02), ". Optionally, if 'include_current_time' is True,
     the current time (in seconds since January 1, 1970) is also printed, in
-    brackets, e.g., "61.9 seconds (1:02) [at 1408645826.68], ".
+    brackets, e.g., "61.9 seconds (1:02) [at 1408645826.68], ", which is useful
+    for debugging purposes.
     """
 
     now = time.time()
