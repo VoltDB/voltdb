@@ -184,7 +184,7 @@ public class ProcedureRunner {
         if (isSystemProcedure()) {
             isEverySite = m_catProc.getEverysite();
         }
-        m_isEverySite = isEverySite();
+        m_isEverySite = isEverySite;
         if (m_isSinglePartition) {
             ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = ppi.index;
