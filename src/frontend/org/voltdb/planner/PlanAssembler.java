@@ -344,10 +344,16 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(ExpressionType.EXISTS_SUBQUERY);
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(
+                ExpressionType.EXISTS_SUBQUERY);
         subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
         ParsedResultAccumulator exprSubqueryResult = null;
         if ( ! subqueryExprs.isEmpty() ) {
+            if (parsedStmt instanceof ParsedSelectStmt == false) {
+                m_recentErrorMsg = "In/Exists are only supported in SELECT clause";
+                return null;
+            }
+
             exprSubqueryResult = getBestCostPlanForExpressionSubQueries(subqueryExprs);
             if (exprSubqueryResult == null) {
                 // There was at least one sub-query and we should have a compiled plan for it
@@ -375,8 +381,13 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (hasSubquery && retval != null) {
-            boolean isDQLStmt = (parsedStmt instanceof ParsedSelectStmt) || (parsedStmt instanceof ParsedUnionStmt);
+        if (retval == null) {
+            return null;
+        }
+
+        if (hasSubquery) {
+            boolean isDQLStmt = (parsedStmt instanceof ParsedSelectStmt)
+                             || (parsedStmt instanceof ParsedUnionStmt);
             if (isDQLStmt) {
                 // Calculate the combined state of determinism for the parent and child statements
                 boolean orderIsDeterministic = (subQueryResult != null) ?
@@ -428,7 +439,7 @@ public class PlanAssembler {
         // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
         // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
         //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.isReadOnly()) {
+        if (retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.isReadOnly()) {
             throw new PlanningErrorException("DML statement manipulates data in content non-deterministic way " +
                         "(this may happen on INSERT INTO ... SELECT, for example).");
         }
@@ -731,6 +742,7 @@ public class PlanAssembler {
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery, true);
         // make sure we got a winner
         if (compiledPlan == null) {
+            m_recentErrorMsg = assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for subquery statement. Error unknown.";
             }
