@@ -742,6 +742,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
                 // So create the LeaderAppointer after the initiators.
+                // arogers: Right now, if we are using DR V2, then the leader appointer should
+                // expect a sync snapshot. This needs to change when the replica supports different
+                // start actions
+                boolean expectSyncSnapshot = useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA;
                 m_leaderAppointer = new LeaderAppointer(
                         m_messenger,
                         m_configuredNumberOfPartitions,
@@ -749,7 +753,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                         usingCommandLog,
-                        topo, m_MPI, kSafetyStats);
+                        topo, m_MPI, kSafetyStats, expectSyncSnapshot);
                 m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;
@@ -2578,6 +2582,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public ReplicaDRGateway getReplicaDRGateway() {
         return m_replicaDRGateway;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
+        m_leaderAppointer.onSyncSnapshotCompletion();
     }
 
     @Override
