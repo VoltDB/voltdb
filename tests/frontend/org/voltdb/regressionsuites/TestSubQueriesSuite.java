@@ -118,7 +118,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc", "select * from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
                     "from " + tb + " GROUP BY dept) T1 ORDER BY dept DESC;").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{2, 140, 35}, {1, 60, 20} });
 
             // derived aggregated table + aggregation on subselect
@@ -224,7 +223,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] { {1, 10}, {2, 20}, {3, 30}, {4, 40}, {5, 50}});
     }
 
-
     public void testENG6276() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
@@ -263,11 +261,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                         "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
                         "WHERE (A.NUM + 5 ) > 44";
 
-        vt = client.callProcedure("@Explain", query).getResults()[0];
-        System.err.println(vt);
-
         vt = client.callProcedure("@AdHoc", query).getResults()[0];
-        System.err.println(vt);
         long[] row = new long[] {-8, 63890};
         validateTableOfLongs(vt, new long[][] {row, row, row, row,
                 row, row, row, row});
@@ -342,7 +336,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select T1.id from R1 T1, " + tb +" T2 where " +
                             "T1.id = T2.id and exists ( " +
                     " select 1 from R1 where R1.dept * 2 = T2.dept)").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
             // Core dump
@@ -355,7 +348,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                                 "   ON T1.id = T2.dept and EXISTS( " +
                                 "      select 1 from R1 where R1.ID =  T2.newid ) " +
                         "ORDER BY id, newid").getResults()[0];
-                System.out.println(vt.toString());
                 validateTableOfLongs(vt, new long[][] { {1, Long.MIN_VALUE}, {2, 4}, {2, 5},
                         {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
             }
@@ -441,7 +433,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             "( (SELECT ID from R1 WHERE ID > 2 LIMIT 3 OFFSET 1) " +
                             " UNION SELECT ID from R2 WHERE ID <= 2"
                             + " INTERSECT SELECT ID from R1 WHERE ID =1);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{1}, {4}, {5}});
         }
     }
@@ -475,28 +466,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
                 "( select WAGE, DEPT from R2 limit 6 offset 1) is true;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{100}});
 
         // There is no match and inner result set is empty, , IN extression evaluates to FALSE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
                 "( select WAGE, DEPT from R2 where ID = 0 limit 6 offset 1) is false;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{100}});
 
         // There is no match, IN extression evaluates to NULL (non-empty inner result set)
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
                 "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {});
 
         // There is an exact match, NOT IN evaluates to FALSE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) not in " +
                 "( select WAGE, DEPT from R2 limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {});
 
         // There is no match, inner result set is non empty, IN evaluates to NULL, NOT IN is also NULL
@@ -505,7 +492,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                     "select ID from R1 where (WAGE, DEPT) not in " +
                     "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {});
         }
 
@@ -513,28 +499,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where WAGE in " +
                 "( select WAGE from R2 where WAGE != 1000 limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {});
 
         // There is a match, the inner result set doesn't have NULLs, The IN expression evaluates to FALSE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where WAGE in " +
                 "( select WAGE from R2 where WAGE != 1000 limit 6 offset 1) is false;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{100}});
 
         // NULL row exists
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where exists " +
                 "( select WAGE from R2 where WAGE is NULL);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{100}});
 
         // Rows exist
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where not exists " +
                 "( select WAGE, DEPT from R2 );").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {});
 
     }
@@ -565,35 +547,30 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
                 "( select WAGE from R1 limit 4 offset 1) is false;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}});
 
         // R2.200 - the inner result set is not empty, the IN  expression is NULL
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
                 "( select WAGE from R1 limit 4 offset 1) is true;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{202}});
 
         // R2.200 - the inner result set is not empty, the IN  expression is NULL
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
                 "( select WAGE from R1 limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{202}});
 
         // R2.200 - the inner result set is not empty, the IN and not IN  expressions are NULL
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE not in " +
                 "( select WAGE from R1 limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}});
 
         // R2.200 - the inner result set is empty, the IN expression is TRUE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
                 "( select WAGE from R1 where ID > 1000 limit 4 offset 1) is false;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
 
         // R2.202 and R1.101 have the same WAGE
