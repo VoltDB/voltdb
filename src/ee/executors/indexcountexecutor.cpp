@@ -20,7 +20,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
+#include "common/ValueFactory.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"

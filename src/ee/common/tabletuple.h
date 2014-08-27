@@ -230,11 +230,11 @@ public:
      * the temp string pool.  So, don't use this to update a tuple in
      * a persistent table!
      */
-    void setNValue(const int idx, voltdb::NValue value);
+    void setNValue(const int idx, voltdb::NValue value) const;
     /*
      * Copies range of NValues from one tuple to another.
      */
-    void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
+    void setNValues(int beginIdx, TableTuple lhs, int begin, int end) const;
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -245,7 +245,7 @@ public:
      * be allocated on the heap.
      */
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                             Pool *dataPool);
+                                             Pool *dataPool) const;
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -316,7 +316,7 @@ public:
     void copy(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
-    void setAllNulls();
+    void setAllNulls() const;
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other) const;
@@ -380,7 +380,7 @@ private:
      */
     char *m_data;
 
-    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) {
+    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
         assert(m_schema);
         assert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
@@ -517,7 +517,8 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 
 /** Copy scalars by value and non-scalars (non-inlined strings, decimals) by
     reference from a slim value in to this tuple. */
-inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
+inline void TableTuple::setNValue(const int idx, voltdb::NValue value) const
+{
     assert(m_schema);
     assert(m_data);
 
@@ -531,7 +532,8 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
 }
 
 /** Multi column version. */
-inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
+inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) const
+{
     assert(m_schema);
     assert(lhs.getSchema());
     assert(beginIdx + end - begin <= sizeInValues());
@@ -543,7 +545,7 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 /* Copy strictly by value from slimvalue into this tuple */
 inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
                                                             voltdb::NValue value,
-                                                            Pool *dataPool)
+                                                            Pool *dataPool) const
 {
     assert(m_schema);
     assert(m_data);
@@ -796,7 +798,7 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     return true;
 }
 
-inline void TableTuple::setAllNulls() {
+inline void TableTuple::setAllNulls() const {
     assert(m_schema);
     assert(m_data);
 

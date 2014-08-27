@@ -82,7 +82,7 @@ class PlanNodeFragment {
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
-    bool constructTree(AbstractPlanNode *node);
+    void constructTree(AbstractPlanNode *node);
 
     // first node from the statement plan
     AbstractPlanNode * getRootNode(int stmtId = 0) {

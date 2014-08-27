@@ -75,42 +75,26 @@ class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-        m_index_values_backing_store(NULL)
-    {
-        m_node = NULL;
-        m_indexNode = NULL;
-        m_innerTable = NULL;
-        m_index = NULL;
-        m_outerTable = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
+        : AbstractExecutor(engine, abstract_node)
+        , m_indexNode(NULL)
+        , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
+    { }
 
     ~NestLoopIndexExecutor();
 
-    void updateTargetTableAndIndex();
-
- protected:
+protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    NestLoopIndexPlanNode* m_node;
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    PersistentTable* m_innerTable;
-    TableIndex *m_index;
-    TableTuple m_indexValues;
-    Table* m_outerTable;
     JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
-
+    StandAloneTupleStorage m_indexValues;
     AggregateExecutorBase* m_aggExec;
-
-    //So valgrind doesn't report the data as lost.
-    char *m_index_values_backing_store;
 };
 
 }

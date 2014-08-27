@@ -43,9 +43,9 @@ import javax.annotation_voltpatches.concurrent.GuardedBy;
  * <p>This class uses the {@link ScheduledExecutorService} returned from {@link #executor} to run
  * the {@link #startUp} and {@link #shutDown} methods and also uses that service to schedule the 
  * {@link #runOneIteration} that will be executed periodically as specified by its 
- * {@link Scheduler}. When this service is asked to stop via {@link #stop} or {@link #stopAndWait}, 
- * it will cancel the periodic task (but not interrupt it) and wait for it to stop before running 
- * the {@link #shutDown} method.  
+ * {@link Scheduler}. When this service is asked to stop via {@link #stopAsync} it will cancel the 
+ * periodic task (but not interrupt it) and wait for it to stop before running the 
+ * {@link #shutDown} method.  
  * 
  * <p>Subclasses are guaranteed that the life cycle methods ({@link #runOneIteration}, {@link 
  * #startUp} and {@link #shutDown}) will never run concurrently. Notably, if any execution of {@link
@@ -317,20 +317,6 @@ public abstract class AbstractScheduledService implements Service {
     return serviceName() + " [" + state() + "]";
   }
 
-  // We override instead of using ForwardingService so that these can be final.
-
-  @Deprecated
-  @Override 
-   public final ListenableFuture<State> start() {
-    return delegate.start();
-  }
-
-  @Deprecated
-  @Override 
-   public final State startAndWait() {
-    return delegate.startAndWait();
-  }
-
   @Override public final boolean isRunning() {
     return delegate.isRunning();
   }
@@ -339,18 +325,6 @@ public abstract class AbstractScheduledService implements Service {
     return delegate.state();
   }
 
-  @Deprecated
-  @Override 
-   public final ListenableFuture<State> stop() {
-    return delegate.stop();
-  }
-
-  @Deprecated
-  @Override 
-   public final State stopAndWait() {
-    return delegate.stopAndWait();
-  }
-  
   /**
    * @since 13.0
    */

@@ -21,7 +21,9 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.common.annotations.VisibleForTesting;
 
+import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Queue;
@@ -41,10 +43,12 @@ import java.util.Queue;
  */
 @Beta
 @GwtIncompatible("java.util.ArrayDeque")
-public final class EvictingQueue<E> extends ForwardingQueue<E> {
+public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serializable {
 
   private final Queue<E> delegate;
-  private final int maxSize;
+
+  @VisibleForTesting
+  final int maxSize;
 
   private EvictingQueue(int maxSize) {
     checkArgument(maxSize >= 0, "maxSize (%s) must >= 0", maxSize);
@@ -60,6 +64,16 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
    */
   public static <E> EvictingQueue<E> create(int maxSize) {
     return new EvictingQueue<E>(maxSize);
+  }
+
+  /**
+   * Returns the number of additional elements that this queue can accept without evicting;
+   * zero if the queue is currently full.
+   *
+   * @since 16.0
+   */
+  public int remainingCapacity() {
+    return maxSize - size();
   }
 
   @Override protected Queue<E> delegate() {
@@ -110,5 +124,5 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
 
   // TODO(user): Do we want to checkNotNull each element in containsAll, removeAll, and retainAll?
 
-  // TODO(user): Do we want to add EvictingQueue#isFull()?
+  private static final long serialVersionUID = 0L;
 }

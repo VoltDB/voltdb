@@ -603,7 +603,7 @@ TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
@@ -701,7 +701,7 @@ TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();
@@ -821,7 +821,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
 bool AggregatePartialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable(0);
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();

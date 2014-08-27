@@ -46,7 +46,6 @@
 #ifndef HSTORESEQSCANNODE_H
 #define HSTORESEQSCANNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
@@ -54,48 +53,30 @@ namespace voltdb {
 class AbstractExpression;
 
 /**
- *
+ * Seqential scan plan node
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
-   public:
-        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id), m_isSemiScan(false) {
-            // Do nothing
+public:
+    SeqScanPlanNode() : m_isSemiScan(false) { }
+    ~SeqScanPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
+
+    void setSemiScanFlag(bool isSemiScan) {
+        m_isSemiScan = isSemiScan;
+        // if it is a semi-scan - IN (SELECT ...) - then it's a subquery
+        if (m_isSemiScan) {
+            m_isSubQuery = true;
         }
-        SeqScanPlanNode() : AbstractScanPlanNode(), m_isSemiScan(false) {
-            // Do nothing
-        }
+    }
 
-        /*
-         * If the output table needs to be cleared then this SeqScanNode is for an executor that created
-         * its own output table rather then forwarding a reference to the persistent table being scanned.
-         * It still isn't necessarily safe to delete the output table since an inline projection node/executor
-         * may have created the table (and will also delete it) so check if there is an inline projection node.
-         *
-         * This is a fragile approach to determining whether or not to delete the output table. Maybe
-         * it is safer to have the inline nodes be deleted first and set the output table of the
-         * enclosing plannode to NULL so the delete can be safely repeated.
-         */
-        ~SeqScanPlanNode();
+    bool isSemiScan() const {
+        return m_isSemiScan;
+    }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
-
-        std::string debugInfo(const std::string &spacer) const;
-
-        void setSemiScanFlag(bool isSemiScan) {
-            m_isSemiScan = isSemiScan;
-            // if it is a semi-scan - IN (SELECT ...) - then it's a subquery
-            if (m_isSemiScan) {
-                m_isSubQuery = true;
-            }
-        }
-
-        bool isSemiScan() const {
-            return m_isSemiScan;
-        }
-
-    private:
-        // If the indicator is set to true, the scan finishes on the first predicate hit
-        bool m_isSemiScan;
+private:
+    // If the indicator is set to true, the scan finishes on the first predicate hit
+    bool m_isSemiScan;
 };
 
 }

@@ -72,7 +72,7 @@ bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_node = dynamic_cast<UpsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    assert(m_node->getInputTableCount() == 1);
 
     setDMLCountOutputTable(limits);
 
@@ -82,7 +82,7 @@ bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
         VOLT_ERROR("Upsert is not supported for Stream table %s", m_node->getTargetTable()->name().c_str());
     }
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     m_partitionColumnIsString = false;

@@ -15,6 +15,7 @@
 package com.google_voltpatches.common.collect;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkRemove;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
@@ -107,7 +108,7 @@ public final class HashBiMap<K, V> extends AbstractMap<K, V> implements BiMap<K,
   }
 
   private void init(int expectedSize) {
-    checkArgument(expectedSize >= 0, "expectedSize must be >= 0 but was %s", expectedSize);
+    checkNonnegative(expectedSize, "expectedSize");
     int tableSize = Hashing.closedTableSize(expectedSize, LOAD_FACTOR);
     this.hashTableKToV = createTable(tableSize);
     this.hashTableVToK = createTable(tableSize);

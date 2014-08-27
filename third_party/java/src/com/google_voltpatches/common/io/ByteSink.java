@@ -47,6 +47,11 @@ import java.nio.charset.Charset;
 public abstract class ByteSink implements OutputSupplier<OutputStream> {
 
   /**
+   * Constructor for use by subclasses.
+   */
+  protected ByteSink() {}
+
+  /**
    * Returns a {@link CharSink} view of this {@code ByteSink} that writes characters to this sink
    * as bytes encoded with the given {@link Charset charset}.
    */
@@ -71,7 +76,7 @@ public abstract class ByteSink implements OutputSupplier<OutputStream> {
    * @since 15.0
    * @deprecated This method is only provided for temporary compatibility with the
    *     {@link OutputSupplier} interface and should not be called directly. Use
-   *     {@link #openStream} instead.
+   *     {@link #openStream} instead. This method is scheduled for removal in Guava 18.0.
    */
   @Override
   @Deprecated

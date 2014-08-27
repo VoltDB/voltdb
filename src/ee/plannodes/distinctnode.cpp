@@ -42,58 +42,30 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "distinctnode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
-#include <stdexcept>
 
-using namespace voltdb;
-using namespace std;
-
-DistinctPlanNode::DistinctPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-}
-
-DistinctPlanNode::DistinctPlanNode() : AbstractPlanNode()
-{
-}
+namespace voltdb {
 
 DistinctPlanNode::~DistinctPlanNode()
 {
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
     delete m_distinctExpression;
 }
 
-PlanNodeType
-DistinctPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_DISTINCT;
-}
+PlanNodeType DistinctPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DISTINCT; }
 
-AbstractExpression*
-DistinctPlanNode::getDistinctExpression() const
+std::string DistinctPlanNode::debugInfo(const std::string &spacer) const
 {
-    return m_distinctExpression;
-}
-
-string
-DistinctPlanNode::debugInfo(const string &spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "DistinctExpression["
-           << this->m_distinctExpression->debug() << "]\n";
+    std::ostringstream buffer;
+    buffer << spacer << "DistinctExpression[" << m_distinctExpression->debug() << "]\n";
     return buffer.str();
 }
 
-void
-DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue value = obj.valueForKey("DISTINCT_EXPRESSION");
     m_distinctExpression = AbstractExpression::buildExpressionTree(value);
 }
+
+} // namespace voltdb

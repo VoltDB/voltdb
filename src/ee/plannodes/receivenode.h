@@ -48,24 +48,20 @@
 
 #include "abstractplannode.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class ReceivePlanNode : public AbstractPlanNode
 {
- public:
-    ReceivePlanNode(CatalogId id);
-    ReceivePlanNode();
+public:
+    ReceivePlanNode() { }
     ~ReceivePlanNode();
-
-    virtual PlanNodeType getPlanNodeType() const;
-
+    PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 };
 
-}
+} // namespace voltdb
 
 #endif

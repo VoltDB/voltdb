@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;

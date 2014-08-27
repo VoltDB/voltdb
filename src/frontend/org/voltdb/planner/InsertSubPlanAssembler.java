@@ -42,7 +42,6 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
     InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning) {
         super(db, parsedStmt, partitioning);
-        // TODO Auto-generated constructor stub
     }
 
     @Override
