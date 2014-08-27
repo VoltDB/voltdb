@@ -33,6 +33,7 @@ import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.CatalogUtil;
 
 public class CatalogDiffEngine {
 
@@ -663,11 +664,22 @@ public class CatalogDiffEngine {
                                                      final CatalogType prevType,
                                                      final String field)
     {
-        if (field.equalsIgnoreCase("isreplicated")) {
-            return suspect.getTypeName();
-        }
-        if (field.equalsIgnoreCase("partitioncolumn")) {
-            return suspect.getTypeName();
+        if (prevType instanceof Table) {
+            Table prevTable = (Table) prevType; // safe because of enclosing if-block
+            Database db = (Database) prevType.getParent();
+
+            // for now, no changes to export tables
+            if (CatalogUtil.isTableExportOnly(db, prevTable)) {
+                return null;
+            }
+
+            // allowed changes to a table
+            if (field.equalsIgnoreCase("isreplicated")) {
+                return suspect.getTypeName();
+            }
+            if (field.equalsIgnoreCase("partitioncolumn")) {
+                return suspect.getTypeName();
+            }
         }
         return null;
     }
