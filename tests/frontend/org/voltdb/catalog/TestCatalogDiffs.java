@@ -1081,7 +1081,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeTableReplicationSettingRejected() throws IOException {
+    public void testChangeTableReplicationSetting() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -1093,7 +1093,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addPartitionInfo("A", "C1");
         builder.compile(testDir + File.separator + "addpart2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "addpart2.jar");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testChangeElasticSettingsCompatibleWithElastic() throws IOException {
