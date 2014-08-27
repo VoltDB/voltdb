@@ -74,6 +74,18 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
     }
 
+    /**
+     * Use EE stats to get the row counts for all tables in this partition.
+     * Check the provided list of tables that need to be empty against actual
+     * row counts. If any of them aren't empty, stop the catalog update and
+     * return the pre-provided error message that corresponds to the non-empty
+     * tables.
+     *
+     * @param tablesThatMustBeEmpty List of table names that must be empty.
+     * @param reasonsForEmptyTables Error messages to return if that table isn't
+     * empty.
+     * @param context
+     */
     protected void checkForNonEmptyTables(String[] tablesThatMustBeEmpty,
                                           String[] reasonsForEmptyTables,
                                           SystemProcedureExecutionContext context)

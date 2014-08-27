@@ -285,12 +285,29 @@ public class TestLiveTableSchemaMigration extends TestCase {
         // drop a column
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (B:SMALLINT, C:INTEGER)");
 
-        // change partitioning on an empty table - does not work yet
-        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)", false);
+        // change partitioning to replicated with data should fail
+        try {
+            migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)");
+            fail();
+        }
+        catch (Exception e) {}
+
+        // change partition key with data should fail
+        try {
+            migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)");
+            fail();
+        }
+        catch (Exception e) {}
     }
 
     public void testFixedSchemasNoData() throws Exception {
-        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)");
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)", false);
+
+        // change partitioned to replicated on an empty table
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)", false);
+
+        // change partition key on an empty table
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)", false);
     }
 
     /**

@@ -1096,6 +1096,22 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
+    public void testChangeTableReplicationSettingOfElasticTable() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addStmtProcedure("the_requisite_procedure", "insert into A values (?, ?);");
+        builder.compile(testDir + File.separator + "elastic1a.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1a.jar");
+
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "elastic2a.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2a.jar");
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
     public void testChangeElasticSettingsCompatibleWithElastic() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
