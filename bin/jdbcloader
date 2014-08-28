@@ -111,19 +111,22 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
 fi
 
 VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
-if [ -n "${VOLTDBJAR}" ]; then
-  CLASSPATH=$VOLTDBJAR
-else
+if [ -z "${VOLTDBJAR}" ]; then
   echo "Couldn't find compiled VoltDB jar to run."
   exit 1
 fi
 
-# add libs to CLASSPATH
-for f in $VOLTDB_LIB/*.jar; do
-  CLASSPATH=${CLASSPATH}:$f;
-done
+APPCLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 
-CLASSPATH=${CLASSPATH}
+if [ -n "${CLASSPATH}" ]; then
+  CLASSPATH="${CLASSPATH}:${APPCLASSPATH}"
+else 
+  CLASSPATH="${APPCLASSPATH}"
+fi
 
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
