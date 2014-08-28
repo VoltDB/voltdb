@@ -29,12 +29,11 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class CSVBulkDataLoader implements CSVDataLoader {
     private final VoltBulkLoader m_loader;
-    private final CSVLoaderErrorHandler m_errHandler;
+    private final BulkLoaderErrorHandler m_errHandler;
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
-                             CSVLoaderErrorHandler errHandler) throws Exception
-    {
+            BulkLoaderErrorHandler errHandler) throws Exception    {
         m_loader = client.getNewBulkLoader(tableName, batchSize, new CsvFailureCallback());
         m_errHandler = errHandler;
     }
@@ -48,7 +47,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             m_failedInsertCount.incrementAndGet();
-            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response, response.getStatusString());
+            m_errHandler.handleError((RowWithMetaData) rowHandle, response, response.getStatusString());
         }
     }
 
@@ -59,7 +58,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException {
+    public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
         m_loader.insertRow(metaData, values);
     }
 

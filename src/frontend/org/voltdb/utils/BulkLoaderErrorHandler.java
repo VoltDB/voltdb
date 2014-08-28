@@ -19,7 +19,7 @@ package org.voltdb.utils;
 
 import org.voltdb.client.ClientResponse;
 
-public interface CSVLoaderErrorHandler {
+public interface BulkLoaderErrorHandler {
     /**
      * Add errors to be reported.
      *
@@ -28,7 +28,7 @@ public interface CSVLoaderErrorHandler {
      * @param error    The error message
      * @return true if we have reached limit....false to continue processing and reporting.
      */
-    public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error);
+    public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error);
 
     public boolean hasReachedErrorLimit();
 }
