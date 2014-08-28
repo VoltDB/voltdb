@@ -118,7 +118,6 @@ public class ProcedureRunner {
     protected final boolean m_isSinglePartition;
     protected final boolean m_hasJava;
     protected final boolean m_isReadOnly;
-    protected final boolean m_isEverySite;
     protected final int m_partitionColumn;
     protected final VoltType m_partitionColumnType;
     protected final Language m_language;
@@ -180,11 +179,6 @@ public class ProcedureRunner {
         m_hasJava = catProc.getHasjava();
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
-        boolean isEverySite = false;
-        if (isSystemProcedure()) {
-            isEverySite = m_catProc.getEverysite();
-        }
-        m_isEverySite = isEverySite;
         if (m_isSinglePartition) {
             ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = ppi.index;
@@ -215,9 +209,6 @@ public class ProcedureRunner {
         return m_isSysProc;
     }
 
-    public boolean isEverySite() {
-        return m_isEverySite;
-    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
