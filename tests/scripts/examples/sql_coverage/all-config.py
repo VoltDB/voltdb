@@ -279,6 +279,8 @@
                                   "ddl": "matview-DDL.sql",
                                   "template": "advanced-matview-subq-nonjoin.sql",
                                   "normalizer": "normalizer.py"},
+    "insert-into-select": {"schema": "insert-into-select-schema.py",
+                           "ddl": "insert-into-select-DDL.sql",
+                           "template": "insert-into-select.sql",
+                           "normalizer": "normalizer.py"},
 }
-
-
