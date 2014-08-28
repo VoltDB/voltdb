@@ -342,9 +342,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
 
             //Created Source reader
-            JDBCSourceReader.initializeReader(cfg, csvClient);
+            JDBCStatementReader.initializeReader(cfg, csvClient);
 
-            JDBCSourceReader jdbcReader = new JDBCSourceReader(dataLoader, errHandler);
+            JDBCStatementReader jdbcReader = new JDBCStatementReader(dataLoader, errHandler);
             Thread readerThread = new Thread(jdbcReader);
             readerThread.setName("JDBCSourceReader");
             readerThread.setDaemon(true);
@@ -456,7 +456,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             out_reportfile.write("JDBCLoader elaspsed: " + elapsedTimeSec + " seconds\n");
             long totalRowCnt;
 
-            totalRowCnt = JDBCSourceReader.m_totalRowCount.get();
+            totalRowCnt = JDBCStatementReader.m_totalRowCount.get();
 
             if (config.limitrows == -1) {
                 out_reportfile.write("Input stopped after "

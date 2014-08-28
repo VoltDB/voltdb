@@ -51,7 +51,7 @@ import com.google_voltpatches.common.reflect.TypeToken;
  * to CSVDataLoader.
  *
  */
-class JDBCSourceReader extends SusceptibleRunnable {
+class JDBCStatementReader extends SusceptibleRunnable {
 
     static final int MAX_COLUMN_SIZE  = 1 * 1024 * 1024; // 1MB
     static AtomicLong m_totalRowCount = new AtomicLong(0);
@@ -67,7 +67,7 @@ class JDBCSourceReader extends SusceptibleRunnable {
         m_csvClient = csvClient;
     }
 
-    public JDBCSourceReader(CSVDataLoader loader, BulkLoaderErrorHandler errorHandler) {
+    public JDBCStatementReader(CSVDataLoader loader, BulkLoaderErrorHandler errorHandler) {
         m_loader = loader;
         m_errHandler = errorHandler;
     }
