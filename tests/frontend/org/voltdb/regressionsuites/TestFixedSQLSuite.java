@@ -1723,9 +1723,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals("ZZ", vt.getString(1));
         assertEquals("AA", vt.getString(2));
-
     }
-
 
     //
     // JUnit / RegressionSuite boilerplate

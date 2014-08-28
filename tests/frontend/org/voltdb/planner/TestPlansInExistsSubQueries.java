@@ -46,6 +46,22 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
+    public void testInExistsGuard() {
+        String errorMsg = "In/Exists are only supported in single partition procedure";
+
+        String sql;
+        sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
+        failToCompile(sql, errorMsg);
+
+        sql = "select p2.c from p2 where p2.a in (select c from r1)";
+        failToCompile(sql, errorMsg);
+
+
+        errorMsg = "Unable to plan for statement. Error unknown";
+        sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
+        failToCompile(sql, errorMsg);
+    }
+
     public void testExistsWithUserParams() {
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
         pn = pn.getChild(0);

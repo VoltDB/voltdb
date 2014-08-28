@@ -444,6 +444,13 @@ public class PlanAssembler {
                         "(this may happen on INSERT INTO ... SELECT, for example).");
         }
 
+        if ( ! subqueryExprs.isEmpty() ) {
+             if (! m_partitioning.isInferredSingle()) {
+                m_recentErrorMsg = "In/Exists are only supported in single partition procedure";
+                return null;
+             }
+        }
+
         return retval;
     }
 
@@ -505,7 +512,7 @@ public class PlanAssembler {
             AbstractParsedStmt subquery = subqueryExpr.getSubquery();
             assert(subquery != null);
 
-            ParsedResultAccumulator parsedResult =  planForParsedSubquery(subqueryExpr.getTable(), nextPlanId);
+            ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryExpr.getTable(), nextPlanId);
             if (parsedResult == null) {
                 return null;
             }
