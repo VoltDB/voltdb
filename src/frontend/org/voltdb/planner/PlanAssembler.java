@@ -532,7 +532,7 @@ public class PlanAssembler {
 
             // make sure we got a winner
             if (bestChildPlan == null) {
-                if (m_recentErrorMsg == null) {
+                if (assembler.getErrorMessage() == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                 }
                 return null;
