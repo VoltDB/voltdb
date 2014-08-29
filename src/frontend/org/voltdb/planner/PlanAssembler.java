@@ -427,7 +427,7 @@ public class PlanAssembler {
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryScan, nextPlanId);
             if (parsedResult == null) {
-                return null;
+                throw new PlanningErrorException(m_recentErrorMsg);
             }
             nextPlanId = parsedResult.m_planId;
             orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
@@ -532,7 +532,8 @@ public class PlanAssembler {
 
             // make sure we got a winner
             if (bestChildPlan == null) {
-                if (assembler.getErrorMessage() == null) {
+                m_recentErrorMsg = assembler.getErrorMessage();
+                if (m_recentErrorMsg == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                 }
                 return null;
@@ -626,8 +627,11 @@ public class PlanAssembler {
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery, true);
         // make sure we got a winner
         if (compiledPlan == null) {
+            String tbAlias = subqueryScan.getTableAlias();
+            m_recentErrorMsg = "Subquery statement with table " + tbAlias
+                    + " has error: " + assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
-                m_recentErrorMsg = "Unable to plan for subquery statement. Error unknown.";
+                m_recentErrorMsg = "Unable to plan for subquery statement with table " + tbAlias;
             }
             return null;
         }
