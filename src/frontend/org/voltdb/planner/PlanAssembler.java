@@ -628,7 +628,7 @@ public class PlanAssembler {
         // make sure we got a winner
         if (compiledPlan == null) {
             String tbAlias = subqueryScan.getTableAlias();
-            m_recentErrorMsg = "Subquery statement with table " + tbAlias
+            m_recentErrorMsg = "Subquery statement for table " + tbAlias
                     + " has error: " + assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for subquery statement with table " + tbAlias;

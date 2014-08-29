@@ -1589,7 +1589,7 @@ public class TestSubQueries extends PlannerTestCase {
                 "                    (SELECT P1.A, P1.C FROM P1, P3) T2, P3 " +
                 "where T1.A = T2.A AND P3.A = T2.A";
         failToCompile(sql, joinErrorMsg);
-        failToCompile(sql, "Subquery statement with table T2 has error");
+        failToCompile(sql, "Subquery statement for table T2 has error");
     }
 
     /**
