@@ -23,15 +23,24 @@
 
 package org.voltdb.utils;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import org.hsqldb_voltpatches.lib.tar.TarReader;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,6 +51,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.PatternFilenameFilter;
 
 public class TestCollector {
     private static final int STARTUP_DELAY = 3000;
@@ -72,7 +84,6 @@ public class TestCollector {
         assert (success);
         cluster.startUp(true);
 
-
         String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
         File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
@@ -82,7 +93,7 @@ public class TestCollector {
         client.createConnection(listener);
     }
 
-    private File collect(String voltDbRootPath, boolean skipHeapDump) throws Exception {
+    private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
         Collector.main(new String[]{"--voltdbroot="+voltDbRootPath, "--prefix="+prefix,
                                     "--host=\"\"", "--username=\"\"", "--password=\"\"", // host, username, password
@@ -91,7 +102,8 @@ public class TestCollector {
                                     "--skipheapdump="+String.valueOf(skipHeapDump),
                                     "--copyToVEM=true",
                                     "--calledFromVEM=true",  // calledFromVem (set to true so that resulting collection can be easily located)
-                                    "--fileInfoOnly=false"  // fileInfoOnly
+                                    "--fileInfoOnly=false",  // fileInfoOnly
+                                    "--days="+String.valueOf(days)
                                     });
         assertTrue(collectionTgz.exists());
 
@@ -134,6 +146,75 @@ public class TestCollector {
         return logPaths;
     }
 
+    private void createLogFiles(String[] fileDates) throws IOException {
+
+        try {
+           String configInfoPath = voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";;
+           JSONObject jsonObject= Collector.parseJSONFile(configInfoPath);
+           JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
+
+           //maintain the file naming format
+           String fileNamePrefix = "volt-junit-fulllog.txt.";
+           String fileText = "This is a dummy log file.";
+
+           VoltFile logFolder = new VoltFile("/home/schoudhary/workspace/voltdb/obj/release/testoutput/");
+           logFolder.mkdir();
+
+           for(File oldLogFile : logFolder.listFiles()) {
+               if(oldLogFile.getName().startsWith(fileNamePrefix + new PatternFilenameFilter("\\d{4}-\\d{2}-\\d{2}"))) {
+                   oldLogFile.delete();
+               }
+           }
+
+           SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+           for(String fileDate: fileDates) {
+               VoltFile file = new VoltFile(logFolder, fileNamePrefix + fileDate);
+               file.createNewFile();
+
+               BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
+               writer.write(fileText);
+               writer.close();
+
+               formatter.format(file.lastModified());
+               file.setLastModified(formatter.parse(fileDate).getTime());
+
+               JSONObject object = new JSONObject();
+               object.put("path", file.getCanonicalPath());
+               object.put("format", "'.'" + fileDate);
+               jsonArray.put(object);
+           }
+           FileOutputStream fos = new FileOutputStream(configInfoPath);
+           fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
+           fos.close();
+        } catch (JSONException e) {
+              System.err.print(e.getMessage());
+        } catch (ParseException e) {
+              System.err.print(e.getMessage());
+        }
+    }
+
+    private String[] addFileDates() {
+
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        String[] fileDates = new String[6];
+        Calendar cal, cal2;
+        cal = Calendar.getInstance();
+        cal2 = Calendar.getInstance();
+        for(int i=0; i < 3; i++) {
+            cal.add(Calendar.DATE, -i-1);
+            fileDates[i] = formatter.format(cal.getTime());
+        }
+        cal = Calendar.getInstance();
+        cal.add(Calendar.YEAR, -1);
+        cal2.set(cal.get(Calendar.YEAR), 11, 31);
+        fileDates[3] = formatter.format(cal2.getTime());
+        cal2.add(Calendar.DATE, -4);
+        fileDates[4] = formatter.format(cal2.getTime());
+        cal2 = Calendar.getInstance();
+        cal2.set(cal2.get(Calendar.YEAR), 0, 02);
+        fileDates[5] = formatter.format(cal2.getTime());
+        return fileDates;
+    }
     /*
      * For each type of file that need to be collected, check whether it actually appears in the collection
      * currently sar data and /var/log/syslog* are ignored in testing
@@ -165,7 +246,7 @@ public class TestCollector {
         writer.close();
 
 
-        File collectionDecompressed = collect(voltDbRootPath, false);
+        File collectionDecompressed = collect(voltDbRootPath, false, 50);
 
         String subFolderPath = "voltdb_logs"+ File.separator;
         File heapdumpFile = new File(collectionDecompressed, subFolderPath + "java_pid" + pid + ".hprof");
@@ -219,7 +300,7 @@ public class TestCollector {
         client.close();
         cluster.shutDown();
 
-        File collectionDecompressed = collect(voltDbRootPath, true);
+        File collectionDecompressed = collect(voltDbRootPath, true, 50);
 
         int pid = getpid(voltDbRootPath);
         String workingDir = getWorkingDir(voltDbRootPath);
@@ -228,5 +309,38 @@ public class TestCollector {
         String subFolderPath = "voltdb_logs"+ File.separator;
         File jvmCrashFile = new File(collectionDecompressed, subFolderPath + "hs_err_pid" + pid + ".log");
         assertTrue(jvmCrashFile.exists());
+    }
+
+    @Test
+    public void testDaysToCollectOption() throws Exception {
+
+        createLogFiles(addFileDates());
+
+        File logDir = getLogDir(3);
+        assertTrue(logDir.exists());
+        assertTrue(logDir.listFiles().length > 0);
+        assertTrue(logDir.listFiles().length > 1);
+    }
+
+    @Test
+    public void testDaysToCollectOptionForCornerCases() throws Exception {
+
+        createLogFiles(addFileDates());
+
+        //set reference date to be 1st January of the current year
+        Calendar cal = Calendar.getInstance();
+        cal.set(cal.get(Calendar.YEAR), 0, 01);
+        Collector.currentDay = cal.getTimeInMillis();
+
+        File logDir = getLogDir(4);
+        assertTrue(logDir.exists());
+        assertTrue(logDir.listFiles().length > 0);
+        assertFalse(logDir.listFiles().length > 1);
+        Collector.resetCurrentDay();
+    }
+
+    private File getLogDir(int daysOfFilesToCollect) throws Exception {
+        File collectionDecompressed = collect(voltDbRootPath, true, daysOfFilesToCollect);
+        return new File(collectionDecompressed, "voltdb_logs"+ File.separator + "log" + File.separator);
     }
 }

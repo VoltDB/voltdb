@@ -69,6 +69,7 @@ public class Collector {
     private static boolean m_copyToVEM;
     private static boolean m_fileInfoOnly;
     private static int m_daysOfFileToCollect;
+    public static long currentDay = System.currentTimeMillis();
 
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
@@ -301,7 +302,7 @@ public class Collector {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
-                        && checkToIncludeFile(file)) {
+                       ) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
@@ -337,9 +338,15 @@ public class Collector {
     }
 
     private static boolean checkToIncludeFile(File file){
-        long currentDay = System.currentTimeMillis();
         long diff = currentDay - file.lastModified();
-        return TimeUnit.MILLISECONDS.toDays(diff) <= m_daysOfFileToCollect;
+        if(diff >= 0) {
+            return TimeUnit.MILLISECONDS.toDays(diff) <= m_daysOfFileToCollect;
+        }
+        return false;
+    }
+
+    public static void resetCurrentDay() {
+        currentDay = System.currentTimeMillis();
     }
 
     private static void generateCollection(List<String> paths, boolean copyToVEM) {
