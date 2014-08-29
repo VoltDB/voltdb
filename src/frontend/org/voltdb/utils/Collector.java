@@ -69,7 +69,8 @@ public class Collector {
     private static boolean m_copyToVEM;
     private static boolean m_fileInfoOnly;
     private static int m_daysOfFileToCollect;
-    public static long currentTimeMillis = System.currentTimeMillis();
+    public static long m_currentTimeMillis = System.currentTimeMillis();
+    private static CollectConfig m_config;
 
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
@@ -124,27 +125,27 @@ public class Collector {
         // get rid of log4j "no appenders could be found for logger" warning when called from VEM
         Logger.getRootLogger().addAppender(new NullAppender());
 
-        CollectConfig config = new CollectConfig();
-        config.parse(Collector.class.getName(), args);
+        m_config = new CollectConfig();
+        m_config.parse(Collector.class.getName(), args);
 
-        m_voltDbRootPath = config.voltdbroot;
-        m_prefix = config.prefix;
-        m_host = config.host;
-        m_username = config.username;
-        m_password = config.password;
-        m_noPrompt = config.noprompt;
-        m_dryRun = config.dryrun;
-        m_skipHeapDump = config.skipheapdump;
-        m_daysOfFileToCollect = config.days;
-        m_calledFromVEM = config.calledFromVEM;
+        m_voltDbRootPath = m_config.voltdbroot;
+        m_prefix = m_config.prefix;
+        m_host = m_config.host;
+        m_username = m_config.username;
+        m_password = m_config.password;
+        m_noPrompt = m_config.noprompt;
+        m_dryRun = m_config.dryrun;
+        m_skipHeapDump = m_config.skipheapdump;
+        m_daysOfFileToCollect = m_config.days;
+        m_calledFromVEM = m_config.calledFromVEM;
 
         // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
         // so the resulting file is easier to be located and copied to VEM
-        m_copyToVEM = config.copyToVEM;
+        m_copyToVEM = m_config.copyToVEM;
 
         // generate a list of information (server name, size, and path) of files rather than actually collect files
         // used by files display panel in VEM UI
-        m_fileInfoOnly = config.fileInfoOnly;
+        m_fileInfoOnly = m_config.fileInfoOnly;
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
@@ -279,7 +280,7 @@ public class Collector {
             for (String path: m_logPaths) {
                 for (File file: new File(path).getParentFile().listFiles()) {
                     if (file.getName().startsWith(new File(path).getName())
-                            && checkToIncludeFile(file)) {
+                            && isFileModifiedInCollectionPeriod(file)) {
                        collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
@@ -287,22 +288,22 @@ public class Collector {
 
             for (File file: new File(m_voltDbRootPath).listFiles()) {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
-                        && checkToIncludeFile(file)) {
+                        && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
-                        && checkToIncludeFile(file)) {
+                        && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
 
             for (File file: new File(m_workingDir).listFiles()) {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
-                        && checkToIncludeFile(file)) {
+                        && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
-                        && checkToIncludeFile(file)) {
+                        && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
@@ -310,7 +311,7 @@ public class Collector {
             if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
-                            && checkToIncludeFile(file)) {
+                            && isFileModifiedInCollectionPeriod(file)) {
                         collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
@@ -323,7 +324,7 @@ public class Collector {
             if (varlogDir.canRead()) {
                 for (File file: varlogDir.listFiles()) {
                     if ((file.getName().startsWith("syslog") || file.getName().equals("dmesg"))
-                            && checkToIncludeFile(file)) {
+                            && isFileModifiedInCollectionPeriod(file)) {
                         if (file.canRead()) {
                             collectionFilesList.add(file.getCanonicalPath());
                         }
@@ -337,8 +338,10 @@ public class Collector {
         return collectionFilesList;
     }
 
-    private static boolean checkToIncludeFile(File file){
-        long diff = currentTimeMillis - file.lastModified();
+    //checks whether the file is in the duration(days) specified by the user
+    //value of diff = 0 indicates current day
+    private static boolean isFileModifiedInCollectionPeriod(File file){
+        long diff = m_currentTimeMillis - file.lastModified();
         if(diff >= 0) {
             return TimeUnit.MILLISECONDS.toDays(diff) <= m_daysOfFileToCollect;
         }
@@ -346,7 +349,7 @@ public class Collector {
     }
 
     public static void resetCurrentDay() {
-        currentTimeMillis = System.currentTimeMillis();
+        m_currentTimeMillis = System.currentTimeMillis();
     }
 
     private static void generateCollection(List<String> paths, boolean copyToVEM) {

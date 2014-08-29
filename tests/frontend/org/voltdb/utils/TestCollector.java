@@ -23,7 +23,7 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedWriter;
@@ -96,7 +96,7 @@ public class TestCollector {
     private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
         if(resetCurrentTime) {
-            Collector.currentTimeMillis = System.currentTimeMillis();
+            Collector.m_currentTimeMillis = System.currentTimeMillis();
         }
         Collector.main(new String[]{"--voltdbroot="+voltDbRootPath, "--prefix="+prefix,
                                     "--host=\"\"", "--username=\"\"", "--password=\"\"", // host, username, password
@@ -149,7 +149,7 @@ public class TestCollector {
         return logPaths;
     }
 
-    private void createLogFiles(String[] fileDates) throws Exception {
+    private void createLogFiles() throws Exception {
 
         try {
            String configInfoPath = voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";;
@@ -170,6 +170,24 @@ public class TestCollector {
            }
 
            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+           String[] fileDates = new String[6];
+           Calendar cal, cal2;
+           cal = Calendar.getInstance();
+           cal2 = Calendar.getInstance();
+           for(int i=0; i < 3; i++) {
+               cal.add(Calendar.DATE, -i-1);
+               fileDates[i] = formatter.format(cal.getTime());
+           }
+           cal = Calendar.getInstance();
+           cal.add(Calendar.YEAR, -1);
+           cal2.set(cal.get(Calendar.YEAR), 11, 31);
+           fileDates[3] = formatter.format(cal2.getTime());
+           cal2.add(Calendar.DATE, -4);
+           fileDates[4] = formatter.format(cal2.getTime());
+           cal2 = Calendar.getInstance();
+           cal2.set(cal2.get(Calendar.YEAR), 0, 02);
+           fileDates[5] = formatter.format(cal2.getTime());
+
            for(String fileDate: fileDates) {
                VoltFile file = new VoltFile(logFolder, fileNamePrefix + fileDate);
                file.createNewFile();
@@ -196,28 +214,6 @@ public class TestCollector {
         }
     }
 
-    private String[] addFileDates() {
-
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-        String[] fileDates = new String[6];
-        Calendar cal, cal2;
-        cal = Calendar.getInstance();
-        cal2 = Calendar.getInstance();
-        for(int i=0; i < 3; i++) {
-            cal.add(Calendar.DATE, -i-1);
-            fileDates[i] = formatter.format(cal.getTime());
-        }
-        cal = Calendar.getInstance();
-        cal.add(Calendar.YEAR, -1);
-        cal2.set(cal.get(Calendar.YEAR), 11, 31);
-        fileDates[3] = formatter.format(cal2.getTime());
-        cal2.add(Calendar.DATE, -4);
-        fileDates[4] = formatter.format(cal2.getTime());
-        cal2 = Calendar.getInstance();
-        cal2.set(cal2.get(Calendar.YEAR), 0, 02);
-        fileDates[5] = formatter.format(cal2.getTime());
-        return fileDates;
-    }
     /*
      * For each type of file that need to be collected, check whether it actually appears in the collection
      * currently sar data and /var/log/syslog* are ignored in testing
@@ -317,29 +313,29 @@ public class TestCollector {
     @Test
     public void testDaysToCollectOption() throws Exception {
 
-        createLogFiles(addFileDates());
+        createLogFiles();
 
         File logDir = getLogDir(3);
         assertTrue(logDir.exists());
         assertTrue(logDir.listFiles().length > 0);
-        assertTrue(logDir.listFiles().length > 1);
+        assertEquals(logDir.listFiles().length, 3);
     }
 
     @Test
-    public void testDaysToCollectOptionForCornerCases() throws Exception {
+    public void testCollectFilesonYearBoundary() throws Exception {
 
-        createLogFiles(addFileDates());
+        createLogFiles();
 
         //set reference date to be 1st January of the current year
         Calendar cal = Calendar.getInstance();
         cal.set(cal.get(Calendar.YEAR), 0, 01);
-        Collector.currentTimeMillis = cal.getTimeInMillis();
+        Collector.m_currentTimeMillis = cal.getTimeInMillis();
 
         resetCurrentTime = false;
         File logDir = getLogDir(4);
         assertTrue(logDir.exists());
         assertTrue(logDir.listFiles().length > 0);
-        assertFalse(logDir.listFiles().length > 1);
+        assertEquals(logDir.listFiles().length, 1);
         resetCurrentTime = true;
     }
 
