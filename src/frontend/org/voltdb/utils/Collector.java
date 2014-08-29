@@ -302,7 +302,7 @@ public class Collector {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
-                       ) {
+                        && checkToIncludeFile(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
