@@ -88,7 +88,7 @@ function benchmark() {
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=120 \
+        --duration=1200 \
         --servers=localhost \
         --threads=20 \
         --threadoffset=0 \
@@ -100,7 +100,8 @@ function benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=120 \
         --usecompression=false \
-        --allowinprocadhoc=false
+        --allowinprocadhoc=false \
+        --disableadhoc=true
 }
 
 function help() {

@@ -492,13 +492,13 @@ public class Benchmark {
         log.info("Loading Filler Tables...");
         log.info(HORIZONTAL_RULE);
 
-        boolean runBigTableLoader = true;
-        boolean runTruncateTable = true;
+        boolean runBigTableLoader = false;
+        boolean runTruncateTable = false;
         boolean runLoadTable = true;
-        boolean runAdhocMayhem = true;
-        boolean runDroppedProcedure = true;
-        boolean runWriteThreads = true;
-        boolean runReadThreads = true;
+        boolean runAdhocMayhem = false;
+        boolean runDroppedProcedure = false;
+        boolean runWriteThreads = false;
+        boolean runReadThreads = false;
 
         if (runBigTableLoader) {
             BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",

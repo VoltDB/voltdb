@@ -29,10 +29,14 @@ public class ReadSPInProcAdHoc extends ReadSP {
 
     @SuppressWarnings("deprecation")
     @Override
-    public VoltTable[] run(byte cid) {
+    public VoltTable[] run(byte cid, byte shouldRollback) {
+    //public VoltTable[] run(byte cid, long rid, byte[] value, byte shouldRollback) {
         // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
         voltQueueSQLExperimental("SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;", cid);
-        return voltExecuteSQL(true);
+        VoltTable[] results =  voltExecuteSQL(true);
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+        return results;
     }
-
 }

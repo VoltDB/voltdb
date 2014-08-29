@@ -36,7 +36,14 @@ public class ReadMPRw extends VoltProcedure {
             "UPDATE replicated set rid=-9223372036854775807-1 WHERE cid = ?;");
 
     public VoltTable[] run(byte cid) {
+    //public VoltTable[] run(byte cid, byte shouldRollback) {
+    //public VoltTable[] run(byte cid, long rid, byte[] value, byte shouldRollback) {
         voltQueueSQL(r_getCIDData, cid);
         return voltExecuteSQL(true);
+        VoltTable[] results = voltExecuteSQL(true);
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+        return results;
     }
 }

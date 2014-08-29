@@ -124,17 +124,18 @@ public class ReadThread extends Thread {
 
             // round robin the read procedures
             // note: MP reads operate on one local partition, so don't derive from config.mpratio
-            String procName = readProcs[(int)(counter % 3)];
+            String procName = readProcs[(int)1]; //(counter % 3)]; //replicated ? (mprwproc ? "ReadMP" : "ReadMPRw")  : "ReadSP";
             // 1/23th of all SP reads are in-proc adhoc
             boolean inprocAdhoc = (counter % 23) == 0;
             counter++;
+            //String procName = replicated ? "ReadMP" : "ReadSP";
             if (inprocAdhoc && allowInProcAdhoc) procName += "InProcAdHoc";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
             // call a transaction
             try {
                 m_permits.acquire();
-                client.callProcedure(new ReadCallback(), procName, cid);
+                client.callProcedure(new ReadCallback(), procName, cid, (byte)0);
             }
             catch (NoConnectionsException e) {
                 log.error("ReadThread got NoConnectionsException on proc call. Will sleep.");

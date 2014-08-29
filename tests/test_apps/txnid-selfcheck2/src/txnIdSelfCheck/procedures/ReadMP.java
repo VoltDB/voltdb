@@ -32,8 +32,13 @@ public class ReadMP extends VoltProcedure {
     public final SQLStmt r_getCIDData = new SQLStmt(
             "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
 
-    public VoltTable[] run(byte cid) {
+    public VoltTable[] run(byte cid, byte shouldRollback) {
+    //public VoltTable[] run(byte cid, long rid, byte[] value, byte shouldRollback) {
         voltQueueSQL(r_getCIDData, cid);
-        return voltExecuteSQL(true);
+        VoltTable[] results =  voltExecuteSQL(true);
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+        return results;
     }
 }

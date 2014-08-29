@@ -29,9 +29,13 @@ public class ReadMPInProcAdHoc extends ReadMP {
 
     @SuppressWarnings("deprecation")
     @Override
-    public VoltTable[] run(byte cid) {
+    public VoltTable[] run(byte cid, byte shouldRollback) {
+    //public VoltTable[] run(byte cid, long rid, byte[] value, byte shouldRollback) {
         voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
-        return voltExecuteSQL(true);
+        VoltTable[] results =  voltExecuteSQL(true);
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+        return results;
     }
-
 }
