@@ -30,7 +30,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -146,7 +145,7 @@ public class TestCollector {
         return logPaths;
     }
 
-    private void createLogFiles(String[] fileDates) throws IOException {
+    private void createLogFiles(String[] fileDates) throws Exception {
 
         try {
            String configInfoPath = voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";;
@@ -156,8 +155,8 @@ public class TestCollector {
            //maintain the file naming format
            String fileNamePrefix = "volt-junit-fulllog.txt.";
            String fileText = "This is a dummy log file.";
-
-           VoltFile logFolder = new VoltFile("/home/schoudhary/workspace/voltdb/obj/release/testoutput/");
+           String workingDir = getWorkingDir(voltDbRootPath);
+           VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
            logFolder.mkdir();
 
            for(File oldLogFile : logFolder.listFiles()) {
