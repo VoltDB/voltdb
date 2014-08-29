@@ -63,6 +63,7 @@ public class TestCollector {
 
     String voltDbRootPath;
     String prefix = "voltdb_logs";
+    boolean resetCurrentTime = true;
 
     @Before
     public void setUp() throws Exception {
@@ -94,6 +95,9 @@ public class TestCollector {
 
     private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
+        if(resetCurrentTime) {
+            Collector.currentTimeMillis = System.currentTimeMillis();
+        }
         Collector.main(new String[]{"--voltdbroot="+voltDbRootPath, "--prefix="+prefix,
                                     "--host=\"\"", "--username=\"\"", "--password=\"\"", // host, username, password
                                     "--noprompt=true",  // noPrompt
@@ -329,13 +333,14 @@ public class TestCollector {
         //set reference date to be 1st January of the current year
         Calendar cal = Calendar.getInstance();
         cal.set(cal.get(Calendar.YEAR), 0, 01);
-        Collector.currentDay = cal.getTimeInMillis();
+        Collector.currentTimeMillis = cal.getTimeInMillis();
 
+        resetCurrentTime = false;
         File logDir = getLogDir(4);
         assertTrue(logDir.exists());
         assertTrue(logDir.listFiles().length > 0);
         assertFalse(logDir.listFiles().length > 1);
-        Collector.resetCurrentDay();
+        resetCurrentTime = true;
     }
 
     private File getLogDir(int daysOfFilesToCollect) throws Exception {
