@@ -757,7 +757,8 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                         "select sp1.bi, sp2.vc, sp1.ii, sp2.ti " +
                         "from source_p1 as sp1 inner join source_p2 as sp2 " +
                         "on sp1.ii = sp2.ii",
-                        "INSERT INTO ... SELECT subquery could not be planned");
+                        "Subquery statement for table __VOLT_INSERT_SUBQUERY__ has error: "
+                        + "Join of multiple partitioned tables has insufficient join criteria");
 
         verifyStmtFails(client, "insert into target_r " +
                         "select sr1.bi, sr1.vc, sr1.ii, sr1.ti  " +
