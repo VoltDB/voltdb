@@ -631,7 +631,7 @@ public class PlanAssembler {
             m_recentErrorMsg = "Subquery statement for table " + tbAlias
                     + " has error: " + assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
-                m_recentErrorMsg = "Unable to plan for subquery statement with table " + tbAlias;
+                m_recentErrorMsg = "Unable to plan for subquery statement for table " + tbAlias;
             }
             return null;
         }
