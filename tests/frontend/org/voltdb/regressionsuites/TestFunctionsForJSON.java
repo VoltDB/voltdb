@@ -40,6 +40,8 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
  */
 
 public class TestFunctionsForJSON extends RegressionSuite {
+	private static long[]   empty_row   = new long[]{};
+	private static long[][] empty_table = new long[][]{};
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
@@ -119,6 +121,39 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("JS1.insert", 9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void testProcWithValidJSON(long[] expectedResult, Client client,
+                                       String procName, Object... parameters) throws Exception {
+        ClientResponse cr = client.callProcedure(procName, parameters);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable result = cr.getResults()[0];
+        validateRowOfLongs(result, expectedResult);
+    }
+
+    private void testProcWithValidJSON(long[][] expectedResult, Client client,
+                                       String procName, Object... parameters) throws Exception {
+        ClientResponse cr = client.callProcedure(procName, parameters);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable result = cr.getResults()[0];
+        validateTableOfLongs(result, expectedResult);
+    }
+
+    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client,
+                                         String procName, Object... parameters) throws Exception {
+    	String procDescription = "'" + procName + "', with parameters:";
+    	for (int i=0; i < parameters.length; i++) {
+    		procDescription += "\n" + parameters[i].toString();
+    	}
+        try {
+        	client.callProcedure(procName, parameters);
+            fail("document validity check failed for " + procDescription);
+        } catch (ProcCallException pcex) {
+        	String actualMessage = pcex.getMessage();
+            assertTrue("For " + procDescription + "\nExpected error message containing: \n'"
+                       + expectedErrorMessage + "'\nbut got:\n'" + actualMessage + "'",
+                       actualMessage.contains(expectedErrorMessage));
+        }
     }
 
     public void testFIELDFunction() throws Exception {
@@ -261,6 +296,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
+
+        // Verify that dot notation returns nothing when used on a primitive
+        // (integer, boolean, float, string), or an array
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "id.veggies", 1);
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "bool.veggies", "true");
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "numeric.veggies", 1.2);
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "tag.veggies", "one");
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "arr.veggies", 0);
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "arr.0", 0);
     }
 
     /** Used to test ENG-6620, part 2 (array index notation). */
@@ -310,6 +354,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{});
+
+        // Verify that index notation returns nothing when used on a primitive
+        // (integer, boolean, float, string), or an object
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "id[0]", 1);
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "bool[0]", "true");
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "numeric[0]", 1.2);
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "tag[0]", "one");
+        testProcWithValidJSON(empty_table, client, "IdFieldProc", "inner[0]", "good for you");
     }
 
     /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined). */
@@ -370,6 +422,38 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+    }
+
+    /** Used to test ENG-6832 (invalid array index notation, for FIELD). */
+    public void testFIELDFunctionWithInvalidIndexNotation() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index [position 6]",
+                                client, "IdFieldProc", "arr[-2]",  0);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "IdFieldProc", "arr[]",    0);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "IdFieldProc", "arr[abc]", 0);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
+                                client, "IdFieldProc", "arr[",     0);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 6]",
+                                client, "IdFieldProc", "arr[123",  0);
+    }
+
+    /** Used to test ENG-6832 (invalid array index notation, for SET_FIELD). */
+    public void testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index [position 6]",
+                                client, "UpdateSetFieldProc", "arr[-2]",  "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "UpdateSetFieldProc", "arr[]",    "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "UpdateSetFieldProc", "arr[abc]", "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
+                                client, "UpdateSetFieldProc", "arr[",     "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 6]",
+                                client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
@@ -1184,6 +1268,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 ";\n" +
                 "CREATE PROCEDURE UpdateSetFieldProc AS\n" +
                 "   UPDATE JS1 SET DOC = SET_FIELD(DOC, ?, ?) WHERE ID = ?\n" +
+                ";\n" +
+
+                // Useful for debugging:
+                "CREATE PROCEDURE GetDocFromId AS\n" +
+                "   SELECT DOC FROM JS1 WHERE ID = ?\n" +
                 ";\n" +
 
                 "CREATE TABLE JSBAD (\n" +
