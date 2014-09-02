@@ -422,8 +422,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     /*
                      * Enforce a limit on the maximum number of connections
+                     *
+                     * Increment the number of connections even though this one hasn't been authenticated
+                     * so that a flood of connection attempts (with many doomed) will not result in
+                     * successful authentication of connections that would put us over the limit.
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
+                    if (!incrementConnectionCount()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
@@ -442,13 +446,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         } catch (IOException e) {}//don't care keep running
                         continue;
                     }
-
-                    /*
-                     * Increment the number of connections even though this one hasn't been authenticated
-                     * so that a flood of connection attempts (with many doomed) will not result in
-                     * successful authentication of connections that would put us over the limit.
-                     */
-                    m_numConnections.incrementAndGet();
 
                     final AuthRunnable authRunnable = new AuthRunnable(socket);
                     while (true) {
@@ -481,6 +478,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
                         VoltDB.crashLocalVoltDB(msg, false, e);
                     }
+                }
+            }
+        }
+
+        /**
+         * Atomically increment the number of connections, as long as that wouldn't
+         * cause it to exceed MAX_CONNECTIONS
+         */
+        private boolean incrementConnectionCount() {
+            while (true) {
+                int numConnections = m_numConnections.get();
+                if (numConnections >= MAX_CONNECTIONS.get()) {
+                    return false;
+                } else if (m_numConnections.compareAndSet(numConnections, numConnections + 1)) {
+                    return true;
                 }
             }
         }
