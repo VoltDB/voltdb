@@ -225,6 +225,9 @@ def abort(*msgs, **kwargs):
         warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
     return_code = kwargs.get('return_code', 1)
     error(*msgs)
+    # Return code must be 0-255 for shell.
+    if return_code != 0:
+        return_code = 1
     sys.exit(return_code)
 
 #===============================================================================

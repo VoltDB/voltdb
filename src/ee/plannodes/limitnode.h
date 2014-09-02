@@ -60,11 +60,10 @@ class Table;
  */
 class LimitPlanNode : public AbstractPlanNode {
 public:
-    LimitPlanNode() : AbstractPlanNode(),
-    limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
+    LimitPlanNode() : limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
     {}
     ~LimitPlanNode();
-    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
+    PlanNodeType getPlanNodeType() const;
 
     // evaluate possibly parameterized limit and offsets.
     void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
@@ -72,7 +71,7 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
 private:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue obj);
     int limit;
     int offset;
     int limitParamIdx;

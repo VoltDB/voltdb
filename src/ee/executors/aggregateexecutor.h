@@ -211,7 +211,6 @@ protected:
     std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
-    TupleSchema* m_aggSchema;
     std::vector<ExpressionType> m_aggTypes;
     std::vector<bool> m_distinctAggs;
     std::vector<AbstractExpression*> m_groupByExpressions;

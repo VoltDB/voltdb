@@ -55,19 +55,13 @@ namespace voltdb {
  */
 class UpsertPlanNode : public AbstractOperationPlanNode {
 public:
-    UpsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
-        // Do nothing
-    }
-    UpsertPlanNode() : AbstractOperationPlanNode() {
-        // Do nothing
-    }
-
-    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPSERT); }
+    UpsertPlanNode() { }
+    PlanNodeType getPlanNodeType() const;
 
     bool isMultiPartition() { return m_multiPartition; }
 
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 
     bool m_multiPartition;
 };

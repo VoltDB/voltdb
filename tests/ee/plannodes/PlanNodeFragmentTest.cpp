@@ -45,9 +45,12 @@ public:
 
 TEST_F(PlanNodeFragmentTest, HasDeleteTrue)
 {
-    AbstractPlanNode* send_node = new SendPlanNode(1);
-    AbstractPlanNode* delete_node = new DeletePlanNode(2);
-    AbstractPlanNode* seq_scan_node = new SeqScanPlanNode(3);
+    AbstractPlanNode* send_node = new SendPlanNode();
+    send_node->setPlanNodeIdForTest(1);
+    AbstractPlanNode* delete_node = new DeletePlanNode();
+    delete_node->setPlanNodeIdForTest(2);
+    AbstractPlanNode* seq_scan_node = new SeqScanPlanNode();
+    seq_scan_node->setPlanNodeIdForTest(3);
 
     AbstractPlanNode* root1 = send_node;
     root1->addChild(delete_node);
@@ -58,8 +61,10 @@ TEST_F(PlanNodeFragmentTest, HasDeleteTrue)
 
 TEST_F(PlanNodeFragmentTest, HasDeleteFalse)
 {
-    AbstractPlanNode* send_node = new SendPlanNode(1);
-    AbstractPlanNode* seq_scan_node = new SeqScanPlanNode(2);
+    AbstractPlanNode* send_node = new SendPlanNode();
+    send_node->setPlanNodeIdForTest(1);
+    AbstractPlanNode* seq_scan_node = new SeqScanPlanNode();
+    seq_scan_node->setPlanNodeIdForTest(2);
 
     AbstractPlanNode* root1 = send_node;
     root1->addChild(seq_scan_node);
@@ -69,9 +74,12 @@ TEST_F(PlanNodeFragmentTest, HasDeleteFalse)
 
 TEST_F(PlanNodeFragmentTest, HasDeleteInline)
 {
-    AbstractPlanNode* send_node = new SendPlanNode(1);
-    AbstractPlanNode* delete_node = new DeletePlanNode(2);
-    AbstractPlanNode* index_scan_node = new IndexScanPlanNode(3);
+    AbstractPlanNode* send_node = new SendPlanNode();
+    send_node->setPlanNodeIdForTest(1);
+    AbstractPlanNode* delete_node = new DeletePlanNode();
+    delete_node->setPlanNodeIdForTest(2);
+    AbstractPlanNode* index_scan_node = new IndexScanPlanNode();
+    index_scan_node->setPlanNodeIdForTest(3);
 
     AbstractPlanNode* root1 = send_node;
     root1->addChild(index_scan_node);

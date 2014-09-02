@@ -209,7 +209,7 @@ public class Driver implements java.sql.Driver
             String tmp = null;
             try {
                 tmp = new File(pathToJar.toURI()).getParent() + File.separator + DEFAULT_PROP_FILENAME;
-            } catch (URISyntaxException e) {
+            } catch (Exception e) {
                 tmp = null;
             }
             filename = tmp;

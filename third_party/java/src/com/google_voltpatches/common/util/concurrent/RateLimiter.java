@@ -98,7 +98,7 @@ public abstract class RateLimiter {
    * The simplest way to maintain a rate of QPS is to keep the timestamp of the last
    * granted request, and ensure that (1/QPS) seconds have elapsed since then. For example,
    * for a rate of QPS=5 (5 tokens per second), if we ensure that a request isn't granted
-   * earlier than 200ms after the the last one, then we achieve the intended rate.
+   * earlier than 200ms after the last one, then we achieve the intended rate.
    * If a request comes and the last request was granted only 100ms ago, then we wait for
    * another 100ms. At this rate, serving 15 fresh permits (i.e. for an acquire(15) request)
    * naturally takes 3 seconds.
@@ -221,7 +221,7 @@ public abstract class RateLimiter {
    * requests being smoothly limited at the stable rate of {@code permitsPerSecond}.
    *
    * @param permitsPerSecond the rate of the returned {@code RateLimiter}, measured in
-   *        how many permits become available per second.
+   *        how many permits become available per second. Must be positive
    */
   // TODO(user): "This is equivalent to
   //                 {@code createWithCapacity(permitsPerSecond, 1, TimeUnit.SECONDS)}".
@@ -266,7 +266,7 @@ public abstract class RateLimiter {
    * will follow), and if it is left unused for long enough, it will return to that state.
    *
    * @param permitsPerSecond the rate of the returned {@code RateLimiter}, measured in
-   *        how many permits become available per second
+   *        how many permits become available per second. Must be positive
    * @param warmupPeriod the duration of the period where the {@code RateLimiter} ramps up its
    *        rate, before reaching its stable (maximum) rate
    * @param unit the time unit of the warmupPeriod argument
@@ -349,7 +349,7 @@ public abstract class RateLimiter {
    * e.g. if the {@code RateLimiter} was configured with a warmup period of 20 seconds,
    * it still has a warmup period of 20 seconds after this method invocation.
    *
-   * @param permitsPerSecond the new stable rate of this {@code RateLimiter}.
+   * @param permitsPerSecond the new stable rate of this {@code RateLimiter}. Must be positive
    */
   public final void setRate(double permitsPerSecond) {
     Preconditions.checkArgument(permitsPerSecond > 0.0
@@ -376,27 +376,55 @@ public abstract class RateLimiter {
   }
 
   /**
-   * Acquires a permit from this {@code RateLimiter}, blocking until the request can be granted.
+   * Acquires a single permit from this {@code RateLimiter}, blocking until the
+   * request can be granted. Tells the amount of time slept, if any.
    *
    * <p>This method is equivalent to {@code acquire(1)}.
+   *
+   * @return time spent sleeping to enforce rate, in seconds; 0.0 if not rate-limited
+   * @since 16.0 (present in 13.0 with {@code void} return type})
    */
-  public void acquire() {
-    acquire(1);
+  public double acquire() {
+    return acquire(1);
   }
 
   /**
    * Acquires the given number of permits from this {@code RateLimiter}, blocking until the
-   * request be granted.
+   * request can be granted. Tells the amount of time slept, if any.
    *
    * @param permits the number of permits to acquire
+   * @return time spent sleeping to enforce rate, in seconds; 0.0 if not rate-limited
+   * @since 16.0 (present in 13.0 with {@code void} return type})
    */
-  public void acquire(int permits) {
-    checkPermits(permits);
-    long microsToWait;
-    synchronized (mutex) {
-      microsToWait = reserveNextTicket(permits, readSafeMicros());
-    }
+  public double acquire(int permits) {
+    long microsToWait = reserve(permits);
     ticker.sleepMicrosUninterruptibly(microsToWait);
+    return 1.0 * microsToWait / TimeUnit.SECONDS.toMicros(1L);
+  }
+
+  /**
+   * Reserves a single permit from this {@code RateLimiter} for future use, returning the number of
+   * microseconds until the reservation.
+   *
+   * <p>This method is equivalent to {@code reserve(1)}.
+   *
+   * @return time in microseconds to wait until the resource can be acquired.
+   */
+  long reserve() {
+    return reserve(1);
+  }
+
+  /**
+   * Reserves the given number of permits from this {@code RateLimiter} for future use, returning
+   * the number of microseconds until the reservation can be consumed.
+   *
+   * @return time in microseconds to wait until the resource can be acquired.
+   */
+  long reserve(int permits) {
+    checkPermits(permits);
+    synchronized (mutex) {
+      return reserveNextTicket(permits, readSafeMicros());
+    }
   }
 
   /**
@@ -476,10 +504,12 @@ public abstract class RateLimiter {
 
   /**
    * Reserves next ticket and returns the wait time that the caller must wait for.
+   *
+   * <p>The return value is guaranteed to be non-negative.
    */
   private long reserveNextTicket(double requiredPermits, long nowMicros) {
     resync(nowMicros);
-    long microsToNextFreeTicket = nextFreeTicketMicros - nowMicros;
+    long microsToNextFreeTicket = Math.max(0, nextFreeTicketMicros - nowMicros);
     double storedPermitsToSpend = Math.min(requiredPermits, this.storedPermits);
     double freshPermits = requiredPermits - storedPermitsToSpend;
 

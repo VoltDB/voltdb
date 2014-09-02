@@ -1583,6 +1583,13 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile(
                 "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, P1 " +
                 "where T1.A = P1.A ", joinErrorMsg);
+
+        // Error in one of the sub-queries and return exception directly for the whole statement
+        String sql = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, " +
+                "                    (SELECT P1.A, P1.C FROM P1, P3) T2, P3 " +
+                "where T1.A = T2.A AND P3.A = T2.A";
+        failToCompile(sql, joinErrorMsg);
+        failToCompile(sql, "Subquery statement for table T2 has error");
     }
 
     /**
