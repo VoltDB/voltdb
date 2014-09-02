@@ -52,7 +52,6 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.io.PatternFilenameFilter;
 
 public class TestCollector {
     private static final int STARTUP_DELAY = 3000;
@@ -164,7 +163,7 @@ public class TestCollector {
            logFolder.mkdir();
 
            for(File oldLogFile : logFolder.listFiles()) {
-               if(oldLogFile.getName().startsWith(fileNamePrefix + new PatternFilenameFilter("\\d{4}-\\d{2}-\\d{2}"))) {
+               if(oldLogFile.getName().startsWith(fileNamePrefix)) {
                    oldLogFile.delete();
                }
            }
