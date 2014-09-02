@@ -24,76 +24,76 @@ import java.nio.ByteBuffer;
 import com.google_voltpatches.common.base.Preconditions;
 
 public class ByteBufferOutputStream extends OutputStream {
-	protected static final int DEFAULT_ALLOCATION_SIZE = 256 * 1024;
+    protected static final int DEFAULT_ALLOCATION_SIZE = 256 * 1024;
 
-	protected ByteBuffer m_bb;
+    protected ByteBuffer m_bb;
 
-	public ByteBufferOutputStream(int initialAllocationSize) {
-		super();
-		Preconditions.checkArgument(
-				initialAllocationSize > 0,
-				"allocation size must be greater than 0"
-				);
-	    m_bb = ByteBuffer.wrap(new byte[initialAllocationSize]);
+    public ByteBufferOutputStream(int initialAllocationSize) {
+        super();
+        Preconditions.checkArgument(
+                initialAllocationSize > 0,
+                "allocation size must be greater than 0"
+                );
+        m_bb = ByteBuffer.wrap(new byte[initialAllocationSize]);
     }
 
-	public ByteBufferOutputStream() {
-	    this(DEFAULT_ALLOCATION_SIZE);
+    public ByteBufferOutputStream() {
+        this(DEFAULT_ALLOCATION_SIZE);
     }
 
-	@Override
+    @Override
     public void write(byte[] b) throws IOException {
-	    ensureCapacity(b.length);
-	    m_bb.put(b);
+        ensureCapacity(b.length);
+        m_bb.put(b);
     }
 
-	@Override
+    @Override
     public void write(byte[] b, int off, int len) throws IOException {
-	    ensureCapacity(len);
-	    m_bb.put(b, off, len);
+        ensureCapacity(len);
+        m_bb.put(b, off, len);
     }
 
-	@Override
-	public void write(int b) throws IOException {
-		ensureCapacity(1);
-		m_bb.put((byte) (b & 0xff));
-	}
+    @Override
+    public void write(int b) throws IOException {
+        ensureCapacity(1);
+        m_bb.put((byte) (b & 0xff));
+    }
 
-	@Override
+    @Override
     public void close() throws IOException {
-	    m_bb.clear();
-	    super.close();
+        m_bb.clear();
+        super.close();
     }
 
-	/**
-	 * Returns a copy of the backing {@link ByteBuffer}. Its contents
-	 * may be modified if any other write or resets occur while the
-	 * returned {@link ByteBuffer} is processed.
-	 *
-	 * @return a read only view of the backing {@link ByteBuffer}
-	 */
-	public ByteBuffer toByteBuffer() {
-		ByteBuffer bb = m_bb.duplicate();
-		bb.flip();
-		return bb;
-	}
+    /**
+     * Returns a copy of the backing {@link ByteBuffer}. Its contents
+     * may be modified if any other write or resets occur while the
+     * returned {@link ByteBuffer} is processed.
+     *
+     * @return a read only view of the backing {@link ByteBuffer}
+     */
+    public ByteBuffer toByteBuffer() {
+        ByteBuffer bb = m_bb.duplicate();
+        bb.flip();
+        return bb;
+    }
 
-	/**
-	 * Clears the backing {@link ByteBuffer}
-	 */
-	public void reset() {
-		m_bb.clear();
-	}
+    /**
+     * Clears the backing {@link ByteBuffer}
+     */
+    public void reset() {
+        m_bb.clear();
+    }
 
-	/**
-	 * @return a byte array copy of the backing {@link ByteBuffer} content
-	 */
-	public byte [] toByteArray() {
-		ByteBuffer bb = m_bb.asReadOnlyBuffer();
-		byte [] byteArray = new byte [bb.flip().limit()];
-		bb.get(byteArray);
-		return byteArray;
-	}
+    /**
+     * @return a byte array copy of the backing {@link ByteBuffer} content
+     */
+    public byte [] toByteArray() {
+        ByteBuffer bb = m_bb.asReadOnlyBuffer();
+        byte [] byteArray = new byte [bb.flip().limit()];
+        bb.get(byteArray);
+        return byteArray;
+    }
 
     /**
      * Expand the underlying byte buffer to contain the specified delta
@@ -106,7 +106,7 @@ public class ByteBufferOutputStream extends OutputStream {
 
             int newCapacity = oldbb.capacity() * 2;
             while (newCapacity < (oldbb.capacity() + delta)) {
-            	newCapacity *= 2;
+                newCapacity *= 2;
             }
 
             ByteBuffer newbb = ByteBuffer.wrap(new byte[newCapacity]);
