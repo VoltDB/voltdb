@@ -109,6 +109,13 @@ class JDBCStatementReader extends SusceptibleRunnable {
             ResultSetMetaData mdata = rslt.getMetaData();
             columnCount = mdata.getColumnCount();
 
+            /*
+             * Each column from jdbc source must be an importable type. First
+             * we determine if there is a corresponding importer type for the
+             * given column. If there is one then determine the column acceptor
+             * that converts the database type to the appropriate volt type, and
+             * add it to the acceptors array
+             */
             acceptors = new ImporterType.Acceptor[columnCount];
             for (int i = 1; i <= columnCount; ++i) {
                 ImporterType type = ImporterType.forClassName(mdata.getColumnClassName(i));
@@ -271,6 +278,11 @@ class JDBCStatementReader extends SusceptibleRunnable {
                 m_idx = idx;
             }
 
+            /**
+             * Default conversion. return it as is
+             * @return return result set object as os
+             * @throws SQLException
+             */
             Object convert() throws SQLException {
                 Object val = m_rslt.getObject(m_idx);
                 if (m_rslt.wasNull()) return null;

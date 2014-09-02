@@ -235,7 +235,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         /**
          * Table name to insert CSV data into.
          */
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+        @AdditionalArgs(desc = "insert the data into the given table")
         public String table = "";
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
@@ -254,10 +254,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             if (jdbcurl.trim().equals("")) {
                 exitWithMessageAndUsage("JDBC Url can not be empty.");
             }
-            if (procedure.equals("") && table.equals("")) {
+            if (procedure.trim().equals("") && table.trim().equals("")) {
                 exitWithMessageAndUsage("procedure name or a table name required");
             }
-            if (!procedure.equals("") && !table.equals("")) {
+            if (!procedure.trim().equals("") && !table.trim().equals("")) {
                 exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
             }
             if (port < 0) {
@@ -269,11 +269,14 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
             }
+            if ("".equals(jdbctable.trim())) {
+                jdbctable = table;
+            }
             try {
                 Class.forName(jdbcdriver);
             } catch (ClassNotFoundException ex) {
                 exitWithMessageAndUsage("JDBC Driver class cannot be loaded make sure: "
-                        + jdbcdriver + " is available in your classpath.");
+                        + jdbcdriver + " is available in your classpath. You may specify it in CLASSPATH environent variable");
             }
         }
 
