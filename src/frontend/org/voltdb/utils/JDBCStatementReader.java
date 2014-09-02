@@ -97,7 +97,7 @@ class JDBCStatementReader extends SusceptibleRunnable {
             DatabaseMetaData dbmd = conn.getMetaData();
             int resultSetType = ResultSet.TYPE_FORWARD_ONLY;
             if (!dbmd.supportsResultSetType(resultSetType)) {
-            	resultSetType = ResultSet.TYPE_SCROLL_INSENSITIVE;
+                resultSetType = ResultSet.TYPE_SCROLL_INSENSITIVE;
             }
             stmt = conn.prepareStatement(
                     "select * from " + m_config.jdbctable,

@@ -149,7 +149,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         String rowContent = "Unknown row content";
         String [] row = (String[])metaData.rawLine;
         if (row != null && row.length == 1 && row[0] != null && !row[0].trim().isEmpty()) {
-        	rowContent = row[0];
+            rowContent = row[0];
         }
 
         String infoStr = (response != null) ? response.getStatusString() : error;
