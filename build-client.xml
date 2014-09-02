@@ -168,7 +168,12 @@ JAR BUILDING
         <fileset dir="${build.client.dir}" defaultexcludes="yes" >
             <include name="**" />
         </fileset>
-        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <fileset dir=".">
+            <include name="buildstring.txt"/>
+        </fileset>
+        <fileset dir="src/frontend">
+            <include name="META-INF/**"/>
+        </fileset>
         <manifest>
             <section name="Credits">
                 <attribute name="Author" value="VoltDB Inc." />
