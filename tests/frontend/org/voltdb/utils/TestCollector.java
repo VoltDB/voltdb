@@ -94,6 +94,7 @@ public class TestCollector {
 
     private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
+        System.out.println("Tar File Path is: " + collectionTgz.getAbsolutePath());
         if(resetCurrentTime) {
             Collector.m_currentTimeMillis = System.currentTimeMillis();
         }
