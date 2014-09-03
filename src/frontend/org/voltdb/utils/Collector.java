@@ -272,11 +272,11 @@ public class Collector {
         try {
             if (new File(m_deploymentPath).exists()) {
                 collectionFilesList.add(m_deploymentPath);
-                System.out.println("Added deploymentfile collection, Path :: " + m_deploymentPath);
+                System.out.println("Added deploymentfile collection");
             }
             if (new File(m_catalogJarPath).exists()) {
                 collectionFilesList.add(m_catalogJarPath);
-                System.out.println("Added catalogJarPath collection, Path :: " + m_catalogJarPath);
+                System.out.println("Added deploymentfile collection");
             }
 
             System.out.println("collectionFileSize :: " + collectionFilesList.size());
@@ -326,8 +326,6 @@ public class Collector {
                     }
                 }
             }
-
-            System.out.println("collectionFileSize :: " + collectionFilesList.size());
 
             collectionFilesList.add("sardata (result of executing \"sar -A\" if sar enabled)");
             collectionFilesList.add("dmesgdata (result of executing \"/bin/dmesg\")");

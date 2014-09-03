@@ -135,7 +135,7 @@ public class TestCollector {
 
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
         String workingDir = jsonObject.getString("workingDir");
-        System.out.println("Working Dir path :: "+ workingDir);
+
         return workingDir;
     }
 
@@ -163,7 +163,6 @@ public class TestCollector {
            String fileNamePrefix = "volt-junit-fulllog.txt.";
            String fileText = "This is a dummy log file.";
            String workingDir = getWorkingDir(voltDbRootPath);
-
            VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
            logFolder.mkdir();
 
@@ -207,8 +206,6 @@ public class TestCollector {
                object.put("path", file.getCanonicalPath());
                object.put("format", "'.'" + fileDate);
                jsonArray.put(object);
-
-               System.out.println("Path of file created :: "+ file.getAbsolutePath());
            }
            FileOutputStream fos = new FileOutputStream(configInfoPath);
            fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
