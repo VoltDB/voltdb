@@ -180,25 +180,31 @@ private:
                     throwInvalidPathError("Unexpected character in array index");
                 }
                 // atoi while advancing our pointer
-                int32_t arrayIndex = c - '0';
-                bool success = false;
+                int64_t arrayIndex = c - '0';
+                bool terminated = false;
                 while (readChar(c)) {
                     if (c == ']') {
-                        success = true;
+                        terminated = true;
                         break;
                     } else if (c < '0' || c > '9') {
                         throwInvalidPathError("Unexpected character in array index");
                     }
                     arrayIndex = 10 * arrayIndex + (c - '0');
+                    if (arrayIndex > static_cast<int64_t>(INT32_MAX)) {
+                        throwInvalidPathError("Invalid array index greater than the maximum integer value");
+                    }
+                }
+                if ( ! terminated ) {
+                    throwInvalidPathError("Missing ']' after array index");
                 }
                 if (neg) {
                     // other than the special '-1' case, negative indices aren't allowed
                     if (arrayIndex != 1) {
-                        throwInvalidPathError("Invalid array index");
+                        throwInvalidPathError("Invalid array index less than -1");
                     }
                     arrayIndex = ARRAY_TAIL;
                 }
-                path.push_back(arrayIndex);
+                path.push_back(static_cast<int32_t>(arrayIndex));
                 expectArrayIndex = false;
             } else if (c == '[') {
                 // handle the case of empty field names. for example, getting the first element of the array
@@ -287,32 +293,31 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     const NValue& docNVal = arguments[0];
     const NValue& pathNVal = arguments[1];
 
-    int32_t lenDoc = -1;
-    const char* docChars = NULL;
-    if (!docNVal.isNull()) {
-        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenDoc = docNVal.getObjectLength_withoutNull();
-        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    if (docNVal.isNull()) {
+        return docNVal;
+    }
+    if (pathNVal.isNull()) {
+        throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid FIELD path argument (SQL null)");
     }
 
-    int32_t lenPath = -1;
-    const char* pathChars = NULL;
-    if (!pathNVal.isNull()) {
-        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenPath = pathNVal.getObjectLength_withoutNull();
-        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
+    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
+    const char* docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
     JsonDocument doc(docChars, lenDoc);
-    std::string value;
-    if (!doc.get(pathChars, lenPath, value)) {
-        return getNullStringValue();
+
+    int32_t lenPath = pathNVal.getObjectLength_withoutNull();
+    const char* pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    std::string result;
+    if (doc.get(pathChars, lenPath, result)) {
+        return getTempStringValue(result.c_str(), result.length() - 1);
     }
-    return getTempStringValue(value.c_str(), value.length() - 1);
+    return getNullStringValue();
 }
 
 /** implement the 2-argument SQL ARRAY_ELEMENT function */
@@ -324,7 +329,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
         return getNullStringValue();
     }
     if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+        throwCastSQLException(docNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
     const NValue& indexNVal = arguments[1];
@@ -388,7 +393,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
         return getNullValue(VALUE_TYPE_INTEGER);
     }
     if (getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+        throwCastSQLException(getValueType(), VALUE_TYPE_VARCHAR);
     }
 
     int32_t lenDoc = getObjectLength_withoutNull();
@@ -427,37 +432,36 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
     const NValue& pathNVal = arguments[1];
     const NValue& valueNVal = arguments[2];
 
-    int32_t lenDoc = -1;
-    const char* docChars = NULL;
-    if (!docNVal.isNull()) {
-        if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenDoc = docNVal.getObjectLength_withoutNull();
-        docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    if (docNVal.isNull()) {
+        return docNVal;
+    }
+    if (pathNVal.isNull()) {
+        throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid SET_FIELD path argument (SQL null)");
+    }
+    if (valueNVal.isNull()) {
+        throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid SET_FIELD value argument (SQL null)");
     }
 
-    int32_t lenPath = -1;
-    const char* pathChars = NULL;
-    if (!pathNVal.isNull()) {
-        if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenPath = pathNVal.getObjectLength_withoutNull();
-        pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(docNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    int32_t lenValue = -1;
-    const char* valueChars = NULL;
-    if (!valueNVal.isNull()) {
-        if (valueNVal.getValueType() != VALUE_TYPE_VARCHAR) {
-            throwCastSQLException (valueNVal.getValueType(), VALUE_TYPE_VARCHAR);
-        }
-        lenValue = valueNVal.getObjectLength_withoutNull();
-        valueChars = reinterpret_cast<char*>(valueNVal.getObjectValue_withoutNull());
+    if (pathNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
+    if (valueNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(valueNVal.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
+    const char* docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
     JsonDocument doc(docChars, lenDoc);
+
+    int32_t lenPath = pathNVal.getObjectLength_withoutNull();
+    const char* pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    int32_t lenValue = valueNVal.getObjectLength_withoutNull();
+    const char* valueChars = reinterpret_cast<char*>(valueNVal.getObjectValue_withoutNull());
     doc.set(pathChars, lenPath, valueChars, lenValue);
 
     std::string value = doc.value();
