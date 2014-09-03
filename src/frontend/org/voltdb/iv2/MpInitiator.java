@@ -33,6 +33,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.ReplicaDRGateway;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
@@ -73,6 +74,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway drGateway,
+                          ReplicaDRGateway replicaDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {

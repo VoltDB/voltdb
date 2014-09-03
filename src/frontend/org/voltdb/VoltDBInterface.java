@@ -157,6 +157,8 @@ public interface VoltDBInterface
 
     public ReplicaDRGateway getReplicaDRGateway();
 
+    public void onSyncSnapshotCompletion();
+
     /**
      * Set the operation mode of this server.
      * @param mode the operational mode to enter

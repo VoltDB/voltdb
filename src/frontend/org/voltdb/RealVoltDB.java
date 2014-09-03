@@ -717,48 +717,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
-            /*
-             * Configure and start all the IV2 sites
-             */
-            boolean usingCommandLog = false;
-            try {
-                usingCommandLog = m_config.m_isEnterprise &&
-                    m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-
-                for (Initiator iv2init : m_iv2Initiators) {
-                    iv2init.configure(
-                            getBackendTargetType(),
-                            m_catalogContext,
-                            m_deployment.getCluster().getKfactor(),
-                            csp,
-                            m_configuredNumberOfPartitions,
-                            m_config.m_startAction,
-                            getStatsAgent(),
-                            m_memoryStats,
-                            m_commandLog,
-                            m_nodeDRGateway,
-                            m_config.m_executionCoreBindings.poll());
-                }
-
-                // LeaderAppointer startup blocks if the initiators are not initialized.
-                // So create the LeaderAppointer after the initiators.
-                m_leaderAppointer = new LeaderAppointer(
-                        m_messenger,
-                        m_configuredNumberOfPartitions,
-                        m_deployment.getCluster().getKfactor(),
-                        m_catalogContext.cluster.getNetworkpartition(),
-                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, kSafetyStats);
-                m_globalServiceElector.registerService(m_leaderAppointer);
-            } catch (Exception e) {
-                Throwable toLog = e;
-                if (e instanceof ExecutionException) {
-                    toLog = ((ExecutionException)e).getCause();
-                }
-                VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
-            }
-
             // Need to register the OpsAgents right before we turn on the client interface
             m_opsRegistrar.setDummyMode(false);
 
@@ -806,11 +764,57 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             drMasterHost,
                             m_clientInterface,
                             true);
-                    m_replicaDRGateway.initializeReplicaCluster(m_cartographer);
                     m_globalServiceElector.registerService(m_replicaDRGateway);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
+            }
+
+            /*
+             * Configure and start all the IV2 sites
+             */
+            boolean usingCommandLog = false;
+            try {
+                usingCommandLog = m_config.m_isEnterprise &&
+                    m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
+
+                for (Initiator iv2init : m_iv2Initiators) {
+                    iv2init.configure(
+                            getBackendTargetType(),
+                            m_catalogContext,
+                            m_deployment.getCluster().getKfactor(),
+                            csp,
+                            m_configuredNumberOfPartitions,
+                            m_config.m_startAction,
+                            getStatsAgent(),
+                            m_memoryStats,
+                            m_commandLog,
+                            m_nodeDRGateway,
+                            m_replicaDRGateway,
+                            m_config.m_executionCoreBindings.poll());
+                }
+
+                // LeaderAppointer startup blocks if the initiators are not initialized.
+                // So create the LeaderAppointer after the initiators.
+                // arogers: Right now, if we are using DR V2, then the leader appointer should
+                // expect a sync snapshot. This needs to change when the replica supports different
+                // start actions
+                boolean expectSyncSnapshot = useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA;
+                m_leaderAppointer = new LeaderAppointer(
+                        m_messenger,
+                        m_configuredNumberOfPartitions,
+                        m_deployment.getCluster().getKfactor(),
+                        m_catalogContext.cluster.getNetworkpartition(),
+                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
+                        usingCommandLog,
+                        topo, m_MPI, kSafetyStats, expectSyncSnapshot);
+                m_globalServiceElector.registerService(m_leaderAppointer);
+            } catch (Exception e) {
+                Throwable toLog = e;
+                if (e instanceof ExecutionException) {
+                    toLog = ((ExecutionException)e).getCause();
+                }
+                VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
             }
 
             // Create the statistics manager and register it to JMX registry
@@ -2576,8 +2580,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_nodeDRGateway;
     }
 
+    @Override
     public ReplicaDRGateway getReplicaDRGateway() {
         return m_replicaDRGateway;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
+        m_leaderAppointer.onSyncSnapshotCompletion();
     }
 
     @Override
