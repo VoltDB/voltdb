@@ -45,8 +45,18 @@ function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
 }
 
+# compile the source code for procedures and the client
+function srccompile() {
+    mkdir -p obj
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+        src/aggregationbenchmark/*.java 
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+}
+
 # build an application catalog
 function catalog() {
+	srccompile
     echo "Compiling the kvbenchmark application catalog."
     echo "To perform this action manually, use the command line: "
     echo
@@ -77,9 +87,20 @@ function restore() {
     ${VOLTADMIN} restore /tmp/aggbench/backup "TestSnapshot"
 }
 
-function client() {
+function sqlclient() {
 # 	for x in `seq 1 5`; do echo "Query $x" ; echo "exec Q${x}"| ${SQLCMD} | grep "rows" ; done
 	for x in `seq 1 5`; do echo "Query $x" ; echo "exec Q${x}"| ${SQLCMD} | grep "rows" ; done
+}
+
+function client() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        aggregationbenchmark.AggregationBenchmark \
+        --servers=localhost \
+        --restore=0 \
+        --proc=1 \
+        --invocations=6 \
+        --statsfile="stats" 
 }
 
 # Run the target passed as the first arg on the command line
