@@ -87,6 +87,7 @@ public class TestCollector {
         File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
 
+        System.out.println("voltDbRootPath :: "+voltDbRootPath);
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -109,6 +110,7 @@ public class TestCollector {
                                     "--days="+String.valueOf(days)
                                     });
         assertTrue(collectionTgz.exists());
+        System.out.println("CollecttionTgz Path2 :: "+collectionTgz.getAbsolutePath());
 
         File collectionDecompressed = new File(voltDbRootPath, prefix);
         TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionDecompressed);
@@ -126,6 +128,7 @@ public class TestCollector {
 
         return pid;
     }
+
     private String getWorkingDir(String voltDbRootPath) throws Exception {
         File configLogDir = new File(voltDbRootPath, "config_log");
         File configInfo = new File(configLogDir, "config.json");
@@ -240,12 +243,16 @@ public class TestCollector {
         File heapdumpGenerated = new File("/tmp", "java_pid" + pid + ".hprof");
         heapdumpGenerated.deleteOnExit();
 
+        System.out.println("heapdumpGenerated :: "+heapdumpGenerated.getAbsolutePath());
+
         PrintWriter writer = new PrintWriter(heapdumpGenerated.getPath());
         writer.println("fake heapdump file");
         writer.close();
 
 
         File collectionDecompressed = collect(voltDbRootPath, false, 50);
+
+        System.out.println("CollectionDecompressed inside testBasicFilesandCrash:: "+collectionDecompressed.getAbsolutePath());
 
         String subFolderPath = "voltdb_logs"+ File.separator;
         File heapdumpFile = new File(collectionDecompressed, subFolderPath + "java_pid" + pid + ".hprof");
@@ -301,6 +308,8 @@ public class TestCollector {
 
         File collectionDecompressed = collect(voltDbRootPath, true, 50);
 
+        System.out.println("CollectionDecompressed inside testJVMCrash:: "+collectionDecompressed.getAbsolutePath());
+
         int pid = getpid(voltDbRootPath);
         String workingDir = getWorkingDir(voltDbRootPath);
         File jvmCrashGenerated = new File(workingDir, "hs_err_pid" + pid + ".log");
@@ -341,6 +350,7 @@ public class TestCollector {
 
     private File getLogDir(int daysOfFilesToCollect) throws Exception {
         File collectionDecompressed = collect(voltDbRootPath, true, daysOfFilesToCollect);
+        System.out.println("CollectionDecompressed inside testDaysToCollectOption:: "+collectionDecompressed.getAbsolutePath());
         return new File(collectionDecompressed, "voltdb_logs"+ File.separator + "log" + File.separator);
     }
 }
