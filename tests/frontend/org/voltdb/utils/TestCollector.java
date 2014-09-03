@@ -94,8 +94,7 @@ public class TestCollector {
     }
 
     private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
-        File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
-        System.out.println("Tar File Path is: " + collectionTgz.getAbsolutePath());
+
         if(resetCurrentTime) {
             Collector.m_currentTimeMillis = System.currentTimeMillis();
         }
@@ -109,6 +108,9 @@ public class TestCollector {
                                     "--fileInfoOnly=false",  // fileInfoOnly
                                     "--days="+String.valueOf(days)
                                     });
+
+        File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
+        System.out.println("Tar File Path is: " + collectionTgz.getAbsolutePath());
         assertTrue(collectionTgz.exists());
         System.out.println("CollecttionTgz Path2 :: "+collectionTgz.getAbsolutePath());
 
