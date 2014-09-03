@@ -389,8 +389,6 @@ public class Collector {
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
             String folderPath= m_prefix + timestamp + File.separator;
 
-            System.out.println("collectionFilePath :: " + collectionFilePath);
-
             // Collect files with paths indicated in the list
             for (String path: paths) {
                 // Skip particular items corresponding to temporary files that are only generated during collecting
