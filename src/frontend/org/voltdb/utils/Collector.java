@@ -272,21 +272,16 @@ public class Collector {
         try {
             if (new File(m_deploymentPath).exists()) {
                 collectionFilesList.add(m_deploymentPath);
-                System.out.println("Added deploymentfile collection");
             }
             if (new File(m_catalogJarPath).exists()) {
                 collectionFilesList.add(m_catalogJarPath);
-                System.out.println("Added deploymentfile collection");
             }
-
-            System.out.println("collectionFileSize :: " + collectionFilesList.size());
 
             for (String path: m_logPaths) {
                 for (File file: new File(path).getParentFile().listFiles()) {
                     if (file.getName().startsWith(new File(path).getName())
                             && isFileModifiedInCollectionPeriod(file)) {
-                        System.out.println("logpath file :: "+file.getAbsolutePath());
-                        collectionFilesList.add(file.getCanonicalPath());
+                       collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
             }
@@ -294,12 +289,10 @@ public class Collector {
             for (File file: new File(m_voltDbRootPath).listFiles()) {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
                         && isFileModifiedInCollectionPeriod(file)) {
-                    System.out.println("crash file :: "+file.getAbsolutePath());
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
                         && isFileModifiedInCollectionPeriod(file)) {
-                    System.out.println("hs_err_pid :: "+file.getAbsolutePath());
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
@@ -307,12 +300,10 @@ public class Collector {
             for (File file: new File(m_workingDir).listFiles()) {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
                         && isFileModifiedInCollectionPeriod(file)) {
-                    System.out.println("voltdb_crash2 :: "+file.getAbsolutePath());
                     collectionFilesList.add(file.getCanonicalPath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
                         && isFileModifiedInCollectionPeriod(file)) {
-                    System.out.println("hs_err_pid :: "+file.getAbsolutePath());
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
@@ -321,7 +312,6 @@ public class Collector {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
                             && isFileModifiedInCollectionPeriod(file)) {
-                        System.out.println(".hprof :: "+file.getAbsolutePath());
                         collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
@@ -369,7 +359,6 @@ public class Collector {
 
             if (copyToVEM) {
                 rootpath = m_voltDbRootPath;
-                System.out.println("Inside If "+rootpath);
             }
             else {
                 TimestampType ts = new TimestampType(new java.util.Date());
@@ -379,7 +368,6 @@ public class Collector {
                 timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
 
                 rootpath = System.getProperty("user.dir");
-                System.out.println("Inside else " + rootpath);
             }
 
             String collectionFilePath = rootpath + File.separator + m_prefix + timestamp + ".tgz";
@@ -412,7 +400,6 @@ public class Collector {
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    System.out.println("tarGenerator files path :: " + folderPath + entryPath +", "+ file.getAbsolutePath());
                     tarGenerator.queueEntry(folderPath + entryPath, file);
                 }
             }
