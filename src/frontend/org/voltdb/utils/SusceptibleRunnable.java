@@ -14,15 +14,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.utils;
 
-//Processor queue to keep track of line data and number and such.
-public class CSVLineWithMetaData {
-    final public String rawLine;
-    final public long lineNumber;
+import com.google_voltpatches.common.base.Throwables;
 
-    public CSVLineWithMetaData(String rawLine, long ln) {
-        this.rawLine = rawLine;
-        lineNumber = ln;
+public abstract class SusceptibleRunnable implements Runnable {
+
+    @Override
+    public void run() {
+        try {
+            susceptibleRun();
+        } catch (Exception ex) {
+            Throwables.propagate(ex);
+        }
     }
+
+    public abstract void susceptibleRun() throws Exception;
 }
