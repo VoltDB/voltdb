@@ -43,8 +43,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     private static final long[] ONE_ROW_UPDATED = new long[]{1};
     private static final long[][] EMPTY_TABLE = new long[][]{};
-    private static final long[][]  FULL_TABLE = new long[][]{{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13}};
-    private static final long[][] NON_NULL_TABLE = new long[][]{{1},{2},{3},{4},{5},{6},{7},{9},{10},{11},{12},{13}};
+    private static final long[][]  FULL_TABLE = new long[][]{{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15}};
     private static final int TOTAL_NUM_ROWS = FULL_TABLE.length;
     private static final boolean DEBUG = false;
 
@@ -129,11 +128,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("JS1.insert", 10, "[1,2,3]");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert", 11, "\"foobar\"");
+        cr = client.callProcedure("JS1.insert", 11, "{\"null\": \"foo\"}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert", 12, "true");
+        cr = client.callProcedure("JS1.insert", 12, "{\"foo\": \"null\"}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert", 13, 42);
+        cr = client.callProcedure("JS1.insert", 13, "\"foobar\"");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert", 14, "true");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert", 15, 42);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
@@ -165,7 +168,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                          String procName, Object... parameters) throws Exception {
         String procDescription = "'" + procName + "', with parameters:";
         for (int i=0; i < parameters.length; i++) {
-            procDescription += "\n" + parameters[i].toString();
+            procDescription += "\n" + (parameters[i] == null ? "null" : parameters[i].toString());
         }
         try {
             client.callProcedure(procName, parameters);
@@ -176,6 +179,23 @@ public class TestFunctionsForJSON extends RegressionSuite {
                        + expectedErrorMessage + "'\nbut got:\n'" + actualMessage + "'",
                        actualMessage.contains(expectedErrorMessage));
         }
+    }
+
+    /** Used to test cases involving minimal JSON documents. */
+    public void testMinimalJSONdocuments() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        testProcWithValidJSON(new long[][]{{13}}, client, "DocEqualsProc", "\"foobar\"");
+        testProcWithValidJSON(new long[][]{{14}}, client, "DocEqualsProc", "true");
+        testProcWithValidJSON(new long[][]{{15}}, client, "DocEqualsProc", 42);
+        testProcWithValidJSON(new long[][]{{5}}, client, "DocEqualsProc", "{}");
+        testProcWithValidJSON(new long[][]{{6}}, client, "DocEqualsProc", "[]");
+
+        testProcWithValidJSON(new long[][]{{6}}, client, "ArrayLengthDocProc", "0");
+        testProcWithValidJSON(new long[][]{{10}}, client, "ArrayLengthDocProc", "3");
+        testProcWithValidJSON(EMPTY_TABLE, client, "ArrayLengthDocProc", "1");
+        testProcWithValidJSON(EMPTY_TABLE, client, "ArrayLengthDocProc", "2");
     }
 
     public void testFIELDFunction() throws Exception {
@@ -244,7 +264,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         cr = client.callProcedure("NullFieldProc", "id");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
-        long[] expectedResults = new long[]{5L, 6L, 8L, 10L, 11L, 12L, 13L};
+        long[] expectedResults = new long[]{5L, 6L, 8L, 10L, 11L, 12L, 13L, 14L, 15L};
         assertEquals(expectedResults.length, result.getRowCount());
         for (long expResult : expectedResults) {
             assertTrue(result.advanceRow());
@@ -293,8 +313,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 1.2);
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "true");
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "one");
-        testProcWithValidJSON(new long[][]{{8}}, client, "NullFieldProc", (Object) null);
-        testProcWithValidJSON(NON_NULL_TABLE, client, "NotNullFieldProc", (Object) null);
+        testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "NullFieldProc", (Object) null);
+
+        testProcWithValidJSON(new long[][]{{11}}, client, "NotNullFieldProc", "null");
+        testProcWithValidJSON(new long[][]{{12}}, client, "NotNullFieldProc", "foo");
+        testProcWithValidJSON(new long[][]{{11}}, client, "IdFieldProc", "null", "foo");
+        testProcWithValidJSON(new long[][]{{12}}, client, "IdFieldProc", "foo", "null");
     }
 
     /** Used to test ENG-6620, part 1 (dotted path notation). */
@@ -419,6 +443,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(FULL_TABLE, client, "NullArrayProc", "last", 0);
         testProcWithValidJSON(FULL_TABLE, client, "NullArrayProc", "inner", 0);
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "NullArrayProc", "tag", 0);
+
+        // Test index notation with no name specified (a weird case!)
+        testProcWithValidJSON(new long[][]{{10}}, client, "NotNullFieldProc", "[0]");
+        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[0]", 1);
+        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[1]", 2);
+        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[2]", 3);
     }
 
     /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined). */
@@ -485,7 +515,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     public void testFIELDFunctionWithInvalidIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
-        testProcWithInvalidJSON("Invalid JSON path: Invalid array index [position 6]",
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index less than -1 [position 6]",
                                 client, "IdFieldProc", "arr[-2]",  0);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
                                 client, "IdFieldProc", "arr[]",    0);
@@ -493,12 +523,13 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "IdFieldProc", "arr[abc]", 0);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
                                 client, "IdFieldProc", "arr[",     0);
-        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 6]",
+        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "IdFieldProc", "arr[123",  0);
     }
 
     /** Used to test ENG-6832 (invalid array index notation, for SET_FIELD). */
-    public void testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
+    // TODO: remove all "no_" prefixes, once SET_FIELD function is re-enabled
+    public void no_testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
         testProcWithInvalidJSON("Invalid JSON path: Invalid array index [position 6]",
@@ -509,12 +540,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "UpdateSetFieldProc", "arr[abc]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
                                 client, "UpdateSetFieldProc", "arr[",     "-1", 1);
-        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 6]",
+        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]'",
                                 client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
-    public void testSET_FIELDFunction() throws Exception {
+    public void no_testSET_FIELDFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -548,7 +579,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6621, part 2 (dotted path notation). */
-    public void testSET_FIELDFunctionWithDotNotation() throws Exception {
+    public void no_testSET_FIELDFunctionWithDotNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -646,7 +677,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6620, part 3 (array index notation). */
-    public void testSET_FIELDFunctionWithIndexNotation() throws Exception {
+    public void no_testSET_FIELDFunctionWithIndexNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -772,7 +803,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined). */
-    public void testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
+    public void no_testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -870,7 +901,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     // Test the SET_FIELD function with numeric, floating-point data, including
     // with dotted path and/or array index notation
-    public void testSET_FIELDFunctionWithNumericData() throws Exception {
+    public void no_testSET_FIELDFunctionWithNumericData() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -1128,7 +1159,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         cr = client.callProcedure("NullArrayLengthProc", "arr");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
-        long[] expectedResults = new long[]{4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L};
+        long[] expectedResults = new long[]{4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L};
         assertEquals(expectedResults.length, result.getRowCount());
         for (long expResult : expectedResults) {
             assertTrue(result.advanceRow());
@@ -1295,6 +1326,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
 
+                "CREATE PROCEDURE DocEqualsProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE DOC = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE ArrayLengthDocProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(DOC) = ? ORDER BY ID\n" +
+                ";\n" +
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
@@ -1334,10 +1371,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
                 ";\n" +
+                // TODO: uncomment this, once the SET_FIELD function is re-enabled
+/*
                 "CREATE PROCEDURE UpdateSetFieldProc AS\n" +
                 "   UPDATE JS1 SET DOC = SET_FIELD(DOC, ?, ?) WHERE ID = ?\n" +
                 ";\n" +
-
+*/
                 // Useful for debugging:
                 "CREATE PROCEDURE GetDocFromId AS\n" +
                 "   SELECT DOC FROM JS1 WHERE ID = ?\n" +
