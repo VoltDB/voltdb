@@ -53,6 +53,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -1064,6 +1065,12 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
            status = ClientResponse.TXN_RESTART;
            msg.append("TRANSACTION RESTART\n");
+       }
+       // SpecifiedException means the dev wants control over status and message
+       else if (e.getClass() == SpecifiedException.class) {
+           SpecifiedException se = (SpecifiedException) e;
+           status = se.getStatus();
+           expected_failure = true;
        }
        else {
            msg.append("UNEXPECTED FAILURE:\n");

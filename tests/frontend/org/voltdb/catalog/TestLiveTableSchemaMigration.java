@@ -38,6 +38,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -297,7 +299,13 @@ public class TestLiveTableSchemaMigration extends TestCase {
             migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)");
             fail();
         }
-        catch (Exception e) {}
+        catch (ProcCallException e) {
+            ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+            assert(cri.getStatus() == ClientResponse.GRACEFUL_FAILURE);
+        }
+        catch (Exception e) {
+            fail();
+        }
     }
 
     public void testFixedSchemasNoData() throws Exception {
@@ -310,13 +318,13 @@ public class TestLiveTableSchemaMigration extends TestCase {
         migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)", false);
     }
 
-    /**
-     * Create and mutate a bunch of random schemas and data in java,
-     * then compare the mutated results with a schema change in the EE.
-     *
-     * The number of times the loop is run can be changed to make the test
-     * better at the cost of runtime.
-     */
+    //
+    // Create and mutate a bunch of random schemas and data in java,
+    // then compare the mutated results with a schema change in the EE.
+    //
+    // The number of times the loop is run can be changed to make the test
+    // better at the cost of runtime.
+    //
     public void testRandomSchemas() throws Exception {
         int count = 15;
         Random rand = new Random(0);

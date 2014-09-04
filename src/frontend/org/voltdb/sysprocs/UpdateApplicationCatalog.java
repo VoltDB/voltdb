@@ -18,11 +18,12 @@
 package org.voltdb.sysprocs;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -42,7 +43,9 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
@@ -95,6 +98,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         if (tablesThatMustBeEmpty.length == 0) {
             return;
         }
+        assert(reasonsForEmptyTables != null);
+        assert(reasonsForEmptyTables.length == tablesThatMustBeEmpty.length);
 
         // fetch the id of the tables that must be empty from the
         //  current catalog (not the new one).
@@ -103,8 +108,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         int i = 0;
         for (String tableName : tablesThatMustBeEmpty) {
             Table table = tables.get(tableName);
-            assert(table != null);
-            //TODO make this throw vs assert
+            if (table == null) {
+                String msg = String.format("@UpdateApplicationCatalog was checking to see if table %s was empty, " +
+                                           "presumably as part of a schema change, and it failed to find the table " +
+                                           "in the current catalog context.", tableName);
+                throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
+            }
             tableIds[i++] = table.getRelativeIndex();
         }
 
@@ -115,11 +124,14 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                                                               false,
                                                               getTransactionTime().getTime());
         if ((s1 == null) || (s1.length == 0)) {
-            // TODO throw a better exception with a real error message
-            throw new VoltAbortException("(s1 == null) || (s1.length == 0)");
+            String tableNames = StringUtils.join(tablesThatMustBeEmpty, ", ");
+            String msg = String.format("@UpdateApplicationCatalog was checking to see if tables (%s) were empty ," +
+                                       "presumably as part of a schema change, but failed to get the row counts " +
+                                       "from the native storage engine.", tableNames);
+            throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-        Set<String> nonEmptyTables = new HashSet<String>();
+        SortedSet<String> nonEmptyTables = new TreeSet<String>();
 
         // find all empty tables
         while (stats.advanceRow()) {
@@ -131,9 +143,15 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         }
 
         // return an error containing the names of all non-empty tables
+        // via the propagated reasons why each needs to be empty
         if (!nonEmptyTables.isEmpty()) {
-            // TODO throw a better exception with a real error message
-            throw new VoltAbortException("!nonEmptyTables.isEmpty()");
+            String msg = "Unable to make requested schema change: ";
+            for (i = 0; i < tablesThatMustBeEmpty.length; ++i) {
+                if (nonEmptyTables.contains(tablesThatMustBeEmpty[i])) {
+                    msg += reasonsForEmptyTables[i] + "\n";
+                }
+            }
+            throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, msg);
         }
     }
 
@@ -414,6 +432,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     catalogStuff.uniqueId,
                     catalogStuff.catalogBytes,
                     catalogStuff.deploymentBytes);
+
+            // hopefully this will throw a SpecifiedException if the fragment threw one
             throw vae;
             // If there is a cluster failure after this point, we will re-run
             // the transaction with the same input args and the old state,
