@@ -16,23 +16,14 @@
  */
 package org.voltdb.utils;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
-
-import org.supercsv.io.CsvListReader;
-import org.supercsv.io.ICsvListReader;
-import org.supercsv.prefs.CsvPreference;
-import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
@@ -42,7 +33,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 
 /**
- * CSVLoader is a simple utility to load data from a CSV formatted file to a table.
+ * JDBCLoader is a simple utility to load data from external database table that supports JDBC.
  *
  * This utility processes partitioned data efficiently and creates as many partition processors.
  * For partitioned data each processor calls
@@ -56,7 +47,7 @@ import org.voltdb.client.ClientResponse;
  * maxerror and additional errors may occur. Only first maxerror indicated errors will be reported.
  *
  */
-public class CSVLoader implements BulkLoaderErrorHandler {
+public class JDBCLoader implements BulkLoaderErrorHandler {
 
     /**
      * Path of invalid row file that will be created.
@@ -65,47 +56,17 @@ public class CSVLoader implements BulkLoaderErrorHandler {
     /**
      * report file name
      */
-    static String pathReportfile = "csvloaderReport.log";
+    static String pathReportfile = "jdbcloaderReport.log";
     /**
      * log file name
      */
-    static String pathLogfile = "csvloaderLog.log";
-    private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
-    private static CSVConfig config = null;
+    static String pathLogfile = "jdbcloaderLog.log";
+    private static final VoltLogger m_log = new VoltLogger("JDBCLOADER");
+    private static JDBCLoaderConfig config = null;
     private static long start = 0;
-    private static boolean standin = false;
     private static BufferedWriter out_invaliderowfile;
     private static BufferedWriter out_logfile;
     private static BufferedWriter out_reportfile;
-    private static CsvPreference csvPreference = null;
-    /**
-     * default CSV separator
-     */
-    public static final char DEFAULT_SEPARATOR = ',';
-    /**
-     * default quote char
-     */
-    public static final char DEFAULT_QUOTE_CHARACTER = '\"';
-    /**
-     * default escape char
-     */
-    public static final char DEFAULT_ESCAPE_CHARACTER = '\\';
-    /**
-     * Are we using strict quotes
-     */
-    public static final boolean DEFAULT_STRICT_QUOTES = false;
-    /**
-     * Number of lines to skip in CSV
-     */
-    public static final int DEFAULT_SKIP_LINES = 0;
-    /**
-     * Allow whitespace?
-     */
-    public static final boolean DEFAULT_NO_WHITESPACE = false;
-    /**
-     * Size limit for each column.
-     */
-    public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
     /**
      * Used for testing only.
@@ -124,7 +85,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
     private static final int ERROR_INFO_QUEUE_SIZE = Integer.getInteger("ERROR_INFO_QUEUE_SIZE", 500);
     //Errors we keep track only upto maxerrors
     private final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
-    private volatile long m_errorCount = 0;
+    private volatile AtomicLong m_errorCount = new AtomicLong(0);
 
     private class ErrorInfoFlushProcessor extends Thread {
         @Override
@@ -140,18 +101,18 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                     if (currItem.errorInfo.length != 2) {
                         System.out.println("internal error, information is not enough");
                     }
-                    out_invaliderowfile.write(currItem.errorInfo[0] + "\n");
+                    out_invaliderowfile.write(currItem.errorInfo[0]);
                     String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
                     m_log.error(message);
-                    out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0] + "\n");
+                    out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0]);
 
-                    m_errorCount++;
+                    m_errorCount.incrementAndGet();
 
                 } catch (FileNotFoundException e) {
-                    m_log.error("CSV report directory '" + config.reportdir
-                            + "' does not exist.");
+                    m_log.error("JDBC Loader report directory '" + config.reportdir
+                            + "' does not exist.",e);
                 } catch (Exception x) {
-                    m_log.error(x.getMessage());
+                    m_log.error(x);
                 }
 
             }
@@ -180,56 +141,49 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
     @Override
     public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
-        synchronized (m_errorInfo) {
-            //Dont collect more than we want to report.
-            if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {
-                return true;
-            }
-
-            String rawLine;
-            if (metaData.rawLine == null) {
-                rawLine = "Unknown line content";
-            } else {
-                rawLine = metaData.rawLine.toString();
-            }
-            String infoStr = (response != null) ? response.getStatusString() : error;
-            String[] info = {rawLine, infoStr};
-
-            ErrorInfoItem newErrorInfo = new ErrorInfoItem(metaData.lineNumber, info);
-
-            try {
-                if (!m_errorInfo.offer(newErrorInfo)) {
-                    m_errorInfo.put(newErrorInfo);
-                }
-            } catch (InterruptedException e) {
-            }
-
-            if (response != null) {
-                byte status = response.getStatus();
-                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
-                    System.out.println("Fatal Response from server for: " + response.getStatusString()
-                            + " for: " + rawLine);
-                    System.exit(1);
-                }
-            }
-
-            return false;
+        //Dont collect more than we want to report.
+        if (m_errorCount.get() + m_errorInfo.size() >= config.maxerrors) {
+            return true;
         }
+
+        String rowContent = "Unknown row content";
+        String [] row = (String[])metaData.rawLine;
+        if (row != null && row.length == 1 && row[0] != null && !row[0].trim().isEmpty()) {
+            rowContent = row[0];
+        }
+
+        String infoStr = (response != null) ? response.getStatusString() : error;
+        String[] info = {rowContent, infoStr};
+
+        ErrorInfoItem newErrorInfo = new ErrorInfoItem(metaData.lineNumber, info);
+
+        try {
+            if (!m_errorInfo.offer(newErrorInfo)) {
+                m_errorInfo.put(newErrorInfo);
+            }
+        } catch (InterruptedException ignoreIt) {
+        }
+
+        if (response != null) {
+            byte status = response.getStatus();
+            if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                System.out.println("Fatal Response from server for: " + response.getStatusString()
+                        + " for: " + rowContent);
+                System.exit(1);
+            }
+        }
+        return false;
     }
 
     @Override
-    public boolean hasReachedErrorLimit()
-    {
-        return m_errorCount + m_errorInfo.size() >= config.maxerrors;
+    public boolean hasReachedErrorLimit() {
+        return m_errorCount.get() + m_errorInfo.size() >= config.maxerrors;
     }
 
     /**
      * Configuration options.
      */
-    public static class CSVConfig extends CLIConfig {
-
-        @Option(shortOpt = "f", desc = "location of CSV input file")
-        String file = "";
+    public static class JDBCLoaderConfig extends CLIConfig {
 
         @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
         String procedure = "";
@@ -243,31 +197,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
 
-        @Option(desc = "different ways to handle blank items: {error|null|empty} (default: null)")
-        String blank = "null";
-
-        @Option(desc = "delimiter to use for separating entries")
-        char separator = DEFAULT_SEPARATOR;
-
-        @Option(desc = "character to use for quoted elements (default: \")")
-        char quotechar = DEFAULT_QUOTE_CHARACTER;
-
-        @Option(desc = "character to use for escaping a separator or quote (default: \\)")
-        char escape = DEFAULT_ESCAPE_CHARACTER;
-
-        @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
-        boolean strictquotes = DEFAULT_STRICT_QUOTES;
-
-        @Option(desc = "number of lines to skip before inserting rows into the database")
-        long skip = DEFAULT_SKIP_LINES;
-
-        @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
-        boolean nowhitespace = DEFAULT_NO_WHITESPACE;
-
-        @Option(desc = "max size of a quoted column in bytes(default: 16777216 = 16MB)")
-        long columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
-
-        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
+        @Option(shortOpt = "s", desc = "list of volt servers to connect to (default: localhost)")
         String servers = "localhost";
 
         @Option(desc = "username when connecting to the servers")
@@ -279,6 +209,23 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
+        @Option(desc = "JDBC Driver class to use to connect to JDBC servers.")
+        String jdbcdriver = "";
+
+        @Option(desc = "JDBC Url to connect to servers.")
+        String jdbcurl = "";
+
+        @Option(desc = "JDBC username when connecting to the servers")
+        String jdbcuser = "";
+
+        @Option(desc = "JDBC password to use when connecting to servers")
+        String jdbcpassword = "";
+
+        @Option(desc = "JDBC table to use for loading data from.")
+        String jdbctable = "";
+
+        @Option(desc = "Fetch Size for JDBC request (default: 100)")
+        int fetchsize = 100;
         /**
          * Batch size for processing batched operations.
          */
@@ -288,7 +235,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         /**
          * Table name to insert CSV data into.
          */
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+        @AdditionalArgs(desc = "insert the data into the given table")
         public String table = "";
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
@@ -301,14 +248,17 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (maxerrors < 0) {
                 exitWithMessageAndUsage("abortfailurecount must be >=0");
             }
-            if (procedure.equals("") && table.equals("")) {
+            if (jdbcdriver.trim().equals("")) {
+                exitWithMessageAndUsage("JDBC Driver can not be empty.");
+            }
+            if (jdbcurl.trim().equals("")) {
+                exitWithMessageAndUsage("JDBC Url can not be empty.");
+            }
+            if (procedure.trim().equals("") && table.trim().equals("")) {
                 exitWithMessageAndUsage("procedure name or a table name required");
             }
-            if (!procedure.equals("") && !table.equals("")) {
+            if (!procedure.trim().equals("") && !table.trim().equals("")) {
                 exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-            }
-            if (skip < 0) {
-                exitWithMessageAndUsage("skipline must be >= 0");
             }
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
@@ -316,13 +266,17 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
-            if (!blank.equalsIgnoreCase("error") &&
-                !blank.equalsIgnoreCase("null") &&
-                !blank.equalsIgnoreCase("empty")) {
-                exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
-            }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if ("".equals(jdbctable.trim())) {
+                jdbctable = table;
+            }
+            try {
+                Class.forName(jdbcdriver);
+            } catch (ClassNotFoundException ex) {
+                exitWithMessageAndUsage("JDBC Driver class cannot be loaded make sure: "
+                        + jdbcdriver + " is available in your classpath. You may specify it in CLASSPATH environent variable");
             }
         }
 
@@ -332,15 +286,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Override
         public void printUsage() {
             System.out
-                    .println("Usage: csvloader [args] tablename");
+                    .println("Usage: jdbcloader [args] tablename");
             System.out
-                    .println("       csvloader [args] -p procedurename");
+                    .println("       jdbcloader [args] -p procedurename");
             super.printUsage();
         }
     }
 
     /**
-     * csvloader main. (main is directly used by tests as well be sure to reset statics that you need to start over)
+     * jdbcloader main. (main is directly used by tests as well be sure to reset statics that you need to start over)
      *
      * @param args
      * @throws IOException
@@ -353,29 +307,11 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         long insertTimeStart = start;
         long insertTimeEnd;
 
-        final CSVConfig cfg = new CSVConfig();
-        cfg.parse(CSVLoader.class.getName(), args);
+        final JDBCLoaderConfig cfg = new JDBCLoaderConfig();
+        cfg.parse(JDBCLoader.class.getName(), args);
 
         config = cfg;
         configuration();
-        final Tokenizer tokenizer;
-        ICsvListReader listReader = null;
-        try {
-            if (CSVLoader.standin) {
-                tokenizer = new Tokenizer(new BufferedReader(new InputStreamReader(System.in)), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip);
-                listReader = new CsvListReader(tokenizer, csvPreference);
-            } else {
-                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip);
-                listReader = new CsvListReader(tokenizer, csvPreference);
-            }
-        } catch (FileNotFoundException e) {
-            m_log.error("CSV file '" + config.file + "' could not be found.");
-            System.exit(-1);
-        }
         // Split server list
         final String[] serverlist = config.servers.split(",");
 
@@ -384,10 +320,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {
-            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+            csvClient = JDBCLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
             m_log.error("Error connecting to the servers: "
-                    + config.servers);
+                    + config.servers, e);
             System.exit(-1);
         }
         assert (csvClient != null);
@@ -396,8 +332,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             long readerTime;
             long insertCount;
             long ackCount;
-            long rowsQueued;
-            final CSVLoader errHandler = new CSVLoader();
+            final JDBCLoader errHandler = new JDBCLoader();
             final CSVDataLoader dataLoader;
 
             errHandler.launchErrorFlushProcessor();
@@ -409,11 +344,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
             }
 
-            CSVFileReader.initializeReader(cfg, csvClient, listReader);
+            //Created Source reader
+            JDBCStatementReader.initializeReader(cfg, csvClient);
 
-            CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
-            Thread readerThread = new Thread(csvReader);
-            readerThread.setName("CSVFileReader");
+            JDBCStatementReader jdbcReader = new JDBCStatementReader(dataLoader, errHandler);
+            Thread readerThread = new Thread(jdbcReader);
+            readerThread.setName("JDBCSourceReader");
             readerThread.setDaemon(true);
 
             //Wait for reader to finish.
@@ -426,46 +362,35 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
             errHandler.waitForErrorFlushComplete();
 
-            readerTime = (csvReader.m_parsingTime) / 1000000;
+            readerTime = (jdbcReader.m_parsingTime) / 1000000;
             insertCount = dataLoader.getProcessedRows();
             ackCount = insertCount - dataLoader.getFailedRows();
-            rowsQueued = CSVFileReader.m_totalRowCount.get();
-
-            //Close the reader.
-            try {
-               listReader.close();
-            } catch (Exception ex) {
-                m_log.error("Error closing reader: " + ex);
-            } finally {
-                m_log.debug("Rows Queued by Reader: " + rowsQueued);
-            }
 
             if (errHandler.hasReachedErrorLimit()) {
                 m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
                            + config.maxerrors);
             }
 
-            m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
-            m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
+                m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
+            }
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                        + ackCount + " rows (final)");
             errHandler.produceFiles(ackCount, insertCount);
             close_cleanup();
+
             //In test junit mode we let it continue for reuse
-            if (!CSVLoader.testMode) {
+            if (!JDBCLoader.testMode) {
                 System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
-            m_log.error("Exception Happened while loading CSV data: " + ex);
+            m_log.error("Exception Happened while loading CSV data", ex);
             System.exit(1);
         }
     }
 
     private static void configuration() {
-        csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").build();
-        if (config.file.equals("")) {
-            standin = true;
-        }
         String insertProcedure;
         if (!config.table.equals("")) {
             insertProcedure = config.table.toUpperCase() + ".insert";
@@ -481,16 +406,16 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x.getMessage(), x);
+            m_log.error(x);
             System.exit(-1);
         }
 
         insertProcedure = insertProcedure.replaceAll("\\.", "_");
-        pathInvalidrowfile = config.reportdir + "csvloader_" + insertProcedure + "_"
+        pathInvalidrowfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "invalidrows.csv";
-        pathLogfile = config.reportdir + "csvloader_" + insertProcedure + "_"
+        pathLogfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "log.log";
-        pathReportfile = config.reportdir + "csvloader_" + insertProcedure + "_"
+        pathReportfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "report.log";
 
         try {
@@ -499,7 +424,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            m_log.error(e);
             System.exit(-1);
         }
     }
@@ -531,41 +456,23 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         try {
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
-            long trueSkip;
-            long totolLineCnt;
+            out_reportfile.write("JDBCLoader elaspsed: " + elapsedTimeSec + " seconds\n");
             long totalRowCnt;
 
-            if (config.useSuppliedProcedure) {
-                totolLineCnt = CSVFileReader.m_totalLineCount.get();
-                totalRowCnt = CSVFileReader.m_totalRowCount.get();
-            } else {
-                totolLineCnt = CSVFileReader.m_totalLineCount.get();
-                totalRowCnt = CSVFileReader.m_totalRowCount.get();
-            }
+            totalRowCnt = JDBCStatementReader.m_totalRowCount.get();
 
-            //get the actual number of lines skipped
-            if (config.skip < totolLineCnt) {
-                trueSkip = config.skip;
-            } else {
-                trueSkip = totolLineCnt;
-            }
-            out_reportfile.write("Number of input lines skipped: "
-                    + trueSkip + "\n");
-            out_reportfile.write("Number of lines read from input: "
-                    + (totolLineCnt - trueSkip) + "\n");
             if (config.limitrows == -1) {
                 out_reportfile.write("Input stopped after "
                         + totalRowCnt + " rows read" + "\n");
             }
-            out_reportfile.write("Number of rows discovered: "
-                    + totolLineCnt + "\n");
+            out_reportfile.write("Number of rows read from source: "
+                    + totalRowCnt + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
             out_reportfile.write("Number of rows that could not be inserted: "
                     + m_errorCount + "\n");
-            out_reportfile.write("CSVLoader rate: " + insertCount
+            out_reportfile.write("JDBCLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
             m_log.info("Invalid row file: " + pathInvalidrowfile);
@@ -576,10 +483,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             out_logfile.flush();
             out_reportfile.flush();
         } catch (FileNotFoundException e) {
-            m_log.error("CSV report directory '" + config.reportdir
-                    + "' does not exist.");
+            m_log.error("JDBC Loader report directory '" + config.reportdir
+                    + "' does not exist.",e);
         } catch (Exception x) {
-            m_log.error(x.getMessage());
+            m_log.error(x);
         }
 
     }
