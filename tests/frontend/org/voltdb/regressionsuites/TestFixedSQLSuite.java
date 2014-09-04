@@ -1723,7 +1723,37 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals("ZZ", vt.getString(1));
         assertEquals("AA", vt.getString(2));
+    }
 
+    // Bug: parser drops extra predicates over certain numbers e.g. 10.
+    public void testENG6870() throws IOException, ProcCallException {
+        System.out.println("test ENG6870...");
+
+        Client client = this.getClient();
+        VoltTable vt;
+        String sql;
+
+        client.callProcedure("ENG6870.insert",
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, null, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                3, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        sql = "SELECT COUNT(*) FROM ENG6870 "
+                + "WHERE C14 = 1 AND C1 IS NOT NULL AND C2 IS NOT NULL "
+                + "AND C5  = 3 AND C7 IS NOT NULL AND C8 IS NOT NULL "
+                + "AND C0 IS NOT NULL AND C10 IS NOT NULL "
+                + "AND C11 IS NOT NULL AND C13 IS NOT NULL  "
+                + "AND C12 IS NOT NULL;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.err.println(vt);
+        validateTableOfScalarLongs(vt, new long[]{0});
     }
 
 

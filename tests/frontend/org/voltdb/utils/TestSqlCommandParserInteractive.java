@@ -33,9 +33,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.voltcore.utils.CoreUtils;
-
 import junit.framework.TestCase;
+
+import org.voltcore.utils.CoreUtils;
 
 public class TestSqlCommandParserInteractive extends TestCase {
 
@@ -44,6 +44,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
     Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
     {
         return new Callable<List<String>>() {
+                @Override
                 public List<String> call() {
                     List<String> results = null;
                     try {
@@ -75,6 +76,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
         Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
         {
             return new Callable<List<String>>() {
+                @Override
                 public List<String> call() {
                     List<String> results = null;
                     try {
@@ -404,5 +406,40 @@ public class TestSqlCommandParserInteractive extends TestCase {
         System.out.println("RESULT: " + result.get());
         assertEquals(1, result.get().size());
         assertEquals(exec, result.get().get(0));
+    }
+
+    public void testInsertIntoSelect() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        String insert = "insert into hats (foo, bar) select goat, chicken from hats";
+        cmd.submitText(insert + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(insert, result.get().get(0));
+
+        // Test double-quoted identifiers with embedded parentheses
+        // and escaped double quotes.
+        result = cmd.openQuery();
+        insert = "insert into\"hats\" (\"foo\", \"b\"\"ar\") " +
+                "( ( ( (((( (select goat, chicken from hats))))))))";
+        cmd.submitText(insert + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(insert, result.get().get(0));
+
+        // double quoted identifiers with embedded semicolons
+        // are yet not handled correctly---this test will fail
+        //
+        // result = cmd.openQuery();
+        // insert = "insert into hats (\"fo;o\", bar) " +
+        //     "( ( ( (((( (select goat, chicken from hats))))))))";
+        // cmd.submitText(insert + ";\n");
+        // cmd.waitOnResult();
+        // System.out.println("RESULT: " + result.get());
+        // assertEquals(1, result.get().size());
+        // assertEquals(insert, result.get().get(0));
     }
 }
