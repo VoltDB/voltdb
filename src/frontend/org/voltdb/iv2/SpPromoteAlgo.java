@@ -26,13 +26,13 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpPromoteAlgo implements RepairAlgo
 {
@@ -44,10 +44,11 @@ public class SpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
     private long m_maxSeenUniqueId;
+    private long m_maxSeenBinaryLogUniqueId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -119,10 +120,11 @@ public class SpPromoteAlgo implements RepairAlgo
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_maxSeenUniqueId = UniqueIdGenerator.makeZero(partitionId);
+        m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
     }
 
     @Override
-    public Future<Pair<Long, Long>> start()
+    public Future<RepairResult> start()
     {
         try {
             prepareForFaultRecovery();
@@ -179,6 +181,7 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getUniqueId() != Long.MIN_VALUE) {
                 m_maxSeenUniqueId = Math.max(m_maxSeenUniqueId, response.getUniqueId());
             }
+            m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
 
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
@@ -243,6 +246,9 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
-        m_promotionResult.set(Pair.of(m_maxSeenTxnId, m_maxSeenUniqueId));
+        m_promotionResult.set(new RepairResult(
+                m_maxSeenTxnId,
+                m_maxSeenUniqueId,
+                m_maxSeenBinaryLogUniqueId));
     }
 }

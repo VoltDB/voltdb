@@ -29,5 +29,5 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract void shutdown();
 
-    public abstract void promotePartition(int partitionId);
+    public abstract void promotePartition(int partitionId, long maxUniqueId);
 }

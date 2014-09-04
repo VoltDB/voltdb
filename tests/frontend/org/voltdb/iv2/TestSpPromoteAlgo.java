@@ -49,7 +49,6 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -346,7 +345,7 @@ public class TestSpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
-        Future<Pair<Long, Long>> result = dut.start();
+        Future<RepairAlgo.RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());

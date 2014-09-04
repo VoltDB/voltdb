@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -40,6 +39,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -133,6 +133,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
+            long binaryLogUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -150,12 +151,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
-                Long uniqueId = UniqueIdGenerator.makeZero(m_partitionId);
+                long txnid = Long.MIN_VALUE;
+                long uniqueId = UniqueIdGenerator.makeZero(m_partitionId);
                 try {
-                    Pair<Long, Long> p = repair.start().get();
-                    txnid = p.getFirst();
-                    uniqueId = p.getSecond();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    uniqueId = res.m_uniqueId;
+                    binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -187,7 +189,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             ExportManager.instance().acceptMastership(m_partitionId);
             // If we are a DR replica, inform that subsystem of its new responsibilities
             if (m_replicaDRGateway != null) {
-                m_replicaDRGateway.promotePartition(m_partitionId);
+                m_replicaDRGateway.promotePartition(m_partitionId, binaryLogUniqueId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

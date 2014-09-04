@@ -50,6 +50,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -115,7 +116,7 @@ public class TestMpPromoteAlgo
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig, uniqueId);
+            ofTotal, handle, handle, versionedHashinatorConfig, uniqueId, Long.MIN_VALUE);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -212,7 +213,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Pair<Long, Long>> result = algo.start();
+        Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         final long uid = uig.getNextUniqueId();
@@ -244,9 +245,8 @@ public class TestMpPromoteAlgo
         needsRepair.add(2L);
         needsRepair.add(3L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        Long real_result = result.get().getFirst();
-        assertEquals(txnEgo(1000L), (long)real_result);
-        assertEquals(new Long(uid), result.get().getSecond());
+        assertEquals(txnEgo(1000L), result.get().m_txnId);
+        assertEquals(uid, result.get().m_uniqueId);
 
         // check if the hashinator was updated to the newer version
         assertEquals(torv3.getFirst(), TheHashinator.getCurrentVersionedConfig().getFirst());
@@ -266,7 +266,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Pair<Long, Long>> result = algo.start();
+        Future<RepairResult> result = algo.start();
 
         long uid = uig.getNextUniqueId();
         // Master 1
@@ -315,8 +315,8 @@ public class TestMpPromoteAlgo
         needsRepair.add(3L);
         inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
-        assertEquals(txnEgo(1003L), (long)result.get().getFirst());
-        assertEquals(uid, (long)result.get().getSecond());
+        assertEquals(txnEgo(1003L), result.get().m_txnId);
+        assertEquals(uid, result.get().m_uniqueId);
     }
 
     // verify correct txnID when no MP has ever been done
@@ -333,7 +333,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Pair<Long, Long>> result = algo.start();
+        Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has only the normal ack. Never saw an MP transaction.
@@ -349,9 +349,8 @@ public class TestMpPromoteAlgo
         algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
-        Long real_result = result.get().getFirst();
-        assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)real_result);
-        assertEquals(UniqueIdGenerator.makeZero(MpInitiator.MP_INIT_PID), (long)result.get().getSecond());
+        assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), result.get().m_txnId);
+        assertEquals(UniqueIdGenerator.makeZero(MpInitiator.MP_INIT_PID), result.get().m_uniqueId);
     }
 
     // Verify that if the MPI is the only person with a complete, that we
@@ -369,7 +368,7 @@ public class TestMpPromoteAlgo
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        Future<Pair<Long, Long>> result = algo.start();
+        Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         long uid = uig.getNextUniqueId();
@@ -389,9 +388,8 @@ public class TestMpPromoteAlgo
         needsRepair.add(1L);
         needsRepair.add(2L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        Long real_result = result.get().getFirst();
-        assertEquals(txnEgo(1000L), (long)real_result);
-        assertEquals(uid, (long)result.get().getSecond());
+        assertEquals(txnEgo(1000L), result.get().m_txnId);
+        assertEquals(uid, result.get().m_uniqueId);
     }
 
     @Test
@@ -447,7 +445,7 @@ public class TestMpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox, "bleh ");
-        Future<Pair<Long, Long>> result = dut.start();
+        Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), true);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());

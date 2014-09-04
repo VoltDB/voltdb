@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -38,6 +37,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -117,12 +117,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
-                Long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
+                long txnid = Long.MIN_VALUE;
+                long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
                 try {
-                    Pair<Long, Long> p = repair.start().get();
-                    txnid = p.getFirst();
-                    uniqueId = p.getSecond();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    uniqueId = res.m_uniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;

@@ -21,8 +21,6 @@ import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
 
-import org.voltcore.utils.Pair;
-
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
 //
@@ -48,6 +46,19 @@ import org.voltcore.utils.Pair;
  */
 public interface RepairAlgo
 {
+    public static class RepairResult
+    {
+        public final long m_txnId;
+        public final long m_uniqueId;
+        public final long m_binaryLogUniqueId;
+
+        RepairResult(long txnId, long uniqueId, long binaryLogUniqueId) {
+            m_txnId = txnId;
+            m_uniqueId = uniqueId;
+            m_binaryLogUniqueId = binaryLogUniqueId;
+        }
+    }
+
     /**
      * Start a new RepairAlgo. Returns a future that is done when the
      * leadership has been fully assumed and all surviving replicas have been
@@ -55,7 +66,7 @@ public interface RepairAlgo
      *
      * The return value is the largest seen txnid and largest seen unique id
      */
-    public Future<Pair<Long, Long>> start();
+    public Future<RepairResult> start();
 
     public boolean cancel();
 
