@@ -319,6 +319,7 @@ public class Collector {
                 }
             }
         } catch (IOException e) {
+            System.out.println("IO Exception inside listCollection");
             System.err.println(e.getMessage());
         }
 
@@ -462,7 +463,11 @@ public class Collector {
                     System.out.println("Uploading is only available in the Enterprise Edition");
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
+            System.out.println("IO Exception");
+            System.err.println(e.getMessage());
+        } catch (TarMalformatException e) {
+            System.out.println("TarMalformatException");
             System.err.println(e.getMessage());
         }
     }
