@@ -221,11 +221,9 @@ public class TestCollector {
            fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
            fos.close();
         } catch (JSONException e) {
-            System.out.println("JSONException");
               System.err.print(e.getMessage());
         } catch (ParseException e) {
-            System.out.println("ParseException");
-            System.err.print(e.getMessage());
+              System.err.print(e.getMessage());
         }
     }
 
@@ -244,7 +242,7 @@ public class TestCollector {
             client.callProcedure("CrashVoltDBProc");
         }
         catch (Exception e) {
-            System.out.println("Exception in testBasicFilesandCrash");
+
         }
         client.close();
         cluster.shutDown();
@@ -312,7 +310,7 @@ public class TestCollector {
             client.callProcedure("CrashJVM");
         }
         catch (Exception e) {
-            System.out.println("Exception in testJvmCrash");
+
         }
 
         client.close();
