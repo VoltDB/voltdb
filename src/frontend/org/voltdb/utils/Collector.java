@@ -378,10 +378,10 @@ public class Collector {
             }
 
             String[] sarCmd = {"bash", "-c", "sar -A"};
-            cmd(tarGenerator, sarCmd, folderPath + "sardata");
+            cmd(tarGenerator, sarCmd, folderPath, "sardata");
 
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
-            cmd(tarGenerator, dmesgCmd, folderPath + "dmesgdata");
+            cmd(tarGenerator, dmesgCmd, folderPath, "dmesgdata");
 
             tarGenerator.write(m_config.calledFromVEM ? null : System.out);
 
@@ -470,7 +470,7 @@ public class Collector {
         }
     }
 
-    private static void cmd(TarGenerator tarGenerator, String[] command, String resFilename)
+    private static void cmd(TarGenerator tarGenerator, String[] command,String folderPathInTar, String resFilename)
             throws IOException, TarMalformatException {
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
@@ -497,7 +497,7 @@ public class Collector {
         writer.close();
 
         if (tempFile.length() > 0) {
-            tarGenerator.queueEntry(resFilename, tempFile);
+            tarGenerator.queueEntry(folderPathInTar + resFilename, tempFile);
         }
     }
 
