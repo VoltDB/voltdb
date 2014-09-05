@@ -528,11 +528,10 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6832 (invalid array index notation, for SET_FIELD). */
-    // TODO: remove all "no_" prefixes, once SET_FIELD function is re-enabled
-    public void no_testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
+    public void testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
-        testProcWithInvalidJSON("Invalid JSON path: Invalid array index [position 6]",
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index less than -1 [position 6]",
                                 client, "UpdateSetFieldProc", "arr[-2]",  "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
                                 client, "UpdateSetFieldProc", "arr[]",    "-1", 1);
@@ -540,12 +539,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "UpdateSetFieldProc", "arr[abc]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
                                 client, "UpdateSetFieldProc", "arr[",     "-1", 1);
-        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]'",
+        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
-    public void no_testSET_FIELDFunction() throws Exception {
+    public void testSET_FIELDFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -579,7 +578,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6621, part 2 (dotted path notation). */
-    public void no_testSET_FIELDFunctionWithDotNotation() throws Exception {
+    public void testSET_FIELDFunctionWithDotNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -677,7 +676,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6620, part 3 (array index notation). */
-    public void no_testSET_FIELDFunctionWithIndexNotation() throws Exception {
+    public void testSET_FIELDFunctionWithIndexNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -803,7 +802,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined). */
-    public void no_testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
+    public void testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -901,7 +900,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     // Test the SET_FIELD function with numeric, floating-point data, including
     // with dotted path and/or array index notation
-    public void no_testSET_FIELDFunctionWithNumericData() throws Exception {
+    public void testSET_FIELDFunctionWithNumericData() throws Exception {
         ClientResponse cr;
         VoltTable result;
         Client client = getClient();
@@ -1371,12 +1370,10 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
                 ";\n" +
-                // TODO: uncomment this, once the SET_FIELD function is re-enabled
-/*
                 "CREATE PROCEDURE UpdateSetFieldProc AS\n" +
                 "   UPDATE JS1 SET DOC = SET_FIELD(DOC, ?, ?) WHERE ID = ?\n" +
                 ";\n" +
-*/
+
                 // Useful for debugging:
                 "CREATE PROCEDURE GetDocFromId AS\n" +
                 "   SELECT DOC FROM JS1 WHERE ID = ?\n" +
