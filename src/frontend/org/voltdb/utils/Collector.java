@@ -465,6 +465,8 @@ public class Collector {
             }
         } catch (IOException e) {
             System.out.println("IO Exception");
+            e.printStackTrace();
+            System.out.println(e.toString());
             System.err.println(e.getMessage());
         } catch (TarMalformatException e) {
             System.out.println("TarMalformatException");
