@@ -498,7 +498,12 @@ public class Collector {
 
     private static void cmd(TarGenerator tarGenerator, String[] command, String resFilename)
             throws IOException, TarMalformatException {
+        System.out.println("resfilename :: "+resFilename);
+        System.out.println("command :: "+command);
         File tempFile = File.createTempFile(resFilename, null);
+        System.out.println("after createTempFile");
+        System.out.println(tempFile.getAbsolutePath());
+        System.out.println("beforedeleteonExit");
         tempFile.deleteOnExit();
 
         Process p = Runtime.getRuntime().exec(command);
