@@ -330,41 +330,17 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6620, part 1 (dotted path notation). */
     public void testFIELDFunctionWithDotNotation() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
         Client client = getClient();
         loadJS1(client);
 
-        cr = client.callProcedure("IdFieldProc", "inner.veggies", "good for you");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "inner.second.fruits", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "inner.second.third.meats", "yum");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "inner.second.third.dairy", "1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1}});
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.veggies", "good for you");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.second.fruits", 1);
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.second.third.meats", "yum");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "inner.second.third.dairy", "1");
 
         // Test \ escape for dot in element name, not used for sub-path
-        cr = client.callProcedure("IdFieldProc", "dot\\.char", "foo.bar");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "dot.char", "foo.bar");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{});
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "dot\\.char", "foo.bar");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "dot.char", "foo.bar");
 
         // Verify that dot notation returns nothing when used on a primitive
         // (integer, float, boolean, string), or an array
@@ -388,51 +364,19 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6620, part 2 (array index notation). */
     public void testFIELDFunctionWithIndexNotation() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
         Client client = getClient();
         loadJS1(client);
 
-        cr = client.callProcedure("IdFieldProc", "arr[0]", 0);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "arr[1]", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{2}});
-
-        cr = client.callProcedure("IdFieldProc", "arr[2]", 100);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][0]", "one");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][0]", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "arr3d[1][1][1]", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{3}});
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[0]", 0);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr[1]", 2);
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[2]", 100);
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][0]", "one");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][1][0]", 2);
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[1][1][1]", 3);
 
         // Test \ escape for brackets in element name, not used for array index
-        cr = client.callProcedure("IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "bracket]]  ] chars", "[foo]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{});
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "bracket]]  ] chars", "[foo]");
 
         // Verify that index notation returns nothing when used on a primitive
         // (integer, float, boolean, string), or an object
@@ -460,62 +404,24 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
     /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined). */
     public void testFIELDFunctionWithDotAndIndexNotation() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
         Client client = getClient();
         loadJS1(client);
 
-        cr = client.callProcedure("IdFieldProc", "inner.arr[0]", 0);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "inner.arr[1]", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{2}});
-
-        cr = client.callProcedure("IdFieldProc", "arr3d[2].veggies", "good for you");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("IdFieldProc", "arr3d[2].dairy", "3");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{3}});
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.arr[0]", 0);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "inner.arr[1]", 2);
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[2].veggies", "good for you");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[2].dairy", "3");
     }
 
     public void testFIELDFunctionWithNumericData() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
         Client client = getClient();
         loadJS1(client);
 
-        cr = client.callProcedure("NumericFieldProc", "numeric", "1.2", "1.20");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
-
-        cr = client.callProcedure("NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        validateTableOfLongs(result, new long[][]{{1},{2},{3}});
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "numeric", "1.2", "1.20");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
     }
 
     /** Used to test ENG-6832 (invalid array index notation, for FIELD). */
