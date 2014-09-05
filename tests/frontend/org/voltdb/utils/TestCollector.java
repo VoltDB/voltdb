@@ -90,6 +90,7 @@ public class TestCollector {
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
+        createLogFiles();
     }
 
     private File collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
@@ -330,7 +331,6 @@ public class TestCollector {
     @Test
     public void testDaysToCollectOption() throws Exception {
 
-        createLogFiles();
 
         File logDir = getLogDir(3);
         assertTrue(logDir.exists());
@@ -341,7 +341,6 @@ public class TestCollector {
     @Test
     public void testCollectFilesonYearBoundary() throws Exception {
 
-        createLogFiles();
 
         //set reference date to be 1st January of the current year
         Calendar cal = Calendar.getInstance();
