@@ -197,6 +197,9 @@ public class Collector {
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
         m_deploymentPath = configLogDirPath + "deployment.xml";
+        System.out.println("configInfoPath FilePath :: " + m_configInfoPath);
+        System.out.println("catalogJarPath FilePath :: " + m_catalogJarPath);
+        System.out.println("deploymentPath FilePath :: " + m_deploymentPath);
     }
 
     public static JSONObject parseJSONFile(String configInfoPath) {
@@ -228,6 +231,8 @@ public class Collector {
         try {
             m_workingDir = jsonObject.getString("workingDir");
 
+            System.out.println("WorkingDir inside collector :: " + m_workingDir);
+
             m_logPaths.clear();
             JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
             for (int i = 0; i < jsonArray.length(); i++) {
@@ -245,9 +250,11 @@ public class Collector {
         try {
             if (new File(m_deploymentPath).exists()) {
                 collectionFilesList.add(m_deploymentPath);
+                System.out.println("added deploymentPath File :: " + m_deploymentPath);
             }
             if (new File(m_catalogJarPath).exists()) {
                 collectionFilesList.add(m_catalogJarPath);
+                System.out.println("added catalogJarPath File :: " + m_catalogJarPath);
             }
 
             for (String path: m_logPaths) {
@@ -255,6 +262,7 @@ public class Collector {
                     if (file.getName().startsWith(new File(path).getName())
                             && isFileModifiedInCollectionPeriod(file)) {
                        collectionFilesList.add(file.getCanonicalPath());
+                       System.out.println("added logPaths File :: " + file.getAbsolutePath());
                     }
                 }
             }
@@ -263,10 +271,12 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
                         && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
+                    System.out.println("added voltdb_crash File :: " + file.getAbsolutePath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
                         && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
+                    System.out.println("added hs_err_pid File :: " + file.getAbsolutePath());
                 }
             }
 
@@ -274,10 +284,12 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")
                         && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
+                    System.out.println("added voltdb_crash2 File :: " + file.getAbsolutePath());
                 }
                 if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")
                         && isFileModifiedInCollectionPeriod(file)) {
                     collectionFilesList.add(file.getCanonicalPath());
+                    System.out.println("added hs_err_pid2 File :: " + file.getAbsolutePath());
                 }
             }
 
@@ -286,6 +298,7 @@ public class Collector {
                     if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
                             && isFileModifiedInCollectionPeriod(file)) {
                         collectionFilesList.add(file.getCanonicalPath());
+                        System.out.println("added java_pid File :: " + file.getAbsolutePath());
                     }
                 }
             }
@@ -300,6 +313,7 @@ public class Collector {
                             && isFileModifiedInCollectionPeriod(file)) {
                         if (file.canRead()) {
                             collectionFilesList.add(file.getCanonicalPath());
+                            System.out.println("adding syslog File :: " + file.getAbsolutePath());
                         }
                     }
                 }
@@ -332,6 +346,7 @@ public class Collector {
 
             if (copyToVEM) {
                 rootpath = m_config.voltdbroot;
+                System.out.println("rootPath inside if :: " + rootpath);
             }
             else {
                 TimestampType ts = new TimestampType(new java.util.Date());
@@ -341,12 +356,15 @@ public class Collector {
                 timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
 
                 rootpath = System.getProperty("user.dir");
+                System.out.println("rootPath inside else :: " + rootpath);
             }
 
             String collectionFilePath = rootpath + File.separator + m_config.prefix + timestamp + ".tgz";
             File collectionFile = new File(collectionFilePath);
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
             String folderPath= m_config.prefix + timestamp + File.separator;
+
+            System.out.println("collectionFilePath :: " + collectionFilePath);
 
             // Collect files with paths indicated in the list
             for (String path: paths) {
@@ -373,6 +391,7 @@ public class Collector {
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
+                    System.out.println("files added to tarGenerator :: " + file.getAbsolutePath());
                     tarGenerator.queueEntry(folderPath + entryPath, file);
                 }
             }

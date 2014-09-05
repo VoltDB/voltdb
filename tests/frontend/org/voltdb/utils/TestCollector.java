@@ -86,7 +86,7 @@ public class TestCollector {
         String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
         File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
-
+        System.out.println("voltDbRootPath :: " + voltDbRootPath);
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -108,6 +108,8 @@ public class TestCollector {
                                     });
 
         File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
+
+        System.out.println("collectionTgz path ::" + collectionTgz.getAbsolutePath());
         assertTrue(collectionTgz.exists());
 
         File collectionDecompressed = new File(voltDbRootPath, prefix);
@@ -124,6 +126,8 @@ public class TestCollector {
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
         int pid = jsonObject.getInt("pid");
 
+        System.out.println("configInfo inside getPid :: " + configInfo);
+        System.out.println("configLogDir inside getPid :: " + configLogDir);
         return pid;
     }
     private String getWorkingDir(String voltDbRootPath) throws Exception {
@@ -133,6 +137,10 @@ public class TestCollector {
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
         String workingDir = jsonObject.getString("workingDir");
 
+        System.out.println("workingDir Path :: " + workingDir);
+
+        System.out.println("configInfo inside getWorkingDir :: " + configInfo);
+        System.out.println("configLogDir inside getWorkingDir :: " + configLogDir);
         return workingDir;
     }
 
@@ -146,6 +154,9 @@ public class TestCollector {
             String path = jsonArray.getJSONObject(i).getString("path");
             logPaths.add(path);
         }
+
+        System.out.println("configInfo inside getLogPaths :: " + configInfo);
+        System.out.println("configLogDir inside getLogPaths :: " + configLogDir);
         return logPaths;
     }
 
@@ -203,6 +214,7 @@ public class TestCollector {
                object.put("path", file.getCanonicalPath());
                object.put("format", "'.'" + fileDate);
                jsonArray.put(object);
+               System.out.println("Log file created path :: " + file.getAbsolutePath());
            }
            FileOutputStream fos = new FileOutputStream(configInfoPath);
            fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
@@ -240,12 +252,16 @@ public class TestCollector {
         File heapdumpGenerated = new File("/tmp", "java_pid" + pid + ".hprof");
         heapdumpGenerated.deleteOnExit();
 
+        System.out.println("heapdumpGenerated :: " + heapdumpGenerated);
+
         PrintWriter writer = new PrintWriter(heapdumpGenerated.getPath());
         writer.println("fake heapdump file");
         writer.close();
 
 
         File collectionDecompressed = collect(voltDbRootPath, false, 50);
+
+        System.out.println("collectionDecompressed testBasicFileCrash:: " + collectionDecompressed.getAbsolutePath());
 
         String subFolderPath = "voltdb_logs"+ File.separator;
         File heapdumpFile = new File(collectionDecompressed, subFolderPath + "java_pid" + pid + ".hprof");
@@ -300,6 +316,7 @@ public class TestCollector {
         cluster.shutDown();
 
         File collectionDecompressed = collect(voltDbRootPath, true, 50);
+        System.out.println("collectionDecompressed testJvmCrash :: " + collectionDecompressed.getAbsolutePath());
 
         int pid = getpid(voltDbRootPath);
         String workingDir = getWorkingDir(voltDbRootPath);
@@ -341,6 +358,7 @@ public class TestCollector {
 
     private File getLogDir(int daysOfFilesToCollect) throws Exception {
         File collectionDecompressed = collect(voltDbRootPath, true, daysOfFilesToCollect);
+        System.out.println("collectionDecompressed inside getLogDir:: " + collectionDecompressed.getAbsolutePath());
         return new File(collectionDecompressed, "voltdb_logs"+ File.separator + "log" + File.separator);
     }
 }
