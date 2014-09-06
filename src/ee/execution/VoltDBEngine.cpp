@@ -349,7 +349,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 {
     assert(planfragmentId != 0);
 
-    Table *cleanUpTable = NULL;
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
@@ -410,10 +409,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
 
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
@@ -421,28 +416,25 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set this back to -1 for error handling
-                m_currentInputDepId = -1;
+                cleanupExecutors(execsForFrag);
+
                 return ENGINE_ERRORCODE_ERROR;
             }
         } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+            cleanupExecutors(execsForFrag);
+
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
-            // set this back to -1 for error handling
-            m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
+
+    // Clean up all the tempTable when each plan finishes and reset current InputDepId
+    cleanupExecutors(execsForFrag);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -473,6 +465,19 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
+}
+
+/**
+ * Function that clean up the temp table the executors used and reset other metadata.
+ */
+void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
+    // Clean up all the tempTable when each plan finishes
+    BOOST_FOREACH(AbstractExecutor *executor, execsForFrag->list) {
+        assert (executor);
+        executor->cleanupTempOutputTable();
+    }
+    // set this back to -1 for error handling
+    m_currentInputDepId = -1;
 }
 
 // -------------------------------------------------
